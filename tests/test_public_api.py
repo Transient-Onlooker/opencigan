@@ -204,6 +204,62 @@ class PublicApiTests(unittest.TestCase):
                 change = json.loads(body)['changes'][0]
                 self.assertEqual((change['before']['subject'], change['after']['subject']), ('Math', 'Art'))
 
+    def test_shutter_bypass_boundaries_status_admin_options(self):
+        from unittest.mock import Mock
+        from backend.shutter import Shutter
+        closed_shutter = Shutter(max_requests=1, window_seconds=60, cooldown_seconds=30)
+        closed_shutter.check()
+        closed_shutter.check()
+
+        # 1. /api/v1/status bypasses shutter
+        status, _, body = dispatch_request('GET', '/api/v1/status', '', shutter_instance=closed_shutter)
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)['status'], 'ok')
+
+        # 2. OPTIONS requests bypass shutter across endpoints
+        for path in ('/api/v1/schools', '/api/v1/timetable', '/api/v1/timetable.ics', '/api/v1/meals', '/api/v1/unknown'):
+            with self.subTest(path=path):
+                status, headers, body = dispatch_request('OPTIONS', path, '', shutter_instance=closed_shutter)
+                self.assertEqual(status, 204)
+                self.assertEqual(body, b'')
+
+        # 3. /api/v1/admin/analytics bypasses shutter (handles auth independently)
+        status, headers, body = dispatch_request(
+            'GET', '/api/v1/admin/analytics', '', shutter_instance=closed_shutter
+        )
+        self.assertEqual(status, 401)
+
+        with patch.dict('os.environ', {'OPENCIGAN_ANALYTICS_ADMIN_TOKEN': 'secret-token-123'}):
+            mock_store = Mock()
+            mock_store.summary.return_value = {'totalViews': 10}
+            with patch('backend.app._analytics_store', return_value=mock_store):
+                status, _, body = dispatch_request(
+                    'GET', '/api/v1/admin/analytics', 'days=7',
+                    request_headers={'Authorization': 'Bearer secret-token-123'},
+                    shutter_instance=closed_shutter
+                )
+                self.assertEqual(status, 200)
+                self.assertEqual(json.loads(body)['totalViews'], 10)
+
+    def test_shutter_sheds_public_endpoints_with_503(self):
+        from backend.shutter import Shutter
+        closed_shutter = Shutter(max_requests=1, window_seconds=60, cooldown_seconds=30)
+        closed_shutter.check()
+        closed_shutter.check()
+
+        for method, path in (
+            ('GET', '/api/v1/schools'),
+            ('GET', '/api/v1/timetable'),
+            ('GET', '/api/v1/meals'),
+            ('POST', '/api/v1/analytics/pageview'),
+            ('GET', '/api/v1/unknown'),
+        ):
+            with self.subTest(method=method, path=path):
+                status, headers, body = dispatch_request(method, path, '', shutter_instance=closed_shutter)
+                self.assertEqual(status, 503)
+                self.assertEqual(headers.get('Retry-After'), '30')
+                self.assertEqual(json.loads(body)['code'], 'service_overloaded')
+
 
 if __name__ == '__main__':
     unittest.main()

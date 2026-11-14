@@ -1,3 +1,5 @@
+import functools
+import ipaddress
 import hashlib
 import hmac
 import json
@@ -28,6 +30,122 @@ _rate_lock = threading.Lock()
 _rate_clients = OrderedDict()
 _analytics_lock = threading.Lock()
 _analytics_instance = None
+_MAX_FORWARDED_HEADER_LEN = 1024
+_MAX_FORWARDED_HOPS = 16
+
+
+@functools.lru_cache(maxsize=64)
+def _parse_trusted_cidr_item(item):
+    try:
+        return ipaddress.ip_network(item, strict=False)
+    except ValueError:
+        logger.warning("invalid trusted proxy CIDR: %r", item)
+        return None
+
+
+def parse_trusted_proxies(config):
+    if not config:
+        return ()
+    if isinstance(config, (list, tuple, set)):
+        items = [x.strip() if isinstance(x, str) else x for x in config]
+    elif isinstance(config, str):
+        items = [x.strip() for x in config.split(",") if x.strip()]
+    else:
+        return ()
+    networks = []
+    for item in items:
+        if isinstance(item, (ipaddress.IPv4Network, ipaddress.IPv6Network)):
+            networks.append(item)
+        elif isinstance(item, str):
+            net = _parse_trusted_cidr_item(item)
+            if net is not None:
+                networks.append(net)
+    return tuple(networks)
+
+
+def _clean_ip_str(raw):
+    if not raw or not isinstance(raw, str):
+        return None
+    val = raw.strip()
+    if val.startswith('"') and val.endswith('"'):
+        val = val[1:-1]
+    if not val:
+        return None
+    if val.startswith("["):
+        match = re.fullmatch(r'\[([0-9a-fA-F:.]+)\](?::([0-9]{1,5}))?', val)
+        if not match or (match[2] and not 1 <= int(match[2]) <= 65535):
+            return None
+        val = match[1]
+    elif val.count(":") == 1:
+        host, _, port = val.partition(":")
+        if port.isdigit():
+            if not 1 <= int(port) <= 65535:
+                return None
+            val = host
+    if '%' in val:
+        return None
+    try:
+        ip = ipaddress.ip_address(val)
+        return getattr(ip, "ipv4_mapped", None) or ip
+    except ValueError:
+        return None
+
+
+def resolve_client_ip(environ, trusted_proxies=None):
+    remote_addr = environ.get("REMOTE_ADDR")
+    if not remote_addr:
+        return remote_addr
+
+    if trusted_proxies is None:
+        env_proxies = os.environ.get("OPENCIGAN_TRUSTED_PROXIES", "")
+        trusted_networks = parse_trusted_proxies(env_proxies)
+    else:
+        trusted_networks = parse_trusted_proxies(trusted_proxies)
+
+    if not trusted_networks:
+        return remote_addr
+
+    immediate_ip = _clean_ip_str(remote_addr)
+    if immediate_ip is None:
+        return remote_addr
+
+    if not any(immediate_ip in net for net in trusted_networks):
+        return str(immediate_ip)
+
+    xff = environ.get("HTTP_X_FORWARDED_FOR")
+    fwd = environ.get("HTTP_FORWARDED")
+    if xff and fwd:
+        return str(immediate_ip)
+
+    hops = []
+    if xff:
+        if len(xff) > _MAX_FORWARDED_HEADER_LEN:
+            return str(immediate_ip)
+        hops = [h.strip() for h in xff.split(",")]
+    elif fwd:
+        if len(fwd) > _MAX_FORWARDED_HEADER_LEN:
+            return str(immediate_ip)
+        for hop in fwd.split(","):
+            values = [part.strip().split('=', 1)[1].strip() for part in hop.split(';')
+                      if re.match(r'(?i)^\s*for\s*=', part)]
+            if len(values) != 1:
+                return str(immediate_ip)
+            hops.append(values[0])
+
+    if not hops or len(hops) > _MAX_FORWARDED_HOPS:
+        return str(immediate_ip)
+
+    client_ip = immediate_ip
+    for raw_hop in reversed(hops):
+        hop_ip = _clean_ip_str(raw_hop)
+        if hop_ip is None:
+            return str(immediate_ip)
+        if any(hop_ip in net for net in trusted_networks):
+            client_ip = hop_ip
+            continue
+        return str(hop_ip)
+
+    return str(client_ip)
 
 
 def _analytics_store():
@@ -475,20 +593,21 @@ _STATUS_PHRASES = {
 }
 
 
-def make_app(cache_instance=None):
+def make_app(cache_instance=None, trusted_proxies=None):
     """Create a PEP 3333 compliant WSGI application."""
 
     def wsgi_application(environ, start_response):
         method = environ.get("REQUEST_METHOD", "GET").upper()
         path = environ.get("PATH_INFO", "") or "/"
         query_string = environ.get("QUERY_STRING", "")
+        client = resolve_client_ip(environ, trusted_proxies=trusted_proxies)
 
         status_code, headers, body = dispatch_request(
             method=method,
             path=path,
             query_string=query_string,
             cache_instance=cache_instance,
-            client=environ.get("REMOTE_ADDR"),
+            client=client,
             request_origin=environ.get("HTTP_ORIGIN"),
             request_body=_read_request_body(environ.get("wsgi.input"), environ.get("CONTENT_LENGTH")) if method == "POST" and path == "/api/v1/analytics/pageview" else None,
             request_headers={"Authorization": environ.get("HTTP_AUTHORIZATION", ""), "If-None-Match": environ.get("HTTP_IF_NONE_MATCH", "")},
