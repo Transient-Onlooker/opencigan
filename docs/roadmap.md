@@ -75,8 +75,8 @@
 - [x] 시간표 필터 API (`grade`, `class`, `teacher`, 기존 학교·주간 캐시 재사용)
 - [x] iCalendar(.ics) 구독 URL (선택한 학급, 현재/다음 주 자동 이동, 학교·주별 캐시 재사용, 로컬에서 하루 요약과 교시별 종일 일정 모드 지원; 실제 수업 시작·종료 시각 연동은 후속 과제)
 - [ ] iframe 임베드 위젯·Embed Builder
-- [ ] TypeScript/Python 클라이언트, 사용 예제
-- [ ] AI Agent Skill(`SKILL.md`), `llms.txt`
+- [x] TypeScript/Python 경량 클라이언트, 실행 예제 및 모의 HTTP 경계 회귀 (2026-11-15)
+- [x] AI Agent Skill(`agent-skill/SKILL.md`), `llms.txt` (실제 API 계약·식별자·조회 범위·개인정보 경계 안내)
 - [ ] 공개 API 버전/하위 호환성 정책, 요청량·지연·오류 모니터링
 - [ ] Tailscale Funnel과 Cloudflare Tunnel의 실제 TTFB·전체 응답 시간을 같은 OpenCigan API(`/api/v1/status`, 캐시된 시간표)로 비교 테스트하고, 한국 접속 환경에서 평균·중앙값·p95 및 거점(ICN/NRT 등)·측정 조건·결과를 `docs/` 벤치마크 보고서에 기록하여 터널 선택에 반영
 - [x] 캘린더 구독(.ics)에 ETag·조건부 요청을 지원해 변경되지 않은 일정의 중복 다운로드 감소 (SHA-256 ETag 및 If-None-Match 304 로컬 구현 완료; 공개 서버 외부 접근 및 클라이언트별 재검증 대기)
@@ -114,9 +114,9 @@
 
 ## 라이선스 및 원작자 표시 (적용 예정)
 
-- [ ] 코드 라이선스로 `AGPL-3.0-only` 채택 및 정식 `LICENSE` 추가. 저작권자는 활동명 `Transient-Onlooker`로 표시.
+- [x] 코드 라이선스로 `AGPL-3.0-only` 채택 및 정식 `LICENSE` 추가. 저작권자는 활동명 `Transient-Onlooker`로 표시.
 - [ ] AGPL-3.0 제7조(b)의 범위에서 합리적인 원작자 출처 표시 추가 조건 검토·명문화. 파생 웹서비스의 메인 랜딩 페이지 하단 등 이용자가 쉽게 확인할 수 있는 공개 위치에 원작자와 [원본 GitHub 저장소](https://github.com/Transient-Onlooker/opensigan)로 연결되는 클릭 가능한 링크를 유지하는 방안. 웹사이트가 아닌 앱은 동등한 확인 위치 고려.
-- [ ] README에 라이선스·원작자·원본 저장소 안내, 기존 저작권 및 외부 의존성 라이선스 고지 유지. 코드 라이선스와 컴시간·NEIS 원본 데이터 이용 권한 구분.
+- [x] README에 라이선스·원작자·원본 저장소 안내, 주요 의존성 고지와 코드/원본 데이터 권한 구분. [근거 및 검증 범위](licensing.md).
 
 ## 구현 순서와 검증
 

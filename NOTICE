@@ -1,0 +1,86 @@
+Opencigan
+Copyright (c) 2026 Transient-Onlooker
+
+This product includes software developed by Transient-Onlooker.
+Opencigan code is licensed under the GNU Affero General Public License
+version 3 only (AGPL-3.0-only), with the Section 7(b) term below.
+Third-party components retain their own licenses and copyright notices.
+Source repository: https://github.com/Transient-Onlooker/opensigan
+
+================================================================================
+Section 7(b) Attribution Requirement Under AGPL-3.0
+================================================================================
+
+Under Section 7(b) of the GNU Affero General Public License version 3, the
+following additional term applies to all recipients and downstream deployers:
+
+Public deployments of this covered work and modified versions, including
+interactive web services and client applications derived from it, must retain
+a reasonable and clearly visible author attribution and clickable hyperlink
+pointing to the original author (Transient-Onlooker) and the source repository
+(https://github.com/Transient-Onlooker/opensigan).
+
+- For websites and web applications: Display the attribution prominently in
+  the primary landing page footer or equivalent visible interface.
+- For non-web applications, desktop apps, or mobile apps: Display the
+  attribution in an equivalent user-accessible view (such as an About,
+  Settings, or Info screen).
+
+This requirement applies only to author attribution for the covered work.
+It does not apply to independent programs solely because they use its API.
+AGPL-3.0 Section 7 governs additional permissions and further restrictions;
+this notice does not limit any removal rights granted by that section.
+
+================================================================================
+Data Rights and External Service Boundaries
+================================================================================
+
+1. School Timetable Data (Comcigan / 컴시간)
+   The code license does not license data obtained from Comcigan or grant
+   permission to access, cache, or redistribute that data. Check the source
+   provider's applicable terms separately.
+
+2. School Meal and Nutrition Data (NEIS OpenAPI / 한국교육학술정보원)
+   The code license does not relicense NEIS school, meal, nutrition, or
+   allergen data. Check the applicable API and dataset terms separately.
+   This notice does not establish ownership or verify reuse permissions
+   for either data source.
+
+================================================================================
+Third-Party Software and Dependency Notices
+================================================================================
+
+Selected dependency notices, verified against the files identified below:
+Keep the full upstream license texts, copyright notices, and bundled-component
+notices when redistributing those components. This summary does not replace
+them and is not a complete audit of all direct or transitive dependencies.
+
+- pycomcigan
+  Copyright (c) 2023 hegelty
+  Licensed under the MIT License.
+  Verified at the backend/requirements.txt pinned commit:
+  https://github.com/hegelty/pycomcigan/blob/6fc801068e3793d17bc3523082e7afbcf05d2d92/LICENSE
+
+- Pretendard Font
+  Copyright (c) 2021 Kil Hyung-jin (https://github.com/orioncactus/pretendard)
+  with Reserved Font Name 'Pretendard'.
+  Licensed under the SIL Open Font License, Version 1.1 (OFL-1.1).
+  See frontend/PRETENDARD-LICENSE.txt for the full license text.
+
+- Svelte and Vite ecosystem
+  Svelte 5.57.3 (MIT): Copyright (c) 2016-2025 Svelte Contributors
+  See frontend/node_modules/svelte/LICENSE.md.
+  Vite 6.4.6 core (MIT): Copyright (c) 2019-present, VoidZero Inc. and Vite contributors
+  See frontend/node_modules/vite/LICENSE.md, including bundled dependency notices.
+
+- pdf-lib
+  Copyright (c) 2019 Andrew Dillon (MIT License)
+  Verified in frontend/node_modules/pdf-lib/LICENSE.md (1.17.1).
+
+- Python runtime dependencies
+  requests 2.34.2 (Apache-2.0): Copyright 2019 Kenneth Reitz
+  See .venv/Lib/site-packages/requests-2.34.2.dist-info/licenses/LICENSE and NOTICE.
+  waitress (ZPL-2.1): Zope Foundation and Contributors
+  Not installed in the inspected .venv; verified against upstream v3.0.0:
+  https://github.com/Pylons/waitress/blob/v3.0.0/LICENSE.txt
+  https://github.com/Pylons/waitress/blob/v3.0.0/COPYRIGHT.txt

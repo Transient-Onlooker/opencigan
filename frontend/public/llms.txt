@@ -1,0 +1,36 @@
+# Opensigan API
+
+> Lightweight proxy API service for Korean school timetables (Comcigan) and NEIS meal data.
+
+## Key Facts
+- Base path: `/api/v1`
+- School ID Formats (strictly separated):
+  - Comcigan: `학교코드:학교명` (e.g. `2:봄빛고등학교`) -> used for `/timetable`, `/timetable.ics`, `/timetable/history`
+  - NEIS: `시도교육청코드:학교코드` (e.g. `B10:1234567`) -> used for `/meals`
+- JSON timetable week: YYYY-MM-DD Monday date. Backend permits ONLY current week or next week in KST (Asia/Seoul).
+- Meals range: YYYY-MM-DD from/to dates, maximum 7 days inclusive.
+- Calendar feed: `/api/v1/timetable.ics` supports rolling schedules (`weeks=1` or `weeks=2`), mode (`periods` or `summary`), and HTTP 304 revalidation via ETag.
+- Timetable history: `/api/v1/timetable/history` accepts any Monday and returns observations retained for 30 days, not a complete historical timetable. Pass nextCursor back as cursor. Returns HTTP 503 code `history_disabled` when database is not configured.
+- Configure the actual HTTP(S) API base. A public frontend deployment does not guarantee API availability. NEIS search/meals require a server-side key. Never upload allergy/profile data or log secrets. Always encode query values.
+
+## Primary Endpoints
+- GET /api/v1/status: Health check and process liveness.
+- GET /api/v1/schools?q={query}: Search Comcigan schools by name (1~50 chars).
+- GET /api/v1/neis/schools?q={query}: Search NEIS schools by name (1~50 chars).
+- GET /api/v1/timetable?school={school_id}&week={monday_date}: Get timetable records for school and week.
+  - Optional query filters: `grade` (1-6), `class` (1-99), `teacher` (case-insensitive substring).
+- GET /api/v1/timetable.ics?school={school_id}&grade={grade}&class={class}: iCalendar (.ics) subscription feed.
+  - Optional parameters: `weeks` (1 or 2, default 1), `mode` (periods or summary, default periods), `teacher` (case-insensitive substring, maximum 50 characters). Events are all-day; actual bell times are unavailable.
+- GET /api/v1/meals?school={neis_id}&from={start_date}&to={end_date}: School meals up to 7 days inclusive.
+- GET /api/v1/timetable/history?school={school_id}&week={monday_date}&cursor={optional_cursor}: Changes history.
+
+## Error Responses
+- 400 Bad Request: `{"error": "...", "code": "invalid_request"}`
+- 404 Not Found: `{"error": "요청한 경로가 없습니다", "code": "not_found"}`
+- 429 Too Many Requests: Rate limit exceeded (60 req/min).
+- 503 Service Unavailable: `{"error": "...", "code": "upstream_unavailable" | "history_disabled"}`
+
+## Documentation
+- OpenAPI 3.1 specification: /openapi.yaml
+- API explorer on deployments serving it: /api-docs.html
+- Repository documentation files: docs/api-guide.md and docs/client-examples.md (not API routes).

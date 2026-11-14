@@ -29,4 +29,6 @@ Opencigan은 학교 시간표와 급식을 한곳에서 보는 웹앱입니다. 
 
 ## 라이선스
 
-현재 저장소에 코드 라이선스 파일이 없습니다. 공개 저장소라는 사실만으로 코드의 재사용·재배포 권한이 부여되지는 않습니다. 컴시간과 NEIS 데이터에는 각 출처의 이용 조건이 적용됩니다.
+Opencigan 코드는 [AGPL-3.0-only](LICENSE)로 배포합니다. Copyright (c) 2026 Transient-Onlooker. 제3자 구성요소는 각자의 라이선스와 고지를 따릅니다.
+
+이 저작물·수정본의 웹 푸터나 앱 정보 화면에는 제7조(b)에 따른 원작자·[원본 저장소](https://github.com/Transient-Onlooker/opensigan) 표시 조건이 적용됩니다. 코드 라이선스는 컴시간·NEIS 데이터 이용 허락을 부여하지 않습니다. 범위와 고지는 [라이선스 안내](docs/licensing.md) 및 [NOTICE](NOTICE)를 확인하세요.
