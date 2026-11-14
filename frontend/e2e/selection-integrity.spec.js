@@ -97,3 +97,49 @@ test('meal date errors preserve the applied date and valid input fetches the mat
   await expect(input).toHaveValue('2024-02-29');
   await expect(input).toHaveAttribute('aria-invalid', 'false');
 });
+
+test('back and forward restore the app tab and class without adding history entries', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  const classes = page.locator('.quick-class select').nth(1);
+  await expect(classes).toHaveValue('1');
+  await classes.selectOption('2');
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  await expect(page.locator('#meals-panel')).toBeVisible();
+  const length = await page.evaluate(() => history.length);
+  await page.goBack();
+  await expect(page.locator('#timetable-panel')).toBeVisible();
+  await expect(classes).toHaveValue('2');
+  await page.goBack();
+  await expect(classes).toHaveValue('1');
+  await page.goForward();
+  await expect(classes).toHaveValue('2');
+  await page.goForward();
+  await expect(page.locator('#meals-panel')).toBeVisible();
+  expect(await page.evaluate(() => history.length)).toBe(length);
+});
+
+test('favorites collapse, settings search and keyboard help remain usable at narrow widths', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
+  await page.getByRole('button', { name: '현재 학급 즐겨찾기 추가' }).click();
+  await page.getByRole('button', { name: '목록 접기' }).click();
+  await expect(page.locator('#favorite-list')).toBeHidden();
+  await expect(page.getByLabel('즐겨찾는 학급 바로 선택')).toBeVisible();
+  const help = page.getByLabel('시간표 조회 범위 도움말');
+  await help.focus();
+  await expect(help.locator('..').getByText(/원본 서비스가 제공하는/)).toBeVisible();
+  await help.press('Enter');
+  await expect(help).toHaveAttribute('aria-expanded', 'true');
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByLabel('설정 검색').fill('알레르기');
+  await expect(page.getByText('급식 알레르기 설정', { exact: true })).toBeVisible();
+  await expect(page.getByText('학교 교시 시각 설정', { exact: true })).toBeHidden();
+  for (const width of [320, 800, 1366]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  }
+  await page.getByLabel('설정 검색').fill('일치하지않는설정');
+  await expect(page.getByText('일치하는 설정이 없어요.')).toBeVisible();
+});

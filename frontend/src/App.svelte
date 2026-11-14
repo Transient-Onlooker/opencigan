@@ -1,5 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import Icon from './Icon.svelte';
+  import Help from './Help.svelte';
+  import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -15,6 +18,9 @@
   type Favorite = { school: School; grade: number; classroom: number };
   let school: School | null = null;
   let favorites: Favorite[] = [];
+  let favoritesExpanded = true;
+  let settingsQuery = '';
+  let settingsOpen = { display: false, times: false, backup: false, meals: false, allergies: false };
   let neis: NeisSchool | null = null;
   let schoolQuery = '';
   let schoolResults: School[] = [];
@@ -69,6 +75,8 @@
   let animationsEnabled = true;
   let systemDark = false;
   let analyticsReady = false;
+  let navigationReady = false;
+  let applyingNavigation = false;
   let timetable: TimetableResponse | null = null;
   let timetableFromDevice = false;
   let meals: Meal[] = [];
@@ -133,6 +141,36 @@
   $: currentFavorite = favorites.some((item) => item.school.id === school?.id && item.grade === Number(grade) && item.classroom === Number(classroom));
   $: isDark = themeIsDark(theme, systemDark);
   $: if (analyticsReady && view !== 'settings') trackPageView(view === 'meals' ? '/meals' : '/timetable');
+  $: if (navigationReady && !applyingNavigation && !classError && !pendingSharedClass) {
+    pushNavigationState({ version: 1, view, timetableView, school, grade: Number(grade), classroom: Number(classroom), week, selectedDay, mealDate }, current);
+  }
+
+  function applyNavigation(state: NavigationState | null) {
+    state = parseNavigationState(state, monday(currentKoreaDate(new Date())));
+    if (!state) return;
+    applyingNavigation = true;
+    cancelSharedSelection();
+    const previousSchool = school?.id;
+    const previousWeek = week;
+    grade = state.grade; classroom = state.classroom; classroomDraft = String(classroom); classError = false;
+    week = state.week; selectedDay = state.selectedDay; mealDate = state.mealDate; mealDateDraft = mealDate; dateError = '';
+    view = state.view; timetableView = state.timetableView;
+    if (state.school && previousSchool !== state.school.id) chooseSchool(state.school, true);
+    else if (!state.school) {
+      tableRequest?.abort(); neisRequest?.abort(); mealRequest?.abort(); historyRequest?.abort();
+      school = null; timetable = null; neis = null; meals = []; schoolEditorOpen = true;
+      tableLoading = false; mealLoading = false;
+      try { localStorage.removeItem('opensigan-school'); } catch { /* 현재 탐색을 유지합니다. */ }
+    } else {
+      if (previousWeek !== week) loadTimetable(false, true, true);
+      else ensureAvailableClass();
+      loadMeals();
+      persistClassSelection();
+    }
+    shareUrl = ''; subscriptionUrl = ''; shareState = ''; subscriptionState = '';
+    historyRequest?.abort(); historyChanges = []; historyCursor = null; historyOpen = false; historyLoading = false;
+    applyingNavigation = false;
+  }
 
   function dateText(key: string, options: Intl.DateTimeFormatOptions = { month: 'numeric', day: 'numeric' }) {
     return new Intl.DateTimeFormat('ko-KR', { ...options, timeZone: 'UTC' }).format(new Date(key + 'T00:00:00Z'));
@@ -369,7 +407,8 @@
 
   function findSchool() {
     clearTimeout(schoolTimer); schoolRequest?.abort(); schoolResults = []; schoolSearchState = '';
-    if (schoolQuery.trim().length < 2) return;
+    if (schoolQuery.trim().length < 2) { schoolSearchState = schoolQuery.length ? '학교 이름을 두 글자 이상 입력해 주세요.' : ''; return; }
+    if (schoolQuery.trim().length > 50) { schoolSearchState = '학교 이름은 최대 50자까지 검색할 수 있어요.'; return; }
     schoolSearchState = '검색 중…';
     schoolTimer = setTimeout(async () => {
       const controller = new AbortController(); schoolRequest = controller;
@@ -386,6 +425,9 @@
     sharedSchoolRequest?.abort();
     pendingSharedClass = null;
     sharedClassState = '';
+  }
+  function settingsMatch(labels: string, query: string) {
+    return !query.trim() || labels.toLocaleLowerCase('ko-KR').includes(query.trim().toLocaleLowerCase('ko-KR'));
   }
   function persistClassSelection() {
     if (!school || classError || pendingSharedClass) return;
@@ -854,7 +896,16 @@
     if (savedSchool) chooseSchool(savedSchool, true);
     sharedSchoolRequest = shared ? new AbortController() : undefined;
     if (shared && sharedSchoolRequest) void restoreSharedClass(shared, { school: savedSchool, grade: Number(grade), classroom: Number(classroom) }, sharedSchoolRequest.signal);
+    if (typeof window.history?.replaceState === 'function') {
+      const savedNavigation = !shared ? getNavigationFromHistory(current) : null;
+      if (savedNavigation) applyNavigation(savedNavigation);
+      replaceNavigationState({ version: 1, view, timetableView, school, grade: Number(grade), classroom: Number(classroom), week, selectedDay, mealDate });
+      navigationReady = true;
+    }
+    const stopNavigation = typeof window.history?.replaceState === 'function'
+      ? subscribeNavigation(current, applyNavigation) : () => {};
     return () => {
+      stopNavigation();
       sharedSchoolRequest?.abort();
       clearInterval(calendarTimer); document.removeEventListener('visibilitychange', onVisibilityChange); window.removeEventListener('focus', onFocus); themeMedia?.removeEventListener?.('change', onThemeMedia); historyRequest?.abort();
       clearTimeout(schoolTimer); schoolRequest?.abort(); neisRequest?.abort(); tableRequest?.abort(); mealRequest?.abort();
@@ -872,7 +923,7 @@
   <main>
     <section class="school-heading" aria-label="선택한 학교">
       <div><p class="eyebrow">내 학교 캘린더</p><h1>{school?.name ?? '어느 학교에 다니나요?'}</h1><p class="school-facts">{school ? school.region + ' · ' + grade + '학년 ' + classroom + '반' : '학교를 한 번 고르면 시간표와 급식을 함께 볼 수 있어요.'}</p></div>
-      {#if school}<button class="secondary-button" onclick={() => schoolEditorOpen = !schoolEditorOpen} aria-expanded={schoolEditorOpen} aria-controls="school-settings">{schoolEditorOpen ? '학교 선택 닫기' : '학교 변경'}</button>{/if}
+      {#if school}<button class="secondary-button" onclick={() => schoolEditorOpen = !schoolEditorOpen} aria-expanded={schoolEditorOpen} aria-controls="school-settings"><Icon name="school" /> {schoolEditorOpen ? '학교 선택 닫기' : '학교 변경'}</button>{/if}
     </section>
     {#if apiNotConfigured}<p class="notice" role="alert">학교 정보를 불러올 API 주소가 설정되지 않았어요.</p>{/if}
     {#if sharedClassState && !classError}<p class="notice" role="status">{sharedClassState}</p>{/if}
@@ -880,7 +931,8 @@
       <section id="school-settings" class="school-panel" aria-label="학교 및 학급 선택">
         <div class="search-field">
           <label for="school">학교 찾기</label>
-          <div class="search-wrap"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4"/></svg><input id="school" type="search" bind:value={schoolQuery} oninput={findSchool} onkeydown={(event) => { if (event.key === 'Escape') { clearTimeout(schoolTimer); schoolRequest?.abort(); schoolResults = []; schoolSearchState = ''; } }} placeholder="학교 이름 두 글자 이상" autocomplete="off" /></div>
+          <div class="search-wrap"><Icon name="search" /><input id="school" type="search" maxlength="50" aria-describedby="school-search-help" bind:value={schoolQuery} oninput={findSchool} onkeydown={(event) => { if (event.key === 'Escape') { clearTimeout(schoolTimer); schoolRequest?.abort(); schoolResults = []; schoolSearchState = ''; } }} placeholder="학교 이름 두 글자 이상" autocomplete="off" /></div>
+          <p id="school-search-help" class="quick-class-hint">2~50자 · 결과는 최대 10개예요. 컴시간에서 제공하는 학교만 찾을 수 있어요.</p>
           <span class="sr-only" aria-live="polite">{schoolSearchState || (schoolResults.length ? schoolResults.length + '개 학교 검색 결과' : '')}</span>
           {#if schoolResults.length || schoolSearchState}
             <div class="search-results">
@@ -900,39 +952,42 @@
     {#if school || favorites.length}
       {#if school && !currentFavorite && favorites.length < 10}
       <div class="favorite-toolbar">
-        <div class="favorite-save"><button class="secondary-button" disabled={classError || !!pendingSharedClass} onclick={addFavorite}>현재 학급 즐겨찾기 추가</button></div>
+        <div class="favorite-save"><button class="secondary-button" disabled={classError || !!pendingSharedClass} onclick={addFavorite}><Icon name="star" /> 현재 학급 즐겨찾기 추가</button></div>
       </div>
       {/if}
       {#if favorites.length}
         <section class="favorites-bar" aria-labelledby="favorites-title">
-          <div class="favorites-heading"><h2 id="favorites-title">즐겨찾는 학급</h2><span>선택하면 바로 전환됩니다</span></div>
-          <div class="favorite-list">
+          <div class="favorites-heading"><h2 id="favorites-title">즐겨찾는 학급 ({favorites.length})</h2><button class="text-button" aria-expanded={favoritesExpanded} aria-controls="favorite-list" onclick={() => favoritesExpanded = !favoritesExpanded}>{favoritesExpanded ? '목록 접기' : '목록 펼치기'}</button></div>
+          <label class="favorite-picker">학급 바로 선택<select aria-label="즐겨찾는 학급 바로 선택" value="" onchange={(event) => { const selected = favorites[Number(event.currentTarget.value)]; if (event.currentTarget.value && selected) switchToFavorite(selected); event.currentTarget.value = ''; }}><option value="">즐겨찾는 학급을 선택하세요</option>{#each favorites as favorite, index}<option value={String(index)}>{favorite.school.name} {favorite.grade}학년 {favorite.classroom}반</option>{/each}</select></label>
+          <div id="favorite-list" class="favorite-list" hidden={!favoritesExpanded}>
             {#each favorites as favorite (`${favorite.school.id}-${favorite.grade}-${favorite.classroom}`)}
               <div class="favorite-item">
                 <button class="favorite-switch" aria-pressed={school?.id === favorite.school.id && Number(grade) === favorite.grade && Number(classroom) === favorite.classroom} onclick={() => switchToFavorite(favorite)}>
                   <strong>{favorite.school.name}</strong><span>{favorite.grade}학년 {favorite.classroom}반</span>
                 </button>
-                <button class="favorite-remove" aria-label={`${favorite.school.name} ${favorite.grade}학년 ${favorite.classroom}반 즐겨찾기 삭제`} onclick={() => removeFavorite(favorite)}>×</button>
+                <button class="favorite-remove" aria-label={`${favorite.school.name} ${favorite.grade}학년 ${favorite.classroom}반 즐겨찾기 삭제`} onclick={() => removeFavorite(favorite)}><Icon name="close" /></button>
               </div>
             {/each}
           </div>
         </section>
       {/if}
     {/if}
+    {#if school && !favorites.length}<p class="quick-class-hint">즐겨찾는 학급이 없어요. 현재 학급을 추가하면 바로 전환할 수 있어요.</p>{/if}
     <nav class="calendar-menu" aria-label="캘린더 메뉴">
       <span class="menu-label">캘린더</span>
       <button aria-pressed={view === 'timetable'} aria-controls="timetable-panel" onclick={() => view = 'timetable'}><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16"/><path d="M7 3v4m10-4v4M3 10h18M8 14h3m2 0h3m-8 3h3m2 0h3"/></svg> 시간표</button>
       <button aria-pressed={view === 'meals'} aria-controls="meals-panel" onclick={() => view = 'meals'}><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 3v6a3 3 0 0 0 6 0V3M7 3v18M16 21V3c3 1 4 4 4 8h-4"/></svg> 급식</button>
-      <button aria-pressed={view === 'settings'} aria-controls="settings-panel" onclick={() => view = 'settings'}>설정</button>
+      <button aria-pressed={view === 'settings'} aria-controls="settings-panel" onclick={() => view = 'settings'}><Icon name="settings" /> 설정</button>
     </nav>
     <div id="calendar" class="calendar-content" tabindex="-1">
         <section id="timetable-panel" hidden={view !== 'timetable'} aria-labelledby="timetable-title">
-           <div class="section-heading"><div><p class="eyebrow">{week === current ? '이번 주' : '선택한 주'}</p><h2 id="timetable-title">시간표</h2></div><div class="heading-actions"><span class="last-fetched">{timetable ? '마지막 수집 ' + timeText(timetable.fetchedAt) : ''}</span>{#if timetable && timetableView !== 'grade'}<button class="secondary-button" disabled={!canExport || exportBusy} onclick={() => exportTimetable('PNG')}>PNG 저장</button><button class="secondary-button" disabled={!canExport || exportBusy} onclick={sharePng}>이미지 공유</button>{/if}<button class="secondary-button refresh-button" disabled={!school || tableLoading} onclick={refreshTimetable} aria-label="현재 표시 중인 주의 시간표 새로고침"><svg class:spinning={tableLoading} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.4 9a7.5 7.5 0 0 1 13.3-1.4L20 12M4 12l1.3 4.4A7.5 7.5 0 0 0 18.6 15"/></svg> {tableLoading ? '갱신 중' : '새로고침'}</button><button class="secondary-button" onclick={currentWeek}>이번 주로</button></div></div>
+           <div class="section-heading"><div><p class="eyebrow">{week === current ? '이번 주' : '선택한 주'}</p><h2 id="timetable-title">시간표</h2></div><div class="heading-actions"><span class="last-fetched">{timetable ? '마지막 수집 ' + timeText(timetable.fetchedAt) : ''}</span>{#if timetable && timetableView !== 'grade'}<button class="secondary-button" disabled={!canExport || exportBusy} onclick={() => exportTimetable('PNG')}><Icon name="save" /> PNG 저장</button><button class="secondary-button" disabled={!canExport || exportBusy} onclick={sharePng}><Icon name="share" /> 이미지 공유</button>{/if}<button class="secondary-button refresh-button" disabled={!school || tableLoading} onclick={refreshTimetable} aria-label="현재 표시 중인 주의 시간표 새로고침"><svg class:spinning={tableLoading} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.4 9a7.5 7.5 0 0 1 13.3-1.4L20 12M4 12l1.3 4.4A7.5 7.5 0 0 0 18.6 15"/></svg> {tableLoading ? '갱신 중' : '새로고침'}</button><button class="secondary-button" onclick={currentWeek}>이번 주로</button></div></div>
            {#if tableRefreshState}<p class="refresh-feedback" role="status">{tableRefreshState}{timetableCheckedAt ? ' · 마지막 확인 ' + timeText(timetableCheckedAt, true) : ''}</p>{/if}
            {#if exportState}<p class="export-feedback" role="status">{exportState}</p>{/if}
            <div class="view-switch timetable-switch" role="group" aria-label="시간표 보기"><button aria-pressed={timetableView === 'today'} onclick={() => selectTimetableView('today')}>오늘</button><button aria-pressed={timetableView === 'week'} onclick={() => selectTimetableView('week')}>이번 주</button><button aria-pressed={timetableView === 'grade'} onclick={() => selectTimetableView('grade')}>{grade}학년</button><button aria-pressed={timetableView === 'teacher'} onclick={() => selectTimetableView('teacher')}>교사</button></div>
            {#if school}<div class="quick-class" aria-label="학급 빠른 전환"><label>학년 <select bind:value={grade} onchange={saveGrade}>{#each gradeOptions as n}<option value={n}>{n}학년</option>{/each}</select></label><label>반 <select bind:value={classroom} onchange={saveClassFromSelect}>{#if !availableClasses.length}<option value={Number(classroom)}>{classroom}반</option>{/if}{#each availableClasses as n}<option value={n}>{n}반</option>{/each}</select></label>{#if !availableClasses.length}<span class="quick-class-hint">{tableLoading ? '학급 정보를 불러오는 중이에요.' : '이 학년의 학급 정보가 없어요.'}</span>{/if}</div>{/if}
            <div class="calendar-toolbar"><button class="arrow-button" onclick={() => changeWeek(-1)} disabled={week <= current} aria-label="이전 주">←</button><div class="calendar-date" aria-live="polite"><strong>{shortDate(week)} ~ {shortDate(addDays(week, weekendClasses ? 6 : 4))}</strong></div><button class="arrow-button" onclick={() => changeWeek(1)} disabled={week >= addDays(current, 7)} aria-label="다음 주">→</button></div>
+           <div class="quick-class-hint">이번 주·다음 주만 조회할 수 있어요. <Help label="시간표 조회 범위" text="원본 서비스가 제공하는 현재 주와 다음 주를 조회합니다. 과거 또는 더 먼 미래의 시간표는 제공하지 않아요." /></div>
           {#if timetable && !classError && timetableView === 'week'}<details class="lesson-search"><summary>이 반의 수업 찾기</summary><div class="lesson-search-fields"><label>과목명 또는 교사명<input type="search" bind:value={lessonQuery} placeholder="이번 주 수업 검색" maxlength="100" /></label><label>요일<select bind:value={lessonWeekday}><option value="">모든 요일</option>{#each ['일', '월', '화', '수', '목', '금', '토'] as day, index}<option value={String(index)}>{day}요일</option>{/each}</select></label></div>{#if lessonQuery.trim() || lessonWeekday}<p role="status">검색 결과 {matchingLessons.length}개</p>{#if matchingLessons.length}<div class="lesson-list">{#each matchingLessons as lesson}<article><span class="lesson-period">{dateText(lesson.date, { weekday: 'short' })} · {lesson.period}교시</span><strong style={subjectStyle(lesson.subject)}>{displaySubject(lesson.subject, displaySettings)}</strong>{#if displaySettings.showTeachers && lesson.teacher}<span>{displayTeacher(lesson.teacher, displaySettings)}</span>{/if}</article>{/each}</div>{:else}<p>이 반의 이번 주 수업 중 일치하는 결과가 없어요.</p>{/if}{/if}</details>{/if}
           {#if tableState}<div class="notice" role="alert">{timetable ? '이전 시간표를 표시하고 있어요. ' : ''}{tableState} <button class="text-button" onclick={() => loadTimetable(!!timetable)}>다시 시도</button></div>{/if}
           {#if !school}<div class="state-message"><strong>학교를 먼저 선택해 주세요</strong><p>학교와 학급을 선택하면 시간표가 표시돼요.</p></div>
@@ -999,7 +1054,7 @@
                   <tbody>{#each periods as period}<tr><th scope="row">{period}<span class="sr-only">교시</span></th>{#each dates as date}{@const lessons = slotLessons(filtered, date, period)}<td class:today-column={date === today} class:other-day={displaySettings.dimOtherDays && week === current && date !== today} class:changed={displaySettings.showChangeHighlights && lessons.some((lesson) => lesson.isChanged)}>{#each lessons as lesson}<div class="class-cell"><strong style={subjectStyle(lesson.subject)}>{displaySubject(lesson.subject, displaySettings)}</strong>{#if displaySettings.showTeachers && lesson.teacher}<span>{displayTeacher(lesson.teacher, displaySettings)}</span>{/if}{#if lesson.isChanged && displaySettings.showChangeBadges}<span class="change-label">변동</span>{/if}</div>{:else}<span class="empty-cell" aria-label="수업 없음">—</span>{/each}</td>{/each}</tr>{/each}</tbody>
               </table>
             </div>
-            <p class="table-hint">— 표시는 수집된 수업 기록이 없는 칸입니다. 휴업일인지, 원본 미제공인지, 일부 데이터가 누락됐는지는 확인되지 않습니다.</p>
+            <div class="table-hint">빈 교시 <Help label="빈 교시" text="— 표시는 수집된 수업 기록이 없는 칸입니다. 휴업일인지, 원본 미제공인지, 일부 데이터가 누락됐는지는 확인되지 않습니다." /></div>
           {:else if !tableState}<div class="state-message"><strong>선택한 학급의 시간표 데이터가 없어요.</strong><p>학교와 학년·반을 확인해 주세요. 해당 기간의 원본 데이터가 제공되지 않은 이유는 확인되지 않습니다.</p></div>{/if}
            {#if timetable}<div class="freshness" aria-live="polite">{#if timetableFromDevice}<span>오프라인 · 이 기기에 저장된 시간표</span>{:else if timetable.stale}<span>저장된 시간표 · 최신 정보가 아닐 수 있어요</span>{/if}<span>원본 갱신 {timeText(timetable.sourceUpdatedAt)}</span></div>{/if}
            {#if timetable?.records.length}<details class="dataset-details"><summary>수업 데이터 규모 · 학급 {observedClassCount}개 · 교사 이름 {teacherNames.length}개</summary><p>선택한 주에 수집된 수업 기록 기준입니다. 학교 전체 학급·교사 수가 아닐 수 있고, 교사 이름 누락이나 동명이인이 있으면 실제 인원과 다를 수 있어요.</p></details>{/if}
@@ -1056,8 +1111,10 @@
         </section>
         <section id="settings-panel" hidden={view !== 'settings'} aria-labelledby="settings-title">
           <h2 id="settings-title">설정</h2>
+          <label class="settings-search">설정 검색<input type="search" bind:value={settingsQuery} oninput={() => { if (settingsQuery.trim()) settingsOpen = { display: true, times: true, backup: true, meals: true, allergies: true }; }} maxlength="60" placeholder="예: 교시, 알레르기, 백업" /></label>
+          {#if settingsQuery.trim() && !settingsMatch('시간표 표시 테마 애니메이션 과목 색상 별칭 교사 이름 날짜 변경 변동 배지 테두리 밀도 종료 요일 학교 교시 시각 시간 시작 백업 복원 파일 저장 가져오기 내보내기 초기화 급식 보기 식사 조식 중식 석식 알레르기 번호 주의', settingsQuery)}<p role="status">일치하는 설정이 없어요.</p>{/if}
            {#if school}
-             <details class="display-settings">
+             <details class="display-settings" hidden={!settingsMatch('시간표 표시 테마 애니메이션 과목 색상 별칭 교사 이름 날짜 변경 변동 배지 테두리 밀도 종료 요일', settingsQuery)} bind:open={settingsOpen.display}>
                <summary>시간표 표시 설정</summary>
                <label class="display-toggle"><input type="checkbox" checked={useClassDisplay} disabled={classError} onchange={(event) => setClassDisplay(event.currentTarget.checked)} /> {grade}학년 {classroom}반만 따로 설정</label>
                <div class="display-settings-grid">
@@ -1119,7 +1176,7 @@
                </div>
                <p class="display-settings-hint">{useClassDisplay ? '현재 학급에만 적용돼요.' : '별도 설정이 없는 이 학교 학급에 적용돼요.'}</p>
              </details>
-             <details class="lesson-time-settings">
+             <details class="lesson-time-settings" hidden={!settingsMatch('학교 교시 시각 시간 시작 종료', settingsQuery)} bind:open={settingsOpen.times}>
                <summary>학교 교시 시각 설정</summary>
                <p class="display-settings-hint">학교에서 확인한 실제 시작·종료 시각을 입력해 주세요. 설정은 이 브라우저의 해당 학교에만 저장되며, 입력하지 않은 교시는 추측하지 않습니다.</p>
                <div class="lesson-time-grid">
@@ -1131,15 +1188,15 @@
                    </div>
                  {/each}
                </div>
-               <div class="lesson-time-actions"><button class="secondary-button" type="button" onclick={saveLessonTimes}>시각 저장</button><button class="secondary-button" type="button" onclick={clearLessonTimes}>시각 초기화</button></div>
+               <div class="lesson-time-actions"><button class="secondary-button" type="button" onclick={saveLessonTimes}><Icon name="save" /> 시각 저장</button><button class="secondary-button" type="button" onclick={clearLessonTimes}>시각 초기화</button></div>
                {#if lessonTimeState}<p class="state-inline" role="status">{lessonTimeState}</p>{/if}
              </details>
-             <details class="settings-backup">
+             <details class="settings-backup" hidden={!settingsMatch('설정 백업 복원 파일 저장 가져오기 내보내기 초기화', settingsQuery)} bind:open={settingsOpen.backup}>
                <summary>설정 백업·복원</summary>
                <p class="display-settings-hint">학교 파일에는 기본 표시 설정과 교시 시각을, 학급 파일에는 해당 학급의 표시 설정을 저장해요. 두 파일 모두 급식 알레르기 설정은 포함하지 않아요.</p>
                <div class="lesson-time-actions">
-                 <button class="secondary-button" type="button" onclick={() => downloadSettingsBackup()}>학교 설정 파일 저장</button>
-                 {#if useClassDisplay}<button class="secondary-button" type="button" disabled={classError} onclick={() => downloadSettingsBackup(true)}>학급 설정 파일 저장</button>{/if}
+                 <button class="secondary-button" type="button" onclick={() => downloadSettingsBackup()}><Icon name="save" /> 학교 설정 파일 저장</button>
+                 {#if useClassDisplay}<button class="secondary-button" type="button" disabled={classError} onclick={() => downloadSettingsBackup(true)}><Icon name="save" /> 학급 설정 파일 저장</button>{/if}
                  <label class="settings-import">설정 파일 불러오기 <input type="file" accept=".json,application/json" aria-label="Opencigan 설정 JSON 파일 불러오기" onchange={importSettingsFile} /></label>
                  <button class="secondary-button" type="button" onclick={resetDisplaySettings}>{useClassDisplay ? '이 학급에 학교 기본 설정 적용' : '학교 표시 설정 초기화'}</button>
                </div>
@@ -1147,20 +1204,20 @@
              </details>
            {/if}
           {#if !school}<p class="display-settings-hint">학교를 선택하면 시간표 설정을 바꿀 수 있어요.</p>{/if}
-             <details class="meal-preferences"><summary>급식 보기 설정</summary><div class="meal-preference-options" aria-label="표시할 식사"><span>표시할 식사</span>{#each mealTypes as type}<label><input type="checkbox" checked={enabledMealTypes.includes(type)} disabled={enabledMealTypes.length === 1 && enabledMealTypes.includes(type)} onchange={(event) => toggleMealType(type, event.currentTarget.checked)} />{type}</label>{/each}</div><label class="meal-number-toggle"><input type="checkbox" checked={showAllergenNumbers} onchange={(event) => setAllergenNumbersVisible(event.currentTarget.checked)} />메뉴의 알레르기 번호 표시</label><p>하루·주간 보기와 표시 설정은 이 브라우저에 저장돼요. 주의 알레르기 경고는 항상 표시됩니다.</p></details>
-             <details class="allergy-settings"><summary>급식 알레르기 설정 {allergySelection.length ? `(${allergySelection.length}개 선택)` : ''}</summary><div class="allergy-grid">{#each allergens as name, index}<label><input type="checkbox" checked={allergySelection.includes(index + 1)} onchange={(event) => toggleAllergy(index + 1, event.currentTarget.checked)} /><span>{index + 1}. {name}</span></label>{/each}</div><p>선택 항목은 이 브라우저에만 저장돼요. NEIS에서 알레르기가 표시되지 않았더라도 안전하다는 뜻은 아니에요.</p></details>
+             <details class="meal-preferences" hidden={!settingsMatch('급식 보기 식사 조식 중식 석식 알레르기 번호', settingsQuery)} bind:open={settingsOpen.meals}><summary>급식 보기 설정</summary><div class="meal-preference-options" aria-label="표시할 식사"><span>표시할 식사</span>{#each mealTypes as type}<label><input type="checkbox" checked={enabledMealTypes.includes(type)} disabled={enabledMealTypes.length === 1 && enabledMealTypes.includes(type)} onchange={(event) => toggleMealType(type, event.currentTarget.checked)} />{type}</label>{/each}</div><label class="meal-number-toggle"><input type="checkbox" checked={showAllergenNumbers} onchange={(event) => setAllergenNumbersVisible(event.currentTarget.checked)} />메뉴의 알레르기 번호 표시</label><p>하루·주간 보기와 표시 설정은 이 브라우저에 저장돼요. 주의 알레르기 경고는 항상 표시됩니다.</p></details>
+             <details class="allergy-settings" hidden={!settingsMatch('급식 알레르기 주의', settingsQuery)} bind:open={settingsOpen.allergies}><summary>급식 알레르기 설정 {allergySelection.length ? `(${allergySelection.length}개 선택)` : ''}</summary><div class="allergy-grid">{#each allergens as name, index}<label><input type="checkbox" checked={allergySelection.includes(index + 1)} onchange={(event) => toggleAllergy(index + 1, event.currentTarget.checked)} /><span>{index + 1}. {name}</span></label>{/each}</div><p>선택 항목은 이 브라우저에만 저장돼요. NEIS에서 알레르기가 표시되지 않았더라도 안전하다는 뜻은 아니에요.</p></details>
         </section>
     </div>
     <section class="secondary-actions" aria-label="공유" hidden={view !== 'timetable'}>
       {#if school}
-        <div class="share-tools"><button class="secondary-button" disabled={classError || !!pendingSharedClass} onclick={shareClass} aria-expanded={!!shareUrl}>{shareUrl ? '학급 링크 닫기' : '학급 링크 복사'}</button><button class="secondary-button" disabled={classError || !!pendingSharedClass || apiNotConfigured} onclick={subscribeTimetable} aria-expanded={!!subscriptionUrl}>{subscriptionUrl ? '구독 링크 닫기' : '캘린더 구독 링크'}</button>{#if canExport}<button class="secondary-button" disabled={exportBusy} onclick={() => exportTimetable('PDF')}>PDF 저장</button>{/if}<span role="status">{shareState || subscriptionState}</span></div>
+        <div class="share-tools"><button class="secondary-button" disabled={classError || !!pendingSharedClass} onclick={shareClass} aria-expanded={!!shareUrl}><Icon name="link" /> {shareUrl ? '학급 링크 닫기' : '학급 링크 복사'}</button><button class="secondary-button" disabled={classError || !!pendingSharedClass || apiNotConfigured} onclick={subscribeTimetable} aria-expanded={!!subscriptionUrl}><Icon name="link" /> {subscriptionUrl ? '구독 링크 닫기' : '캘린더 구독 링크'}</button>{#if canExport}<button class="secondary-button" disabled={exportBusy} onclick={() => exportTimetable('PDF')}><Icon name="save" /> PDF 저장</button>{/if}<span role="status">{shareState || subscriptionState}</span></div>
         {#if shareUrl}<label class="shared-link">공유 링크<input type="text" readonly value={shareUrl} onfocus={(event) => event.currentTarget.select()} /></label>{/if}
         {#if subscriptionUrl}
           <div class="lesson-search-fields">
             <label>일정 표시 방식<select value={subscriptionMode} onchange={changeSubscriptionMode}><option value="summary">하루 요약</option><option value="periods">교시별 종일 일정</option></select></label>
           </div>
           <label class="shared-link">시간표 구독 URL (이번 주·다음 주)<input type="text" readonly value={subscriptionUrl} onfocus={(event) => event.currentTarget.select()} /></label>
-          <button type="button" class="secondary-button" onclick={copySubscription}>구독 링크 복사</button>
+          <button type="button" class="secondary-button" onclick={copySubscription}><Icon name="link" /> 구독 링크 복사</button>
         {/if}
       {/if}
     </section>

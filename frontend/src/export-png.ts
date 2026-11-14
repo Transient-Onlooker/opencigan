@@ -18,6 +18,22 @@ export interface ExportOptions {
 
 type ExportLesson = { title: string; detail: string; color?: string };
 
+function sanitizeFilenamePart(value: string): string {
+  return value.normalize('NFC').replace(/[\\/:*?"<>|\x00-\x1F\x7F]/g, '').trim().replace(/\s+/g, '_');
+}
+
+export function buildExportFilename(options: ExportOptions, extension: 'png' | 'pdf' = 'png'): string {
+  const safeSchool = sanitizeFilenamePart(options.schoolName) || '학교';
+  const target = options.view === 'teacher'
+    ? sanitizeFilenamePart(options.teacherName || '선생님')
+    : `${options.grade || 1}학년${options.classroom || 1}반`;
+  const dateOrWeek = sanitizeFilenamePart(options.view === 'today' ? options.selectedDay : options.week);
+  const safeExt = extension === 'pdf' ? 'pdf' : 'png';
+  const filename = `Opencigan_${safeSchool}_${target}_${options.view}_${dateOrWeek}.${safeExt}`;
+  if (filename.length <= 120) return filename;
+  return filename.slice(0, 116).replace(/[\uD800-\uDBFF]$/, '') + '.' + extension;
+}
+
 function addDate(date: string, offset: number) {
   const value = new Date(date + 'T00:00:00Z');
   value.setUTCDate(value.getUTCDate() + offset);
@@ -55,16 +71,32 @@ export function createExportGrid(options: ExportOptions) {
   };
 }
 
-function wrappedText(ctx: CanvasRenderingContext2D, value: string, maxWidth: number) {
+export function wrappedText(ctx: CanvasRenderingContext2D, value: string, maxWidth: number): string[] {
+  if (!value) return [''];
+  const rawLines = value.split('\n');
   const lines: string[] = [];
-  let line = '';
-  for (const letter of Array.from(value)) {
-    if (line && ctx.measureText(line + letter).width > maxWidth) {
-      lines.push(line);
-      line = letter;
-    } else line += letter;
+  for (const rawLine of rawLines) {
+    const tokens = rawLine.split(/(\s+)/);
+    let current = '';
+    for (const token of tokens) {
+      if (!token) continue;
+      const candidate = current + token;
+      if (ctx.measureText(candidate).width <= maxWidth) {
+        current = candidate;
+      } else if (current && ctx.measureText(token).width <= maxWidth) {
+        lines.push(current.trimEnd());
+        current = token.trimStart();
+      } else {
+        for (const char of Array.from(token)) {
+          if (current && ctx.measureText(current + char).width > maxWidth) {
+            lines.push(current);
+            current = char;
+          } else current += char;
+        }
+      }
+    }
+    if (current) lines.push(current);
   }
-  if (line) lines.push(line);
   return lines.length ? lines : [''];
 }
 
@@ -92,11 +124,17 @@ export async function createTimetablePng(options: ExportOptions) {
   const subtitleLines = wrappedText(ctx, grid.subtitle, contentWidth);
   const headingHeight = padding + titleLines.length * 43 + subtitleLines.length * 25 + 34;
   const rowHeights = grid.rows.map((cells) => {
-    let maxHeight = 56;
+    let maxHeight = 68;
     for (const lessons of cells) {
-      let cellHeight = 20;
-      for (const lesson of lessons) {
+      if (!lessons.length) {
+        maxHeight = Math.max(maxHeight, 56);
+        continue;
+      }
+      let cellHeight = 16;
+      for (let i = 0; i < lessons.length; i++) {
+        const lesson = lessons[i];
         ctx.font = `700 20px ${font}`;
+        if (i > 0) cellHeight += 10;
         cellHeight += wrappedText(ctx, lesson.title, cellWidth - 24).length * 26;
         if (lesson.detail) {
           ctx.font = `400 16px ${font}`;
@@ -104,15 +142,18 @@ export async function createTimetablePng(options: ExportOptions) {
         }
         cellHeight += 8;
       }
-      maxHeight = Math.max(maxHeight, cellHeight + 12);
+      maxHeight = Math.max(maxHeight, cellHeight + 16);
     }
     return maxHeight;
   });
   const height = headingHeight + 52 + rowHeights.reduce((sum, row) => sum + row, 0) + padding + 28;
-  const scale = 2;
-  canvas.width = width * scale;
-  canvas.height = height * scale;
-  ctx.scale(scale, scale);
+  const maxDimension = 4096;
+  const scale = Math.min(2, maxDimension / Math.max(width, height));
+  canvas.width = Math.floor(width * scale);
+  canvas.height = Math.floor(height * scale);
+  if (scale !== 1) {
+    ctx.scale(scale, scale);
+  }
   ctx.fillStyle = colors.bg;
   ctx.fillRect(0, 0, width, height);
   ctx.textBaseline = 'top';
@@ -141,31 +182,50 @@ export async function createTimetablePng(options: ExportOptions) {
     const rowHeight = rowHeights[index];
     ctx.beginPath(); ctx.moveTo(padding, y + .5); ctx.lineTo(padding + contentWidth, y + .5); ctx.stroke();
     ctx.textAlign = 'center'; ctx.font = `700 17px ${font}`; ctx.fillStyle = colors.text;
-    ctx.fillText(String(grid.periods[index]), padding + periodWidth / 2, y + 18);
+    ctx.fillText(String(grid.periods[index]), padding + periodWidth / 2, y + Math.max(16, (rowHeight - 20) / 2));
     for (let column = 0; column < row.length; column++) {
-      const x = padding + periodWidth + column * cellWidth + 12;
-      let textY = y + 14;
-      ctx.textAlign = 'left';
-      for (const lesson of row[column]) {
-        ctx.font = `700 20px ${font}`;
-        const title = wrappedText(ctx, lesson.title, cellWidth - 24);
+      const cellLessons = row[column];
+      const cellX = padding + periodWidth + column * cellWidth;
+      const x = cellX + 12;
+      if (!cellLessons.length) {
+        ctx.textAlign = 'center';
         ctx.font = `400 16px ${font}`;
-        const detail = lesson.detail ? wrappedText(ctx, lesson.detail, cellWidth - 24) : [];
-        if (lesson.color) {
-          ctx.fillStyle = lesson.color;
-          ctx.fillRect(x - 6, textY - 4, cellWidth - 12, title.length * 26 + detail.length * 22 + 8);
-        }
-        ctx.font = `700 20px ${font}`; ctx.fillStyle = lesson.color ? subjectTextColor(lesson.color) : colors.text;
-        for (const line of title) {
-          ctx.fillText(line, x, textY); textY += 26;
-        }
-        if (detail.length) {
-          ctx.font = `400 16px ${font}`; ctx.fillStyle = lesson.color ? subjectTextColor(lesson.color) : colors.sub;
-          for (const line of detail) {
-            ctx.fillText(line, x, textY); textY += 22;
+        ctx.fillStyle = options.dark ? '#555555' : '#bbbbbb';
+        ctx.fillText('—', cellX + cellWidth / 2, y + (rowHeight - 18) / 2);
+      } else {
+        let textY = y + 12;
+        ctx.textAlign = 'left';
+        for (let i = 0; i < cellLessons.length; i++) {
+          const lesson = cellLessons[i];
+          if (i > 0) {
+            ctx.strokeStyle = options.dark ? '#333333' : '#ebebeb';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(x - 2, textY - 4.5);
+            ctx.lineTo(x + cellWidth - 22, textY - 4.5);
+            ctx.stroke();
+            textY += 6;
           }
+          ctx.font = `700 20px ${font}`;
+          const title = wrappedText(ctx, lesson.title, cellWidth - 24);
+          ctx.font = `400 16px ${font}`;
+          const detail = lesson.detail ? wrappedText(ctx, lesson.detail, cellWidth - 24) : [];
+          if (lesson.color) {
+            ctx.fillStyle = lesson.color;
+            ctx.fillRect(x - 6, textY - 4, cellWidth - 12, title.length * 26 + detail.length * 22 + 8);
+          }
+          ctx.font = `700 20px ${font}`; ctx.fillStyle = lesson.color ? subjectTextColor(lesson.color) : colors.text;
+          for (const line of title) {
+            ctx.fillText(line, x, textY); textY += 26;
+          }
+          if (detail.length) {
+            ctx.font = `400 16px ${font}`; ctx.fillStyle = lesson.color ? subjectTextColor(lesson.color) : colors.sub;
+            for (const line of detail) {
+              ctx.fillText(line, x, textY); textY += 22;
+            }
+          }
+          textY += 8;
         }
-        textY += 8;
       }
     }
     y += rowHeight;
@@ -178,7 +238,7 @@ export async function createTimetablePng(options: ExportOptions) {
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((value) => value ? resolve(value) : reject(new Error('이미지 생성에 실패했어요.')), 'image/png');
   });
-  const filename = `Opencigan_${options.schoolName.replace(/[\\/:*?"<>|]/g, '')}_${options.view}_${options.selectedDay}.png`;
+  const filename = buildExportFilename(options, 'png');
   return { blob, filename };
 }
 
@@ -209,7 +269,8 @@ export async function saveTimetablePdf(options: ExportOptions) {
   const size = image.scaleToFit(page.getWidth() - 48, page.getHeight() - 48);
   page.drawImage(image, { ...size, x: (page.getWidth() - size.width) / 2, y: page.getHeight() - size.height - 24 });
   const bytes = await pdf.save();
-  downloadFile(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), filename.replace(/\.png$/, '.pdf'));
+  const pdfFilename = buildExportFilename(options, 'pdf');
+  downloadFile(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), pdfFilename);
 }
 
 export async function shareTimetablePng(options: ExportOptions): Promise<'shared' | 'downloaded' | 'cancelled'> {

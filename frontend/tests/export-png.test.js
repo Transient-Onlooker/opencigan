@@ -15,7 +15,7 @@ runInNewContext(compiled, { exports, require: (name) => {
   if (name === './personalization') return personalization;
   throw new Error(`Unexpected dependency: ${name}`);
 } });
-const { createExportGrid } = exports;
+const { createExportGrid, buildExportFilename, wrappedText } = exports;
 
 const lessons = [
   { grade: 1, class: 2, date: '2026-11-09', period: 1, subject: '긴 과목명', teacher: '김철수' },
@@ -137,4 +137,93 @@ test('unsupported share and share failures fall back to PNG download', async () 
     assert.equal(await harness.share(), 'downloaded');
     assert.equal(harness.getDownloads(), 1);
   }
+});
+
+test('buildExportFilename creates safe sanitized filenames for class and teacher views', () => {
+  const classFilename = buildExportFilename(options);
+  assert.equal(classFilename, 'Opencigan_보인고등학교_1학년2반_week_2026-11-09.png');
+
+  const teacherFilename = buildExportFilename({
+    ...options,
+    view: 'teacher',
+    teacherName: '김철수/선생님*?',
+  });
+  assert.equal(teacherFilename, 'Opencigan_보인고등학교_김철수선생님_teacher_2026-11-09.png');
+
+  const specialCharsFilename = buildExportFilename({
+    ...options,
+    schoolName: '특수<학교>: "서울"',
+    view: 'today',
+    selectedDay: '2026-11-10',
+  });
+  assert.equal(specialCharsFilename, 'Opencigan_특수학교_서울_1학년2반_today_2026-11-10.png');
+
+  const pdfFilename = buildExportFilename(options, 'pdf');
+  assert.equal(pdfFilename, 'Opencigan_보인고등학교_1학년2반_week_2026-11-09.pdf');
+
+  const ultraLongSchool = '가'.repeat(200);
+  const cappedFilename = buildExportFilename({ ...options, schoolName: ultraLongSchool });
+  assert.ok(cappedFilename.length <= 120);
+  assert.ok(cappedFilename.startsWith('Opencigan_'));
+  assert.ok(cappedFilename.endsWith('.png'));
+});
+
+test('wrappedText preserves words when wrapping long labels and splits long tokens', () => {
+  const dummyCtx = {
+    measureText: (str) => ({ width: str.length * 10 }),
+  };
+  const wrapped = wrappedText(dummyCtx, '프로그래밍 실습 과목', 100);
+  assert.deepEqual(Array.from(wrapped), ['프로그래밍 실습', '과목']);
+
+  const longWordWrapped = wrappedText(dummyCtx, '아주긴단어과목명테스트용텍스트입니다', 80);
+  assert.equal(longWordWrapped.length, 3);
+  assert.equal(longWordWrapped[0], '아주긴단어과목명');
+});
+
+test('createTimetablePng handles empty periods and multiple lessons without throwing', async () => {
+  const multipleLessons = [
+    { grade: 1, class: 2, date: '2026-11-09', period: 1, subject: '인공지능 수학', teacher: '이순신', isChanged: false },
+    { grade: 1, class: 2, date: '2026-11-09', period: 1, subject: '심화 정보통신', teacher: '강감찬', isChanged: true },
+    { grade: 1, class: 2, date: '2026-11-09', period: 3, subject: '진로 활동', teacher: '권율', isChanged: false },
+  ];
+  const multiOptions = {
+    ...options,
+    records: multipleLessons,
+  };
+  let drawnLines = 0;
+  let filledRects = 0;
+  const filledTexts = [];
+  let renderedCanvas;
+  const mockContext = new Proxy({
+    measureText: (val) => ({ width: val.length * 10 }),
+    stroke: () => { drawnLines++; },
+    fillRect: () => { filledRects++; },
+    fillText: (text) => { filledTexts.push(text); },
+    scale: () => {},
+  }, { get: (target, key) => target[key] ?? (() => {}) });
+
+  const sandbox = {
+    exports: {},
+    require: (name) => name === './personalization' ? personalization : undefined,
+    Blob,
+    document: {
+      fonts: { ready: Promise.resolve() },
+      createElement: () => (renderedCanvas = {
+        getContext: () => mockContext,
+        toBlob: (cb) => cb(new Blob(['png'], { type: 'image/png' })),
+      }),
+    },
+  };
+  runInNewContext(compiled, sandbox);
+  const res = await sandbox.exports.createTimetablePng(multiOptions);
+  assert.ok(res.blob);
+  assert.equal(res.filename, 'Opencigan_보인고등학교_1학년2반_week_2026-11-09.png');
+  assert.ok(filledTexts.includes('—'), '빈 교시에 em-dash 플레이스홀더가 그려져야 합니다.');
+  assert.ok(filledTexts.includes('인공지능 수학'));
+  assert.ok(filledTexts.includes('심화 정보통신'));
+  await sandbox.exports.createTimetablePng({ ...multiOptions, records: [
+    { ...multipleLessons[0], subject: '가'.repeat(1000) },
+  ] });
+  assert.ok(renderedCanvas.width <= 4096 && renderedCanvas.height <= 4096, '긴 과목명도 캔버스 상한을 넘지 않는다');
+  assert.ok(drawnLines > 0 && filledRects > 0);
 });
