@@ -18,7 +18,7 @@ const neis = { id: 'B10:1234567', name: school.name, region: '고등학교', add
 async function harness() {
   const source = await readFile(new URL('../src/App.svelte', import.meta.url), 'utf8');
   const script = source.match(/<script lang="ts">([\s\S]*?)<\/script>/)[1].replace(/^\s*import .*;\s*$/gm, '');
-  const body = script + '\nreturn { chooseSchool, changeMealDate, selectMealDate, todayMeals, state: () => ({ school, neis, neisResults, meals, mealDate, hasMeals, mealLoading, mealState, dateError }) };';
+  const body = script + '\nreturn { chooseSchool, changeMealDate, selectMealDate, updateMealDateDraft, todayMeals, state: () => ({ school, neis, neisResults, meals, mealDate, mealDateDraft, hasMeals, mealLoading, mealState, dateError }) };';
   const calls = { neis: [], meals: [] };
   const pending = (list, args) => new Promise((resolve, reject) => list.push({ ...args, resolve, reject }));
   const app = runInNewContext(ts.transpile('(function(){' + body + '})()', { target: ts.ScriptTarget.ES2022 }), {
@@ -101,8 +101,47 @@ test('동명이교는 자동 선택하지 않고 후보 확인으로 남긴다',
 
 test('빈 날짜 입력은 선택 날짜와 요청을 바꾸지 않는다', async () => {
   const { app, calls } = await harness();
-  app.selectMealDate({ currentTarget: { value: '' } });
+  const input = { value: '' };
+  app.updateMealDateDraft({ currentTarget: input });
+  app.selectMealDate({ currentTarget: input });
   assert.equal(app.state().mealDate, '2026-11-13');
+  assert.equal(app.state().mealDateDraft, '2026-11-13');
+  assert.equal(input.value, '2026-11-13');
   assert.ok(app.state().dateError);
   assert.equal(calls.meals.length, 0);
+});
+
+test('급식 날짜는 실제 달력 날짜만 적용하고 잘못된 편집은 마지막 선택을 유지한다', async () => {
+  const { app, calls } = await harness();
+  for (const value of ['0005-11-13', '2026-02-29', '2026-02-31']) {
+    const input = { value };
+    app.updateMealDateDraft({ currentTarget: input });
+    assert.equal(app.state().mealDate, '2026-11-13');
+    app.selectMealDate({ currentTarget: input });
+    assert.equal(app.state().mealDate, '2026-11-13');
+    assert.equal(app.state().mealDateDraft, '2026-11-13');
+    assert.equal(input.value, '2026-11-13');
+  }
+  assert.equal(calls.meals.length, 0);
+});
+
+test('윤년의 유효한 날짜는 급식 조회 날짜로 적용한다', async () => {
+  const { app, calls } = await harness();
+  const input = { value: '2024-02-29' };
+  app.updateMealDateDraft({ currentTarget: input });
+  app.selectMealDate({ currentTarget: input });
+  assert.equal(app.state().mealDate, '2024-02-29');
+  assert.equal(app.state().mealDateDraft, '2024-02-29');
+  assert.equal(calls.meals.length, 0);
+});
+
+test('급식 날짜 화살표도 날짜 입력의 하한과 상한을 넘지 않는다', async () => {
+  const { app } = await harness();
+  for (const [value, delta] of [['1900-01-01', -1], ['9999-12-31', 1]]) {
+    app.selectMealDate({ currentTarget: { value } });
+    app.changeMealDate(delta);
+    assert.equal(app.state().mealDate, value);
+    assert.equal(app.state().mealDateDraft, value);
+    assert.ok(app.state().dateError);
+  }
 });

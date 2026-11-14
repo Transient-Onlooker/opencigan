@@ -50,6 +50,7 @@
   let subscriptionState = '';
   let grade = 1;
   let classroom = 1;
+  let classroomDraft = '1';
   let classError = false;
   let today = currentKoreaDate(new Date());
   let clockMinute = koreaClockMinutes(new Date());
@@ -57,10 +58,13 @@
   let current = monday(today);
   let week = current;
   let mealDate = today;
+  let mealDateDraft = today;
   let mealView: 'day' | 'week' = 'day';
   let enabledMealTypes = ['조식', '중식', '석식'];
   let showAllergenNumbers = true;
   let dateError = '';
+  let sharedClassState = '';
+  let pendingSharedClass: { schoolId: string; grade: number; classroom: number; fallback: { school: School | null; grade: number; classroom: number } } | null = null;
   let theme: 'light' | 'dark' | 'system' = 'light';
   let animationsEnabled = true;
   let systemDark = false;
@@ -83,6 +87,7 @@
   let mealsRefreshAt = 0;
   let schoolTimer: ReturnType<typeof setTimeout>;
   let schoolRequest: AbortController | undefined;
+  let sharedSchoolRequest: AbortController | undefined;
   let neisRequest: AbortController | undefined;
   let tableRequest: AbortController | undefined;
   let mealRequest: AbortController | undefined;
@@ -111,7 +116,7 @@
   $: teacherSuggestions = teacherNames.filter((name) => [name, displayTeacher(name, displaySettings)].some((label) => label.toLocaleLowerCase('ko-KR').includes(teacherQuery.trim().toLocaleLowerCase('ko-KR'))));
   $: selectedTeacherName = teacherNames.find((name) => name === teacherQuery.trim() || displayTeacher(name, displaySettings) === teacherQuery.trim()) ?? '';
   $: selectedTeacherRecords = selectedTeacherName ? (timetable?.records ?? []).filter((r) => r.teacher?.trim() === selectedTeacherName) : [];
-  $: canExport = !!timetable && !classError && timetableView !== 'grade' && (timetableView === 'teacher' ? selectedTeacherRecords.length > 0 : timetableView === 'today' ? dayRecords.some((item) => Number(item.grade) === Number(grade) && Number(item.class) === Number(classroom)) : filtered.length > 0);
+  $: canExport = !!timetable && !classError && !pendingSharedClass && timetableView !== 'grade' && (timetableView === 'teacher' ? selectedTeacherRecords.length > 0 : timetableView === 'today' ? dayRecords.some((item) => Number(item.grade) === Number(grade) && Number(item.class) === Number(classroom)) : filtered.length > 0);
   $: teacherPeriods = Array.from({ length: Math.max(0, ...selectedTeacherRecords.map((r) => Number(r.period))) }, (_, i) => i + 1);
   $: teacherDates = Array.from({ length: 5 }, (_, i) => addDays(week, i));
   $: availableGrades = gradesInTimetable(timetable?.records ?? [], school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6);
@@ -339,7 +344,7 @@
     try { localStorage.setItem('opensigan-favorites', JSON.stringify(favorites)); } catch { /* 브라우저 저장이 차단되어도 현재 화면은 동작합니다. */ }
   }
   function addFavorite() {
-    if (!school || classError || favorites.length >= 10 ||
+    if (!school || classError || pendingSharedClass || favorites.length >= 10 ||
         favorites.some((item) => item.school.id === school?.id && item.grade === Number(grade) && item.classroom === Number(classroom))) return;
     favorites = [...favorites, { school: { ...school }, grade: Number(grade), classroom: Number(classroom) }];
     saveFavorites();
@@ -349,10 +354,13 @@
     saveFavorites();
   }
   function switchToFavorite(favorite: Favorite) {
+    cancelSharedSelection();
     grade = favorite.grade; classroom = favorite.classroom; classError = false;
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
     if (school?.id !== favorite.school.id) chooseSchool(favorite.school, true);
     else { schoolEditorOpen = false; ensureAvailableClass(); }
+    classroomDraft = String(classroom);
+    persistClassSelection();
     try {
       localStorage.setItem('opensigan-grade', String(grade));
       localStorage.setItem('opensigan-class', String(classroom));
@@ -369,16 +377,32 @@
         const result = await searchSchools(schoolQuery.trim(), controller.signal);
         if (!controller.signal.aborted) {
           schoolResults = result.schools;
-          schoolSearchState = result.stale ? '저장된 검색 결과예요. 최신 정보가 아닐 수 있습니다.' : schoolResults.length ? '' : '검색 결과가 없어요.';
+          schoolSearchState = result.stale ? '저장된 검색 결과예요. 최신 정보가 아닐 수 있습니다.' : schoolResults.length ? '' : '검색 결과가 없어요. 컴시간에서 시간표를 제공하지 않는 학교는 검색되지 않을 수 있습니다.';
         }
       } catch (error) { if (!controller.signal.aborted) schoolSearchState = errorText(error); }
     }, 250);
   }
-  function chooseSchool(value: School, keepClass = false) {
+  function cancelSharedSelection() {
+    sharedSchoolRequest?.abort();
+    pendingSharedClass = null;
+    sharedClassState = '';
+  }
+  function persistClassSelection() {
+    if (!school || classError || pendingSharedClass) return;
+    try {
+      localStorage.setItem('opensigan-school', JSON.stringify(school));
+      localStorage.setItem('opensigan-grade', String(grade));
+      localStorage.setItem('opensigan-class', String(classroom));
+    } catch { /* 현재 선택은 저장 없이 유지합니다. */ }
+  }
+  function chooseSchool(value: School, keepClass = false, keepSharedValidation = false, persistSelection = true) {
     tableRefreshState = '';
     exportState = '';
+    if (!keepSharedValidation) cancelSharedSelection();
+    sharedClassState = '';
     if (school?.id !== value.id && !keepClass) { grade = 1; classroom = 1; classError = false; }
     if (/(?:중학교|고등학교)/.test(value.name) && grade > 3) grade = 1;
+    classroomDraft = String(classroom);
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
     schoolRequest?.abort(); clearTimeout(schoolTimer); neisRequest?.abort(); mealRequest?.abort(); historyRequest?.abort();
     school = value; schoolQuery = value.name; schoolResults = []; schoolSearchState = ''; schoolEditorOpen = false;
@@ -392,12 +416,15 @@
     historyChanges = []; historyCursor = null; historyDisabled = false; historyError = ''; historyLoading = false; historyOpen = false; historyRequestKey = '';
     neis = null; neisResults = []; neisSearchState = ''; neisLoading = false;
     meals = []; hasMeals = false; mealsStale = false; mealState = ''; mealLoading = false; mealDataKey = ''; mealRequestKey = '';
-    try {
-      localStorage.setItem('opensigan-school', JSON.stringify(value));
-      localStorage.setItem('opensigan-grade', String(grade));
-      localStorage.setItem('opensigan-class', String(classroom));
-    } catch { /* 현재 선택은 저장 없이 유지합니다. */ }
+    if (persistSelection) {
+      try {
+        localStorage.setItem('opensigan-school', JSON.stringify(value));
+        localStorage.setItem('opensigan-grade', String(grade));
+        localStorage.setItem('opensigan-class', String(classroom));
+      } catch { /* 현재 선택은 저장 없이 유지합니다. */ }
+    }
     loadTimetable(false, true, true);
+    if (school?.id !== value.id) return;
     try {
       const saved = localStorage.getItem(neisKey(value.id));
       if (saved) {
@@ -434,6 +461,43 @@
     loadMeals();
   }
   function ensureAvailableClass() {
+    if (pendingSharedClass && pendingSharedClass.schoolId === school?.id) {
+      const pending = pendingSharedClass;
+      pendingSharedClass = null;
+      const records = timetable?.records ?? [];
+      const grades = gradesInTimetable(records, school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6);
+      const classes = [...new Set(records.filter((record) => Number(record.grade) === pending.grade)
+        .map((record) => Number(record.class)).filter((value) => Number.isInteger(value) && value > 0))];
+      const hasCurrentData = !!timetable && !timetable.stale && !timetableFromDevice && records.length > 0;
+      if (!hasCurrentData || !grades.includes(pending.grade) || !classes.includes(pending.classroom)) {
+        const message = hasCurrentData
+          ? `공유 링크의 ${pending.grade}학년 ${pending.classroom}반이 선택한 주의 시간표 데이터에 없어 적용하지 않았어요.`
+          : '시간표 데이터가 없어 공유 링크의 학년·반을 확인하지 못했어요.';
+        if (pending.fallback.school) {
+          grade = pending.fallback.grade;
+          classroom = pending.fallback.classroom;
+          classError = false;
+          chooseSchool(pending.fallback.school, true);
+          sharedClassState = message + ' 이전 학교와 학급을 유지했어요.';
+        } else {
+          classError = true;
+          schoolEditorOpen = true;
+          sharedClassState = message + ' 시간표에서 확인할 수 있는 학급을 선택해 주세요.';
+        }
+        return;
+      }
+      classError = false;
+      grade = pending.grade;
+      classroom = pending.classroom;
+      classroomDraft = String(classroom);
+      sharedClassState = '';
+      try {
+        localStorage.setItem('opensigan-school', JSON.stringify(school));
+        localStorage.setItem('opensigan-grade', String(grade));
+        localStorage.setItem('opensigan-class', String(classroom));
+      } catch { /* 현재 선택은 저장 없이 유지합니다. */ }
+      return;
+    }
     const grades = gradesInTimetable(timetable?.records ?? [], school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6);
     const previousGrade = Number(grade);
     const previousClass = Number(classroom);
@@ -441,12 +505,14 @@
     const options = [...new Set((timetable?.records ?? []).filter((record) => Number(record.grade) === Number(grade))
       .map((record) => Number(record.class)).filter((value) => Number.isInteger(value) && value > 0))].sort((a, b) => a - b);
     if (options.length && !options.includes(Number(classroom))) classroom = options[0];
+    classroomDraft = String(classroom);
     if (previousGrade === Number(grade) && previousClass === Number(classroom)) return;
     classError = false;
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
     try { localStorage.setItem('opensigan-grade', String(grade)); localStorage.setItem('opensigan-class', String(classroom)); } catch { /* 현재 선택을 유지합니다. */ }
   }
   function loadTimetable(preserve = false, reuseCachedWeek = false, validateClass = false) {
+    validateClass = validateClass || !!pendingSharedClass;
     tableRequest?.abort(); if (!preserve) timetable = null; tableState = ''; tableLoading = false;
     if (!preserve) timetableFromDevice = false;
     if (!preserve) timetableCheckedAt = '';
@@ -458,6 +524,7 @@
         timetable = cached.data;
         timetableFromDevice = false;
         if (validateClass) ensureAvailableClass();
+        if (school?.id !== cached.data.schoolId || classError) return;
         timetableRefreshAt = cached.expires;
         return;
       }
@@ -471,6 +538,7 @@
         timetable = data;
         timetableFromDevice = false;
         if (validateClass) ensureAvailableClass();
+        if (controller.signal.aborted || classError) return;
         if (tableRefreshState === '갱신 중') {
           timetableCheckedAt = new Date().toISOString();
           tableRefreshState = data.stale ? '서버에 연결했어요. 저장된 시간표를 표시 중이에요.' : '새로고침 완료';
@@ -490,10 +558,11 @@
             if (saved && saved.schoolId === school?.id && saved.weekStart === week && Array.isArray(saved.records)) {
               timetable = saved;
               timetableFromDevice = true;
-              if (validateClass) ensureAvailableClass();
             }
           } catch { /* 저장된 시간표가 없으면 연결 오류를 표시합니다. */ }
         }
+        if (validateClass) ensureAvailableClass();
+        if (controller.signal.aborted) return;
         if (!timetableFromDevice || navigator.onLine !== false) tableState = errorText(error);
         if (tableRefreshState === '갱신 중') tableRefreshState = '새로고침 실패';
       })
@@ -556,7 +625,7 @@
         if (historyOpen) void loadHistory();
       }
     }
-    if (mealDate === previousToday && today !== previousToday) { mealDate = today; if (refreshData) loadMeals(); }
+    if (mealDate === previousToday && today !== previousToday) { mealDate = today; mealDateDraft = today; if (refreshData) loadMeals(); }
     if (refreshData && document.visibilityState === 'visible') {
       const now = Date.now();
       if (school && !tableLoading && now >= timetableRefreshAt) loadTimetable(true);
@@ -569,18 +638,43 @@
     tableRefreshState = ''; exportState = ''; teacherQuery = ''; week = next; selectedDay = week === current ? today : week; historyRequest?.abort(); historyRequestKey = ''; historyChanges = []; historyCursor = null; historyDisabled = false; historyError = ''; historyLoading = false; historyOpen = false; loadTimetable(false, true);
   }
   function currentWeek() { refreshCalendar(false); const preserve = week === current; const reopenHistory = historyOpen; tableRefreshState = ''; if (!preserve) teacherQuery = ''; week = current; selectedDay = today; historyRequest?.abort(); historyRequestKey = ''; historyChanges = []; historyCursor = null; historyDisabled = false; historyError = ''; historyLoading = false; loadTimetable(preserve); if (reopenHistory) void loadHistory(); }
-  function changeMealDate(delta: number) { mealDate = addDays(mealDate, delta); dateError = ''; loadMeals(); }
+  function changeMealDate(delta: number) {
+    const next = addDays(mealDate, delta);
+    if (!validMealDate(next)) { dateError = '1900년 이후의 올바른 날짜를 선택해 주세요.'; return; }
+    mealDate = next; mealDateDraft = next; dateError = ''; loadMeals();
+  }
   function selectTimetableDate(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
     const value = input.value;
     if (value && input.validity.valid && value >= week && value <= addDays(week, 6)) selectedDay = value;
     else input.value = selectedDay;
   }
-  function todayMeals() { refreshCalendar(); mealDate = today; dateError = ''; loadMeals(); }
+  function todayMeals() { refreshCalendar(); mealDate = today; mealDateDraft = today; dateError = ''; loadMeals(); }
+  function updateMealDateDraft(event: Event) {
+    mealDateDraft = (event.currentTarget as HTMLInputElement).value;
+  }
+  function validMealDate(value: string) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return false;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    if (year < 1900) return false;
+    const date = new Date(0);
+    date.setUTCHours(0, 0, 0, 0);
+    date.setUTCFullYear(year, month - 1, day);
+    return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+  }
   function selectMealDate(event: Event) {
-    const value = (event.currentTarget as HTMLInputElement).value;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(value + 'T00:00:00Z'))) { dateError = '날짜를 선택해 주세요.'; return; }
-    mealDate = value; dateError = ''; loadMeals();
+    const input = event.currentTarget as HTMLInputElement;
+    const value = input.value;
+    if (!validMealDate(value)) {
+      dateError = '1900년 이후의 올바른 날짜를 선택해 주세요.';
+      mealDateDraft = mealDate;
+      input.value = mealDate;
+      return;
+    }
+    mealDate = value; mealDateDraft = value; dateError = ''; loadMeals();
   }
   function setTheme(value: string) {
     if (value !== 'light' && value !== 'dark' && value !== 'system') return;
@@ -627,28 +721,43 @@
     finally { exportBusy = false; }
   }
   function updateClass(event: Event) {
+    cancelSharedSelection();
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
-    const value = (event.currentTarget as HTMLInputElement).valueAsNumber;
+    sharedClassState = '';
+    const input = event.currentTarget as HTMLInputElement;
+    const value = input.valueAsNumber;
+    classroomDraft = input.value;
     classError = !Number.isInteger(value) || value < 1 || value > 99 || (availableClasses.length > 0 && !availableClasses.includes(value));
-    if (!classError) classroom = value;
   }
   function saveClass(event: Event) {
     updateClass(event);
+    const input = event.currentTarget as HTMLInputElement;
+    if (!classError) classroom = input.valueAsNumber;
+    classroomDraft = String(classroom);
+    input.value = classroomDraft;
     if (!classError) { try { localStorage.setItem('opensigan-class', String(classroom)); } catch { /* 현재 선택은 저장 없이 유지합니다. */ } }
+    persistClassSelection();
   }
   function saveGrade() {
+    cancelSharedSelection();
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
+    sharedClassState = '';
     ensureAvailableClass();
     classError = false;
     try { localStorage.setItem('opensigan-grade', String(grade)); localStorage.setItem('opensigan-class', String(classroom)); } catch { /* 현재 선택은 저장 없이 유지합니다. */ }
+    persistClassSelection();
   }
   function saveClassFromSelect() {
+    cancelSharedSelection();
+    classroomDraft = String(classroom);
     classError = false;
+    sharedClassState = '';
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
     try { localStorage.setItem('opensigan-class', String(classroom)); } catch { /* 현재 선택은 저장 없이 유지합니다. */ }
+    persistClassSelection();
   }
   async function shareClass() {
-    if (!school || classError) return;
+    if (!school || classError || pendingSharedClass) return;
     if (shareUrl) { shareUrl = ''; shareState = ''; return; }
     shareState = ''; subscriptionState = '';
     subscriptionUrl = '';
@@ -662,7 +771,7 @@
   }
 
   function subscribeTimetable() {
-    if (!school || classError || apiNotConfigured) return;
+    if (!school || classError || pendingSharedClass || apiNotConfigured) return;
     if (subscriptionUrl) { subscriptionUrl = ''; subscriptionState = ''; return; }
     shareState = ''; subscriptionState = '';
     shareUrl = '';
@@ -686,8 +795,30 @@
     }
   }
 
+  async function restoreSharedClass(shared: NonNullable<ReturnType<typeof readSharedClass>>, fallback: { school: School | null; grade: number; classroom: number }, signal: AbortSignal) {
+    try {
+      const result = await searchSchools(shared.school.name, signal);
+      if (signal.aborted) return;
+      const verified = !result.stale && result.schools.find((candidate) =>
+        candidate.id === shared.school.id && candidate.name === shared.school.name && candidate.region === shared.school.region);
+      if (!verified) {
+        sharedClassState = '공유 링크의 학교를 확인하지 못해 이전 학교를 유지했어요.';
+        return;
+      }
+      if (school?.id !== fallback.school?.id) return;
+      grade = shared.grade;
+      classroom = shared.classroom;
+      classError = false;
+      pendingSharedClass = { schoolId: verified.id, grade: shared.grade, classroom: shared.classroom, fallback };
+      chooseSchool(verified, true, true, false);
+    } catch {
+      if (!signal.aborted) sharedClassState = '공유 링크의 학교를 확인하지 못해 이전 학교를 유지했어요.';
+    }
+  }
+
   onMount(() => {
     const shared = typeof window !== 'undefined' && window.location?.hash ? readSharedClass(window.location.hash) : null;
+    let savedSchool: School | null = null;
     analyticsReady = true;
     refreshCalendar();
     const calendarTimer = setInterval(refreshCalendar, 60_000);
@@ -718,10 +849,13 @@
       animationsEnabled = localStorage.getItem('opensigan-animations') !== 'off';
       const savedGrade = Number(localStorage.getItem('opensigan-grade')); if (savedGrade >= 1 && savedGrade <= 6) grade = savedGrade;
       const savedClass = Number(localStorage.getItem('opensigan-class')); if (Number.isInteger(savedClass) && savedClass >= 1 && savedClass <= 99) classroom = savedClass;
-      const saved = localStorage.getItem('opensigan-school'); if (saved && !shared) chooseSchool(JSON.parse(saved) as School, true);
+      const saved = localStorage.getItem('opensigan-school'); if (saved) savedSchool = JSON.parse(saved) as School;
     } catch { /* 저장소를 사용할 수 없으면 기본 설정으로 시작합니다. */ }
-    if (shared) { grade = shared.grade; classroom = shared.classroom; chooseSchool(shared.school, true); }
+    if (savedSchool) chooseSchool(savedSchool, true);
+    sharedSchoolRequest = shared ? new AbortController() : undefined;
+    if (shared && sharedSchoolRequest) void restoreSharedClass(shared, { school: savedSchool, grade: Number(grade), classroom: Number(classroom) }, sharedSchoolRequest.signal);
     return () => {
+      sharedSchoolRequest?.abort();
       clearInterval(calendarTimer); document.removeEventListener('visibilitychange', onVisibilityChange); window.removeEventListener('focus', onFocus); themeMedia?.removeEventListener?.('change', onThemeMedia); historyRequest?.abort();
       clearTimeout(schoolTimer); schoolRequest?.abort(); neisRequest?.abort(); tableRequest?.abort(); mealRequest?.abort();
     };
@@ -741,6 +875,7 @@
       {#if school}<button class="secondary-button" onclick={() => schoolEditorOpen = !schoolEditorOpen} aria-expanded={schoolEditorOpen} aria-controls="school-settings">{schoolEditorOpen ? '학교 선택 닫기' : '학교 변경'}</button>{/if}
     </section>
     {#if apiNotConfigured}<p class="notice" role="alert">학교 정보를 불러올 API 주소가 설정되지 않았어요.</p>{/if}
+    {#if sharedClassState && !classError}<p class="notice" role="status">{sharedClassState}</p>{/if}
     {#if schoolEditorOpen || !school}
       <section id="school-settings" class="school-panel" aria-label="학교 및 학급 선택">
         <div class="search-field">
@@ -756,15 +891,16 @@
         </div>
         <div class="selectors">
           <label for="grade">학년<select id="grade" bind:value={grade} onchange={saveGrade}>{#each gradeOptions as n}<option value={n}>{n}학년</option>{/each}</select></label>
-          <label for="classroom">반<input id="classroom" type="number" min="1" max="99" step="1" required value={classroom} oninput={updateClass} onchange={saveClass} aria-invalid={classError} aria-describedby={classError ? 'class-error' : undefined} /></label>
+          <label for="classroom">반<input id="classroom" type="number" min="1" max="99" step="1" required value={classroomDraft} oninput={updateClass} onchange={saveClass} aria-invalid={classError} aria-describedby={classError ? 'class-error' : 'class-selection'} /></label>
         </div>
-        {#if classError}<p id="class-error" class="notice" role="alert">1~99 사이의 반을 입력해 주세요. 시간표가 있는 경우 등록된 반만 선택할 수 있어요.</p>{/if}
+        <p id="class-selection" class="quick-class-hint">현재 선택: {grade}학년 {classroom}반 · 반 입력은 편집을 마치면 적용돼요.</p>
+        {#if classError}<p id="class-error" class="notice" role="alert">{sharedClassState || '1~99 사이의 반을 입력해 주세요. 시간표가 있는 경우 등록된 반만 선택할 수 있어요.'}</p>{/if}
       </section>
     {/if}
     {#if school || favorites.length}
       {#if school && !currentFavorite && favorites.length < 10}
       <div class="favorite-toolbar">
-        <div class="favorite-save"><button class="secondary-button" disabled={classError} onclick={addFavorite}>현재 학급 즐겨찾기 추가</button></div>
+        <div class="favorite-save"><button class="secondary-button" disabled={classError || !!pendingSharedClass} onclick={addFavorite}>현재 학급 즐겨찾기 추가</button></div>
       </div>
       {/if}
       {#if favorites.length}
@@ -801,7 +937,7 @@
           {#if tableState}<div class="notice" role="alert">{timetable ? '이전 시간표를 표시하고 있어요. ' : ''}{tableState} <button class="text-button" onclick={() => loadTimetable(!!timetable)}>다시 시도</button></div>{/if}
           {#if !school}<div class="state-message"><strong>학교를 먼저 선택해 주세요</strong><p>학교와 학급을 선택하면 시간표가 표시돼요.</p></div>
           {:else if tableLoading && !timetable}<div class="state-message" role="status"><strong>시간표를 불러오고 있어요.</strong></div>
-          {:else if classError}<div class="state-message">반을 1부터 99까지의 정수로 입력해 주세요.</div>
+          {:else if classError}<div class="state-message">{sharedClassState || '현재 선택은 유지했어요. 시간표에 등록된 반을 선택하거나 반 입력을 확인해 주세요.'}</div>
           {:else if timetable && timetableView === 'today'}
             <div class="day-picker"><label for="today-date">날짜</label><input id="today-date" type="date" min={week} max={addDays(week, 6)} value={selectedDay} onchange={selectTimetableDate} /><span>{selectedDay === today ? '오늘' : dateText(selectedDay, { weekday: 'long' })}</span></div>
             {#if selectedClassLessons.length}
@@ -863,8 +999,8 @@
                   <tbody>{#each periods as period}<tr><th scope="row">{period}<span class="sr-only">교시</span></th>{#each dates as date}{@const lessons = slotLessons(filtered, date, period)}<td class:today-column={date === today} class:other-day={displaySettings.dimOtherDays && week === current && date !== today} class:changed={displaySettings.showChangeHighlights && lessons.some((lesson) => lesson.isChanged)}>{#each lessons as lesson}<div class="class-cell"><strong style={subjectStyle(lesson.subject)}>{displaySubject(lesson.subject, displaySettings)}</strong>{#if displaySettings.showTeachers && lesson.teacher}<span>{displayTeacher(lesson.teacher, displaySettings)}</span>{/if}{#if lesson.isChanged && displaySettings.showChangeBadges}<span class="change-label">변동</span>{/if}</div>{:else}<span class="empty-cell" aria-label="수업 없음">—</span>{/each}</td>{/each}</tr>{/each}</tbody>
               </table>
             </div>
-              {#if displaySettings.showChangeBadges}<p class="table-hint">‘변동’ 표시는 수업 정보 변경을 뜻해요.</p>{/if}
-          {:else if !tableState}<div class="state-message"><strong>등록된 시간표가 없어요.</strong><p>학교와 학년·반을 확인해 주세요.</p></div>{/if}
+            <p class="table-hint">— 표시는 수집된 수업 기록이 없는 칸입니다. 휴업일인지, 원본 미제공인지, 일부 데이터가 누락됐는지는 확인되지 않습니다.</p>
+          {:else if !tableState}<div class="state-message"><strong>선택한 학급의 시간표 데이터가 없어요.</strong><p>학교와 학년·반을 확인해 주세요. 해당 기간의 원본 데이터가 제공되지 않은 이유는 확인되지 않습니다.</p></div>{/if}
            {#if timetable}<div class="freshness" aria-live="polite">{#if timetableFromDevice}<span>오프라인 · 이 기기에 저장된 시간표</span>{:else if timetable.stale}<span>저장된 시간표 · 최신 정보가 아닐 수 있어요</span>{/if}<span>원본 갱신 {timeText(timetable.sourceUpdatedAt)}</span></div>{/if}
            {#if timetable?.records.length}<details class="dataset-details"><summary>수업 데이터 규모 · 학급 {observedClassCount}개 · 교사 이름 {teacherNames.length}개</summary><p>선택한 주에 수집된 수업 기록 기준입니다. 학교 전체 학급·교사 수가 아닐 수 있고, 교사 이름 누락이나 동명이인이 있으면 실제 인원과 다를 수 있어요.</p></details>{/if}
           {#if timetable}
@@ -901,8 +1037,8 @@
         <section id="meals-panel" hidden={view !== 'meals'} aria-labelledby="meals-title">
           <div class="section-heading"><div><p class="eyebrow">{mealDate === today ? '오늘의 식단' : '하루 식단'}</p><h2 id="meals-title">학교 급식</h2></div><button class="secondary-button" onclick={todayMeals}>오늘로</button></div>
           <div class="view-switch" role="group" aria-label="급식 보기"><button aria-pressed={mealView === 'day'} onclick={() => setMealView('day')}>하루 식단</button><button aria-pressed={mealView === 'week'} onclick={() => setMealView('week')}>주간 식단</button></div>
-          <div class="calendar-toolbar"><button class="arrow-button" onclick={() => changeMealDate(mealView === 'week' ? -7 : -1)} aria-label={mealView === 'week' ? '이전 급식 주' : '이전 날짜'}>←</button><div class="calendar-date"><strong aria-live="polite">{mealView === 'week' ? dateText(mealDates[0]) + ' — ' + dateText(mealDates[6]) : dateText(mealDate, { month: 'long', day: 'numeric', weekday: 'long' })}</strong><label class="date-picker">날짜 선택 <input type="date" value={mealDate} onchange={selectMealDate} aria-invalid={!!dateError} /></label></div><button class="arrow-button" onclick={() => changeMealDate(mealView === 'week' ? 7 : 1)} aria-label={mealView === 'week' ? '다음 급식 주' : '다음 날짜'}>→</button></div>
-          {#if dateError}<p class="notice" role="alert">{dateError}</p>{/if}
+          <div class="calendar-toolbar"><button class="arrow-button" onclick={() => changeMealDate(mealView === 'week' ? -7 : -1)} aria-label={mealView === 'week' ? '이전 급식 주' : '이전 날짜'}>←</button><div class="calendar-date"><strong aria-live="polite">{mealView === 'week' ? dateText(mealDates[0]) + ' — ' + dateText(mealDates[6]) : dateText(mealDate, { month: 'long', day: 'numeric', weekday: 'long' })}</strong><label class="date-picker">날짜 선택 <input type="date" min="1900-01-01" max="9999-12-31" value={mealDateDraft} oninput={updateMealDateDraft} onchange={selectMealDate} aria-invalid={!!dateError} aria-describedby={dateError ? 'meal-date-error' : undefined} /></label></div><button class="arrow-button" onclick={() => changeMealDate(mealView === 'week' ? 7 : 1)} aria-label={mealView === 'week' ? '다음 급식 주' : '다음 날짜'}>→</button></div>
+          {#if dateError}<p id="meal-date-error" class="notice" role="alert">{dateError}</p>{/if}
            <div class="meal-connection" aria-live="polite">{!neis && school ? neisSearchState : ''}</div>
           {#if !school}<div class="state-message"><strong>학교를 먼저 선택해 주세요</strong><p>시간표 학교를 선택하면 급식도 함께 연결돼요.</p></div>
           {:else if neisLoading}<div class="state-message" role="status">같은 학교의 급식을 연결하고 있어요.</div>
@@ -1017,7 +1153,7 @@
     </div>
     <section class="secondary-actions" aria-label="공유" hidden={view !== 'timetable'}>
       {#if school}
-        <div class="share-tools"><button class="secondary-button" disabled={classError} onclick={shareClass} aria-expanded={!!shareUrl}>{shareUrl ? '학급 링크 닫기' : '학급 링크 복사'}</button><button class="secondary-button" disabled={classError || apiNotConfigured} onclick={subscribeTimetable} aria-expanded={!!subscriptionUrl}>{subscriptionUrl ? '구독 링크 닫기' : '캘린더 구독 링크'}</button>{#if canExport}<button class="secondary-button" disabled={exportBusy} onclick={() => exportTimetable('PDF')}>PDF 저장</button>{/if}<span role="status">{shareState || subscriptionState}</span></div>
+        <div class="share-tools"><button class="secondary-button" disabled={classError || !!pendingSharedClass} onclick={shareClass} aria-expanded={!!shareUrl}>{shareUrl ? '학급 링크 닫기' : '학급 링크 복사'}</button><button class="secondary-button" disabled={classError || !!pendingSharedClass || apiNotConfigured} onclick={subscribeTimetable} aria-expanded={!!subscriptionUrl}>{subscriptionUrl ? '구독 링크 닫기' : '캘린더 구독 링크'}</button>{#if canExport}<button class="secondary-button" disabled={exportBusy} onclick={() => exportTimetable('PDF')}>PDF 저장</button>{/if}<span role="status">{shareState || subscriptionState}</span></div>
         {#if shareUrl}<label class="shared-link">공유 링크<input type="text" readonly value={shareUrl} onfocus={(event) => event.currentTarget.select()} /></label>{/if}
         {#if subscriptionUrl}
           <div class="lesson-search-fields">

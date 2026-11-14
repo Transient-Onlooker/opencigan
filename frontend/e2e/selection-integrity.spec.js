@@ -1,0 +1,99 @@
+import { expect, test } from '@playwright/test';
+
+test.use({ serviceWorkers: 'block' });
+const school = { id: '2:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
+const week = '2026-11-09';
+const sharedHash = (room = 7) => '#' + new URLSearchParams({ school: school.id, name: school.name, region: school.region, grade: '1', class: String(room) });
+const timetable = {
+  schoolId: school.id, weekStart: week, fetchedAt: '2026-11-09T01:00:00Z', sourceUpdatedAt: null, stale: false,
+  records: [1, 2].map((room) => ({ grade: 1, class: room, date: week, period: 1, subject: `과목${room}`, teacher: null, isChanged: false })),
+};
+
+async function mockApi(page, delayedSearch) {
+  await page.clock.setFixedTime(new Date('2026-11-09T02:00:00Z'));
+  await page.route('**/api/v1/**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/v1/schools') {
+      if (delayedSearch) await delayedSearch;
+      return route.fulfill({ json: { schools: [school], stale: false } });
+    }
+    if (url.pathname === '/api/v1/timetable') return route.fulfill({ json: timetable });
+    if (url.pathname === '/api/v1/neis/schools') return route.fulfill({ json: { schools: [{ id: 'B10:1234567', name: school.name, region: '서울', address: '서울특별시' }], stale: false } });
+    if (url.pathname === '/api/v1/meals') return route.fulfill({ json: { meals: [{ date: url.searchParams.get('from'), type: '중식', dishes: ['식단 ' + url.searchParams.get('from')] }], stale: false } });
+    return route.fulfill({ json: { schools: [], changes: [], stale: false } });
+  });
+}
+
+test('invalid shared classroom exposes an error and can be corrected without saving the forged class', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash());
+  const input = page.getByRole('spinbutton', { name: '반', exact: true });
+  await expect(input).toBeVisible();
+  await expect(input).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('#class-error')).toContainText('1학년 7반');
+  expect(await page.evaluate(() => localStorage.getItem('opensigan-school'))).toBeNull();
+  await input.fill('2');
+  await input.press('Tab');
+  await expect(input).toHaveValue('2');
+  await expect(input).toHaveAttribute('aria-invalid', 'false');
+  await expect(page.locator('#timetable-panel').getByRole('table')).toContainText('과목2');
+  expect(await page.evaluate(() => localStorage.getItem('opensigan-class'))).toBe('2');
+});
+
+test('manual class selection wins over a delayed shared school check in the same school', async ({ page }) => {
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  await mockApi(page, pending);
+  await page.addInitScript((value) => {
+    localStorage.setItem('opensigan-school', JSON.stringify(value));
+    localStorage.setItem('opensigan-grade', '1');
+    localStorage.setItem('opensigan-class', '1');
+  }, school);
+  await page.goto('/' + sharedHash(1));
+  const classes = page.locator('.quick-class select').nth(1);
+  await expect(classes).toHaveValue('1');
+  await classes.selectOption('2');
+  release();
+  await page.getByRole('button', { name: '학교 변경', exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: '반', exact: true })).toHaveValue('2');
+  await expect(page.locator('#timetable-panel').getByRole('table')).toContainText('과목2');
+  expect(await page.evaluate(() => localStorage.getItem('opensigan-class'))).toBe('2');
+});
+
+test('invalid manual class edits restore the applied selection on blur', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
+  await page.getByRole('button', { name: '학교 변경', exact: true }).click();
+  const input = page.getByRole('spinbutton', { name: '반', exact: true });
+  await input.fill('99');
+  await expect(input).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('#class-selection')).toContainText('현재 선택: 1학년 1반');
+  await input.press('Tab');
+  await expect(input).toHaveValue('1');
+  expect(await page.evaluate(() => localStorage.getItem('opensigan-class'))).toBe('1');
+  await input.fill('2');
+  await input.press('Tab');
+  await expect(page.locator('#class-error')).toHaveCount(0);
+  await expect(page.locator('#timetable-panel').getByRole('table')).toContainText('과목2');
+});
+
+test('meal date errors preserve the applied date and valid input fetches the matching week', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  const input = page.getByLabel('날짜 선택');
+  await expect(input).toHaveValue(week);
+  await input.fill('0005-11-13');
+  await input.press('Tab');
+  await expect(input).toHaveValue(week);
+  await expect(input).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('#meal-date-error')).toBeVisible();
+  const requested = page.waitForRequest((request) => request.url().includes('/api/v1/meals?') && new URL(request.url()).searchParams.get('from') === '2024-02-26');
+  await input.fill('2024-02-29');
+  await input.press('Tab');
+  await requested;
+  await expect(input).toHaveValue('2024-02-29');
+  await expect(input).toHaveAttribute('aria-invalid', 'false');
+});
