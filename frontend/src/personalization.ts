@@ -17,6 +17,30 @@ export interface DisplaySettings {
   showTeachers: boolean;
 }
 
+export function createClassDisplayPreferences(storage: () => Storage) {
+  const drafts = new Map<string, DisplaySettings | null>();
+  return {
+    read(key: string, fallback: DisplaySettings) {
+      let saved = drafts.get(key);
+      if (saved === undefined) {
+        try {
+          const raw = storage().getItem(key);
+          saved = raw ? parseDisplaySettings(JSON.parse(raw)) : null;
+        } catch { saved = null; }
+      }
+      return { enabled: saved !== null, settings: saved ?? fallback };
+    },
+    set(key: string, settings: DisplaySettings | null) {
+      drafts.set(key, settings);
+      try {
+        if (settings) storage().setItem(key, JSON.stringify(settings));
+        else storage().removeItem(key);
+      } catch { /* Keep changes in memory when storage is unavailable. */ }
+    },
+    remember(key: string, settings: DisplaySettings) { drafts.set(key, settings); },
+  };
+}
+
 export function defaultDisplaySettings(): DisplaySettings {
   return { colorMode: 'none', endedLessonMode: 'dim', dimOtherDays: false, showDates: true, showChangeHighlights: true, showChangeBadges: true, showCellBorders: true, density: 'normal', subjectColors: {}, subjectAliases: {}, teacherAliases: {}, teacherPrefix: '', teacherSuffix: '', showTeachers: true };
 }
