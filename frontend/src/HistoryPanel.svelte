@@ -43,3 +43,11 @@
                 {:else if !historyLoading}<p class="state-inline">이 주에 수집된 변경 기록이 없어요.</p>{/if}
               </div>
             </section>
+
+<style>
+.history-section{margin-top:24px;border:1px solid var(--line);padding:16px}.history-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}.history-heading h3{font-size:17px}.history-heading p{margin:4px 0 0;color:var(--muted);font-size:14px}.history-list{list-style:none;margin:14px 0 0;padding:0;border-top:1px solid var(--line)}.history-list li{padding:12px 0;border-bottom:1px solid var(--line)}.history-list li>div{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.history-list li>div span{font-size:12px;color:var(--muted)}.history-list li p{margin:6px 0 0;overflow-wrap:anywhere}.history-more{margin-top:12px}
+.history-filters label{flex:0 1 13rem}
+.history-list li p{display:flex;flex-wrap:wrap;gap:4px 16px}
+.history-list li p>span{min-width:0}
+@media(max-width:700px){.history-section{padding:12px}.history-heading{align-items:flex-start}.history-heading .secondary-button{flex:none;padding-inline:9px}}
+</style>
