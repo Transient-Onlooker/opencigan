@@ -2,6 +2,18 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 
 const dist = new URL('../dist/', import.meta.url);
+const docsUrl = new URL('api-docs.html', dist);
+const docsHtml = await readFile(docsUrl, 'utf8');
+const configuredApi = (process.env.VITE_API_BASE_URL || '').trim();
+let apiOrigin = '';
+if (configuredApi) {
+  const parsed = new URL(configuredApi);
+  if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash) {
+    throw new Error('VITE_API_BASE_URL must be an HTTP(S) origin');
+  }
+  apiOrigin = parsed.origin;
+}
+await writeFile(docsUrl, docsHtml.replace('content="__API_ORIGIN__"', `content="${apiOrigin.replaceAll('&', '&amp;').replaceAll('"', '&quot;')}"`));
 const html = await readFile(new URL('index.html', dist), 'utf8');
 const assets = [...new Set([...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((match) => match[1]))];
 const template = await readFile(new URL('./offline-shell.js', import.meta.url), 'utf8');
