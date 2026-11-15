@@ -1,4 +1,4 @@
-import type { School } from './api';
+import type { School, TimetableRecord, TimetableResponse } from './api';
 
 /** A shared link may select only a fresh search result with matching identity. */
 export function verifiedSharedSchool(shared: School, results: School[], stale: boolean): School | undefined {
@@ -24,4 +24,11 @@ export function saveGradeAndClass(storage: Pick<Storage, 'setItem'>, grade: numb
 export function saveClassToStorage(storage: Pick<Storage, 'setItem'>, classroom: number): void {
   try { storage.setItem('opensigan-class', String(classroom)); }
   catch { /* Keep the current in-memory selection if storage is unavailable. */ }
+}
+
+export function validateSharedClass(timetable: TimetableResponse | null, fromDevice: boolean, maxGrade: number, grade: number, classroom: number): 'valid' | 'missing' | 'unavailable' {
+  const records: TimetableRecord[] = timetable?.records ?? [];
+  if (!timetable || timetable.stale || fromDevice || !records.length) return 'unavailable';
+  if (grade < 1 || grade > maxGrade || !records.some((record) => Number(record.grade) === grade && Number(record.class) === classroom)) return 'missing';
+  return 'valid';
 }

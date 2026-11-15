@@ -28,3 +28,14 @@ test('selection persistence tolerates blocked storage and stops subsequent write
   assert.deepEqual(attempted, ['opensigan-grade']);
   assert.doesNotThrow(() => exports.saveClassToStorage(storage, 2));
 });
+
+test('shared classroom requires fresh matching data and valid school grade', () => {
+  const data = { stale: false, records: [{ grade: 1, class: '3' }, { grade: 4, class: 3 }] };
+  assert.equal(exports.validateSharedClass(data, false, 3, 1, 3), 'valid');
+  assert.equal(exports.validateSharedClass(data, false, 3, 4, 3), 'missing');
+  assert.equal(exports.validateSharedClass(data, false, 6, 1, 4), 'missing');
+  assert.equal(exports.validateSharedClass({ ...data, stale: true }, false, 3, 1, 3), 'unavailable');
+  assert.equal(exports.validateSharedClass(data, true, 3, 1, 3), 'unavailable');
+  assert.equal(exports.validateSharedClass({ ...data, records: [] }, false, 3, 1, 3), 'unavailable');
+  assert.equal(exports.validateSharedClass(null, false, 3, 1, 3), 'unavailable');
+});
