@@ -317,6 +317,28 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /api/v1/timetable/history.rss:
+    get:
+      tags: [History]
+      summary: Subscribe to observed classroom changes as RSS
+      description: Most recent 50 observed changes for one classroom. Defaults to the current KST week; the feed does not refresh the source timetable and may miss unobserved changes. History must be enabled.
+      parameters:
+        - { name: school, in: query, required: true, schema: { type: string, pattern: '^[0-9]+:[^:]{1,50}$' } }
+        - { name: grade, in: query, required: true, schema: { type: integer, minimum: 1, maximum: 6 } }
+        - { name: class, in: query, required: true, schema: { type: integer, minimum: 1, maximum: 99 } }
+        - { name: week, in: query, schema: { type: string, format: date }, description: Optional Monday; defaults to the current KST week. }
+        - { name: If-None-Match, in: header, schema: { type: string } }
+      responses:
+        '200':
+          description: RSS 2.0 feed in UTF-8.
+          headers: { ETag: { schema: { type: string } } }
+          content: { application/rss+xml: { schema: { type: string } } }
+        '304':
+          description: Feed unchanged; no response body.
+          headers: { ETag: { schema: { type: string } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { description: History disabled or storage temporarily unavailable. }
   /api/v1/timetable/history:
     get:
       tags: [History]

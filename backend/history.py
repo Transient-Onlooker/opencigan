@@ -149,7 +149,7 @@ class HistoryStore:
                 db.execute("ROLLBACK")
                 raise
 
-    def list(self, school, week, cursor=None, limit=50):
+    def list(self, school, week, cursor=None, limit=50, grade=None, classroom=None, include_ids=False):
         if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
             raise ValueError("limit must be a positive integer")
         if cursor is None:
@@ -175,8 +175,10 @@ class HistoryStore:
             db.execute("COMMIT")
             rows = db.execute("""SELECT id, observed_at, grade, class_number, date,
                     period, type, before_json, after_json FROM changes
-                    WHERE school=? AND week=? AND observed_at>=? AND id<? ORDER BY id DESC LIMIT ?""",
-                (school, week, cutoff, before_id, limit + 1)).fetchall()
+                    WHERE school=? AND week=? AND observed_at>=? AND id<?
+                    AND (? IS NULL OR grade=?) AND (? IS NULL OR class_number=?)
+                    ORDER BY id DESC LIMIT ?""",
+                (school, week, cutoff, before_id, grade, grade, classroom, classroom, limit + 1)).fetchall()
         more = len(rows) > limit
         rows = rows[:limit]
         changes = [{"observedAt": r["observed_at"], "grade": r["grade"],
@@ -185,5 +187,8 @@ class HistoryStore:
                     "before": json.loads(r["before_json"]) if r["before_json"] else None,
                     "after": json.loads(r["after_json"]) if r["after_json"] else None}
                    for r in rows]
+        if include_ids:
+            for change, row in zip(changes, rows):
+                change["_id"] = row["id"]
         next_cursor = str(rows[-1]["id"]) if more and rows else None
         return {"changes": changes, "nextCursor": next_cursor}

@@ -97,6 +97,14 @@ class OpenApiContractTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assert_json_response(path, status, headers, body)
 
+        path = "/api/v1/timetable/history.rss"
+        store.list.return_value = {"changes": [], "nextCursor": None}
+        with patch("backend.app._history_store", return_value=store):
+            status, headers, body = dispatch_request("GET", path, urlencode({"school": "2:예시학교", "grade": 2, "class": 3}), self.cache)
+        self.assertEqual(status, 200)
+        self.assertTrue(headers["Content-Type"].startswith("application/rss+xml"))
+        Draft202012Validator(self.response_schema(path, status, "application/rss+xml")).validate(body.decode("utf-8"))
+
     def test_calendar_modes_and_conditional_response_match_contract(self):
         path = "/api/v1/timetable.ics"
         week = self.start.isoformat()

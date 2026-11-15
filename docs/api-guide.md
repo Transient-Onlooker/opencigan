@@ -15,7 +15,7 @@
 - 기본 경로: `/api/v1`
 - 이 문서에 나오는 조회 API는 `GET`, `HEAD`, `OPTIONS`를 지원합니다.
 - 개발용 API 주소: `http://127.0.0.1:8000` (API를 실행하는 **같은 기기**에서만 접근)
-- HTTP 응답: JSON (UTF-8), 시간표 구독만 `text/calendar` (UTF-8). 구독 피드는 비공유 캐시에서 재검증할 수 있으며, 나머지는 `Cache-Control: no-store`를 사용합니다.
+- HTTP 응답: JSON (UTF-8), 시간표 구독은 `text/calendar`, 변경 이력 피드는 `application/rss+xml`입니다. 두 구독 피드는 비공유 캐시에서 재검증할 수 있으며, 나머지는 `Cache-Control: no-store`를 사용합니다.
 - 브라우저에서 다른 출처로 호출하려면 서버의 `ALLOWED_ORIGIN`과 배포 경로를 함께 맞춰야 합니다.
 
 `/api-docs.html`에서 API 주소를 설정하고 필터와 캘린더 구독을 시험할 수 있습니다. 다른 출처의 API는 서버에서 해당 문서의 출처를 CORS로 허용해야 합니다.
@@ -35,6 +35,7 @@
 | GET | `/api/v1/timetable.ics` | `school`, `grade`, `class` | 지속해서 사용하는 iCalendar 구독 URL, 기본 이번 주·`weeks=2`면 다음 주까지 |
 | GET | `/api/v1/meals` | `school`, `from`, `to` | NEIS 학교 ID와 최대 7일(양 끝 포함) |
 | GET | `/api/v1/timetable/history` | `school`, `week` | 선택적 `cursor`. 변경 이력 미설정 시 503 |
+| GET | `/api/v1/timetable/history.rss` | `school`, `grade`, `class` | 학급별 관측 변경 RSS. 이력 미설정 시 503 |
 
 ### 학교 ID는 출처별로 다릅니다
 
@@ -99,6 +100,8 @@ curl --get 'http://127.0.0.1:8000/api/v1/timetable.ics' \
 - `isChanged`: 컴시간이 표시한 수업 변경 여부. 변경 이력 엔드포인트의 before/after와 구분됩니다.
 
 이력 API는 `OPENCIGAN_HISTORY_DB`로 명시적으로 활성화된 경우에만 동작합니다. 최초 관측은 기준 데이터만 만들고, 이후 관측한 차이를 `added`/`deleted`/`changed`로 제공합니다. 응답의 `nextCursor`가 있다면 그대로 `cursor`에 넘깁니다. 관측 이력 보존 기간은 최대 30일입니다.
+
+RSS는 `/api/v1/timetable/history.rss?school=1234%3A예시학교&grade=2&class=3` 형식으로 구독합니다. 기본적으로 한국 시간 기준 현재 주의 최근 50건이며, `week=YYYY-MM-DD`로 특정 월요일을 지정할 수 있습니다. 피드 조회는 원본 시간표를 갱신하지 않습니다. 다른 시간표 조회에서 새로 관측된 변경만 표시하므로 모든 변경이나 실시간 알림을 보장하지 않습니다. `ETag`와 `If-None-Match`로 변경 없는 응답을 재검증할 수 있습니다. 원본 데이터의 보존·재제공 조건을 확인하기 전에는 이력 기능을 운영 환경에서 활성화하지 마세요.
 
 ## 오류 및 호출 정책
 

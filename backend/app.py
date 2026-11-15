@@ -21,6 +21,7 @@ from backend.cache import Cache
 from backend.analytics import ApiRecorder
 from backend.access_logs import AccessLogRecorder, AccessLogStore, classify_origin
 from backend.ical import render_timetable_ics
+from backend.history_feed import render_history_feed
 from backend.shutter import Shutter
 from backend.neis import NEISClient, School
 from backend.timetable import fetch_timetable, search_schools, validate_timetable_week
@@ -319,12 +320,12 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
         headers["Vary"] = "Origin"
     if origin and (request_origin is None or request_origin in [item.strip() for item in origin.split(",")]):
         headers["Access-Control-Allow-Origin"] = request_origin or origin.split(",")[0].strip()
-        headers["Access-Control-Expose-Headers"] = "Retry-After, ETag" if path == "/api/v1/timetable.ics" else "Retry-After"
+        headers["Access-Control-Expose-Headers"] = "Retry-After, ETag" if path in ("/api/v1/timetable.ics", "/api/v1/timetable/history.rss") else "Retry-After"
 
     if method == "OPTIONS":
         headers["Access-Control-Allow-Methods"] = "GET, HEAD, POST, OPTIONS"
         headers["Access-Control-Allow-Headers"] = (
-            "Content-Type, Authorization, If-None-Match" if path == "/api/v1/timetable.ics"
+            "Content-Type, Authorization, If-None-Match" if path in ("/api/v1/timetable.ics", "/api/v1/timetable/history.rss")
             else "Content-Type, Authorization"
         )
         headers["Content-Length"] = "0"
@@ -513,11 +514,15 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
                 return 304, headers, b""
             headers["Content-Length"] = str(len(body))
             return 200, headers, body
-        elif path == "/api/v1/timetable/history":
+        elif path in ("/api/v1/timetable/history", "/api/v1/timetable/history.rss"):
             school = _query_param(query, "school", 100)
             if not re.fullmatch(r"[0-9]+:[^:]{1,50}", school):
                 raise ValueError("학교 식별자가 올바르지 않습니다")
-            week = _query_param(query, "week", 10)
+            if path.endswith(".rss") and "week" not in query:
+                now = datetime.now(timezone(timedelta(hours=9))).date()
+                week = (now - timedelta(days=now.weekday())).isoformat()
+            else:
+                week = _query_param(query, "week", 10)
             parsed_week = date.fromisoformat(week)
             if parsed_week.isoformat() != week or parsed_week.weekday() != 0:
                 raise ValueError("주 시작일이 올바르지 않습니다")
@@ -527,6 +532,20 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
                 body = json.dumps({"error": "변경 이력 저장이 활성화되지 않았습니다", "code": "history_disabled"}, ensure_ascii=False).encode("utf-8")
                 headers["Content-Length"] = str(len(body))
                 return 503, headers, body
+            if path.endswith(".rss"):
+                grade_filter, class_filter, teacher_filter = _timetable_filters(query, require_class=True)
+                if teacher_filter is not None or cursor is not None:
+                    raise ValueError("피드에는 교사 필터와 커서를 사용할 수 없습니다")
+                changes = store.list(school, week, grade=grade_filter, classroom=class_filter, include_ids=True)["changes"]
+                body = render_history_feed(school, grade_filter, class_filter, changes)
+                etag = '"' + hashlib.sha256(body).hexdigest() + '"'
+                headers.update({"Content-Type": "application/rss+xml; charset=utf-8", "ETag": etag,
+                                "Cache-Control": "private, max-age=0, must-revalidate"})
+                validators = (request_headers or {}).get("If-None-Match", "").strip()
+                if validators == "*" or etag in (tag.strip().removeprefix("W/") for tag in validators.split(",")):
+                    return 304, headers, b""
+                headers["Content-Length"] = str(len(body))
+                return 200, headers, body
             result = store.list(school, week, cursor=cursor)
         elif path == "/api/v1/neis/schools":
             name = _query_param(query, "q", 50)
@@ -614,7 +633,7 @@ def dispatch_request(method, path, query_string, cache_instance=None, client=Non
     received_at = datetime.now(timezone(timedelta(hours=9)))
     started = time.perf_counter()
     response = _dispatch_request(method, path, query_string, cache_instance, client, request_origin, request_body, request_headers, shutter_instance)
-    if method in ("GET", "HEAD") and path in ("/api/v1/schools", "/api/v1/neis/schools", "/api/v1/timetable", "/api/v1/timetable.ics", "/api/v1/timetable/history", "/api/v1/meals") and os.environ.get("OPENCIGAN_ANALYTICS_DB"):
+    if method in ("GET", "HEAD") and path in ("/api/v1/schools", "/api/v1/neis/schools", "/api/v1/timetable", "/api/v1/timetable.ics", "/api/v1/timetable/history", "/api/v1/timetable/history.rss", "/api/v1/meals") and os.environ.get("OPENCIGAN_ANALYTICS_DB"):
         metadata = {}
         if (path == "/api/v1/timetable" or response[0] >= 500) and response[1].get("Content-Type", "").startswith("application/json"):
             try:
@@ -630,7 +649,7 @@ def dispatch_request(method, path, query_string, cache_instance=None, client=Non
         fields = {}
         try:
             query = parse_qs(query_string, max_num_fields=30)
-            for key in ('school', 'grade', 'class', 'week', 'from', 'to') if path in ('/api/v1/timetable', '/api/v1/timetable.ics', '/api/v1/timetable/history', '/api/v1/meals') else ():
+            for key in ('school', 'grade', 'class', 'week', 'from', 'to') if path in ('/api/v1/timetable', '/api/v1/timetable.ics', '/api/v1/timetable/history', '/api/v1/timetable/history.rss', '/api/v1/meals') else ():
                 items = query.get(key, [])
                 if len(items) == 1 and len(items[0]) <= 100:
                     value = items[0]
@@ -653,7 +672,7 @@ def dispatch_request(method, path, query_string, cache_instance=None, client=Non
             cache_status = json.loads(response[2]).get('cacheStatus')
         _access_log_recorder.submit({
             'client_ip': client or '', 'method': method,
-            'route': path if path in ('/api/v1/status', '/api/v1/schools', '/api/v1/neis/schools', '/api/v1/timetable', '/api/v1/timetable.ics', '/api/v1/timetable/history', '/api/v1/meals', '/api/v1/analytics/pageview') else '/unknown',
+            'route': path if path in ('/api/v1/status', '/api/v1/schools', '/api/v1/neis/schools', '/api/v1/timetable', '/api/v1/timetable.ics', '/api/v1/timetable/history', '/api/v1/timetable/history.rss', '/api/v1/meals', '/api/v1/analytics/pageview') else '/unknown',
             'school_id': fields.get('school'), 'grade': fields.get('grade'), 'class_nm': fields.get('class'),
             'week': fields.get('week'), 'dates': fields.get('from', '') + ('~' + fields['to'] if fields.get('to') else ''),
             'datatype': 'meals' if path == '/api/v1/meals' else 'timetable' if path.startswith('/api/v1/timetable') else 'other',
