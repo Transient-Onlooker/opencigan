@@ -13,7 +13,7 @@
   import { allergens } from './allergens';
   import { saveTimetablePdf, saveTimetablePng, shareTimetablePng, type ExportOptions } from './export-png';
   import { slotLessons } from './timetable-slots';
-  import { createTimetableCache } from './timetable-cache';
+  import { createTimetableSession } from './timetable-cache';
   import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, type LessonTimes } from './lesson-times';
   import { defaultDisplaySettings, parseDisplaySettings, displaySubject, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
   import { createSettingsBackup, parseSettingsBackup, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
@@ -99,14 +99,13 @@
   let mealRequestKey = '';
   const mealTypes = ['조식', '중식', '석식'];
   const refreshInterval = 30 * 60 * 1000;
-  const timetableWeeks = createTimetableCache();
+  const timetableSession = createTimetableSession();
   let timetableRefreshAt = 0;
   let mealsRefreshAt = 0;
   let schoolTimer: ReturnType<typeof setTimeout>;
   let schoolRequest: AbortController | undefined;
   let sharedSchoolRequest: AbortController | undefined;
   let neisRequest: AbortController | undefined;
-  let tableRequest: AbortController | undefined;
   let mealRequest: AbortController | undefined;
   let historyOpen = false;
   let historyLoading = false;
@@ -167,7 +166,7 @@
     view = state.view; timetableView = state.timetableView;
     if (state.school && previousSchool !== state.school.id) chooseSchool(state.school, true);
     else if (!state.school) {
-      tableRequest?.abort(); neisRequest?.abort(); mealRequest?.abort(); historyRequest?.abort();
+      timetableSession.cancel(); neisRequest?.abort(); mealRequest?.abort(); historyRequest?.abort();
       school = null; timetable = null; neis = null; meals = []; schoolEditorOpen = true;
       tableLoading = false; mealLoading = false;
       try { localStorage.removeItem('opensigan-school'); } catch { /* 현재 탐색을 유지합니다. */ }
@@ -543,7 +542,7 @@
   }
   function loadTimetable(preserve = false, reuseCachedWeek = false, validateClass = false) {
     validateClass = validateClass || !!pendingSharedClass;
-    tableRequest?.abort(); if (!preserve) timetable = null; tableState = ''; tableLoading = false;
+    timetableSession.cancel(); if (!preserve) timetable = null; tableState = ''; tableLoading = false;
     if (!preserve) {
       timetableFromDevice = false;
       timetableCheckedAt = '';
@@ -552,7 +551,7 @@
     if (!school) return;
     const key = `${school.id}\u0000${week}`;
     if (reuseCachedWeek) {
-      const cached = timetableWeeks.get(key, Date.now());
+      const cached = timetableSession.cache.get(key, Date.now());
       if (cached) {
         timetable = cached.data;
         timetableFromDevice = false;
@@ -563,7 +562,7 @@
       }
     }
     timetableRefreshAt = Date.now() + refreshInterval;
-    const controller = new AbortController(); tableRequest = controller; tableLoading = true;
+    const controller = timetableSession.begin(); tableLoading = true;
     void getTimetable(school.id, week, controller.signal)
       .then((data) => {
         if (controller.signal.aborted) return;
@@ -578,7 +577,7 @@
         }
         if (!data.stale) {
           try { localStorage.setItem('opensigan-offline-timetable', JSON.stringify(data)); } catch { /* 오프라인 저장 없이 계속 사용합니다. */ }
-          timetableWeeks.put(key, data, Date.now() + refreshInterval);
+          timetableSession.cache.put(key, data, Date.now() + refreshInterval);
         }
       })
       .catch((error) => {
@@ -939,7 +938,7 @@
       stopNavigation();
       sharedSchoolRequest?.abort();
       clearInterval(calendarTimer); document.removeEventListener('visibilitychange', onVisibilityChange); document.removeEventListener('focusin', onFocusIn); document.removeEventListener('focusout', onFocusOut); window.removeEventListener('focus', onFocus); themeMedia?.removeEventListener?.('change', onThemeMedia); historyRequest?.abort();
-      clearTimeout(schoolTimer); schoolRequest?.abort(); neisRequest?.abort(); tableRequest?.abort(); mealRequest?.abort();
+      clearTimeout(schoolTimer); schoolRequest?.abort(); neisRequest?.abort(); timetableSession.cancel(); mealRequest?.abort();
     };
   });
 </script>

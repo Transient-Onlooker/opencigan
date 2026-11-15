@@ -6,7 +6,7 @@ import ts from 'typescript';
 
 const source = await readFile(new URL('../src/timetable-cache.ts', import.meta.url), 'utf8');
 const exports = {};
-runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports });
+runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports, AbortController });
 
 test('week cache isolates instances, expires at the deadline and evicts oldest writes', () => {
   const cache = exports.createTimetableCache();
@@ -32,4 +32,18 @@ test('cache reads do not change eviction order and replacement moves a week to t
   cache.put('d', { id: 4 }, 100);
   assert.equal(cache.get('c', 1), undefined);
   assert.equal(cache.get('b', 1).data.id, 20);
+});
+
+test('a new timetable request cancels only the previous request in the same session', () => {
+  const session = exports.createTimetableSession();
+  const other = exports.createTimetableSession();
+  const first = session.begin();
+  const independent = other.begin();
+  const next = session.begin();
+  assert.equal(first.signal.aborted, true);
+  assert.equal(next.signal.aborted, false);
+  assert.equal(independent.signal.aborted, false);
+  session.cancel();
+  assert.equal(next.signal.aborted, true);
+  assert.equal(independent.signal.aborted, false);
 });
