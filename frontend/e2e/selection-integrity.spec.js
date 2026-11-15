@@ -154,6 +154,7 @@ test('timed calendar includes bell times only after explicit consent and closes 
   await page.getByLabel('1교시 종료', { exact: true }).fill('09:50');
   await page.getByRole('button', { name: '시각 저장', exact: true }).click();
   await expect(page.getByText('이 학교의 교시 시각을 저장했어요.')).toBeVisible();
+  await expect(page.getByRole('navigation', { name: '캘린더 메뉴' })).toBeVisible();
   await page.getByRole('button', { name: '시간표', exact: true }).click();
   await page.getByRole('button', { name: '캘린더 구독 링크' }).click();
   await page.getByLabel('일정 표시 방식').selectOption('timed');
