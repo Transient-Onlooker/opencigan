@@ -6,6 +6,8 @@
   import PersonalTimetable from './PersonalTimetable.svelte';
   import CalendarNav from './CalendarNav.svelte';
   import QuickClass from './QuickClass.svelte';
+  import SchoolSelector from './SchoolSelector.svelte';
+  import FavoritesBar from './FavoritesBar.svelte';
   import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference } from './preferences';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
   import { saveSelection, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
@@ -28,7 +30,6 @@
   type Favorite = { school: School; grade: number; classroom: number };
   let school: School | null = null;
   let favorites: Favorite[] = [];
-  let favoritesExpanded = true;
   let settingsQuery = '';
   let settingsOpen = { display: false, times: false, backup: false, meals: false, allergies: false };
   let neis: NeisSchool | null = null;
@@ -849,51 +850,9 @@
     {#if apiNotConfigured}<p class="notice" role="alert">학교 정보를 불러올 API 주소가 설정되지 않았어요.</p>{/if}
     {#if sharedClassState && !classError}<p class="notice" role="status">{sharedClassState}</p>{/if}
     {#if schoolEditorOpen || !school}
-      <section id="school-settings" class="school-panel" aria-label="학교 및 학급 선택">
-        <div class="search-field">
-          <label for="school">학교 찾기</label>
-          <div class="search-wrap"><Icon name="search" /><input id="school" type="search" maxlength="50" aria-describedby="school-search-help" bind:value={schoolQuery} oninput={findSchool} onkeydown={(event) => { if (event.key === 'Escape') { clearTimeout(schoolTimer); schoolRequest?.abort(); schoolResults = []; schoolSearchState = ''; } }} placeholder="학교 이름 두 글자 이상" autocomplete="off" /></div>
-          <p id="school-search-help" class="quick-class-hint">2~50자 · 결과는 최대 10개예요. 컴시간에서 제공하는 학교만 찾을 수 있어요.</p>
-          <span class="sr-only" aria-live="polite">{schoolSearchState || (schoolResults.length ? schoolResults.length + '개 학교 검색 결과' : '')}</span>
-          {#if schoolResults.length || schoolSearchState}
-            <div class="search-results">
-              {#each schoolResults as item (item.id)}<button class="school-option" onclick={() => chooseSchool(item)}><strong>{item.name}</strong><span>{item.region}</span></button>{/each}
-              {#if schoolSearchState}<p>{schoolSearchState}</p>{/if}
-            </div>
-          {/if}
-        </div>
-        <div class="selectors">
-          <label for="grade">학년<select id="grade" value={grade} onchange={selectGrade}>{#each gradeOptions as n}<option value={n}>{n}학년</option>{/each}</select></label>
-          <label for="classroom">반<input id="classroom" type="number" min="1" max="99" step="1" required value={classroomDraft} oninput={updateClass} onchange={saveClass} aria-invalid={classError} aria-describedby={classError ? 'class-error' : 'class-selection'} /></label>
-        </div>
-        <p id="class-selection" class="quick-class-hint">현재 선택: {grade}학년 {classroom}반 · 반 입력은 편집을 마치면 적용돼요.</p>
-        {#if classError}<p id="class-error" class="notice" role="alert">{sharedClassState || '1~99 사이의 반을 입력해 주세요. 시간표가 있는 경우 등록된 반만 선택할 수 있어요.'}</p>{/if}
-      </section>
+      <SchoolSelector bind:schoolQuery {schoolResults} {schoolSearchState} {grade} {classroom} {classroomDraft} {gradeOptions} {classError} {sharedClassState} {findSchool} cancelSearch={() => { clearTimeout(schoolTimer); schoolRequest?.abort(); schoolResults = []; schoolSearchState = ''; }} {chooseSchool} {selectGrade} {updateClass} {saveClass} />
     {/if}
-    {#if school || favorites.length}
-      {#if school && !currentFavorite && favorites.length < 10}
-      <div class="favorite-toolbar">
-        <div class="favorite-save"><button class="secondary-button" disabled={classError || !!pendingSharedClass} onclick={addFavorite}><Icon name="star" /> 현재 학급 즐겨찾기 추가</button></div>
-      </div>
-      {/if}
-      {#if favorites.length}
-        <section class="favorites-bar" aria-labelledby="favorites-title">
-          <div class="favorites-heading"><h2 id="favorites-title">즐겨찾는 학급 ({favorites.length})</h2><button class="text-button" aria-expanded={favoritesExpanded} aria-controls="favorite-list" onclick={() => favoritesExpanded = !favoritesExpanded}>{favoritesExpanded ? '목록 접기' : '목록 펼치기'}</button></div>
-          <label class="favorite-picker">학급 바로 선택<select aria-label="즐겨찾는 학급 바로 선택" value="" onchange={(event) => { const selected = favorites[Number(event.currentTarget.value)]; if (event.currentTarget.value && selected) switchToFavorite(selected); event.currentTarget.value = ''; }}><option value="">즐겨찾는 학급을 선택하세요</option>{#each favorites as favorite, index}<option value={String(index)}>{favorite.school.name} {favorite.grade}학년 {favorite.classroom}반</option>{/each}</select></label>
-          <div id="favorite-list" class="favorite-list" hidden={!favoritesExpanded}>
-            {#each favorites as favorite (`${favorite.school.id}-${favorite.grade}-${favorite.classroom}`)}
-              <div class="favorite-item">
-                <button class="favorite-switch" aria-pressed={school?.id === favorite.school.id && Number(grade) === favorite.grade && Number(classroom) === favorite.classroom} onclick={() => switchToFavorite(favorite)}>
-                  <strong>{favorite.school.name}</strong><span>{favorite.grade}학년 {favorite.classroom}반</span>
-                </button>
-                <button class="favorite-remove" aria-label={`${favorite.school.name} ${favorite.grade}학년 ${favorite.classroom}반 즐겨찾기 삭제`} onclick={() => removeFavorite(favorite)}><Icon name="close" /></button>
-              </div>
-            {/each}
-          </div>
-        </section>
-      {/if}
-    {/if}
-    {#if school && !favorites.length}<p class="quick-class-hint">즐겨찾는 학급이 없어요. 현재 학급을 추가하면 바로 전환할 수 있어요.</p>{/if}
+    <FavoritesBar {school} {grade} {classroom} {favorites} {currentFavorite} disabled={classError || !!pendingSharedClass} {addFavorite} {removeFavorite} {switchToFavorite} />
     <CalendarNav {view} {inputFocused} selectView={(value) => view = value} />
     <div id="calendar" class="calendar-content" tabindex="-1">
         <section id="timetable-panel" hidden={view !== 'timetable'} aria-labelledby="timetable-title">
