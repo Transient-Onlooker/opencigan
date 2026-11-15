@@ -227,3 +227,58 @@ test('createTimetablePng handles empty periods and multiple lessons without thro
   assert.ok(renderedCanvas.width <= 4096 && renderedCanvas.height <= 4096, '긴 과목명도 캔버스 상한을 넘지 않는다');
   assert.ok(drawnLines > 0 && filledRects > 0);
 });
+
+
+test('PDF always uses a white canvas even when PNG follows dark mode', async () => {
+  const backgrounds = [];
+  let downloadedFilename = '';
+  const context = new Proxy({
+    measureText: (value) => ({ width: value.length * 10 }),
+    fillRect(x, y) {
+      if (x === 0 && y === 0) backgrounds.push(this.fillStyle);
+    },
+  }, { get: (target, key) => target[key] ?? (() => {}) });
+
+  const mockPdfLib = {
+    PDFDocument: { create: async () => ({
+      embedPng: async () => ({ scaleToFit: () => ({ width: 300, height: 200 }) }),
+      addPage: ([width, height]) => ({
+        getWidth: () => width, getHeight: () => height, drawImage() {},
+      }),
+      save: async () => new Uint8Array([37, 80, 68, 70]),
+    }) },
+    PageSizes: { A4: [595, 842] },
+  };
+  const sandbox = {
+    exports: {},
+    require: (name) => {
+      if (name === './personalization') return personalization;
+      if (name === 'pdf-lib') return mockPdfLib;
+      throw new Error('Unexpected dependency: ' + name);
+    },
+    Blob,
+    document: {
+      fonts: { ready: Promise.resolve() },
+      body: { append() {} },
+      createElement: (type) => type === 'canvas'
+        ? {
+          getContext: () => context,
+          toBlob: (callback) => callback(new Blob(['png'], { type: 'image/png' })),
+        }
+        : {
+          click() { downloadedFilename = this.download; },
+          remove() {},
+        },
+    },
+    URL: { createObjectURL: () => 'blob:local', revokeObjectURL() {} },
+    window: { setTimeout() {} },
+  };
+  runInNewContext(compiled, sandbox);
+
+  await sandbox.exports.saveTimetablePdf({ ...options, dark: true });
+  assert.equal(backgrounds[0], '#ffffff');
+  assert.match(downloadedFilename, /\.pdf$/);
+
+  await sandbox.exports.createTimetablePng({ ...options, dark: true });
+  assert.equal(backgrounds[1], '#111111');
+});

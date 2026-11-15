@@ -259,8 +259,10 @@ export async function saveTimetablePng(options: ExportOptions) {
 }
 
 export async function saveTimetablePdf(options: ExportOptions) {
-  const [{ PDFDocument, PageSizes }, { blob, filename }] = await Promise.all([
-    import('pdf-lib'), createTimetablePng(options),
+  // PDF export is intended for printing, independent of the screen theme.
+  const printOptions = { ...options, dark: false };
+  const [{ PDFDocument, PageSizes }, { blob }] = await Promise.all([
+    import('pdf-lib'), createTimetablePng(printOptions),
   ]);
   const pdf = await PDFDocument.create();
   const image = await pdf.embedPng(await blob.arrayBuffer());
