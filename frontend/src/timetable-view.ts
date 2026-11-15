@@ -1,5 +1,15 @@
 import type { TimetableRecord } from './api';
 
+export function observedClassCount(records: TimetableRecord[]): number {
+  return new Set(records.filter((record) => Number.isInteger(Number(record.grade)) && Number(record.grade) > 0 && Number.isInteger(Number(record.class)) && Number(record.class) > 0)
+    .map((record) => `${Number(record.grade)}:${Number(record.class)}`)).size;
+}
+
+export function subjectNamesInTimetable(records: TimetableRecord[]): string[] {
+  return [...new Set(records.map((record) => record.subject?.trim()).filter((name): name is string => !!name))]
+    .sort((a, b) => a.localeCompare(b, 'ko-KR'));
+}
+
 export function classLessons(records: TimetableRecord[], grade: number, classroom: number): TimetableRecord[] {
   return records.filter((record) => Number(record.grade) === Number(grade) && Number(record.class) === Number(classroom));
 }

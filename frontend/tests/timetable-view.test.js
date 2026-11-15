@@ -27,3 +27,15 @@ test('grade comparison and missing weekdays keep scope and ordering', () => {
   assert.deepEqual(Array.from(view.missingWeekdayDates(selected, ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])), ['tue', 'wed', 'thu', 'fri']);
   assert.equal(selected.length, 3);
 });
+
+test('school summary counts observed classes and lists distinct trimmed subjects', () => {
+  const records = [
+    { grade: 1, class: '2', subject: ' 수학 ' },
+    { grade: '1', class: 2, subject: '수학' },
+    { grade: 2, class: 2, subject: '국어' },
+    { grade: 0, class: 3, subject: '' },
+    { grade: 1, class: 'bad', subject: null },
+  ];
+  assert.equal(view.observedClassCount(records), 2);
+  assert.deepEqual(Array.from(view.subjectNamesInTimetable(records)), ['국어', '수학']);
+});

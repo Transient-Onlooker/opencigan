@@ -20,7 +20,7 @@
   import { createTimetableSession } from './timetable-cache';
   import { createHistorySession } from './history-session';
   import { createMealSession } from './meal-session';
-  import { classLessons, teacherLessons, teacherNamesInTimetable, gradeLessons, comparisonClasses, missingWeekdayDates } from './timetable-view';
+  import { classLessons, teacherLessons, teacherNamesInTimetable, gradeLessons, comparisonClasses, missingWeekdayDates, observedClassCount as countObservedClasses, subjectNamesInTimetable } from './timetable-view';
   import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, type LessonTimes } from './lesson-times';
   import { createClassDisplayPreferences, defaultDisplaySettings, parseDisplaySettings, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
   import { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
@@ -145,8 +145,8 @@
   $: gradeRecords = gradeLessons(dayRecords, grade);
   $: comparableClasses = comparisonClasses(gradeRecords);
   $: teacherNames = teacherNamesInTimetable(timetable?.records ?? []);
-  $: observedClassCount = new Set((timetable?.records ?? []).filter((r) => Number.isInteger(Number(r.grade)) && Number(r.grade) > 0 && Number.isInteger(Number(r.class)) && Number(r.class) > 0).map((r) => `${Number(r.grade)}:${Number(r.class)}`)).size;
-  $: subjectNames = [...new Set((timetable?.records ?? []).map((r) => r.subject?.trim()).filter((name): name is string => !!name))].sort((a, b) => a.localeCompare(b, 'ko-KR'));
+  $: observedClassCount = countObservedClasses(timetable?.records ?? []);
+  $: subjectNames = subjectNamesInTimetable(timetable?.records ?? []);
   $: teacherSuggestions = teacherNames.filter((name) => [name, displayTeacher(name, displaySettings)].some((label) => label.toLocaleLowerCase('ko-KR').includes(teacherQuery.trim().toLocaleLowerCase('ko-KR'))));
   $: selectedTeacherName = teacherNames.find((name) => name === teacherQuery.trim() || displayTeacher(name, displaySettings) === teacherQuery.trim()) ?? '';
   $: selectedTeacherRecords = teacherLessons(timetable?.records ?? [], selectedTeacherName);
