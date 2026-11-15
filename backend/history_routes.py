@@ -1,8 +1,8 @@
 import hashlib
-import json
 import re
 from datetime import date, datetime, timedelta, timezone
 
+from backend.http_core import json_response
 
 def timetable_history(path, query, request_headers, headers, query_param, timetable_filters, history_store, render_feed):
     school = query_param(query, "school", 100)
@@ -19,9 +19,7 @@ def timetable_history(path, query, request_headers, headers, query_param, timeta
     cursor = query_param(query, "cursor", 100) if "cursor" in query else None
     store = history_store()
     if store is None:
-        body = json.dumps({"error": "변경 이력 저장이 활성화되지 않았습니다", "code": "history_disabled"}, ensure_ascii=False).encode("utf-8")
-        headers["Content-Length"] = str(len(body))
-        return 503, headers, body
+        return json_response(503, headers, {"error": "변경 이력 저장이 활성화되지 않았습니다", "code": "history_disabled"})
     if path.endswith(".rss"):
         grade_filter, class_filter, _ = timetable_filters({key: value for key, value in query.items() if key != "teacher"}, require_class=True)
         if cursor is not None:

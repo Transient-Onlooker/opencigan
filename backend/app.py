@@ -15,6 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 from backend.cache import Cache
+from backend.http_core import json_response
 from backend.analytics import ApiRecorder
 from backend.access_logs import AccessLogRecorder, AccessLogStore, classify_origin
 from backend.ical import render_timetable_ics
@@ -310,10 +311,8 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
     if path not in ("/api/v1/status", "/api/v1/admin/analytics"):
         allowed, retry_after = (shutter if shutter_instance is None else shutter_instance).check()
         if not allowed:
-            body = json.dumps({"error": "요청이 집중되어 일시적으로 중단되었습니다. 잠시 후 다시 시도해 주세요.", "code": "service_overloaded", "retry_after": retry_after}, ensure_ascii=False).encode("utf-8")
             headers["Retry-After"] = str(retry_after)
-            headers["Content-Length"] = str(len(body))
-            return 503, headers, body
+            return json_response(503, headers, {"error": "요청이 집중되어 일시적으로 중단되었습니다. 잠시 후 다시 시도해 주세요.", "code": "service_overloaded", "retry_after": retry_after})
 
     if path == "/api/v1/webhooks" or path.startswith("/api/v1/webhooks/"):
         return _webhook_api(method, path, request_body, request_headers, client, headers)
@@ -325,17 +324,13 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
         return analytics_summary(method, query_string, request_headers, headers, _analytics_store, _api_recorder)
 
     if method not in ("GET", "HEAD"):
-        body = json.dumps({"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"}, ensure_ascii=False).encode("utf-8")
-        headers["Content-Length"] = str(len(body))
-        return 405, headers, body
+        return json_response(405, headers, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
 
     if client and path != "/api/v1/status":
         retry = _rate_allowed(client)
         if retry:
-            body = json.dumps({"error": "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.", "code": "rate_limited"}, ensure_ascii=False).encode("utf-8")
             headers["Retry-After"] = str(retry)
-            headers["Content-Length"] = str(len(body))
-            return 429, headers, body
+            return json_response(429, headers, {"error": "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.", "code": "rate_limited"})
     query = parse_qs(query_string, keep_blank_values=path == "/api/v1/timetable/history.rss")
     try:
         if path == "/api/v1/status":
@@ -355,25 +350,14 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
         elif path == "/api/v1/meals":
             result = get_meals(query, current_cache, _query_param, NEISClient, School)
         else:
-            body = json.dumps({"error": "요청한 경로가 없습니다", "code": "not_found"}, ensure_ascii=False).encode("utf-8")
-            headers["Content-Length"] = str(len(body))
-            return 404, headers, body
+            return json_response(404, headers, {"error": "요청한 경로가 없습니다", "code": "not_found"})
 
-        body = json.dumps(result, ensure_ascii=False).encode("utf-8")
-        headers["Content-Length"] = str(len(body))
-        return 200, headers, body
+        return json_response(200, headers, result)
     except ValueError as exc:
-        body = json.dumps({"error": str(exc), "code": "invalid_request"}, ensure_ascii=False).encode("utf-8")
-        headers["Content-Length"] = str(len(body))
-        return 400, headers, body
+        return json_response(400, headers, {"error": str(exc), "code": "invalid_request"})
     except Exception:
         logger.exception("upstream request failed")
-        body = json.dumps(
-            {"error": "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", "code": "upstream_unavailable"},
-            ensure_ascii=False,
-        ).encode("utf-8")
-        headers["Content-Length"] = str(len(body))
-        return 503, headers, body
+        return json_response(503, headers, {"error": "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", "code": "upstream_unavailable"})
 
 
 _api_recorder = ApiRecorder(_analytics_store)

@@ -1,15 +1,14 @@
 import json
 import re
 import sqlite3
+from backend.http_core import json_response
 
 
 def webhook_api(method, path, body, request_headers, client, headers, rate_allowed, webhook_store):
     from backend.webhook_store import SubscriptionLimitError
 
     def respond(status, payload):
-        encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        headers["Content-Length"] = str(len(encoded))
-        return status, headers, encoded
+        return json_response(status, headers, payload)
 
     if client:
         retry = rate_allowed(("webhooks", client))
