@@ -164,3 +164,27 @@ test('timed calendar includes bell times only after explicit consent and closes 
   await page.getByRole('button', { name: '구독 링크 닫기' }).click();
   await expect(page.getByLabel('일정 표시 방식')).toHaveCount(0);
 });
+
+test('personal timetable saves, replaces and deletes local lessons without changing source data', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
+  await page.getByText('개인 시간표·일정', { exact: true }).click();
+  const personal = page.getByRole('region', { name: '개인 시간표', exact: true });
+  await personal.getByLabel('과목명', { exact: true }).fill('개인 수학');
+  await personal.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(personal.getByRole('table')).toContainText('개인 수학');
+  await personal.getByLabel('과목명', { exact: true }).fill('수정한 수학');
+  await personal.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(personal.getByRole('table')).toContainText('수정한 수학');
+  await expect(personal.getByRole('table')).not.toContainText('개인 수학');
+  const download = page.waitForEvent('download');
+  await personal.getByRole('button', { name: '시간표 PNG 저장' }).click();
+  expect((await download).suggestedFilename()).toMatch(/개인_시간표.*\.png$/);
+  await expect(page.locator('#timetable-panel').getByRole('table')).toContainText('과목1');
+  await personal.getByRole('button', { name: /수정한 수학 삭제/ }).click();
+  await expect(personal.getByRole('table')).not.toContainText('수정한 수학');
+  await page.reload();
+  await page.getByText('개인 시간표·일정', { exact: true }).click();
+  await expect(personal.getByRole('table')).not.toContainText('수정한 수학');
+});
