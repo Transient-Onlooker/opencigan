@@ -14,6 +14,7 @@
   import { saveTimetablePdf, saveTimetablePng, shareTimetablePng, type ExportOptions } from './export-png';
   import { slotLessons } from './timetable-slots';
   import { createTimetableSession } from './timetable-cache';
+  import { classLessons, teacherLessons, teacherNamesInTimetable } from './timetable-view';
   import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, type LessonTimes } from './lesson-times';
   import { defaultDisplaySettings, parseDisplaySettings, displaySubject, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
   import { createSettingsBackup, parseSettingsBackup, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
@@ -119,19 +120,19 @@
   let historyRequest: AbortController | undefined;
   let historyRequestKey = '';
 
-  $: filtered = (timetable?.records ?? []).filter((r) => Number(r.grade) === Number(grade) && Number(r.class) === Number(classroom));
+  $: filtered = classLessons(timetable?.records ?? [], grade, classroom);
   $: dayRecords = (timetable?.records ?? []).filter((r) => r.date === selectedDay);
-  $: selectedClassLessons = dayRecords.filter((r) => Number(r.grade) === Number(grade) && Number(r.class) === Number(classroom)).sort((a, b) => Number(a.period) - Number(b.period));
+  $: selectedClassLessons = classLessons(dayRecords, grade, classroom).sort((a, b) => Number(a.period) - Number(b.period));
   $: dayOverview = dailyLessonOverview(selectedClassLessons, lessonTimes, clockMinute, selectedDay === today);
   $: shownClassLessons = displaySettings.endedLessonMode === 'hide' ? selectedClassLessons.filter((item) => !dayOverview.completed.includes(Number(item.period))) : selectedClassLessons;
   $: comparableClasses = [...new Set(dayRecords.filter((r) => Number(r.grade) === Number(grade)).map((r) => Number(r.class)))].sort((a, b) => a - b);
   $: gradeRecords = dayRecords.filter((r) => Number(r.grade) === Number(grade));
-  $: teacherNames = [...new Set((timetable?.records ?? []).map((r) => r.teacher?.trim()).filter((name): name is string => !!name))].sort((a, b) => a.localeCompare(b, 'ko-KR'));
+  $: teacherNames = teacherNamesInTimetable(timetable?.records ?? []);
   $: observedClassCount = new Set((timetable?.records ?? []).filter((r) => Number.isInteger(Number(r.grade)) && Number(r.grade) > 0 && Number.isInteger(Number(r.class)) && Number(r.class) > 0).map((r) => `${Number(r.grade)}:${Number(r.class)}`)).size;
   $: subjectNames = [...new Set((timetable?.records ?? []).map((r) => r.subject?.trim()).filter((name): name is string => !!name))].sort((a, b) => a.localeCompare(b, 'ko-KR'));
   $: teacherSuggestions = teacherNames.filter((name) => [name, displayTeacher(name, displaySettings)].some((label) => label.toLocaleLowerCase('ko-KR').includes(teacherQuery.trim().toLocaleLowerCase('ko-KR'))));
   $: selectedTeacherName = teacherNames.find((name) => name === teacherQuery.trim() || displayTeacher(name, displaySettings) === teacherQuery.trim()) ?? '';
-  $: selectedTeacherRecords = selectedTeacherName ? (timetable?.records ?? []).filter((r) => r.teacher?.trim() === selectedTeacherName) : [];
+  $: selectedTeacherRecords = teacherLessons(timetable?.records ?? [], selectedTeacherName);
   $: classActionsReady = !!school && timetable?.schoolId === school.id && timetable.weekStart === week && filtered.length > 0 && !classError && !pendingSharedClass && !sharedSchoolChecking;
   $: canExport = !!school && timetable?.schoolId === school.id && timetable.weekStart === week && !classError && !pendingSharedClass && !sharedSchoolChecking && (timetableView === 'teacher' ? selectedTeacherRecords.length > 0 : classActionsReady && (timetableView === 'week' || timetableView === 'today' && selectedClassLessons.length > 0));
   $: teacherPeriods = Array.from({ length: Math.max(0, ...selectedTeacherRecords.map((r) => Number(r.period))) }, (_, i) => i + 1);
