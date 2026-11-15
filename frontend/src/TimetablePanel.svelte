@@ -114,6 +114,9 @@
         </section>
 
 <style>
+.lesson-search{border:1px solid var(--line);padding:12px 16px;margin:0 0 20px}
+.lesson-search summary{cursor:pointer;min-height:44px;display:list-item;align-content:center;font-weight:650}
+.lesson-search p{font-size:14px;color:var(--muted)}
 .last-fetched{font-size:12px;color:var(--muted);white-space:nowrap}
 .dataset-details{margin:8px 0 0;font-size:12px;color:var(--muted)}
 .dataset-details summary{display:list-item;width:fit-content;min-height:36px;align-content:center;cursor:pointer}
