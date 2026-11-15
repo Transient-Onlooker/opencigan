@@ -564,11 +564,7 @@
       }
     }
     timetableRefreshAt = Date.now() + refreshInterval;
-    const controller = timetableSession.begin(); tableLoading = true;
-    void getTimetable(school.id, week, controller.signal)
-      .then((data) => {
-        if (controller.signal.aborted) return;
-        if (data.schoolId !== school?.id || data.weekStart !== week) throw new Error('선택한 학교·주차와 다른 시간표가 도착했어요.');
+    const { controller, result } = timetableSession.fetch(school.id, week, () => ({ schoolId: school?.id, week }), getTimetable, (data) => {
         timetable = data;
         timetableFromDevice = false;
         if (validateClass) ensureAvailableClass();
@@ -578,7 +574,9 @@
           tableRefreshState = data.stale ? '서버에 연결했어요. 저장된 시간표를 표시 중이에요.' : '새로고침 완료';
         }
         timetableSession.saveFresh(key, data, Date.now() + refreshInterval, () => localStorage);
-      })
+      });
+    tableLoading = true;
+    void result
       .catch((error) => {
         if (controller.signal.aborted) return;
         if (!timetable && navigator.onLine === false) {
