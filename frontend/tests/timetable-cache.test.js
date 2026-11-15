@@ -48,6 +48,26 @@ test('a new timetable request cancels only the previous request in the same sess
   assert.equal(independent.signal.aborted, false);
 });
 
+test('timetable session rejects mismatched responses and ignores cancelled requests', async () => {
+  const session = exports.createTimetableSession();
+  let resolve;
+  let accepted = 0;
+  const current = () => ({ schoolId: 'a', week: '2026-11-09' });
+  const load = () => new Promise((done) => { resolve = done; });
+  const first = session.fetch('a', '2026-11-09', current, load, () => { accepted++; });
+  session.cancel();
+  resolve({ schoolId: 'a', weekStart: '2026-11-09' });
+  await first.result;
+  assert.equal(accepted, 0);
+  const second = session.fetch('a', '2026-11-09', current, load, () => { accepted++; });
+  resolve({ schoolId: 'b', weekStart: '2026-11-09' });
+  await assert.rejects(second.result, /다른 시간표/);
+  const third = session.fetch('a', '2026-11-09', current, load, () => { accepted++; });
+  resolve({ schoolId: 'a', weekStart: '2026-11-09' });
+  await third.result;
+  assert.equal(accepted, 1);
+});
+
 test('offline data is restored only for the matching school and week and stale data is not saved', () => {
   const session = exports.createTimetableSession();
   const values = new Map();

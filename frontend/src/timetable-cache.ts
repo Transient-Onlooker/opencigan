@@ -20,7 +20,7 @@ export function createTimetableCache(limit = 4) {
 export function createTimetableSession() {
   const cache = createTimetableCache();
   let request: AbortController | undefined;
-  return {
+  const session = {
     cache,
     saveFresh(key: string, data: TimetableResponse, expires: number, storage: () => Storage) {
       if (data.stale) return;
@@ -39,5 +39,16 @@ export function createTimetableSession() {
       request = new AbortController();
       return request;
     },
+    fetch(schoolId: string, week: string, current: () => { schoolId: string | undefined; week: string }, load: (schoolId: string, week: string, signal: AbortSignal) => Promise<TimetableResponse>, accept: (data: TimetableResponse) => void) {
+      const controller = session.begin();
+      const result = load(schoolId, week, controller.signal).then((data) => {
+        if (controller.signal.aborted) return;
+        const selected = current();
+        if (data.schoolId !== selected.schoolId || data.weekStart !== selected.week) throw new Error('선택한 학교·주차와 다른 시간표가 도착했어요.');
+        accept(data);
+      });
+      return { controller, result };
+    },
   };
+  return session;
 }
