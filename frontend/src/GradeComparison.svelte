@@ -32,3 +32,16 @@
                  {/each}
                </div>
              {:else}<div class="state-message"><strong>비교할 시간표가 없어요</strong><p>선택한 날짜에 선택 학년의 수업이 없습니다.</p></div>{/if}
+
+<style>
+.grade-compact{display:none}
+.grade-compact.no-cell-borders .grade-period,.grade-compact.no-cell-borders .grade-period h3,.grade-compact.no-cell-borders .grade-class{border:0}
+.grade-compact.density-compact{gap:8px}
+.grade-compact.density-compact .grade-class{padding:6px 8px}
+.grade-compact.density-relaxed{gap:16px}
+.grade-compact.density-relaxed .grade-class{padding:15px 12px}
+@media(max-width:700px){
+  .grade-comparison-scroll{display:none}.grade-compact{display:grid;gap:12px}.grade-period{border:1px solid var(--line);min-width:0}.grade-period h3{background:var(--soft);font-size:15px;padding:8px 12px;border-bottom:1px solid var(--line)}.grade-class-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.grade-class{min-width:0;padding:9px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);overflow-wrap:anywhere}.grade-class:nth-child(even){border-right:0}.grade-class:last-child,.grade-class:nth-last-child(2):nth-child(odd){border-bottom:0}.grade-class h4{font-size:13px;font-weight:800;margin:0 0 4px}.grade-class .class-cell{align-items:flex-start;gap:2px}.grade-class .class-cell strong{font-size:14px;line-height:1.4}.grade-class .class-cell>span{font-size:12px}.grade-class .class-cell+.class-cell{border-top:1px solid var(--line);margin-top:7px;padding-top:7px}.grade-class.changed{box-shadow:inset 3px 0 var(--ink)}
+  .grade-class h4{white-space:nowrap}
+}
+</style>

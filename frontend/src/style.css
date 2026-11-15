@@ -93,7 +93,6 @@ label{font-size:14px;font-weight:650}
 .class-cell>span{font-size:13px;color:var(--muted)}
 .class-cell .change-label{font-size:11px;padding:1px 5px;background:var(--ink);color:var(--surface);font-weight:750}
 .timetable .class-cell+.class-cell{border-top:1px solid var(--line);padding-top:8px;margin-top:8px}
-.grade-compact{display:none}
 .empty-cell{color:var(--muted)}
 .table-hint,.meal-note{font-size:13px;color:var(--muted);line-height:1.7;margin:12px 0}
 .freshness{display:flex;justify-content:flex-end;gap:4px 18px;font-size:12px;color:var(--muted);padding:12px 0;border-top:1px solid var(--line)}
@@ -128,7 +127,6 @@ button,.school-option,.footer-links a{transition:background-color .16s ease,colo
   .school-heading .secondary-button{font-size:13px}
   .section-heading{margin-bottom:10px;flex-wrap:wrap}.section-heading .heading-actions{width:100%;gap:6px}.heading-actions .secondary-button{padding:7px 9px;min-height:40px}.calendar-toolbar{gap:8px;grid-template-columns:44px minmax(0,1fr) 44px;padding:8px 0;margin-bottom:12px}.calendar-date strong{font-size:17px}
   .timetable:not(.comparison-table){min-width:0}.timetable:not(.comparison-table) thead th:first-child,.timetable:not(.comparison-table) tbody th{width:35px;font-size:12px}.timetable:not(.comparison-table) thead th{height:48px;font-size:13px}.timetable:not(.comparison-table) thead th small{font-size:10px;margin-top:0}.timetable:not(.comparison-table) .class-cell{gap:2px}.timetable:not(.comparison-table) .class-cell strong{font-size:12px;line-height:1.32;word-break:break-word}.timetable:not(.comparison-table) .class-cell>span{font-size:10px;line-height:1.3}.table-hint span{display:block}
-  .grade-comparison-scroll{display:none}.grade-compact{display:grid;gap:12px}.grade-period{border:1px solid var(--line);min-width:0}.grade-period h3{background:var(--soft);font-size:15px;padding:8px 12px;border-bottom:1px solid var(--line)}.grade-class-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.grade-class{min-width:0;padding:9px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);overflow-wrap:anywhere}.grade-class:nth-child(even){border-right:0}.grade-class:last-child,.grade-class:nth-last-child(2):nth-child(odd){border-bottom:0}.grade-class h4{font-size:13px;font-weight:800;margin:0 0 4px}.grade-class .class-cell{align-items:flex-start;gap:2px}.grade-class .class-cell strong{font-size:14px;line-height:1.4}.grade-class .class-cell>span{font-size:12px}.grade-class .class-cell+.class-cell{border-top:1px solid var(--line);margin-top:7px;padding-top:7px}.grade-class.changed{box-shadow:inset 3px 0 var(--ink)}
   .timetable-switch button{font-size:13px;padding:7px 5px}
   .lesson-search-fields input,.lesson-search-fields select{font-size:16px}
   .meal-cards{grid-template-columns:1fr;gap:14px}.meal-card-heading{padding:14px 16px}.dishes{padding:16px;font-size:17px;gap:8px}.no-meal{padding:18px 16px}
@@ -137,7 +135,6 @@ button,.school-option,.footer-links a{transition:background-color .16s ease,colo
 }
 @media(max-width:390px){main{width:calc(100% - 24px)}.topbar{padding-inline:12px}.calendar-date strong{font-size:17px}.date-picker{gap:4px}.section-heading{gap:8px}.section-heading .secondary-button{padding-inline:8px}.school-heading h1{font-size:20px}}
 .timetable.no-cell-borders th,.timetable.no-cell-borders td{border-right:0;border-bottom:0}
-.grade-compact.no-cell-borders .grade-period,.grade-compact.no-cell-borders .grade-period h3,.grade-compact.no-cell-borders .grade-class{border:0}
 .lesson-list article.changed:not(.active-lesson){box-shadow:inset 3px 0 var(--ink)}
 .lesson-list article.active-lesson{animation:current-lesson-emphasis 1s ease-out both}
 @keyframes current-lesson-emphasis{0%{box-shadow:0 0 0 0 var(--line)}50%{box-shadow:0 0 0 3px var(--line)}100%{box-shadow:0 0 0 0 transparent}}
@@ -151,10 +148,6 @@ button,.school-option,.footer-links a{transition:background-color .16s ease,colo
 .timetable.density-relaxed thead th{height:78px}
 .timetable.density-relaxed td{height:110px;padding:15px 8px}
 .timetable.density-relaxed .class-cell{gap:8px}
-.grade-compact.density-compact{gap:8px}
-.grade-compact.density-compact .grade-class{padding:6px 8px}
-.grade-compact.density-relaxed{gap:16px}
-.grade-compact.density-relaxed .grade-class{padding:15px 12px}
 @media(max-width:700px){
   .section-heading .heading-actions{justify-content:flex-start}
   .timetable:not(.comparison-table) td{height:49px;padding:3px 2px}
@@ -165,7 +158,6 @@ button,.school-option,.footer-links a{transition:background-color .16s ease,colo
   .timetable.teacher-table:not(.comparison-table) .class-cell strong{font-size:11px;word-break:keep-all;overflow-wrap:normal;line-height:1.4}
   .teacher-table .class-cell strong span{display:inline-block;white-space:nowrap}
   .settings-search input{font-size:16px}
-  .grade-class h4{white-space:nowrap}
   .lesson-list.density-compact article{gap:4px 8px}
   .lesson-list.density-relaxed article{gap:8px 12px}
 }
