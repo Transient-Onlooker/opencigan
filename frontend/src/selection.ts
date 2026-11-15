@@ -45,7 +45,7 @@ export function createSharedSelectionSession(onChange: (state: { checking: boole
   let checking = false;
   let pending: PendingSharedClass | null = null;
   const publish = () => onChange({ checking, pending });
-  return {
+  const session = {
     begin() {
       request?.abort();
       request = new AbortController();
@@ -68,7 +68,31 @@ export function createSharedSelectionSession(onChange: (state: { checking: boole
       pending = null;
       publish();
     },
+    async verifySchool(
+      shared: { school: School; grade: number; classroom: number },
+      fallback: PendingSharedClass['fallback'],
+      currentSchoolId: () => string | undefined,
+      search: (name: string, signal: AbortSignal) => Promise<{ schools: School[]; stale: boolean }>,
+      apply: (school: School) => void,
+      fail: () => void,
+    ) {
+      const signal = session.begin();
+      try {
+        const result = await search(shared.school.name, signal);
+        if (signal.aborted) return;
+        const verified = verifiedSharedSchool(shared.school, result.schools, result.stale);
+        if (!verified) { fail(); return; }
+        if (currentSchoolId() !== fallback.school?.id) return;
+        session.setPending({ schoolId: verified.id, grade: shared.grade, classroom: shared.classroom, fallback });
+        apply(verified);
+      } catch {
+        if (!signal.aborted) fail();
+      } finally {
+        session.finish(signal);
+      }
+    },
   };
+  return session;
 }
 
 export function resolveSharedClass(pending: PendingSharedClass, timetable: TimetableResponse | null, fromDevice: boolean, maxGrade: number) {
