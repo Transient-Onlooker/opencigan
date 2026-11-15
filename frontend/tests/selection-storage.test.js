@@ -12,9 +12,9 @@ test('selection persistence preserves keys, values and write order', () => {
   const writes = [];
   const storage = { setItem: (key, value) => writes.push([key, value]) };
   const school = { id: '2:학교', name: '학교', region: '서울' };
-  exports.saveSelection(storage, school, 2, 3);
-  exports.saveGradeAndClass(storage, 3, 4);
-  exports.saveClassToStorage(storage, 5);
+  exports.saveSelection(storage, { school, grade: 2, classroom: 3 });
+  exports.saveSelection(storage, { grade: 3, classroom: 4 });
+  exports.saveSelection(storage, { classroom: 5 });
   assert.deepEqual(writes, [
     ['opensigan-school', JSON.stringify(school)], ['opensigan-grade', '2'], ['opensigan-class', '3'],
     ['opensigan-grade', '3'], ['opensigan-class', '4'], ['opensigan-class', '5'],
@@ -24,9 +24,13 @@ test('selection persistence preserves keys, values and write order', () => {
 test('selection persistence tolerates blocked storage and stops subsequent writes', () => {
   const attempted = [];
   const storage = { setItem: (key) => { attempted.push(key); throw new Error('blocked'); } };
-  assert.doesNotThrow(() => exports.saveGradeAndClass(storage, 1, 2));
+  assert.doesNotThrow(() => exports.saveSelection(storage, { grade: 1, classroom: 2 }));
   assert.deepEqual(attempted, ['opensigan-grade']);
-  assert.doesNotThrow(() => exports.saveClassToStorage(storage, 2));
+  assert.doesNotThrow(() => exports.saveSelection(storage, { classroom: 2 }));
+  const partial = [];
+  const failsOnGrade = { setItem: (key) => { partial.push(key); if (key === 'opensigan-grade') throw new Error('blocked'); } };
+  exports.saveSelection(failsOnGrade, { school: { id: 'school' }, grade: 1, classroom: 2 });
+  assert.deepEqual(partial, ['opensigan-school', 'opensigan-grade']);
 });
 
 test('shared classroom requires fresh matching data and valid school grade', () => {

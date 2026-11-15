@@ -5,7 +5,7 @@
   import MealMenu from './MealMenu.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { saveSelection, saveGradeAndClass, saveClassToStorage, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSharedSelectionSession, type PendingSharedClass } from './selection';
+  import { saveSelection, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSharedSelectionSession, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -406,7 +406,7 @@
     else { schoolEditorOpen = false; ensureAvailableClass(); }
     classroomDraft = String(classroom);
     persistClassSelection();
-    try { saveGradeAndClass(localStorage, grade, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
+    try { saveSelection(localStorage, { grade, classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
   }
 
   function findSchool() {
@@ -435,7 +435,7 @@
   }
   function persistClassSelection() {
     if (!school || classError || pendingSharedClass) return;
-    try { saveSelection(localStorage, school, grade, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
+    try { saveSelection(localStorage, { school, grade, classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
   }
   function chooseSchool(value: School, keepClass = false, keepSharedValidation = false, persistSelection = true) {
     tableRefreshState = '';
@@ -460,7 +460,7 @@
     neis = null; neisResults = []; neisSearchState = ''; neisLoading = false;
     meals = []; hasMeals = false; mealsStale = false; mealState = ''; mealLoading = false; mealDataKey = ''; mealRequestKey = '';
     if (persistSelection) {
-      try { saveSelection(localStorage, value, grade, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
+      try { saveSelection(localStorage, { school: value, grade, classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
     }
     loadTimetable(false, true, true);
     if (school?.id !== value.id) return;
@@ -525,7 +525,7 @@
       classroom = outcome.classroom;
       classroomDraft = String(classroom);
       sharedClassState = '';
-      if (school) { try { saveSelection(localStorage, school, grade, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ } }
+      if (school) { try { saveSelection(localStorage, { school, grade, classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ } }
       return;
     }
     const previousGrade = Number(grade);
@@ -536,7 +536,7 @@
     if (previousGrade === Number(grade) && previousClass === Number(classroom)) return;
     classError = false;
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
-    try { saveGradeAndClass(localStorage, grade, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
+    try { saveSelection(localStorage, { grade, classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
   }
   function loadTimetable(preserve = false, reuseCachedWeek = false, validateClass = false) {
     validateClass = validateClass || !!pendingSharedClass;
@@ -776,7 +776,7 @@
     if (!classError) classroom = input.valueAsNumber;
     classroomDraft = String(classroom);
     input.value = classroomDraft;
-    if (!classError) { try { saveClassToStorage(localStorage, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ } }
+    if (!classError) { try { saveSelection(localStorage, { classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ } }
     persistClassSelection();
   }
   function saveGrade() {
@@ -785,7 +785,7 @@
     sharedClassState = '';
     ensureAvailableClass();
     classError = false;
-    try { saveGradeAndClass(localStorage, grade, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
+    try { saveSelection(localStorage, { grade, classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
     persistClassSelection();
   }
   function saveClassFromSelect() {
@@ -794,7 +794,7 @@
     classError = false;
     sharedClassState = '';
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
-    try { saveClassToStorage(localStorage, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
+    try { saveSelection(localStorage, { classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
     persistClassSelection();
   }
   async function shareClass() {
