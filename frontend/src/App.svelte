@@ -13,6 +13,7 @@
   import { allergens } from './allergens';
   import { saveTimetablePdf, saveTimetablePng, shareTimetablePng, type ExportOptions } from './export-png';
   import { slotLessons } from './timetable-slots';
+  import { createTimetableCache } from './timetable-cache';
   import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, type LessonTimes } from './lesson-times';
   import { defaultDisplaySettings, parseDisplaySettings, displaySubject, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
   import { createSettingsBackup, parseSettingsBackup, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
@@ -98,7 +99,7 @@
   let mealRequestKey = '';
   const mealTypes = ['조식', '중식', '석식'];
   const refreshInterval = 30 * 60 * 1000;
-  const timetableWeeks = new Map<string, { data: TimetableResponse; expires: number }>();
+  const timetableWeeks = createTimetableCache();
   let timetableRefreshAt = 0;
   let mealsRefreshAt = 0;
   let schoolTimer: ReturnType<typeof setTimeout>;
@@ -551,8 +552,8 @@
     if (!school) return;
     const key = `${school.id}\u0000${week}`;
     if (reuseCachedWeek) {
-      const cached = timetableWeeks.get(key);
-      if (cached && cached.expires > Date.now()) {
+      const cached = timetableWeeks.get(key, Date.now());
+      if (cached) {
         timetable = cached.data;
         timetableFromDevice = false;
         if (validateClass) ensureAvailableClass();
@@ -560,7 +561,6 @@
         timetableRefreshAt = cached.expires;
         return;
       }
-      timetableWeeks.delete(key);
     }
     timetableRefreshAt = Date.now() + refreshInterval;
     const controller = new AbortController(); tableRequest = controller; tableLoading = true;
@@ -578,9 +578,7 @@
         }
         if (!data.stale) {
           try { localStorage.setItem('opensigan-offline-timetable', JSON.stringify(data)); } catch { /* 오프라인 저장 없이 계속 사용합니다. */ }
-          timetableWeeks.delete(key);
-          timetableWeeks.set(key, { data, expires: Date.now() + refreshInterval });
-          if (timetableWeeks.size > 4) timetableWeeks.delete(timetableWeeks.keys().next().value!);
+          timetableWeeks.put(key, data, Date.now() + refreshInterval);
         }
       })
       .catch((error) => {
