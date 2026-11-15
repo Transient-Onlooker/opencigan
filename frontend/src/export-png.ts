@@ -25,13 +25,16 @@ function sanitizeFilenamePart(value: string): string {
 export function buildExportFilename(options: ExportOptions, extension: 'png' | 'pdf' = 'png'): string {
   const safeSchool = sanitizeFilenamePart(options.schoolName) || '학교';
   const target = options.view === 'teacher'
-    ? sanitizeFilenamePart(options.teacherName || '선생님')
+    ? sanitizeFilenamePart(options.teacherName) || '선생님'
     : `${options.grade || 1}학년${options.classroom || 1}반`;
   const dateOrWeek = sanitizeFilenamePart(options.view === 'today' ? options.selectedDay : options.week);
-  const safeExt = extension === 'pdf' ? 'pdf' : 'png';
-  const filename = `Opencigan_${safeSchool}_${target}_${options.view}_${dateOrWeek}.${safeExt}`;
-  if (filename.length <= 120) return filename;
-  return filename.slice(0, 116).replace(/[\uD800-\uDBFF]$/, '') + '.' + extension;
+  const suffix = `_${options.view}_${dateOrWeek}.${extension}`;
+  const available = Math.max(0, 120 - 'Opencigan_'.length - suffix.length - 1);
+  const truncate = (value: string, length: number) => value.slice(0, length).replace(/[\uD800-\uDBFF]$/, '');
+  const schoolLimit = Math.min(safeSchool.length, Math.max(Math.floor(available / 2), available - target.length));
+  const school = truncate(safeSchool, schoolLimit);
+  const safeTarget = truncate(target, available - school.length);
+  return `Opencigan_${school}_${safeTarget}${suffix}`;
 }
 
 function addDate(date: string, offset: number) {

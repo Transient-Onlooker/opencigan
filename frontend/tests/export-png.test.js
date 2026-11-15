@@ -165,7 +165,12 @@ test('buildExportFilename creates safe sanitized filenames for class and teacher
   const cappedFilename = buildExportFilename({ ...options, schoolName: ultraLongSchool });
   assert.ok(cappedFilename.length <= 120);
   assert.ok(cappedFilename.startsWith('Opencigan_'));
-  assert.ok(cappedFilename.endsWith('.png'));
+  assert.ok(cappedFilename.endsWith('_1학년2반_week_2026-11-09.png'));
+  const longTeacher = buildExportFilename({ ...options, view: 'teacher', schoolName: '학교😀'.repeat(80), teacherName: '선생님😀'.repeat(80) });
+  assert.ok(longTeacher.length <= 120);
+  assert.ok(longTeacher.endsWith('_teacher_2026-11-09.png'));
+  assert.doesNotMatch(longTeacher, /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u);
+  assert.match(buildExportFilename({ ...options, view: 'teacher', teacherName: '///' }), /_선생님_teacher_/);
 });
 
 test('wrappedText preserves words when wrapping long labels and splits long tokens', () => {
