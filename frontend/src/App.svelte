@@ -1218,7 +1218,7 @@
                    </div>
                  {/each}
                </div>
-               <div class="lesson-time-actions"><button class="secondary-button" type="button" onclick={(event) => { event.currentTarget.focus(); saveLessonTimes(); }}><Icon name="save" /> 시각 저장</button><button class="secondary-button" type="button" onclick={clearLessonTimes}>시각 초기화</button></div>
+               <div class="lesson-time-actions"><button class="secondary-button" type="button" onclick={(event) => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); event.currentTarget.focus(); saveLessonTimes(); }}><Icon name="save" /> 시각 저장</button><button class="secondary-button" type="button" onclick={clearLessonTimes}>시각 초기화</button></div>
                {#if lessonTimeState}<p class="state-inline" role="status">{lessonTimeState}</p>{/if}
              </details>
              <details class="settings-backup" hidden={!settingsMatch('설정 백업 복원 파일 저장 가져오기 내보내기 초기화', settingsQuery)} bind:open={settingsOpen.backup}>
