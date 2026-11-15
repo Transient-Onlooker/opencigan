@@ -70,20 +70,6 @@ label{font-size:14px;font-weight:650}
 .teacher-options{display:flex;gap:8px;flex-wrap:wrap;max-height:190px;overflow-y:auto;overscroll-behavior:contain;margin:0 0 18px;padding:2px}
 .teacher-options button{min-height:40px;padding:7px 12px}
 .teacher-table .class-cell+.class-cell{border-top:1px solid var(--line);padding-top:8px;margin-top:8px}
-.allergy-settings{border:1px solid var(--line);margin:0 0 16px;padding:0 14px}
-.meal-preferences{border:1px solid var(--line);margin:0 0 12px;padding:0 14px}
-.meal-preferences summary{cursor:pointer;font-size:14px;font-weight:700;min-height:44px;align-content:center}
-.meal-preference-options{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 12px}
-.meal-preference-options>span{font-size:13px;color:var(--muted);margin-right:4px}
-.meal-preference-options label,.meal-number-toggle{display:inline-flex;align-items:center;min-height:44px;gap:8px;font-size:14px;cursor:pointer}
-.meal-preferences input{width:18px;height:18px;accent-color:var(--ink)}
-.meal-preferences p{font-size:12px;line-height:1.6;color:var(--muted);margin:4px 0 12px}
-.allergy-settings summary{cursor:pointer;font-size:14px;font-weight:700;min-height:44px;align-content:center}
-.allergy-settings summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-.allergy-settings p{font-size:12px;line-height:1.6;color:var(--muted);margin:12px 0}
-.allergy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:10px}
-.allergy-grid label{display:flex;align-items:center;gap:8px;min-height:38px;font-size:14px;cursor:pointer}
-.allergy-grid input{width:18px;height:18px;accent-color:var(--ink)}
 .dishes li{min-width:0}
 .dishes li.allergy-warning{display:grid;gap:3px;color:#a11125;background:#fff1f2;border-left:3px solid #c4263d;padding:6px 10px;margin-left:-10px}
 .allergy-label{font-size:12px;line-height:1.5;font-weight:800}
@@ -161,7 +147,6 @@ button,.school-option,.footer-links a{transition:background-color .16s ease,colo
   .grade-comparison-scroll{display:none}.grade-compact{display:grid;gap:12px}.grade-period{border:1px solid var(--line);min-width:0}.grade-period h3{background:var(--soft);font-size:15px;padding:8px 12px;border-bottom:1px solid var(--line)}.grade-class-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.grade-class{min-width:0;padding:9px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);overflow-wrap:anywhere}.grade-class:nth-child(even){border-right:0}.grade-class:last-child,.grade-class:nth-last-child(2):nth-child(odd){border-bottom:0}.grade-class h4{font-size:13px;font-weight:800;margin:0 0 4px}.grade-class .class-cell{align-items:flex-start;gap:2px}.grade-class .class-cell strong{font-size:14px;line-height:1.4}.grade-class .class-cell>span{font-size:12px}.grade-class .class-cell+.class-cell{border-top:1px solid var(--line);margin-top:7px;padding-top:7px}.grade-class.changed{box-shadow:inset 3px 0 var(--ink)}
   .timetable-switch button{font-size:13px;padding:7px 5px}
   .lesson-search-fields input,.lesson-search-fields select{font-size:16px}
-  .allergy-grid label{min-height:44px}
   .meal-cards{grid-template-columns:1fr;gap:14px}.meal-card-heading{padding:14px 16px}.dishes{padding:16px;font-size:17px;gap:8px}.no-meal{padding:18px 16px}
   .view-switch button{min-width:calc(50% - 1px);border-bottom:1px solid var(--line)}.view-switch button:nth-child(2){border-right:0}.view-switch button:nth-child(n+3){border-bottom:0}.timetable-switch button{min-width:0;min-height:44px;flex:1 1 0;border-bottom:0}.timetable-switch button:nth-child(2){border-right:1px solid var(--line)}.lesson-list article{grid-template-columns:64px minmax(0,1fr);gap:4px 10px}.lesson-list article>span:not(.lesson-period):not(.change-label){grid-column:2}.lesson-list article .change-label{grid-column:2;justify-self:start}.history-section{padding:12px}.history-heading{align-items:flex-start}.history-heading .secondary-button{flex:none;padding-inline:9px}
   footer{margin-top:28px}

@@ -164,4 +164,19 @@
 .settings-import input{max-width:100%;min-width:0;font-size:13px}
 .settings-backup .state-inline{margin-top:10px}
 @media(max-width:700px){.display-settings-grid input:not([type="checkbox"]),.display-settings-grid select{font-size:16px}}
+.allergy-settings{border:1px solid var(--line);margin:0 0 16px;padding:0 14px}
+.meal-preferences{border:1px solid var(--line);margin:0 0 12px;padding:0 14px}
+.meal-preferences summary{cursor:pointer;font-size:14px;font-weight:700;min-height:44px;align-content:center}
+.meal-preference-options{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 12px}
+.meal-preference-options>span{font-size:13px;color:var(--muted);margin-right:4px}
+.meal-preference-options label,.meal-number-toggle{display:inline-flex;align-items:center;min-height:44px;gap:8px;font-size:14px;cursor:pointer}
+.meal-preferences input{width:18px;height:18px;accent-color:var(--ink)}
+.meal-preferences p{font-size:12px;line-height:1.6;color:var(--muted);margin:4px 0 12px}
+.allergy-settings summary{cursor:pointer;font-size:14px;font-weight:700;min-height:44px;align-content:center}
+.allergy-settings summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.allergy-settings p{font-size:12px;line-height:1.6;color:var(--muted);margin:12px 0}
+.allergy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:10px}
+.allergy-grid label{display:flex;align-items:center;gap:8px;min-height:38px;font-size:14px;cursor:pointer}
+.allergy-grid input{width:18px;height:18px;accent-color:var(--ink)}
+@media(max-width:700px){.allergy-grid label{min-height:44px}}
 </style>
