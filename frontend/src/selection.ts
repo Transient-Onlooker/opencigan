@@ -40,6 +40,37 @@ export type PendingSharedClass = {
   fallback: { school: School | null; grade: number; classroom: number };
 };
 
+export function createSharedSelectionSession(onChange: (state: { checking: boolean; pending: PendingSharedClass | null }) => void) {
+  let request: AbortController | undefined;
+  let checking = false;
+  let pending: PendingSharedClass | null = null;
+  const publish = () => onChange({ checking, pending });
+  return {
+    begin() {
+      request?.abort();
+      request = new AbortController();
+      checking = true;
+      pending = null;
+      publish();
+      return request.signal;
+    },
+    setPending(value: PendingSharedClass) { pending = value; publish(); },
+    consume() { const value = pending; pending = null; publish(); return value; },
+    finish(signal: AbortSignal) {
+      if (request?.signal !== signal || signal.aborted) return;
+      checking = false;
+      publish();
+    },
+    cancel() {
+      request?.abort();
+      request = undefined;
+      checking = false;
+      pending = null;
+      publish();
+    },
+  };
+}
+
 export function resolveSharedClass(pending: PendingSharedClass, timetable: TimetableResponse | null, fromDevice: boolean, maxGrade: number) {
   const validation = validateSharedClass(timetable, fromDevice, maxGrade, pending.grade, pending.classroom);
   if (validation === 'valid') return { status: 'committed' as const, grade: pending.grade, classroom: pending.classroom };
