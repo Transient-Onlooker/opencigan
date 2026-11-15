@@ -1,12 +1,15 @@
 import sqlite3
+import json
 import tempfile
 import unittest
 from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from backend.webhook_store import WebhookStore
 from backend.webhook_worker import deliver_next
+from backend.history import HistoryStore
 
 
 class WebhookStoreTests(unittest.TestCase):
@@ -73,3 +76,39 @@ class WebhookStoreTests(unittest.TestCase):
         self.assertTrue(deliver_next(self.store, now=130, sender=sender))
         self.assertEqual(calls[0], calls[1])
         self.assertFalse(deliver_next(self.store, now=1000, sender=sender))
+
+    def test_observed_changes_enqueue_only_matching_class_atomically(self):
+        history = HistoryStore(self.path)
+        other = self.store.create("2:예시학교", 2, 4, "https://chat.googleapis.com/v1/spaces/abc/messages?key=K&token=T")
+        base = datetime.now(timezone.utc)
+        lesson = {"grade": 2, "class": 3, "date": "2026-11-16", "period": 1, "subject": "수학", "teacher": "김"}
+        history.observe("2:예시학교", "2026-11-16", [lesson], base)
+        self.assertIsNone(self.store.claim(now=base.timestamp() + 30))
+        modified = {**lesson, "subject": "<users/all>@everyone"}
+        history.observe("2:예시학교", "2026-11-16", [modified], base + timedelta(seconds=1))
+        delivery = self.store.claim(now=base.timestamp() + 30)
+        payload = json.loads(delivery["body"])
+        self.assertEqual(payload["allowed_mentions"], {"parse": []})
+        self.assertNotIn("<users/all>", payload["content"])
+        self.assertIsNone(self.store.claim(now=base.timestamp() + 30))
+        self.assertIsNotNone(self.store.get(other["id"], other["token"]))
+        self.assertEqual(len(history.list("2:예시학교", "2026-11-16")["changes"]), 1)
+        history.observe("2:예시학교", "2026-11-16", [modified], base + timedelta(seconds=2))
+        self.assertIsNone(self.store.claim(now=base.timestamp() + 30))
+
+    def test_failed_enqueue_rolls_back_history_and_snapshot(self):
+        history = HistoryStore(self.path)
+        base = datetime.now(timezone.utc)
+        lesson = {"grade": 2, "class": 3, "date": "2026-11-16", "period": 1, "subject": "수학", "teacher": "김"}
+        history.observe("2:예시학교", "2026-11-16", [lesson], base)
+        with closing(sqlite3.connect(self.path)) as db:
+            db.execute("CREATE TRIGGER reject_queue BEFORE INSERT ON webhook_deliveries BEGIN SELECT RAISE(ABORT, 'test failure'); END")
+            db.commit()
+        with self.assertRaises(sqlite3.IntegrityError):
+            history.observe("2:예시학교", "2026-11-16", [{**lesson, "subject": "과학"}], base + timedelta(seconds=1))
+        self.assertEqual(history.list("2:예시학교", "2026-11-16")["changes"], [])
+        with closing(sqlite3.connect(self.path)) as db:
+            db.execute("DROP TRIGGER reject_queue")
+            db.commit()
+        history.observe("2:예시학교", "2026-11-16", [{**lesson, "subject": "과학"}], base + timedelta(seconds=2))
+        self.assertEqual(history.list("2:예시학교", "2026-11-16")["changes"][0]["before"]["subject"], "수학")

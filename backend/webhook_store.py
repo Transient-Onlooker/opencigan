@@ -12,6 +12,27 @@ from contextlib import closing
 from backend.webhook_delivery import validate_destination
 
 
+def enqueue_observed_change(db, school, grade, classroom, date, period, kind, before, after, change_id, now):
+    subscriptions = db.execute("SELECT id, provider FROM webhook_subscriptions WHERE school=? AND grade=? AND classroom=?",
+                               (school, grade, classroom)).fetchall()
+    if not subscriptions:
+        return
+
+    def lesson(value):
+        if value is None:
+            return "없음"
+        return " · ".join(part for part in (value.get("subject"), value.get("teacher")) if part) or "정보 없음"
+
+    text = f"{school.split(':', 1)[-1]} {grade}학년 {classroom}반 · {date} {period}교시 ({kind})\n{lesson(before)} → {lesson(after)}"
+    # Google Chat interprets angle-bracket tokens as mentions; Discord disables all mentions explicitly.
+    safe_text = text.replace("<", "＜").replace(">", "＞")[:1800]
+    for subscription in subscriptions:
+        payload = {"content": safe_text, "allowed_mentions": {"parse": []}} if subscription["provider"] == "discord" else {"text": safe_text}
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        db.execute("INSERT OR IGNORE INTO webhook_deliveries(subscription_id, event_id, body, next_at) VALUES (?, ?, ?, ?)",
+                   (subscription["id"], f"change_{change_id}", body, now))
+
+
 class WebhookStore:
     def __init__(self, path):
         self.path = str(path)
