@@ -33,6 +33,19 @@ export function validateSharedClass(timetable: TimetableResponse | null, fromDev
   return 'valid';
 }
 
+export type PendingSharedClass = {
+  schoolId: string;
+  grade: number;
+  classroom: number;
+  fallback: { school: School | null; grade: number; classroom: number };
+};
+
+export function resolveSharedClass(pending: PendingSharedClass, timetable: TimetableResponse | null, fromDevice: boolean, maxGrade: number) {
+  const validation = validateSharedClass(timetable, fromDevice, maxGrade, pending.grade, pending.classroom);
+  if (validation === 'valid') return { status: 'committed' as const, grade: pending.grade, classroom: pending.classroom };
+  return { status: 'rolled-back' as const, reason: validation, fallback: pending.fallback };
+}
+
 export function gradesInTimetable(records: TimetableRecord[], maxGrade: number): number[] {
   return [...new Set(records.map((record) => Number(record.grade))
     .filter((value) => Number.isInteger(value) && value >= 1 && value <= maxGrade))].sort((a, b) => a - b);

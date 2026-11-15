@@ -5,7 +5,7 @@
   import MealMenu from './MealMenu.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { saveSelection, saveGradeAndClass, saveClassToStorage, validateSharedClass, verifiedSharedSchool, gradesInTimetable, classesInGrade, reconcileClassSelection } from './selection';
+  import { saveSelection, saveGradeAndClass, saveClassToStorage, resolveSharedClass, verifiedSharedSchool, gradesInTimetable, classesInGrade, reconcileClassSelection, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -77,7 +77,7 @@
   let showAllergenNumbers = true;
   let dateError = '';
   let sharedClassState = '';
-  let pendingSharedClass: { schoolId: string; grade: number; classroom: number; fallback: { school: School | null; grade: number; classroom: number } } | null = null;
+  let pendingSharedClass: PendingSharedClass | null = null;
   let sharedSchoolChecking = false;
   let classActionsReady = false;
   let inputFocused = false;
@@ -505,16 +505,16 @@
     if (pendingSharedClass && pendingSharedClass.schoolId === school?.id) {
       const pending = pendingSharedClass;
       pendingSharedClass = null;
-      const validation = validateSharedClass(timetable, timetableFromDevice, school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6, pending.grade, pending.classroom);
-      if (validation !== 'valid') {
-        const message = validation === 'missing'
+      const outcome = resolveSharedClass(pending, timetable, timetableFromDevice, school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6);
+      if (outcome.status === 'rolled-back') {
+        const message = outcome.reason === 'missing'
           ? `공유 링크의 ${pending.grade}학년 ${pending.classroom}반이 선택한 주의 시간표 데이터에 없어 적용하지 않았어요.`
           : '시간표 데이터가 없어 공유 링크의 학년·반을 확인하지 못했어요.';
-        if (pending.fallback.school) {
-          grade = pending.fallback.grade;
-          classroom = pending.fallback.classroom;
+        if (outcome.fallback.school) {
+          grade = outcome.fallback.grade;
+          classroom = outcome.fallback.classroom;
           classError = false;
-          chooseSchool(pending.fallback.school, true);
+          chooseSchool(outcome.fallback.school, true);
           sharedClassState = message + ' 이전 학교와 학급을 유지했어요.';
         } else {
           classError = true;
@@ -524,8 +524,8 @@
         return;
       }
       classError = false;
-      grade = pending.grade;
-      classroom = pending.classroom;
+      grade = outcome.grade;
+      classroom = outcome.classroom;
       classroomDraft = String(classroom);
       sharedClassState = '';
       if (school) { try { saveSelection(localStorage, school, grade, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ } }

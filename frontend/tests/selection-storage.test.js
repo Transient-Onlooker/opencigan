@@ -40,6 +40,22 @@ test('shared classroom requires fresh matching data and valid school grade', () 
   assert.equal(exports.validateSharedClass(null, false, 3, 1, 3), 'unavailable');
 });
 
+test('shared selection commits only verified classes and otherwise returns the original fallback', () => {
+  const fallback = { school: { id: 'previous' }, grade: 2, classroom: 3 };
+  const pending = { schoolId: 'next', grade: 1, classroom: 7, fallback };
+  const data = { stale: false, records: [{ grade: 1, class: 7 }] };
+  const committed = exports.resolveSharedClass(pending, data, false, 3);
+  assert.equal(committed.status, 'committed');
+  assert.equal(committed.grade, 1);
+  assert.equal(committed.classroom, 7);
+  for (const [table, fromDevice, reason] of [[data, true, 'unavailable'], [{ ...data, records: [{ grade: 1, class: 1 }] }, false, 'missing']]) {
+    const result = exports.resolveSharedClass(pending, table, fromDevice, 3);
+    assert.equal(result.status, 'rolled-back');
+    assert.equal(result.reason, reason);
+    assert.equal(result.fallback, fallback);
+  }
+});
+
 test('grade and class options are unique, sorted and limited by school level', () => {
   const records = [{ grade: 2, class: '11' }, { grade: 2, class: 3 }, { grade: 2, class: 3 },
     { grade: 4, class: 1 }, { grade: 0, class: 1 }, { grade: 2, class: 'bad' }];
