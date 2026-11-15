@@ -15,11 +15,15 @@ Opensigan provides lightweight TypeScript and Python API clients for programmati
 3. **Meal Query Range Limits**
    - The `from` and `to` query range can span at most **7 days** inclusive (`(to - from).days <= 6`).
 4. **Rolling Calendar Feeds (.ics)**
-   - `/api/v1/timetable.ics` supports rolling schedules (`weeks=1` or `weeks=2`), display modes (`periods` or `summary`), and HTTP 304 conditional revalidation with `If-None-Match` / `ETag`.
+   - `/api/v1/timetable.ics` supports rolling schedules (`weeks=1` or `weeks=2`), display modes (`periods`, `summary`, or `timed`), and HTTP 304 conditional revalidation with `If-None-Match` / `ETag`.
+   - In `timed` mode, client applications can pass an optional `times` query string formatted as comma-separated `period:HHMM-HHMM` entries (e.g. `1:0900-0950,2:1000-1050`). Periods must be 1..20, unique, and strictly nonoverlapping in chronological order.
+   - Bell times are interpreted as KST (`Asia/Seoul`) inputs and converted to UTC in the output iCalendar feed (`DTSTART`/`DTEND` in `YYYYMMDDTHHMMSSZ`).
+   - Any periods missing from `times` remain explicitly labelled all-day events (`DTSTART;VALUE=DATE` with description note `교시 시각 미설정`).
+   - Privacy & Security: Obtain user consent before exporting local times; subscription URLs are visible to the server and calendar sync providers. No profile or bell-schedule data is stored on the server.
 5. **Privacy Guardrail**
    - Never send student names, personal allergy lists, or profile information to the API.
 
-JSON timetable and ICS apply `teacher` as a case-insensitive substring (1–50 characters), combined with grade/class filters. ICS requires grade/class and creates all-day events; it has no actual lesson times. NEIS search/meals need the server-side NEIS key. School IDs and dates in snippets are synthetic; replace dates with the current/next KST Monday and use IDs from search.
+JSON timetable and ICS apply `teacher` as a case-insensitive substring (1–50 characters), combined with grade/class filters. ICS requires grade/class and defaults to all-day events (`periods` or `summary`); `timed` mode maps supplied bell times to UTC. NEIS search/meals need the server-side NEIS key. School IDs and dates in snippets are synthetic; replace dates with the current/next KST Monday and use IDs from search.
 
 ---
 
@@ -52,6 +56,11 @@ const timetable = await client.getTimetable(schoolId, '2026-11-16', {
 
 // 3. Calendar subscription URL
 const icsUrl = client.getTimetableIcsUrl(schoolId, 1, 2, { weeks: 2, mode: 'periods' });
+const timedIcsUrl = client.getTimetableIcsUrl(schoolId, 1, 2, {
+  weeks: 2,
+  mode: 'timed',
+  times: '1:0900-0950,2:1000-1050',
+});
 
 // 4. Fetch meals (up to 7 days)
 const meals = await client.getMeals('B10:1234567', '2026-11-16', '2026-11-20');
@@ -85,6 +94,9 @@ except OpensiganError as e:
 
 # 3. Calendar subscription URL
 ics_url = client.get_timetable_ics_url(school_id, grade=1, classroom=2, weeks=2, mode="periods")
+timed_ics_url = client.get_timetable_ics_url(
+    school_id, grade=1, classroom=2, weeks=2, mode="timed", times="1:0900-0950,2:1000-1050"
+)
 
 # 4. Fetch meals
 meals = client.get_meals("B10:1234567", "2026-11-16", "2026-11-20")

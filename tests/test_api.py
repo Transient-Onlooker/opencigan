@@ -133,10 +133,13 @@ class ApiTests(unittest.TestCase):
             self.assertEqual(self.get("/api/v1/schools?q=school")["schools"][0]["id"], "2:school")
         with patch.dict("os.environ", {"NEIS_API_KEY": "test-key"}), patch("backend.app.NEISClient.from_environment") as factory:
             factory.return_value.search_schools.return_value = [School("B10", "1234567", "school", "high", "address")]
-            factory.return_value.get_meals.return_value = [Meal("2026-11-10", "lunch", "rice(1)<br/>soup(2)")]
+            factory.return_value.get_meals.return_value = [Meal("2026-11-10", "lunch", "rice(1)<br/>soup(2)", "700 kcal", "국내산", "단백질 20g")]
             self.assertEqual(self.get("/api/v1/neis/schools?q=school")["schools"][0]["id"], "B10:1234567")
             meals = self.get("/api/v1/meals?school=B10%3A1234567&from=2026-11-09&to=2026-11-15")
             self.assertEqual(meals["meals"][0]["dishes"], ["rice(1)", "soup(2)"])
+            self.assertEqual(meals["meals"][0]["calories"], "700 kcal")
+            self.assertEqual(meals["meals"][0]["nutrition"], "단백질 20g")
+            self.assertEqual(meals["meals"][0]["origin"], "국내산")
 
     def test_meals_cache_reuses_school_and_date_range(self):
         with patch("backend.app.cache", Cache()), patch.dict("os.environ", {"NEIS_API_KEY": "test-key"}), \

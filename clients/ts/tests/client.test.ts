@@ -69,6 +69,11 @@ test('OpensiganClient query encoding and URL construction', async () => {
   // 6. ICS URL generation for both modes
   const icsPeriods = client.getTimetableIcsUrl('1234:학교', 1, 2, { weeks: 1, mode: 'periods', teacher: '박' });
   const icsSummary = client.getTimetableIcsUrl('1234:학교', 1, 2, { weeks: 2, mode: 'summary' });
+  const icsTimed = client.getTimetableIcsUrl('1234:학교', 1, 2, {
+    weeks: 2,
+    mode: 'timed',
+    times: '1:0900-0950,2:1000-1050',
+  });
   const parsedIcsPeriods = new URL(icsPeriods);
   assert.equal(parsedIcsPeriods.searchParams.get('mode'), 'periods');
   assert.equal(parsedIcsPeriods.searchParams.get('weeks'), '1');
@@ -76,6 +81,10 @@ test('OpensiganClient query encoding and URL construction', async () => {
   const parsedIcsSummary = new URL(icsSummary);
   assert.equal(parsedIcsSummary.searchParams.get('mode'), 'summary');
   assert.equal(parsedIcsSummary.searchParams.get('weeks'), '2');
+  const parsedIcsTimed = new URL(icsTimed);
+  assert.equal(parsedIcsTimed.searchParams.get('mode'), 'timed');
+  assert.equal(parsedIcsTimed.searchParams.get('weeks'), '2');
+  assert.equal(parsedIcsTimed.searchParams.get('times'), '1:0900-0950,2:1000-1050');
 });
 
 test('malformed success JSON is structured; HTTP error status survives invalid JSON', async () => {
@@ -232,6 +241,63 @@ test('OpensiganClient error code handling and boundary responses', async () => {
   assert.equal(cachedIcs.notModified, true);
   assert.equal(cachedIcs.data, null);
   assert.equal(cachedIcs.etag, '"etag-123"');
+
+  // 4b. ICS timed mode and ETag revalidation with times
+  let requestedTimes: string | null = null;
+  const clientTimed = new OpensiganClient({
+    baseUrl: 'http://127.0.0.1:8000',
+    fetch: (async (url, init) => {
+      const parsed = new URL(url.toString());
+      requestedTimes = parsed.searchParams.get('times');
+      const reqHeaders = (init?.headers as Record<string, string>) || {};
+      if (reqHeaders['If-None-Match'] === '"etag-timed"') {
+        return new Response(null, { status: 304, headers: { ETag: '"etag-timed"' } });
+      }
+      return new Response('BEGIN:VCALENDAR\r\nDTSTART:20261109T000000Z\r\nEND:VCALENDAR', {
+        status: 200,
+        headers: { ETag: '"etag-timed"', 'Content-Type': 'text/calendar' },
+      });
+    }),
+  });
+  const timedIcs = await clientTimed.getTimetableIcs('1234:학교', 1, 1, {
+    mode: 'timed',
+    times: '1:0900-0950,2:1000-1050',
+  });
+  assert.equal(requestedTimes, '1:0900-0950,2:1000-1050');
+  assert.equal(timedIcs.notModified, false);
+  assert.equal(timedIcs.etag, '"etag-timed"');
+  assert.match(timedIcs.data!, /DTSTART:20261109T000000Z/);
+
+  const timedIcsCached = await clientTimed.getTimetableIcs('1234:학교', 1, 1, {
+    mode: 'timed',
+    times: '1:0900-0950,2:1000-1050',
+    ifNoneMatch: '"etag-timed"',
+  });
+  assert.equal(timedIcsCached.notModified, true);
+  assert.equal(timedIcsCached.data, null);
+  assert.equal(timedIcsCached.etag, '"etag-timed"');
+
+  // 4c. Timed mode query encoding with special characters and multiple periods
+  let capturedUrl: string = '';
+  const clientTimedUrl = new OpensiganClient({
+    baseUrl: 'http://127.0.0.1:8000',
+    fetch: (async (url) => {
+      capturedUrl = url.toString();
+      return new Response('BEGIN:VCALENDAR\r\nEND:VCALENDAR', {
+        status: 200,
+        headers: { ETag: '"etag-multi"', 'Content-Type': 'text/calendar' },
+      });
+    }),
+  });
+  await clientTimedUrl.getTimetableIcs('1234:학교&본관', 1, 2, {
+    weeks: 2,
+    mode: 'timed',
+    times: '1:0900-0950,2:1000-1050',
+  });
+  const parsedCaptured = new URL(capturedUrl);
+  assert.equal(parsedCaptured.searchParams.get('school'), '1234:학교&본관');
+  assert.equal(parsedCaptured.searchParams.get('mode'), 'timed');
+  assert.equal(parsedCaptured.searchParams.get('times'), '1:0900-0950,2:1000-1050');
 
   // 5. Network TypeError
   const clientNetworkErr = new OpensiganClient({

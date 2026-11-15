@@ -23,6 +23,9 @@ def main():
         school = schools[0]["id"]
         print("Timetable:", client.get_timetable(school, monday, grade=1, classroom=1))
         print("Calendar URL:", client.get_timetable_ics_url(school, 1, 1, weeks=2, mode="periods"))
+        print("Timed Calendar URL:", client.get_timetable_ics_url(
+            school, 1, 1, weeks=2, mode="timed", times="1:0900-0950,2:1000-1050",
+        ))
         try:
             print("History first page:", client.get_timetable_history(school, monday))
         except OpensiganError as error:

@@ -49,11 +49,20 @@ class Meal:
     menu: str
     calories: str | None = None
     origin: str | None = None
+    nutrition: str | None = None
+
+
+MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+MAX_ROWS = 100_000
+MAX_NUTRITION_FIELD_LENGTH = 4_000
 
 
 def _transport(url: str, timeout: float) -> bytes:
     with urlopen(url, timeout=timeout) as response:
-        return response.read()
+        raw = response.read(MAX_RESPONSE_BYTES + 1)
+    if len(raw) > MAX_RESPONSE_BYTES:
+        raise NEISResponseError("NEIS response exceeds the 16 MiB limit.")
+    return raw
 
 
 class NEISClient:
@@ -122,7 +131,8 @@ class NEISClient:
             return [], 0
         count = next((h["list_total_count"] for h in head if isinstance(h, dict) and "list_total_count" in h), None)
         rows = next((b["row"] for b in blocks if isinstance(b, dict) and "row" in b), None)
-        if not isinstance(count, int) or isinstance(count, bool) or count < 0 or not isinstance(rows, list):
+        if (not isinstance(count, int) or isinstance(count, bool) or count < 0
+                or count > MAX_ROWS or not isinstance(rows, list) or len(rows) > 1000):
             raise NEISResponseError("NEIS 응답의 건수 또는 데이터가 올바르지 않습니다.")
         if any(not isinstance(row, dict) for row in rows):
             raise NEISResponseError("NEIS 데이터 형식이 올바르지 않습니다.")
@@ -140,7 +150,7 @@ class NEISClient:
             result.extend(rows)
             if len(result) == count:
                 return result
-            if not rows or len(result) > count:
+            if not rows or len(result) > count or page >= (MAX_ROWS + 999) // 1000:
                 raise NEISResponseError("NEIS가 전체 결과를 반환하지 않았습니다.")
             page += 1
 
@@ -184,5 +194,15 @@ class NEISClient:
                     raise ValueError
             except (KeyError, TypeError, ValueError):
                 raise NEISResponseError("NEIS 급식 데이터가 올바르지 않습니다.") from None
-            result.append(Meal(meal_date.isoformat(), row.get("MMEAL_SC_NM") or "", menu, row.get("CAL_INFO"), row.get("ORPLC_INFO")))
+            def optional_field(name: str) -> str | None:
+                value = row.get(name)
+                if not isinstance(value, str) or not value.strip():
+                    return None
+                return value[:MAX_NUTRITION_FIELD_LENGTH]
+
+            result.append(Meal(
+                meal_date.isoformat(), row.get("MMEAL_SC_NM") or "", menu,
+                optional_field("CAL_INFO"), optional_field("ORPLC_INFO"),
+                optional_field("NTR_INFO"),
+            ))
         return result

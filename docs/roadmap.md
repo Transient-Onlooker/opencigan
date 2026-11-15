@@ -74,7 +74,7 @@
 
 - [x] 시간표 필터 API (`grade`, `class`, `teacher`, 기존 학교·주간 캐시 재사용)
 - [x] iCalendar(.ics) 구독 URL (선택한 학급, 현재/다음 주 자동 이동, 학교·주별 캐시 재사용, 로컬에서 하루 요약과 교시별 종일 일정 모드 지원; 실제 수업 시작·종료 시각 연동은 후속 과제)
-- [ ] iframe 임베드 위젯·Embed Builder
+- [x] iframe 임베드 위젯·Embed Builder (2026-11-15: 실제 학년·반 선택, 복수 수업·20교시, 안전한 문자열 표시·취소 경합 브라우저 회귀 검증.)
 - [x] TypeScript/Python 경량 클라이언트, 실행 예제 및 모의 HTTP 경계 회귀 (2026-11-15)
 - [x] AI Agent Skill(`agent-skill/SKILL.md`), `llms.txt` (실제 API 계약·식별자·조회 범위·개인정보 경계 안내)
 - [ ] 공개 API 버전/하위 호환성 정책, 요청량·지연·오류 모니터링

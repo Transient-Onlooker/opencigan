@@ -10,7 +10,7 @@ from backend.app import dispatch_request
 
 
 class BackendFilterContractTests(unittest.TestCase):
-    def test_teacher_substring_applies_to_json_and_both_ics_modes(self):
+    def test_teacher_substring_applies_to_json_and_all_ics_modes(self):
         timetable = {
             "schoolId": "2:Example", "weekStart": "2026-11-09",
             "fetchedAt": "2026-11-09T00:00:00Z", "stale": False,
@@ -28,7 +28,7 @@ class BackendFilterContractTests(unittest.TestCase):
             status, _, body = dispatch_request("GET", "/api/v1/timetable", urlencode(params))
             self.assertEqual(status, 200)
             self.assertEqual([record["teacher"] for record in json.loads(body)["records"]], ["Kim Min"])
-            for mode in ("periods", "summary"):
+            for mode in ("periods", "summary", "timed"):
                 with self.subTest(mode=mode):
                     status, _, body = dispatch_request(
                         "GET", "/api/v1/timetable.ics", urlencode({**params, "mode": mode}),
@@ -37,6 +37,39 @@ class BackendFilterContractTests(unittest.TestCase):
                     self.assertEqual(body.count(b"BEGIN:VEVENT"), 1)
                     self.assertIn(b"Math", body)
                     self.assertNotIn(b"Science", body)
+
+    def test_timed_mode_times_parsing_contract(self):
+        timetable = {
+            "schoolId": "2:Example", "weekStart": "2026-11-09",
+            "fetchedAt": "2026-11-09T00:00:00Z", "stale": False,
+            "records": [
+                {"grade": 1, "class": 1, "date": "2026-11-09", "period": 1, "subject": "Math", "teacher": None},
+                {"grade": 1, "class": 1, "date": "2026-11-09", "period": 2, "subject": "Art", "teacher": None},
+            ],
+        }
+        params = {
+            "school": "2:Example", "week": "2026-11-09",
+            "grade": 1, "class": 1, "mode": "timed", "times": "1:0900-0950",
+        }
+        with patch("backend.app._cached_timetable", return_value=(timetable, "hit")), \
+                patch("backend.app.validate_timetable_week"):
+            status, headers, body = dispatch_request("GET", "/api/v1/timetable.ics", urlencode(params))
+            self.assertEqual(status, 200)
+            self.assertIn("ETag", headers)
+            # 09:00 KST -> 00:00 UTC
+            self.assertIn(b"DTSTART:20261109T000000Z", body)
+            self.assertIn(b"DTEND:20261109T005000Z", body)
+            # Period 2 has no time -> fallback to all-day with explicit label
+            self.assertIn(b"DTSTART;VALUE=DATE:20261109", body)
+            self.assertIn("교시 시각 미설정".encode("utf-8"), body)
+
+            # Revalidation with ETag returns 304
+            status_304, _, empty_body = dispatch_request(
+                "GET", "/api/v1/timetable.ics", urlencode(params),
+                request_headers={"If-None-Match": headers["ETag"]},
+            )
+            self.assertEqual(status_304, 304)
+            self.assertEqual(empty_body, b"")
         self.assertEqual(len(timetable["records"]), 2)
 
 

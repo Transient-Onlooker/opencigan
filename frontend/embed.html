@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex,nofollow">
+  <title>시간표 위젯 · Opencigan</title>
+</head>
+<body class="widget-body">
+  <div id="widget-root" class="widget-root" role="region" aria-label="시간표 위젯">
+    <header class="widget-header">
+      <div class="widget-title-wrap">
+        <h1 id="widget-title" class="widget-title">시간표 위젯</h1>
+        <p id="widget-meta" class="widget-meta"></p>
+      </div>
+      <div class="widget-actions">
+        <a id="widget-link" class="widget-link" href="./" target="_blank" rel="noopener noreferrer" title="Opencigan 원본 페이지에서 보기">Opencigan ↗</a>
+      </div>
+    </header>
+
+    <div id="widget-message" class="widget-status" role="status" aria-live="polite">불러오는 중…</div>
+
+    <div id="widget-table-wrap" class="widget-table-wrap" hidden>
+      <table class="widget-table" aria-label="주간 시간표">
+        <thead>
+          <tr id="widget-table-head">
+            <th scope="col" class="col-period">교시</th>
+            <th scope="col" data-day="1">월</th>
+            <th scope="col" data-day="2">화</th>
+            <th scope="col" data-day="3">수</th>
+            <th scope="col" data-day="4">목</th>
+            <th scope="col" data-day="5">금</th>
+          </tr>
+        </thead>
+        <tbody id="widget-table-body"></tbody>
+      </table>
+    </div>
+
+    <footer class="widget-footer">
+      <span id="widget-updated" class="widget-updated"></span>
+      <span class="widget-brand"><a href="https://github.com/Transient-Onlooker/opensigan" target="_blank" rel="noopener noreferrer">Opensigan</a></span>
+    </footer>
+  </div>
+  <script type="module" src="/src/embed.ts"></script>
+</body>
+</html>

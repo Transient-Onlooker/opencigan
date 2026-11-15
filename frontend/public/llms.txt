@@ -9,7 +9,7 @@
   - NEIS: `시도교육청코드:학교코드` (e.g. `B10:1234567`) -> used for `/meals`
 - JSON timetable week: YYYY-MM-DD Monday date. Backend permits ONLY current week or next week in KST (Asia/Seoul).
 - Meals range: YYYY-MM-DD from/to dates, maximum 7 days inclusive.
-- Calendar feed: `/api/v1/timetable.ics` supports rolling schedules (`weeks=1` or `weeks=2`), mode (`periods` or `summary`), and HTTP 304 revalidation via ETag.
+- Calendar feed: `/api/v1/timetable.ics` supports rolling schedules (`weeks=1` or `weeks=2`), mode (`periods`, `summary`, or `timed`), and HTTP 304 revalidation via ETag. In `timed` mode, client-supplied `times` (e.g. `1:0900-0950,2:1000-1050`, periods 1..20, unique, nonoverlapping) map KST inputs to UTC calendar events. Missing times fall back to explicitly labelled all-day events (`교시 시각 미설정`). Obtain user consent before exporting local times; URLs are visible to servers/calendar services with no stored user profile.
 - Timetable history: `/api/v1/timetable/history` accepts any Monday and returns observations retained for 30 days, not a complete historical timetable. Pass nextCursor back as cursor. Returns HTTP 503 code `history_disabled` when database is not configured.
 - Configure the actual HTTP(S) API base. A public frontend deployment does not guarantee API availability. NEIS search/meals require a server-side key. Never upload allergy/profile data or log secrets. Always encode query values.
 
@@ -20,7 +20,7 @@
 - GET /api/v1/timetable?school={school_id}&week={monday_date}: Get timetable records for school and week.
   - Optional query filters: `grade` (1-6), `class` (1-99), `teacher` (case-insensitive substring).
 - GET /api/v1/timetable.ics?school={school_id}&grade={grade}&class={class}: iCalendar (.ics) subscription feed.
-  - Optional parameters: `weeks` (1 or 2, default 1), `mode` (periods or summary, default periods), `teacher` (case-insensitive substring, maximum 50 characters). Events are all-day; actual bell times are unavailable.
+  - Optional parameters: `weeks` (1 or 2, default 1), `mode` (periods, summary, or timed, default periods), `times` (timed mode only, comma-separated period:HHMM-HHMM, e.g. `1:0900-0950,2:1000-1050`), `teacher` (case-insensitive substring, maximum 50 characters). Default periods/summary events are all-day; timed mode maps KST bell times to UTC instants, leaving missing periods labelled as all-day events.
 - GET /api/v1/meals?school={neis_id}&from={start_date}&to={end_date}: School meals up to 7 days inclusive.
 - GET /api/v1/timetable/history?school={school_id}&week={monday_date}&cursor={optional_cursor}: Changes history.
 

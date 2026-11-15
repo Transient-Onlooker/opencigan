@@ -84,11 +84,12 @@ export interface TimetableFilterOptions extends RequestOptions {
   teacher?: string;
 }
 
-export type SubscriptionMode = 'periods' | 'summary';
+export type SubscriptionMode = 'periods' | 'summary' | 'timed';
 
 export interface IcsOptions {
   weeks?: 1 | 2;
   mode?: SubscriptionMode;
+  times?: string;
   teacher?: string;
 }
 
@@ -232,6 +233,7 @@ export class OpensiganClient {
     params.set('class', String(classroom));
     if (options?.weeks !== undefined) params.set('weeks', String(options.weeks));
     if (options?.mode !== undefined) params.set('mode', options.mode);
+    if (options?.times !== undefined) params.set('times', options.times);
     if (options?.teacher !== undefined) params.set('teacher', options.teacher);
     return `${this.baseUrl}/api/v1/timetable.ics?${params.toString()}`;
   }

@@ -572,6 +572,9 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
                             "date": m.date,
                             "type": m.meal_type,
                             "dishes": re.split(r"<br\s*/?>", m.menu, flags=re.I),
+                            "calories": m.calories,
+                            "nutrition": m.nutrition,
+                            "origin": m.origin,
                         }
                         for m in meals
                     ],

@@ -42,7 +42,7 @@ const assert = require('node:assert/strict');
       sourceUpdatedAt: null, fetchedAt: '2026-11-10T00:00:00Z', stale: false, cacheStatus: 'miss',
     });
     assert.deepEqual(await api.getMeals('B10:1234567', '2026-11-09', '2026-11-15'), {
-      meals: [{ date: '2026-11-10', type: '중식', dishes: ['밥(1)', '국(2)'] }], stale: false,
+      meals: [{ date: '2026-11-10', type: '중식', dishes: ['밥(1)', '국(2)'], calories: null, nutrition: null, origin: null }], stale: false,
     });
     await assert.rejects(api.getMeals('invalid', '2026-11-09', '2026-11-15'), /400/);
     await assert.rejects(api.searchSchools('failure'), /503/);

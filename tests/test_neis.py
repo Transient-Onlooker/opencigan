@@ -145,5 +145,43 @@ class NEISTests(unittest.TestCase):
             client.get_meals(School("A10", "1", "학교"), date(2026, 1, 2), date(2026, 1, 1))
 
 
+    def test_nutrition_is_optional_bounded_and_keeps_meal_constructor_positions(self):
+        rows = [
+            {"MLSV_YMD": "20261110", "DDISH_NM": "rice", "NTR_INFO": "carbohydrate 80<br/>protein 20"},
+            {"MLSV_YMD": "20261111", "DDISH_NM": "soup", "NTR_INFO": None},
+            {"MLSV_YMD": "20261112", "DDISH_NM": "fruit", "NTR_INFO": "x" * 5000},
+        ]
+        client = NEISClient("key", transport=lambda url, timeout: response("mealServiceDietInfo", rows))
+        meals = client.get_meals(School("A10", "1000001", "school"), date(2026, 11, 10), date(2026, 11, 12))
+        self.assertEqual(meals[0].nutrition, rows[0]["NTR_INFO"])
+        self.assertIsNone(meals[1].nutrition)
+        self.assertEqual(len(meals[2].nutrition), 4000)
+        self.assertEqual(Meal("d", "t", "m", "cal", "origin").nutrition, None)
+
+    def test_nutrition_ignores_non_string_values_and_normalizes_blank(self):
+        rows = [
+            {"MLSV_YMD": "20261110", "DDISH_NM": "rice", "NTR_INFO": {"protein": 4}},
+            {"MLSV_YMD": "20261111", "DDISH_NM": "soup", "NTR_INFO": "   "},
+        ]
+        client = NEISClient("key", transport=lambda url, timeout: response("mealServiceDietInfo", rows))
+        meals = client.get_meals(School("A10", "1000001", "school"), date(2026, 11, 10), date(2026, 11, 11))
+        self.assertEqual([meal.nutrition for meal in meals], [None, None])
+
+    def test_pagination_rejects_unreasonable_count_and_nonprogress(self):
+        for count in [100_001, -1]:
+            with self.subTest(count=count):
+                client = NEISClient("key", transport=lambda url, timeout: response("schoolInfo", [], count=count))
+                with self.assertRaises(NEISResponseError):
+                    client.search_schools("school")
+
+        calls = []
+        def empty_page(url, timeout):
+            calls.append(url)
+            return response("schoolInfo", [], count=3)
+        with self.assertRaises(NEISResponseError):
+            NEISClient("key", transport=empty_page).search_schools("school")
+        self.assertEqual(len(calls), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

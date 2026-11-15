@@ -442,6 +442,9 @@ components:
         date: { type: string, format: date }
         type: { type: string }
         dishes: { type: array, items: { type: string } }
+        calories: { type: [string, 'null'], maxLength: 4000, description: 'Original NEIS calorie text; no estimated value.' }
+        nutrition: { type: [string, 'null'], maxLength: 4000, description: 'Original NEIS NTR_INFO text, if provided.' }
+        origin: { type: [string, 'null'], maxLength: 4000, description: 'Original NEIS ingredient origin text, if provided.' }
       additionalProperties: false
     MealsResponse:
       type: object

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex,nofollow">
+  <title>시간표 위젯 생성기 (Embed Builder) · Opencigan</title>
+</head>
+<body class="builder-body">
+  <main class="builder-container">
+    <header class="builder-header">
+      <h1>시간표 위젯 생성기 (Embed Builder)</h1>
+      <p>홈페이지, 노션, 블로그 등에 삽입할 수 있는 컴팩트한 읽기 전용 iframe 시간표 코드를 생성합니다.</p>
+    </header>
+
+    <div class="builder-grid">
+      <section class="builder-form" aria-label="위젯 설정">
+        <div class="builder-field">
+          <label for="school-search-input">학교 검색</label>
+          <input id="school-search-input" type="text" placeholder="학교 이름을 입력하세요 (예: 봄빛고등학교)" maxlength="50" autocomplete="off">
+          <p class="helper-text">학교 이름을 입력하면 검색 결과가 표시됩니다.</p>
+          <ul id="school-search-results" class="builder-search-results" hidden></ul>
+        </div>
+
+        <div id="selected-school-box" class="builder-selected-school" hidden>
+          <div>
+            <strong id="selected-school-name">선택된 학교 없음</strong>
+            <span id="selected-school-meta" class="helper-text"></span>
+          </div>
+          <button id="selected-school-clear" class="btn" type="button" style="min-height:36px;padding:4px 10px;font-size:12px">변경</button>
+        </div>
+
+        <div class="builder-row">
+          <div class="builder-field">
+            <label for="grade-select">학년</label>
+            <select id="grade-select" disabled>
+              <option value="">선택</option>
+              <option value="1">1학년</option>
+              <option value="2">2학년</option>
+              <option value="3">3학년</option>
+              <option value="4">4학년</option>
+              <option value="5">5학년</option>
+              <option value="6">6학년</option>
+            </select>
+          </div>
+          <div class="builder-field">
+            <label for="class-select">반</label>
+            <select id="class-select" disabled>
+              <option value="">선택</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="builder-row">
+          <div class="builder-field">
+            <label for="week-select">주간 선택</label>
+            <select id="week-select">
+              <option value="current">이번 주 (자동 롤링)</option>
+              <option value="next">다음 주</option>
+            </select>
+          </div>
+          <div class="builder-field">
+            <label for="theme-select">테마</label>
+            <select id="theme-select">
+              <option value="auto">시스템 설정 따름 (Auto)</option>
+              <option value="light">라이트 모드 (Light)</option>
+              <option value="dark">다크 모드 (Dark)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="builder-row">
+          <div class="builder-field">
+            <label for="width-input">너비 (Width)</label>
+            <input id="width-input" type="text" value="100%" maxlength="20">
+          </div>
+          <div class="builder-field">
+            <label for="height-input">높이 (Height)</label>
+            <input id="height-input" type="number" value="380" min="200" max="1200" step="10">
+          </div>
+        </div>
+      </section>
+
+      <section class="builder-preview-wrap" aria-label="미리보기 및 코드">
+        <div class="preview-box">
+          <h2>위젯 미리보기</h2>
+          <iframe id="preview-iframe" class="preview-iframe" title="시간표 위젯 미리보기" loading="lazy"></iframe>
+        </div>
+
+        <div class="code-box">
+          <h2>임베드 HTML 코드</h2>
+          <textarea id="code-output" class="code-textarea" readonly></textarea>
+          <button id="copy-code-btn" class="btn btn-primary" type="button">코드 복사</button>
+          <span id="copy-feedback" class="helper-text" style="margin-left:8px" role="status" aria-live="polite"></span>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="/src/embed-builder.ts"></script>
+</body>
+</html>

@@ -18,6 +18,11 @@ async function main() {
     const school = schools[0].id;
     console.log('Timetable:', await client.getTimetable(school, monday, { grade: 1, class: 1 }));
     console.log('Calendar URL:', client.getTimetableIcsUrl(school, 1, 1, { weeks: 2, mode: 'periods' }));
+    console.log('Timed Calendar URL:', client.getTimetableIcsUrl(school, 1, 1, {
+      weeks: 2,
+      mode: 'timed',
+      times: '1:0900-0950,2:1000-1050',
+    }));
     try {
       console.log('History first page:', await client.getTimetableHistory(school, monday));
     } catch (error) {
