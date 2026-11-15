@@ -105,6 +105,8 @@ RSS는 `/api/v1/timetable/history.rss?school=1234%3A예시학교&grade=2&class=3
 
 필요하면 `subject`, `teacher`(각 1~50자 부분 일치, 대소문자 구분), `weekday`(월~금 1~5), `period`(1~20), `type`(`added`, `deleted`, `changed`)을 조합할 수 있습니다. 과목과 교사는 각각 변경 전이나 변경 후 어느 쪽이든 일치하면 됩니다. 조건을 모두 적용한 뒤 최신 50건을 반환합니다.
 
+`group=daily`를 사용하면 조회된 최대 50건을 수업 날짜별 항목으로 묶습니다. 새 관측이 포함되면 요약 항목의 식별자가 바뀌며, 알림 횟수와 갱신 방식은 RSS 리더에 따라 다릅니다. 기본값 `group=changes`는 변경별 항목입니다.
+
 ## 오류 및 호출 정책
 
 | HTTP | `code` | 의미 |

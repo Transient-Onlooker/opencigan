@@ -71,3 +71,22 @@ class HistoryFeedTests(unittest.TestCase):
             for bad in ("weekday=6", "period=21", "type=other", "teacher=a&teacher=b", "period=01", "subject="):
                 with self.subTest(bad=bad):
                     self.assertEqual(dispatch_request("GET", self.path, self.query + "&" + bad)[0], 400)
+
+    def test_daily_summary_groups_changes_and_changes_id_when_updated(self):
+        records = [dict(grade=1, date=self.week, period=i, subject="수학", teacher="", **{"class": 1}) for i in (1, 2)]
+        self.store.observe(self.school, self.week, records, self.now)
+        self.store.observe(self.school, self.week, [{**r, "subject": "<과학>"} for r in records], self.now + timedelta(seconds=1))
+        with patch("backend.app._history_store", return_value=self.store):
+            status, headers, body = dispatch_request("GET", self.path, self.query + "&group=daily")
+            self.assertEqual(status, 200)
+            item = ElementTree.fromstring(body).find("channel/item")
+            self.assertEqual(item.findtext("title"), f"{self.week} 시간표 변경 2건")
+            self.assertEqual(item.findtext("description").count("<br/>"), 1)
+            self.assertIn("&lt;과학&gt;", item.findtext("description"))
+            guid = item.findtext("guid")
+            self.store.observe(self.school, self.week, [{**r, "subject": "영어"} for r in records], self.now + timedelta(seconds=2))
+            status, _, updated = dispatch_request("GET", self.path, self.query + "&group=daily",
+                                                  request_headers={"If-None-Match": headers["ETag"]})
+            self.assertEqual(status, 200)
+            self.assertNotEqual(ElementTree.fromstring(updated).findtext("channel/item/guid"), guid)
+            self.assertEqual(dispatch_request("GET", self.path, self.query + "&group=invalid")[0], 400)

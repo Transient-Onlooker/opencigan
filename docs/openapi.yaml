@@ -332,6 +332,7 @@ paths:
         - { name: weekday, in: query, schema: { type: integer, minimum: 1, maximum: 5 }, description: Monday is 1; Friday is 5. }
         - { name: period, in: query, schema: { type: integer, minimum: 1, maximum: 20 } }
         - { name: type, in: query, schema: { type: string, enum: [added, deleted, changed] } }
+        - { name: group, in: query, schema: { type: string, enum: [changes, daily], default: changes }, description: Group the selected latest 50 changes by lesson date. }
         - { name: If-None-Match, in: header, schema: { type: string } }
       responses:
         '200':

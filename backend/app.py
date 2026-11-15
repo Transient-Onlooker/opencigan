@@ -550,8 +550,11 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
                     filters["type"] = _query_param(query, "type", 7)
                     if filters["type"] not in ("added", "deleted", "changed"):
                         raise ValueError("type이 올바르지 않습니다")
+                group = _query_param(query, "group", 7) if "group" in query else "changes"
+                if group not in ("changes", "daily"):
+                    raise ValueError("group은 changes 또는 daily여야 합니다")
                 changes = store.list(school, week, grade=grade_filter, classroom=class_filter, include_ids=True, filters=filters)["changes"]
-                body = render_history_feed(school, grade_filter, class_filter, changes)
+                body = render_history_feed(school, grade_filter, class_filter, changes, group=group)
                 etag = '"' + hashlib.sha256(body).hexdigest() + '"'
                 headers.update({"Content-Type": "application/rss+xml; charset=utf-8", "ETag": etag,
                                 "Cache-Control": "private, max-age=0, must-revalidate"})
