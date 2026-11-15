@@ -10,4 +10,4 @@ const compiled = ts.transpileModule(source, {
 export const personalizationVm = {};
 runInNewContext(compiled, { exports: personalizationVm });
 const selection = readFileSync(new URL('../../src/selection.ts', import.meta.url), 'utf8');
-runInNewContext(ts.transpileModule(selection, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: personalizationVm });
+runInNewContext(ts.transpileModule(selection, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports: personalizationVm });

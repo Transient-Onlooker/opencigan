@@ -5,7 +5,7 @@
   import MealMenu from './MealMenu.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { saveSelection, saveGradeAndClass, saveClassToStorage, validateSharedClass, verifiedSharedSchool } from './selection';
+  import { saveSelection, saveGradeAndClass, saveClassToStorage, validateSharedClass, verifiedSharedSchool, gradesInTimetable, classesInGrade } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -138,7 +138,7 @@
   $: teacherDates = Array.from({ length: 5 }, (_, i) => addDays(week, i));
   $: availableGrades = gradesInTimetable(timetable?.records ?? [], school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6);
   $: gradeOptions = availableGrades.length ? availableGrades : school && /(?:중학교|고등학교)/.test(school.name) ? [1, 2, 3] : [1, 2, 3, 4, 5, 6];
-  $: availableClasses = [...new Set((timetable?.records ?? []).filter((r) => Number(r.grade) === Number(grade)).map((r) => Number(r.class)).filter((n) => Number.isInteger(n) && n > 0))].sort((a, b) => a - b);
+  $: availableClasses = classesInGrade(timetable?.records ?? [], grade);
   $: weekendClasses = filtered.some((r) => r.date === addDays(week, 5) || r.date === addDays(week, 6));
   $: dates = Array.from({ length: weekendClasses ? 7 : 5 }, (_, i) => addDays(week, i));
   $: missingWeekdays = dates.slice(0, 5).filter((date) => !filtered.some((record) => record.date === date));
@@ -198,11 +198,6 @@
 
   function themeIsDark(preference: 'light' | 'dark' | 'system', prefersDark: boolean) {
     return preference === 'dark' || (preference === 'system' && prefersDark);
-  }
-
-  function gradesInTimetable(records: TimetableRecord[], maxGrade: number) {
-    return [...new Set(records.map((record) => Number(record.grade))
-      .filter((value) => Number.isInteger(value) && value >= 1 && value <= maxGrade))].sort((a, b) => a - b);
   }
 
   function subjectStyle(subject: string | null | undefined) {
@@ -539,8 +534,7 @@
     const previousGrade = Number(grade);
     const previousClass = Number(classroom);
     if (grades.length && !grades.includes(previousGrade)) grade = grades[0];
-    const options = [...new Set((timetable?.records ?? []).filter((record) => Number(record.grade) === Number(grade))
-      .map((record) => Number(record.class)).filter((value) => Number.isInteger(value) && value > 0))].sort((a, b) => a - b);
+    const options = classesInGrade(timetable?.records ?? [], grade);
     if (options.length && !options.includes(Number(classroom))) classroom = options[0];
     classroomDraft = String(classroom);
     if (previousGrade === Number(grade) && previousClass === Number(classroom)) return;
