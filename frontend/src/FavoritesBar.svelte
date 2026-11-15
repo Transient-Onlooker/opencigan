@@ -34,3 +34,23 @@
   {/if}
 {/if}
 {#if school && !favorites.length}<p class="quick-class-hint">즐겨찾는 학급이 없어요. 현재 학급을 추가하면 바로 전환할 수 있어요.</p>{/if}
+
+<style>
+  .favorite-save{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:0 0 18px}
+  .favorites-bar{border:1px solid var(--line);padding:16px;margin-bottom:20px;min-width:0}
+  .favorites-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:12px}.favorites-heading h2{font-size:17px}
+  .favorite-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(250px,100%),1fr));gap:8px}
+  .favorite-picker{display:grid;gap:5px;margin:0 0 12px;font-size:13px;color:var(--muted)}
+  .favorite-picker select{min-height:44px;max-width:100%;width:100%;border:1px solid var(--line);padding:8px;background:var(--surface);color:var(--ink)}
+  .favorite-item{display:flex;min-width:0;border:1px solid var(--line)}
+  .favorite-switch{display:flex;flex:1;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;min-height:52px;padding:9px 12px;text-align:left;border:0;background:var(--surface);color:var(--ink);overflow-wrap:anywhere}
+  .favorite-switch strong{font-size:14px}.favorite-switch span{color:var(--muted);font-size:13px}.favorite-switch:hover{background:var(--soft)}
+  .favorite-switch[aria-pressed=true]{background:var(--ink);color:var(--surface)}.favorite-switch[aria-pressed=true] span{color:var(--surface)}
+  .favorite-remove{flex:none;width:44px;min-height:52px;border:0;border-left:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:23px}.favorite-remove:hover{background:var(--soft)}
+  @media(max-width:700px){
+    .favorite-save{margin-bottom:8px;gap:6px}
+    .favorite-save .secondary-button{min-height:38px;padding:5px 9px;font-size:12px}
+    .favorites-bar{padding:10px;margin-bottom:12px}
+    .favorite-picker select{font-size:16px}
+  }
+</style>
