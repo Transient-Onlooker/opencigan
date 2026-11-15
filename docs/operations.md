@@ -13,6 +13,12 @@
 
 운영 파일: `deploy/opensigan.service`, `deploy/opensigan-preview.service`, `deploy/opensigan-preview-p0.conf`, `deploy/rpi-guard-opensigan.conf`. 서비스는 `systemd --user`에서 실행하도록 설계되어 있습니다. 자동 시작 여부와 실제 설치 상태는 RPi에서 따로 확인해야 합니다.
 
+## 컴시간 전용 프록시
+
+컴시간에서 서버의 직접 연결이 거부되는 경우 `OPENCIGAN_COMCIGAN_PROXY=http://127.0.0.1:18084`처럼 루프백 HTTP 프록시를 지정할 수 있습니다. 이 설정은 pycomcigan 요청에만 적용되며 NEIS 요청에는 적용하지 않습니다. 프록시가 실패하면 직접 연결로 우회하지 않습니다. 프록시 상태는 Pi에서 `curl --proxy http://127.0.0.1:18084 --max-time 8 http://comci.net:4082/st`로 확인할 수 있습니다. 일반적인 `http_proxy` 환경변수로 서비스 전체 트래픽을 변경하지 마세요.
+
+2026-11-16 운영 긴급 적용은 기존 `release-54f89b9`를 보존한 `release-warp-20261116` 복사본과 `zzzz-opencigan-warp.conf` 사용자 서비스 drop-in을 사용했습니다. 이전 버전으로 되돌릴 때는 해당 drop-in을 다른 이름으로 옮긴 뒤 `systemctl --user daemon-reload`와 `systemctl --user restart opensigan.service`를 실행하고 로컬 상태 API를 확인합니다. 직접 연결이 차단된 동안 이전 버전의 컴시간 조회는 실패할 수 있습니다.
+
 ## 비밀키와 설정
 
 - NEIS 키: `~/.config/opensigan/neis.env` (예: `NEIS_API_KEY=...`). 키 자체를 로그·Issue·PR에 붙이지 마세요.
