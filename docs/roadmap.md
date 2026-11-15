@@ -79,6 +79,8 @@
 - [x] AI Agent Skill(`agent-skill/SKILL.md`), `llms.txt` (실제 API 계약·식별자·조회 범위·개인정보 경계 안내)
 - [ ] 공개 API 버전/하위 호환성 정책, 요청량·지연·오류 모니터링
 - [ ] Tailscale Funnel과 Cloudflare Tunnel의 실제 TTFB·전체 응답 시간을 같은 OpenCigan API(`/api/v1/status`, 캐시된 시간표)로 비교 테스트하고, 한국 접속 환경에서 평균·중앙값·p95 및 거점(ICN/NRT 등)·측정 조건·결과를 `docs/` 벤치마크 보고서에 기록하여 터널 선택에 반영
+- [ ] Cloudflare Tunnel을 Tailscale Funnel의 대안으로 검토: Raspberry Pi `cloudflared` → 로컬 API(`127.0.0.1:8000`) 연결, `opencigan.mcv.kr` DNS/TLS, 웹·API·ICS 접근, Cloudflare WAF·요청 제한, 접속 로그의 원본 IP 인식을 시험
+- [ ] Tailscale Funnel의 대역폭 제한과 Cloudflare Tunnel의 플랜·사용 정책·트래픽/요청 제한을 비교하고, 터널별 지연·안정성·보안·운영 편의성을 종합하여 사용 방식 결정
 - [x] 캘린더 구독(.ics)에 ETag·조건부 요청을 지원해 변경되지 않은 일정의 중복 다운로드 감소 (SHA-256 ETag 및 If-None-Match 304 로컬 구현 완료; 공개 서버 외부 접근 및 클라이언트별 재검증 대기)
 - [x] 사용자 동의를 받은 교시 시각 URL 전달 및 `mode=timed` 일정 구현. 한국 시각 입력·표시를 유지하고 ICS는 UTC 순간으로 직렬화. 공개 API 배포·실제 캘린더 동기화는 별도 게이트.
 - [ ] 신규 API 필터·캘린더 구독을 Playground에서 바로 시험하고 OpenAPI 명세와 실제 응답 일치 여부 자동 검사
