@@ -18,6 +18,14 @@ export function createTimetableCache(limit = 4) {
 }
 
 export type TimetableSessionState = { data: TimetableResponse | null; fromDevice: boolean; loading: boolean; error: string; refreshAt: number };
+type TimetableLoad = {
+  schoolId: string | undefined; week: string; preserve: boolean; reuseCachedWeek: boolean; validateClass: boolean;
+  refreshInterval: number; now: () => number; storage: () => Storage; online: () => boolean;
+  current: () => { schoolId: string | undefined; week: string };
+  fetch: (schoolId: string, week: string, signal: AbortSignal) => Promise<TimetableResponse>;
+  validate: () => void; classError: () => boolean; errorText: (error: unknown) => string;
+  onSuccess: (data: TimetableResponse) => void; onFailure: () => void;
+};
 
 export function createTimetableSession(onChange: (state: TimetableSessionState) => void = () => {}) {
   const cache = createTimetableCache();
@@ -55,6 +63,43 @@ export function createTimetableSession(onChange: (state: TimetableSessionState) 
         accept(data);
       });
       return { controller, result };
+    },
+    load(options: TimetableLoad) {
+      session.cancel();
+      session.update({ ...(options.preserve ? {} : { data: null, fromDevice: false }), error: '', loading: false });
+      if (!options.schoolId) return;
+      const key = options.schoolId + '\u0000' + options.week;
+      if (options.reuseCachedWeek) {
+        const cached = cache.get(key, options.now());
+        if (cached) {
+          session.update({ data: cached.data, fromDevice: false });
+          if (options.validateClass) options.validate();
+          if (options.current().schoolId !== cached.data.schoolId || options.classError()) return;
+          session.update({ refreshAt: cached.expires });
+          return;
+        }
+      }
+      session.update({ refreshAt: options.now() + options.refreshInterval });
+      const { controller, result } = session.fetch(options.schoolId, options.week, options.current, options.fetch, (data) => {
+        session.update({ data, fromDevice: false });
+        if (options.validateClass) options.validate();
+        if (controller.signal.aborted || options.classError()) return;
+        options.onSuccess(data);
+        session.saveFresh(key, data, options.now() + options.refreshInterval, options.storage);
+      });
+      session.update({ loading: true });
+      void result.catch((error) => {
+        if (controller.signal.aborted) return;
+        if (!state.data && !options.online()) {
+          const selected = options.current();
+          const saved = selected.schoolId && session.restoreOffline(selected.schoolId, selected.week, options.storage);
+          if (saved) session.update({ data: saved, fromDevice: true });
+        }
+        if (options.validateClass) options.validate();
+        if (controller.signal.aborted) return;
+        if (!state.fromDevice || options.online()) session.update({ error: options.errorText(error) });
+        options.onFailure();
+      }).finally(() => { if (!controller.signal.aborted) session.update({ loading: false }); });
     },
   };
   return session;

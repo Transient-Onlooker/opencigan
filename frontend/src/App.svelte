@@ -550,49 +550,23 @@
   }
   function loadTimetable(preserve = false, reuseCachedWeek = false, validateClass = false) {
     validateClass = validateClass || !!pendingSharedClass;
-    timetableSession.cancel(); timetableSession.update({ ...(preserve ? {} : { data: null }), error: '', loading: false });
     if (!preserve) {
-      timetableSession.update({ fromDevice: false });
       timetableCheckedAt = '';
       shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = ''; subscriptionPanelOpen = false;
     }
-    if (!school) return;
-    const key = `${school.id}\u0000${week}`;
-    if (reuseCachedWeek) {
-      const cached = timetableSession.cache.get(key, Date.now());
-      if (cached) {
-        timetableSession.update({ data: cached.data, fromDevice: false });
-        if (validateClass) ensureAvailableClass();
-        if (school?.id !== cached.data.schoolId || classError) return;
-        timetableSession.update({ refreshAt: cached.expires });
-        return;
-      }
-    }
-    timetableSession.update({ refreshAt: Date.now() + refreshInterval });
-    const { controller, result } = timetableSession.fetch(school.id, week, () => ({ schoolId: school?.id, week }), getTimetable, (data) => {
-        timetableSession.update({ data, fromDevice: false });
-        if (validateClass) ensureAvailableClass();
-        if (controller.signal.aborted || classError) return;
+    timetableSession.load({
+      schoolId: school?.id, week, preserve, reuseCachedWeek, validateClass, refreshInterval,
+      now: () => Date.now(), storage: () => localStorage, online: () => navigator.onLine !== false,
+      current: () => ({ schoolId: school?.id, week }), fetch: getTimetable,
+      validate: ensureAvailableClass, classError: () => classError, errorText,
+      onSuccess: (data) => {
         if (tableRefreshState === '갱신 중') {
           timetableCheckedAt = new Date().toISOString();
           tableRefreshState = data.stale ? '서버에 연결했어요. 저장된 시간표를 표시 중이에요.' : '새로고침 완료';
         }
-        timetableSession.saveFresh(key, data, Date.now() + refreshInterval, () => localStorage);
-      });
-    timetableSession.update({ loading: true });
-    void result
-      .catch((error) => {
-        if (controller.signal.aborted) return;
-        if (!timetable && navigator.onLine === false) {
-          const saved = school && timetableSession.restoreOffline(school.id, week, () => localStorage);
-          if (saved) timetableSession.update({ data: saved, fromDevice: true });
-        }
-        if (validateClass) ensureAvailableClass();
-        if (controller.signal.aborted) return;
-        if (!timetableFromDevice || navigator.onLine !== false) timetableSession.update({ error: errorText(error) });
-        if (tableRefreshState === '갱신 중') tableRefreshState = '새로고침 실패';
-      })
-      .finally(() => { if (!controller.signal.aborted) timetableSession.update({ loading: false }); });
+      },
+      onFailure: () => { if (tableRefreshState === '갱신 중') tableRefreshState = '새로고침 실패'; },
+    });
   }
   async function loadHistory(append = false) {
     if (!school || historyDisabled || historyLoading) return;
