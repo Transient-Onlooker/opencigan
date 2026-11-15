@@ -3,6 +3,23 @@ import { parseLessonTimes, type LessonTimes } from './lesson-times';
 
 export const MAX_SETTINGS_BACKUP_BYTES = 64 * 1024;
 
+export function saveSchoolSettingsBackup(storage: Storage, schoolId: string, displaySettings: DisplaySettings, lessonTimes: LessonTimes) {
+  const displayKey = 'opensigan-display:' + schoolId;
+  const timesKey = 'opensigan-lesson-times:' + schoolId;
+  const previousDisplay = storage.getItem(displayKey);
+  const previousTimes = storage.getItem(timesKey);
+  try {
+    storage.setItem(displayKey, JSON.stringify(displaySettings));
+    storage.setItem(timesKey, JSON.stringify(lessonTimes));
+  } catch {
+    try {
+      if (previousDisplay === null) storage.removeItem(displayKey); else storage.setItem(displayKey, previousDisplay);
+      if (previousTimes === null) storage.removeItem(timesKey); else storage.setItem(timesKey, previousTimes);
+    } catch { /* Storage access may remain blocked during rollback. */ }
+    throw new Error('브라우저 저장소에 설정을 저장하지 못했어요.');
+  }
+}
+
 type ClassroomScope = { grade: number; classroom: number };
 
 export function createSettingsBackup(schoolId: string, displaySettings: DisplaySettings, lessonTimes: LessonTimes, scope?: ClassroomScope): string {

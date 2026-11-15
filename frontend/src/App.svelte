@@ -19,7 +19,7 @@
   import { classLessons, teacherLessons, teacherNamesInTimetable } from './timetable-view';
   import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, type LessonTimes } from './lesson-times';
   import { createClassDisplayPreferences, defaultDisplaySettings, parseDisplaySettings, displaySubject, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
-  import { createSettingsBackup, parseSettingsBackup, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
+  import { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
   import { apiNotConfigured, getMeals, getTimetable, getTimetableHistory, searchSchools, searchNeisSchools, timetableSubscriptionUrl, type Meal, type NeisSchool, type School, type TimetableRecord, type TimetableResponse, type TimetableChange } from './api';
 
   type Favorite = { school: School; grade: number; classroom: number };
@@ -303,20 +303,7 @@
         settingsBackupState = '현재 학급의 표시 설정을 복원했어요.';
         return;
       }
-      const displayKey = 'opensigan-display:' + schoolId;
-      const timesKey = 'opensigan-lesson-times:' + schoolId;
-      const previousDisplay = localStorage.getItem(displayKey);
-      const previousTimes = localStorage.getItem(timesKey);
-      try {
-        localStorage.setItem(displayKey, JSON.stringify(backup.displaySettings));
-        localStorage.setItem(timesKey, JSON.stringify(backup.lessonTimes));
-      } catch {
-        try {
-          if (previousDisplay === null) localStorage.removeItem(displayKey); else localStorage.setItem(displayKey, previousDisplay);
-          if (previousTimes === null) localStorage.removeItem(timesKey); else localStorage.setItem(timesKey, previousTimes);
-        } catch { /* 저장소 접근이 차단되었다면 이후 새로고침으로 확인할 수 있어요. */ }
-        throw new Error('브라우저 저장소에 설정을 저장하지 못했어요.');
-      }
+      saveSchoolSettingsBackup(localStorage, schoolId, backup.displaySettings, backup.lessonTimes);
       schoolDisplaySettings = backup.displaySettings;
       lessonTimes = backup.lessonTimes;
       lessonTimeDrafts = { ...backup.lessonTimes };
