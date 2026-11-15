@@ -75,6 +75,14 @@ paths:
                   apiErrorRate: { type: number, minimum: 0, maximum: 1 }
                   apiAverageMs: { type: number, minimum: 0 }
                   droppedApiEvents: { type: integer, minimum: 0, description: Process-local count since startup. }
+                  cacheStatuses:
+                    type: object
+                    description: Counts of recorded timetable cache outcomes; older events may have no outcome.
+                    additionalProperties: { type: integer, minimum: 0 }
+                  failureKinds:
+                    type: object
+                    description: Counts of recorded upstream_unavailable and service_overloaded errors.
+                    additionalProperties: { type: integer, minimum: 0 }
                   daily:
                     type: array
                     items:
