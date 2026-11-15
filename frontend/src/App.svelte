@@ -8,6 +8,8 @@
   import QuickClass from './QuickClass.svelte';
   import SchoolSelector from './SchoolSelector.svelte';
   import FavoritesBar from './FavoritesBar.svelte';
+  import HistoryPanel from './HistoryPanel.svelte';
+  import ShareTools from './ShareTools.svelte';
   import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference } from './preferences';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
   import { saveSelection, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
@@ -936,34 +938,7 @@
            {#if timetable}<div class="freshness" aria-live="polite">{#if timetableFromDevice}<span>오프라인 · 이 기기에 저장된 시간표</span>{:else if timetable.stale}<span>저장된 시간표 · 최신 정보가 아닐 수 있어요</span>{/if}<span>원본 갱신 {timeText(timetable.sourceUpdatedAt)}</span></div>{/if}
            {#if timetable?.records.length}<details class="dataset-details"><summary>수업 데이터 규모 · 학급 {observedClassCount}개 · 교사 이름 {teacherNames.length}개</summary><p>선택한 주에 수집된 수업 기록 기준입니다. 학교 전체 학급·교사 수가 아닐 수 있고, 교사 이름 누락이나 동명이인이 있으면 실제 인원과 다를 수 있어요.</p></details>{/if}
           {#if timetable}
-            <section class="history-section" aria-labelledby="history-title">
-              <div class="history-heading">
-                <div><h3 id="history-title">시간표 변경 이력</h3><p>선택한 주에 실제로 수집된 변경 기록</p></div>
-                <button class="secondary-button" aria-expanded={historyOpen} aria-controls="history-list" onclick={toggleHistory}>{historyOpen ? '이력 닫기' : '이력 보기'}</button>
-              </div>
-              <div id="history-list" hidden={!historyOpen}>
-                {#if historyDisabled}<p class="state-inline">변경 이력 저장이 아직 활성화되지 않았어요.</p>
-                {:else if historyLoading && !historyChanges.length}<p class="state-inline" role="status">변경 이력을 불러오는 중…</p>
-                {:else if historyError}<div class="notice" role="alert">{historyError} <button class="text-button" onclick={() => loadHistory()}>다시 시도</button></div>
-                {:else if historyChanges.length}
-                  <div class="history-filters lesson-search-fields"><label>비교 범위<select bind:value={historyScope}><option value="class">현재 학급</option><option value="school">학교 전체</option></select></label></div>
-                  {#if visibleHistory.length}
-                    <ol class="history-list">
-                      {#each visibleHistory as change}
-                        <li>
-                          <div><strong>{change.grade}학년 {change.class}반 · {dateText(change.date)} · {change.period}교시</strong><span>{timeText(change.observedAt)} 확인 · {changeTypeText(change.type)}</span></div>
-                          <p><span><strong>변경 전</strong> {change.before ? [change.before.subject, change.before.teacher].filter(Boolean).join(' · ') : '수업 없음'}</span>
-                          <span><strong>변경 후</strong> {change.after ? [change.after.subject, change.after.teacher].filter(Boolean).join(' · ') : '수업 없음'}</span></p>
-                        </li>
-                      {/each}
-                    </ol>
-                  {:else}
-                    <p class="state-inline">{historyCursor ? '불러온 기록에 현재 학급의 변경이 없어요.' : '이 주에 수집된 현재 학급의 변경 기록이 없어요.'}</p>
-                  {/if}
-                  {#if historyCursor}<button class="secondary-button history-more" disabled={historyLoading} onclick={() => loadHistory(true)}>{historyLoading ? '불러오는 중…' : '이전 변경 더 보기'}</button>{/if}
-                {:else if !historyLoading}<p class="state-inline">이 주에 수집된 변경 기록이 없어요.</p>{/if}
-              </div>
-            </section>
+            <HistoryPanel {historyOpen} {historyDisabled} {historyLoading} {historyError} {historyChanges} {visibleHistory} {historyCursor} bind:historyScope {toggleHistory} {loadHistory} {dateText} {timeText} {changeTypeText} />
           {/if}
         </section>
         <section id="meals-panel" hidden={view !== 'meals'} aria-labelledby="meals-title">
@@ -1102,22 +1077,7 @@
           </details>
         {/if}
     </div>
-    <section class="secondary-actions" aria-label="공유" hidden={view !== 'timetable'}>
-      {#if school}
-        <div class="share-tools"><button class="secondary-button" disabled={!classActionsReady} onclick={shareClass} aria-expanded={classActionsReady && !!shareUrl}><Icon name="link" /> {classActionsReady && shareUrl ? '학급 링크 닫기' : '학급 링크 복사'}</button><button class="secondary-button" disabled={!classActionsReady || apiNotConfigured} onclick={subscribeTimetable} aria-expanded={classActionsReady && subscriptionPanelOpen}><Icon name="link" /> {classActionsReady && subscriptionPanelOpen ? '구독 링크 닫기' : '캘린더 구독 링크'}</button>{#if canExport}<button class="secondary-button" disabled={exportBusy} onclick={() => exportTimetable('PDF')}><Icon name="save" /> PDF 저장</button>{/if}<span role="status">{classActionsReady ? shareState || subscriptionState : ''}</span></div>
-        {#if classActionsReady && shareUrl}<label class="shared-link">공유 링크<input type="text" readonly value={shareUrl} onfocus={(event) => event.currentTarget.select()} /></label>{/if}
-        {#if classActionsReady && subscriptionPanelOpen}
-          <div class="lesson-search-fields">
-            <label>일정 표시 방식<select value={subscriptionMode} onchange={changeSubscriptionMode}><option value="summary">하루 요약</option><option value="periods">교시별 종일 일정</option><option value="timed">입력한 교시 시각</option></select></label>
-          </div>
-          {#if subscriptionMode === 'timed'}<label class="display-toggle"><input type="checkbox" checked={subscriptionTimesConsent} onchange={(event) => { subscriptionTimesConsent = event.currentTarget.checked; updateSubscriptionUrl(); }} /> 입력한 교시 시각을 구독 URL에 포함하는 데 동의합니다.</label><p class="display-settings-hint">시각은 API 서버와 캘린더 서비스에 전달됩니다. 시각을 바꾸면 구독 URL을 다시 추가하세요. 입력하지 않은 교시는 ‘교시 시각 미설정’ 종일 일정으로 표시됩니다.</p>{/if}
-          {#if subscriptionUrl}
-          <label class="shared-link">시간표 구독 URL (이번 주·다음 주)<input type="text" readonly value={subscriptionUrl} onfocus={(event) => event.currentTarget.select()} /></label>
-          <button type="button" class="secondary-button" onclick={copySubscription}><Icon name="link" /> 구독 링크 복사</button>
-          {/if}
-        {/if}
-      {/if}
-    </section>
+    <ShareTools {view} {school} {classActionsReady} {apiNotConfigured} {shareUrl} {shareState} {subscriptionUrl} {subscriptionState} {subscriptionPanelOpen} {subscriptionMode} {subscriptionTimesConsent} {canExport} {exportBusy} {shareClass} {subscribeTimetable} {exportTimetable} {changeSubscriptionMode} setSubscriptionTimesConsent={(value) => { subscriptionTimesConsent = value; updateSubscriptionUrl(); }} {copySubscription} />
     <footer><div class="footer-open"><svg class="github-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .75a11.25 11.25 0 0 0-3.56 21.92c.56.1.77-.24.77-.54v-2.1c-3.13.68-3.79-1.33-3.79-1.33-.51-1.3-1.25-1.64-1.25-1.64-1.02-.7.08-.69.08-.69 1.13.08 1.72 1.16 1.72 1.16 1 1.72 2.63 1.22 3.27.93.1-.72.39-1.22.7-1.5-2.5-.28-5.13-1.25-5.13-5.56 0-1.23.44-2.24 1.16-3.03-.12-.28-.5-1.43.11-2.98 0 0 .95-.3 3.1 1.16A10.8 10.8 0 0 1 12 6.17c.96 0 1.92.13 2.82.38 2.15-1.46 3.1-1.16 3.1-1.16.61 1.55.23 2.7.11 2.98.72.79 1.16 1.8 1.16 3.03 0 4.32-2.63 5.27-5.14 5.55.4.35.76 1.03.76 2.08v3.1c0 .3.2.65.78.54A11.25 11.25 0 0 0 12 .75Z"/></svg><div><strong>함께 만드는 오픈소스</strong><p>Opencigan은 오픈소스 프로젝트예요. GitHub에서 함께 기여해 주세요.</p><div class="footer-links"><a href="https://github.com/Transient-Onlooker/opensigan">Opencigan GitHub ↗</a><a href="https://github.com/hegelty/pycomcigan">pycomcigan ↗</a><a href="https://opencigan.mcv.kr/">Opencigan 사이트 ↗</a><a href="/api-docs.html">API 문서</a></div></div></div></footer>
   </main>
 </div>
