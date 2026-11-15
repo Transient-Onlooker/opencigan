@@ -25,6 +25,7 @@ from backend.history_feed import render_history_feed
 from backend.shutter import Shutter
 from backend.neis import NEISClient, School
 from backend.meal_routes import get_meals, search_meal_schools
+from backend.timetable_routes import get_timetable, search_timetable_schools
 from backend.timetable import fetch_timetable, search_schools, validate_timetable_week
 
 cache = Cache()
@@ -523,29 +524,9 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
         if path == "/api/v1/status":
             result = {"status": "ok", "scope": "process liveness"}
         elif path == "/api/v1/schools":
-            name = _query_param(query, "q", 50)
-
-            def fetch_school_search():
-                try:
-                    return {"schools": search_schools(name), "stale": False}
-                except ValueError as exc:
-                    raise RuntimeError("school search failed") from exc
-
-            result = current_cache.get(("school_search", name), fetch_school_search)
+            result = search_timetable_schools(query, current_cache, _query_param, search_schools)
         elif path == "/api/v1/timetable":
-            school = _query_param(query, "school", 100)
-            if not re.fullmatch(r"[0-9]+:[^:]{1,50}", school):
-                raise ValueError("학교 식별자가 올바르지 않습니다")
-            week = _query_param(query, "week", 10)
-            validate_timetable_week(week)
-            grade_filter, class_filter, teacher_filter = _timetable_filters(query)
-            timetable, cache_status = _cached_timetable(school, week, current_cache)
-            result = {**timetable, "cacheStatus": cache_status}
-            if grade_filter is not None or class_filter is not None or teacher_filter is not None:
-                result["records"] = [record for record in timetable["records"]
-                                     if (grade_filter is None or int(record["grade"]) == grade_filter)
-                                     and (class_filter is None or int(record["class"]) == class_filter)
-                                     and (teacher_filter is None or teacher_filter in (record.get("teacher") or "").casefold())]
+            result = get_timetable(query, current_cache, _query_param, validate_timetable_week, _timetable_filters, _cached_timetable)
         elif path == "/api/v1/timetable.ics":
             school = _query_param(query, "school", 100)
             if not re.fullmatch(r"[0-9]+:[^:]{1,50}", school):

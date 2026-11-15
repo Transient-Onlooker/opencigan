@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import Icon from './Icon.svelte';
   import Help from './Help.svelte';
-  import MealMenu from './MealMenu.svelte';
+  import MealsPanel from './MealsPanel.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import CalendarNav from './CalendarNav.svelte';
   import QuickClass from './QuickClass.svelte';
@@ -941,37 +941,7 @@
             <HistoryPanel {historyOpen} {historyDisabled} {historyLoading} {historyError} {historyChanges} {visibleHistory} {historyCursor} bind:historyScope {toggleHistory} {loadHistory} {dateText} {timeText} {changeTypeText} />
           {/if}
         </section>
-        <section id="meals-panel" hidden={view !== 'meals'} aria-labelledby="meals-title">
-          <div class="section-heading"><div><p class="eyebrow">{mealDate === today ? '오늘의 식단' : '하루 식단'}</p><h2 id="meals-title">학교 급식</h2></div><button class="secondary-button" onclick={todayMeals}>오늘로</button></div>
-          <div class="view-switch" role="group" aria-label="급식 보기"><button aria-pressed={mealView === 'day'} onclick={() => setMealView('day')}>하루 식단</button><button aria-pressed={mealView === 'week'} onclick={() => setMealView('week')}>주간 식단</button></div>
-          <div class="calendar-toolbar"><button class="arrow-button" onclick={() => changeMealDate(mealView === 'week' ? -7 : -1)} aria-label={mealView === 'week' ? '이전 급식 주' : '이전 날짜'}>←</button><div class="calendar-date"><strong aria-live="polite">{mealView === 'week' ? dateText(mealDates[0]) + ' — ' + dateText(mealDates[6]) : dateText(mealDate, { month: 'long', day: 'numeric', weekday: 'long' })}</strong><label class="date-picker">날짜 선택 <input type="date" min="1900-01-01" max="9999-12-31" value={mealDateDraft} oninput={updateMealDateDraft} onchange={selectMealDate} aria-invalid={!!dateError} aria-describedby={dateError ? 'meal-date-error' : undefined} /></label></div><button class="arrow-button" onclick={() => changeMealDate(mealView === 'week' ? 7 : 1)} aria-label={mealView === 'week' ? '다음 급식 주' : '다음 날짜'}>→</button></div>
-          {#if dateError}<p id="meal-date-error" class="notice" role="alert">{dateError}</p>{/if}
-           <div class="meal-connection" aria-live="polite">{!neis && school ? neisSearchState : ''}</div>
-          {#if !school}<div class="state-message"><strong>학교를 먼저 선택해 주세요</strong><p>시간표 학교를 선택하면 급식도 함께 연결돼요.</p></div>
-          {:else if neisLoading}<div class="state-message" role="status">같은 학교의 급식을 연결하고 있어요.</div>
-          {:else if !neis}
-            <div class="connection-options">{#each neisResults as item (item.id)}<button class="school-option" onclick={() => chooseNeis(item)}><strong>{item.name}</strong><span>{item.address}</span></button>{/each}<button class="text-button" onclick={() => connectMeals()}>급식 연결 다시 시도</button></div>
-           {:else}
-            {#if mealState}<div class="notice" role="alert">{hasMeals ? '이전 급식 정보를 표시하고 있어요. ' : ''}{mealState} <button class="text-button" onclick={() => loadMeals(true)}>다시 시도</button></div>{/if}
-            {#if mealLoading && hasMeals}<p class="state-inline" role="status">새 식단을 확인하는 동안 이전 식단을 표시하고 있어요.</p>{/if}
-            {#if mealLoading && !hasMeals}<div class="state-message" role="status">식단을 불러오고 있어요.</div>
-            {:else if hasMeals}
-               <MealMenu
-                 {meals}
-                 dates={mealView === 'week' ? mealDates : [mealDate]}
-                 {today}
-                 visibleTypes={visibleMealTypes}
-                 {allergySelection}
-                 {showAllergenNumbers}
-                 timetableFrom={current}
-                 timetableTo={addDays(current, 13)}
-                 formatDate={(date) => dateText(date, { month: 'numeric', day: 'numeric', weekday: 'long' })}
-                 onDateSelect={selectMealTimetableDate}
-               />
-            {/if}
-            {#if mealsStale}<p class="notice">저장된 급식 정보예요. 최신 정보가 아닐 수 있습니다.</p>{/if}
-          {/if}
-        </section>
+        <MealsPanel {view} {mealDate} {today} {mealView} {mealDates} {mealDateDraft} {dateError} {neis} {school} {neisSearchState} {neisLoading} {neisResults} {mealState} {hasMeals} {mealLoading} {meals} {visibleMealTypes} {allergySelection} {showAllergenNumbers} {current} {mealsStale} {todayMeals} {setMealView} {changeMealDate} {dateText} {updateMealDateDraft} {selectMealDate} {chooseNeis} {connectMeals} {loadMeals} {selectMealTimetableDate} />
         <section id="settings-panel" hidden={view !== 'settings'} aria-labelledby="settings-title">
           <h2 id="settings-title">설정</h2>
           <p><a href="./webhooks.html">시간표 변경 알림 관리</a></p>
