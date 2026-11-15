@@ -110,7 +110,7 @@
 
 ## P3 — 알림과 자동화
 
-- [ ] Webhook 구독·삭제·인증·HMAC 서명·재시도·중복 방지 (허용 호스트 전송·서명·재시도 가능 오류 분류 기반 로컬 구현. 구독 저장·큐·실제 재시도·중복 방지는 미연결)
+- [ ] Webhook 구독·삭제·인증·HMAC 서명·재시도·중복 방지 (허용 호스트 전송·서명·구독 저장·큐·작업자 단계 로컬 구현 및 모의 테스트 완료. API·이력 관측·상시 작업자 미연결)
 - [ ] 기존 [timetable-watcher](https://github.com/Transient-Onlooker/timetable-watcher)의 Google Chat 전송·변경 비교·메시지 생성·중복 알림 방지 로직을 OpenCigan에 재사용
 - [ ] 로그인 없이 비밀 관리 링크로 Webhook 구독 생성·수정·삭제하기
 - [ ] Webhook 알림 메시지 꾸미기 — 학교·학년·반·날짜·교시·변경 전후 값 등 템플릿 변수, 메시지 미리보기, 변경 유형별 문구, Discord Embed·Google Chat 등 채널별 서식

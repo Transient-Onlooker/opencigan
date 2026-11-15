@@ -1,0 +1,131 @@
+"""SQLite subscription and delivery queue; not exposed until connected to the API."""
+
+import hashlib
+import json
+import os
+import re
+import secrets
+import sqlite3
+import time
+from contextlib import closing
+
+from backend.webhook_delivery import validate_destination
+
+
+class WebhookStore:
+    def __init__(self, path):
+        self.path = str(path)
+        if self.path == ":memory:":
+            raise ValueError("webhook queue requires a persistent database")
+        try:
+            fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError:
+            pass
+        else:
+            os.close(fd)
+        with closing(self._connect()) as db:
+            db.executescript("""
+                CREATE TABLE IF NOT EXISTS webhook_subscriptions (
+                    id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, school TEXT NOT NULL,
+                    grade INTEGER NOT NULL, classroom INTEGER NOT NULL, destination TEXT NOT NULL,
+                    provider TEXT NOT NULL, signing_secret BLOB NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS webhook_deliveries (
+                    id INTEGER PRIMARY KEY, subscription_id TEXT NOT NULL REFERENCES webhook_subscriptions(id) ON DELETE CASCADE,
+                    event_id TEXT NOT NULL, body BLOB NOT NULL, state TEXT NOT NULL DEFAULT 'pending',
+                    attempts INTEGER NOT NULL DEFAULT 0, next_at REAL NOT NULL,
+                    lease_token TEXT, lease_until REAL, last_status INTEGER,
+                    UNIQUE(subscription_id, event_id)
+                );
+                CREATE INDEX IF NOT EXISTS webhook_ready ON webhook_deliveries(state, next_at, lease_until);
+            """)
+
+    def _connect(self):
+        db = sqlite3.connect(self.path, timeout=10, isolation_level=None)
+        db.row_factory = sqlite3.Row
+        db.execute("PRAGMA foreign_keys=ON")
+        return db
+
+    @staticmethod
+    def _token_hash(token):
+        if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_-]{43}", token):
+            return ""
+        return hashlib.sha256(token.encode("ascii")).hexdigest()
+
+    def create(self, school, grade, classroom, destination):
+        provider = validate_destination(destination)
+        if not isinstance(school, str) or not re.fullmatch(r"[0-9]+:[^:]{1,50}", school):
+            raise ValueError("invalid school")
+        if type(grade) is not int or not 1 <= grade <= 6 or type(classroom) is not int or not 1 <= classroom <= 99:
+            raise ValueError("invalid class")
+        identifier, token = secrets.token_urlsafe(18), secrets.token_urlsafe(32)
+        with closing(self._connect()) as db:
+            db.execute("INSERT INTO webhook_subscriptions VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                       (identifier, self._token_hash(token), school, grade, classroom, destination, provider, secrets.token_bytes(32)))
+        return {"id": identifier, "token": token, "provider": provider}
+
+    def get(self, identifier, token):
+        with closing(self._connect()) as db:
+            row = db.execute("SELECT id, school, grade, classroom, provider FROM webhook_subscriptions WHERE id=? AND token_hash=?",
+                             (identifier, self._token_hash(token))).fetchone()
+        return dict(row) if row else None
+
+    def delete(self, identifier, token):
+        with closing(self._connect()) as db:
+            return db.execute("DELETE FROM webhook_subscriptions WHERE id=? AND token_hash=?", (identifier, self._token_hash(token))).rowcount == 1
+
+    def enqueue(self, identifier, event_id, body, now=None):
+        if not isinstance(event_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", event_id):
+            raise ValueError("invalid event ID")
+        if not isinstance(body, bytes) or not body or len(body) > 65536:
+            raise ValueError("invalid body")
+        try:
+            json.loads(body)
+        except (ValueError, UnicodeDecodeError):
+            raise ValueError("invalid JSON body") from None
+        with closing(self._connect()) as db:
+            return db.execute("INSERT OR IGNORE INTO webhook_deliveries(subscription_id, event_id, body, next_at) VALUES (?, ?, ?, ?)",
+                              (identifier, event_id, body, time.time() if now is None else now)).rowcount == 1
+
+    def claim(self, now=None, lease_seconds=60):
+        now = time.time() if now is None else now
+        lease_token = secrets.token_urlsafe(18)
+        with closing(self._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                row = db.execute("""SELECT d.id, d.event_id, d.body, d.attempts, s.destination, s.signing_secret
+                    FROM webhook_deliveries d JOIN webhook_subscriptions s ON s.id=d.subscription_id
+                    WHERE (d.state='pending' AND d.next_at<=?) OR (d.state='leased' AND d.lease_until<=?)
+                    ORDER BY d.next_at, d.id LIMIT 1""", (now, now)).fetchone()
+                if row:
+                    db.execute("UPDATE webhook_deliveries SET state='leased', attempts=attempts+1, lease_token=?, lease_until=? WHERE id=?",
+                               (lease_token, now + lease_seconds, row["id"]))
+                db.execute("COMMIT")
+            except BaseException:
+                db.execute("ROLLBACK")
+                raise
+        return {**dict(row), "leaseToken": lease_token, "attempt": row["attempts"] + 1} if row else None
+
+    def finish(self, delivery_id, lease_token, result, now=None, max_attempts=6):
+        now = time.time() if now is None else now
+        with closing(self._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                row = db.execute("SELECT attempts FROM webhook_deliveries WHERE id=? AND state='leased' AND lease_token=?", (delivery_id, lease_token)).fetchone()
+                if not row:
+                    db.execute("COMMIT")
+                    return False
+                if result["delivered"]:
+                    state, next_at = "delivered", now
+                elif result["retryable"] and row["attempts"] < max_attempts:
+                    delay = min(3600, max(2 ** row["attempts"] * 15, result.get("retryAfter") or 0))
+                    state, next_at = "pending", now + delay
+                else:
+                    state, next_at = "failed", now
+                db.execute("UPDATE webhook_deliveries SET state=?, next_at=?, last_status=?, lease_token=NULL, lease_until=NULL WHERE id=?",
+                           (state, next_at, result.get("status"), delivery_id))
+                db.execute("COMMIT")
+                return True
+            except BaseException:
+                db.execute("ROLLBACK")
+                raise
