@@ -47,3 +47,23 @@ test('a new timetable request cancels only the previous request in the same sess
   assert.equal(next.signal.aborted, true);
   assert.equal(independent.signal.aborted, false);
 });
+
+test('offline data is restored only for the matching school and week and stale data is not saved', () => {
+  const session = exports.createTimetableSession();
+  const values = new Map();
+  const storage = () => ({ getItem: (key) => values.get(key), setItem: (key, value) => values.set(key, value) });
+  const fresh = { schoolId: 'a', weekStart: '2026-11-09', records: [], stale: false };
+  session.saveFresh('a-week', fresh, 100, storage);
+  assert.equal(session.restoreOffline('a', '2026-11-09', storage).schoolId, 'a');
+  assert.equal(session.restoreOffline('b', '2026-11-09', storage), null);
+  assert.equal(session.restoreOffline('a', '2026-11-16', storage), null);
+  session.saveFresh('b-week', { ...fresh, schoolId: 'b', stale: true }, 100, storage);
+  assert.equal(session.restoreOffline('a', '2026-11-09', storage).schoolId, 'a');
+  assert.equal(session.cache.get('b-week', 1), undefined);
+  const unavailable = () => { throw new Error('storage unavailable'); };
+  session.saveFresh('memory', fresh, 100, unavailable);
+  assert.equal(session.cache.get('memory', 1).data.schoolId, 'a');
+  assert.equal(session.restoreOffline('a', '2026-11-09', unavailable), null);
+  values.set('opensigan-offline-timetable', '{broken');
+  assert.equal(session.restoreOffline('a', '2026-11-09', storage), null);
+});
