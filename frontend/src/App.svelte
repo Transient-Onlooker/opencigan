@@ -236,10 +236,13 @@
   function saveDisplaySettings(next: DisplaySettings) {
     displaySettings = next;
     if (!school) return;
-    if (useClassDisplay) classDisplayPreferences.remember(classDisplayKey, next);
-    else schoolDisplaySettings = next;
-    try { localStorage.setItem(useClassDisplay ? classDisplayKey : 'opensigan-display:' + school.id, JSON.stringify(next)); }
-    catch { /* 현재 설정은 페이지에서 유지됩니다. */ }
+    if (useClassDisplay) {
+      classDisplayPreferences.set(classDisplayKey, next);
+    } else {
+      schoolDisplaySettings = next;
+      try { writeSchoolPreference(localStorage, 'opensigan-display:', school.id, next); }
+      catch { /* 현재 설정은 페이지에서 유지됩니다. */ }
+    }
   }
   function saveAlias(kind: 'subject' | 'teacher', key: string, value: string) {
     if (!key) return;
