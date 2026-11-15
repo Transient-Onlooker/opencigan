@@ -17,3 +17,5 @@ const timetableView = readFileSync(new URL('../../src/timetable-view.ts', import
 runInNewContext(ts.transpileModule(timetableView, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports: personalizationVm });
 const history = readFileSync(new URL('../../src/history-session.ts', import.meta.url), 'utf8');
 runInNewContext(ts.transpileModule(history, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports: personalizationVm, AbortController });
+const meal = readFileSync(new URL('../../src/meal-session.ts', import.meta.url), 'utf8');
+runInNewContext(ts.transpileModule(meal, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports: personalizationVm, AbortController });
