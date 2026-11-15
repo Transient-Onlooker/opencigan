@@ -5,7 +5,7 @@
   import MealMenu from './MealMenu.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { saveSelection, saveGradeAndClass, saveClassToStorage, verifiedSharedSchool } from './selection';
+  import { saveSelection, saveGradeAndClass, saveClassToStorage, validateSharedClass, verifiedSharedSchool } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -509,13 +509,9 @@
     if (pendingSharedClass && pendingSharedClass.schoolId === school?.id) {
       const pending = pendingSharedClass;
       pendingSharedClass = null;
-      const records = timetable?.records ?? [];
-      const grades = gradesInTimetable(records, school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6);
-      const classes = [...new Set(records.filter((record) => Number(record.grade) === pending.grade)
-        .map((record) => Number(record.class)).filter((value) => Number.isInteger(value) && value > 0))];
-      const hasCurrentData = !!timetable && !timetable.stale && !timetableFromDevice && records.length > 0;
-      if (!hasCurrentData || !grades.includes(pending.grade) || !classes.includes(pending.classroom)) {
-        const message = hasCurrentData
+      const validation = validateSharedClass(timetable, timetableFromDevice, school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6, pending.grade, pending.classroom);
+      if (validation !== 'valid') {
+        const message = validation === 'missing'
           ? `공유 링크의 ${pending.grade}학년 ${pending.classroom}반이 선택한 주의 시간표 데이터에 없어 적용하지 않았어요.`
           : '시간표 데이터가 없어 공유 링크의 학년·반을 확인하지 못했어요.';
         if (pending.fallback.school) {
