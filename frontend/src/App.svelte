@@ -14,6 +14,7 @@
   import { saveTimetablePdf, saveTimetablePng, shareTimetablePng, type ExportOptions } from './export-png';
   import { slotLessons } from './timetable-slots';
   import { createTimetableSession } from './timetable-cache';
+  import { createHistorySession } from './history-session';
   import { classLessons, teacherLessons, teacherNamesInTimetable } from './timetable-view';
   import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, type LessonTimes } from './lesson-times';
   import { defaultDisplaySettings, parseDisplaySettings, displaySubject, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
@@ -129,8 +130,10 @@
   $: visibleHistory = historyScope === 'school' ? historyChanges : historyChanges.filter(
     (change) => Number(change.grade) === Number(grade) && Number(change.class) === Number(classroom));
   let historyCursor: string | null = null;
-  let historyRequest: AbortController | undefined;
-  let historyRequestKey = '';
+  const historySession = createHistorySession((state) => {
+    historyLoading = state.loading; historyDisabled = state.disabled; historyError = state.error;
+    historyChanges = state.changes; historyCursor = state.cursor;
+  });
 
   $: filtered = classLessons(timetable?.records ?? [], grade, classroom);
   $: dayRecords = (timetable?.records ?? []).filter((r) => r.date === selectedDay);
@@ -179,7 +182,7 @@
     view = state.view; timetableView = state.timetableView;
     if (state.school && previousSchool !== state.school.id) chooseSchool(state.school, true);
     else if (!state.school) {
-      timetableSession.cancel(); neisRequest?.abort(); mealRequest?.abort(); historyRequest?.abort();
+      timetableSession.cancel(); neisRequest?.abort(); mealRequest?.abort(); historySession.cancel();
       selectionState.update({ school: null }); timetableSession.update({ data: null, loading: false }); neis = null; meals = []; schoolEditorOpen = true;
       mealLoading = false;
       try { localStorage.removeItem('opensigan-school'); } catch { /* 현재 탐색을 유지합니다. */ }
@@ -190,7 +193,7 @@
       persistClassSelection();
     }
     shareUrl = ''; subscriptionUrl = ''; shareState = ''; subscriptionState = '';
-    historyRequest?.abort(); historyChanges = []; historyCursor = null; historyOpen = false; historyLoading = false;
+    historySession.cancel(); historySession.update({ changes: [], cursor: null, loading: false }); historyOpen = false;
     applyingNavigation = false;
   }
 
@@ -458,7 +461,7 @@
     if (/(?:중학교|고등학교)/.test(value.name) && grade > 3) selectionState.update({ grade: 1 });
     classroomDraft = String(classroom);
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
-    schoolRequest?.abort(); clearTimeout(schoolTimer); neisRequest?.abort(); mealRequest?.abort(); historyRequest?.abort();
+    schoolRequest?.abort(); clearTimeout(schoolTimer); neisRequest?.abort(); mealRequest?.abort(); historySession.cancel();
     selectionState.update({ school: value }); schoolQuery = value.name; schoolResults = []; schoolSearchState = ''; schoolEditorOpen = false;
     selectedSubject = ''; selectedTeacher = ''; teacherQuery = '';
     try { schoolDisplaySettings = parseDisplaySettings(JSON.parse(localStorage.getItem('opensigan-display:' + value.id) || 'null')); }
@@ -468,7 +471,7 @@
     lessonTimeDrafts = { ...lessonTimes }; lessonTimeState = '';
     subscriptionTimesConsent = false;
     settingsBackupState = '';
-    historyChanges = []; historyCursor = null; historyDisabled = false; historyError = ''; historyLoading = false; historyOpen = false; historyRequestKey = '';
+    historySession.reset(); historyOpen = false;
     neis = null; neisResults = []; neisSearchState = ''; neisLoading = false;
     meals = []; hasMeals = false; mealsStale = false; mealState = ''; mealLoading = false; mealDataKey = ''; mealRequestKey = '';
     if (persistSelection) {
@@ -569,22 +572,7 @@
     });
   }
   async function loadHistory(append = false) {
-    if (!school || historyDisabled || historyLoading) return;
-    const capturedSchoolId = school.id;
-    const capturedWeek = week;
-    const requestKey = `${capturedSchoolId}\u0000${capturedWeek}`;
-    const controller = new AbortController(); historyRequest?.abort(); historyRequest = controller; historyRequestKey = requestKey;
-    historyLoading = true; historyError = '';
-    try {
-      const data = await getTimetableHistory(capturedSchoolId, capturedWeek, append ? historyCursor : null, controller.signal);
-      if (!controller.signal.aborted && historyRequestKey === requestKey && school?.id === capturedSchoolId && week === capturedWeek) { historyChanges = append ? [...historyChanges, ...data.changes] : data.changes; historyCursor = data.nextCursor; }
-    } catch (error) {
-      if (!controller.signal.aborted && historyRequestKey === requestKey && school?.id === capturedSchoolId && week === capturedWeek) {
-        if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'history_disabled') historyDisabled = true;
-        else historyError = errorText(error);
-      }
-    }
-    finally { if (!controller.signal.aborted && historyRequestKey === requestKey && school?.id === capturedSchoolId && week === capturedWeek) historyLoading = false; }
+    await historySession.load(school?.id, week, append, () => ({ schoolId: school?.id, week }), getTimetableHistory, errorText);
   }
   function toggleHistory() {
     historyOpen = !historyOpen;
@@ -623,7 +611,7 @@
     if (validWeek !== week) {
       selectionState.update({ week: validWeek });
       selectedDay = selectedDay < week ? week : selectedDay > addDays(week, 6) ? addDays(week, 6) : selectedDay;
-      historyRequest?.abort(); historyRequestKey = ''; historyChanges = []; historyCursor = null; historyDisabled = false; historyError = ''; historyLoading = false;
+      historySession.reset();
       if (refreshData) {
         loadTimetable();
         if (historyOpen) void loadHistory();
@@ -639,9 +627,9 @@
   function changeWeek(delta: number) {
     refreshCalendar(false); const next = addDays(week, delta * 7);
     if (next < current || next > addDays(current, 7)) return;
-    tableRefreshState = ''; exportState = ''; teacherQuery = ''; selectionState.update({ week: next }); selectedDay = week === current ? today : week; historyRequest?.abort(); historyRequestKey = ''; historyChanges = []; historyCursor = null; historyDisabled = false; historyError = ''; historyLoading = false; historyOpen = false; loadTimetable(false, true);
+    tableRefreshState = ''; exportState = ''; teacherQuery = ''; selectionState.update({ week: next }); selectedDay = week === current ? today : week; historySession.reset(); historyOpen = false; loadTimetable(false, true);
   }
-  function currentWeek() { refreshCalendar(false); const preserve = week === current; const reopenHistory = historyOpen; tableRefreshState = ''; if (!preserve) teacherQuery = ''; selectionState.update({ week: current }); selectedDay = today; historyRequest?.abort(); historyRequestKey = ''; historyChanges = []; historyCursor = null; historyDisabled = false; historyError = ''; historyLoading = false; loadTimetable(preserve); if (reopenHistory) void loadHistory(); }
+  function currentWeek() { refreshCalendar(false); const preserve = week === current; const reopenHistory = historyOpen; tableRefreshState = ''; if (!preserve) teacherQuery = ''; selectionState.update({ week: current }); selectedDay = today; historySession.reset(); loadTimetable(preserve); if (reopenHistory) void loadHistory(); }
   function changeMealDate(delta: number) {
     const next = addDays(mealDate, delta);
     if (!validMealDate(next)) { dateError = '1900년 이후의 올바른 날짜를 선택해 주세요.'; return; }
@@ -666,7 +654,7 @@
     mealDate = value; mealDateDraft = value; dateError = '';
     if (needsTimetable) {
       tableRefreshState = ''; teacherQuery = '';
-      historyRequest?.abort(); historyRequestKey = ''; historyChanges = []; historyCursor = null; historyDisabled = false; historyError = ''; historyLoading = false; historyOpen = false;
+      historySession.reset(); historyOpen = false;
       loadTimetable(false, true);
     }
     loadMeals();
@@ -892,7 +880,7 @@
     return () => {
       stopNavigation();
       sharedSelection.cancel();
-      clearInterval(calendarTimer); document.removeEventListener('visibilitychange', onVisibilityChange); document.removeEventListener('focusin', onFocusIn); document.removeEventListener('focusout', onFocusOut); window.removeEventListener('focus', onFocus); themeMedia?.removeEventListener?.('change', onThemeMedia); historyRequest?.abort();
+      clearInterval(calendarTimer); document.removeEventListener('visibilitychange', onVisibilityChange); document.removeEventListener('focusin', onFocusIn); document.removeEventListener('focusout', onFocusOut); window.removeEventListener('focus', onFocus); themeMedia?.removeEventListener?.('change', onThemeMedia); historySession.cancel();
       clearTimeout(schoolTimer); schoolRequest?.abort(); neisRequest?.abort(); timetableSession.cancel(); mealRequest?.abort();
     };
   });
