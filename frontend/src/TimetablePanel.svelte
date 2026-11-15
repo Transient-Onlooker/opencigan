@@ -112,3 +112,18 @@
             <HistoryPanel {historyOpen} {historyDisabled} {historyLoading} {historyError} {historyChanges} {visibleHistory} {historyCursor} bind:historyScope {toggleHistory} {loadHistory} {dateText} {timeText} {changeTypeText} />
           {/if}
         </section>
+
+<style>
+.last-fetched{font-size:12px;color:var(--muted);white-space:nowrap}
+.dataset-details{margin:8px 0 0;font-size:12px;color:var(--muted)}
+.dataset-details summary{display:list-item;width:fit-content;min-height:36px;align-content:center;cursor:pointer}
+.dataset-details summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.dataset-details p{margin:0 0 8px;line-height:1.6}
+.refresh-button{display:inline-flex;align-items:center;gap:6px}
+.refresh-button svg{width:17px;height:17px;flex:none}
+.refresh-button svg.spinning{animation:refresh-spin .85s linear infinite}
+@keyframes refresh-spin{to{transform:rotate(360deg)}}
+.refresh-feedback{margin:-10px 0 10px;color:var(--muted);font-size:12px;text-align:right}
+.export-feedback{margin:-6px 0 10px;color:var(--muted);font-size:12px;text-align:right}
+@media(max-width:700px){.last-fetched{min-width:0;text-align:left;font-size:11px;flex:0 0 100%;white-space:normal;overflow-wrap:normal}}
+</style>

@@ -50,17 +50,6 @@ label{font-size:14px;font-weight:650}
 .day-picker{display:flex;align-items:center;gap:10px;margin:0 0 16px;font-weight:650}.day-picker input{min-height:44px;max-width:100%;border:1px solid var(--line);padding:8px 10px;color:var(--ink);background:var(--surface)}
 .lesson-list{display:grid;border-top:1px solid var(--line)}.lesson-list article{display:grid;grid-template-columns:90px minmax(0,1fr) minmax(0,1fr) auto;gap:12px;align-items:center;min-height:68px;padding:12px 14px;border-bottom:1px solid var(--line)}.lesson-list article strong{font-size:16px;overflow-wrap:anywhere}.lesson-list article>span:not(.lesson-period):not(.change-label){color:var(--muted);font-size:14px;overflow-wrap:anywhere}.lesson-period{font-size:14px;font-weight:750;white-space:nowrap}.comparison-table{min-width:550px}.state-inline{margin:4px 0 0;color:var(--muted);font-size:14px}
 .calendar-content:focus{outline:0}
-.last-fetched{font-size:12px;color:var(--muted);white-space:nowrap}
-.dataset-details{margin:8px 0 0;font-size:12px;color:var(--muted)}
-.dataset-details summary{display:list-item;width:fit-content;min-height:36px;align-content:center;cursor:pointer}
-.dataset-details summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-.dataset-details p{margin:0 0 8px;line-height:1.6}
-.refresh-button{display:inline-flex;align-items:center;gap:6px}
-.refresh-button svg{width:17px;height:17px;flex:none}
-.refresh-button svg.spinning{animation:refresh-spin .85s linear infinite}
-@keyframes refresh-spin{to{transform:rotate(360deg)}}
-.refresh-feedback{margin:-10px 0 10px;color:var(--muted);font-size:12px;text-align:right}
-.export-feedback{margin:-6px 0 10px;color:var(--muted);font-size:12px;text-align:right}
 .quick-class-hint{font-size:12px;color:var(--muted)}
 .display-toggle input{width:18px;height:18px;accent-color:var(--ink)}
 .display-settings-hint{font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 12px}
@@ -137,7 +126,7 @@ button,.school-option,.footer-links a{transition:background-color .16s ease,colo
   main{width:calc(100% - 32px);padding-bottom:var(--mobile-menu-space)}
   .school-heading{padding:10px 0 8px;align-items:center;flex-wrap:wrap;gap:8px}.school-heading .eyebrow{display:none}h1{font-size:22px}h2{font-size:20px}.school-facts{font-size:13px}
   .school-heading .secondary-button{font-size:13px}
-  .section-heading{margin-bottom:10px;flex-wrap:wrap}.section-heading .heading-actions{width:100%;gap:6px}.heading-actions .secondary-button{padding:7px 9px;min-height:40px}.last-fetched{min-width:0;text-align:left;font-size:11px}.calendar-toolbar{gap:8px;grid-template-columns:44px minmax(0,1fr) 44px;padding:8px 0;margin-bottom:12px}.calendar-date strong{font-size:17px}
+  .section-heading{margin-bottom:10px;flex-wrap:wrap}.section-heading .heading-actions{width:100%;gap:6px}.heading-actions .secondary-button{padding:7px 9px;min-height:40px}.calendar-toolbar{gap:8px;grid-template-columns:44px minmax(0,1fr) 44px;padding:8px 0;margin-bottom:12px}.calendar-date strong{font-size:17px}
   .timetable:not(.comparison-table){min-width:0}.timetable:not(.comparison-table) thead th:first-child,.timetable:not(.comparison-table) tbody th{width:35px;font-size:12px}.timetable:not(.comparison-table) thead th{height:48px;font-size:13px}.timetable:not(.comparison-table) thead th small{font-size:10px;margin-top:0}.timetable:not(.comparison-table) .class-cell{gap:2px}.timetable:not(.comparison-table) .class-cell strong{font-size:12px;line-height:1.32;word-break:break-word}.timetable:not(.comparison-table) .class-cell>span{font-size:10px;line-height:1.3}.table-hint span{display:block}
   .grade-comparison-scroll{display:none}.grade-compact{display:grid;gap:12px}.grade-period{border:1px solid var(--line);min-width:0}.grade-period h3{background:var(--soft);font-size:15px;padding:8px 12px;border-bottom:1px solid var(--line)}.grade-class-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.grade-class{min-width:0;padding:9px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);overflow-wrap:anywhere}.grade-class:nth-child(even){border-right:0}.grade-class:last-child,.grade-class:nth-last-child(2):nth-child(odd){border-bottom:0}.grade-class h4{font-size:13px;font-weight:800;margin:0 0 4px}.grade-class .class-cell{align-items:flex-start;gap:2px}.grade-class .class-cell strong{font-size:14px;line-height:1.4}.grade-class .class-cell>span{font-size:12px}.grade-class .class-cell+.class-cell{border-top:1px solid var(--line);margin-top:7px;padding-top:7px}.grade-class.changed{box-shadow:inset 3px 0 var(--ink)}
   .timetable-switch button{font-size:13px;padding:7px 5px}
@@ -168,7 +157,6 @@ button,.school-option,.footer-links a{transition:background-color .16s ease,colo
 .grade-compact.density-relaxed .grade-class{padding:15px 12px}
 @media(max-width:700px){
   .section-heading .heading-actions{justify-content:flex-start}
-  .heading-actions .last-fetched{flex:0 0 100%;white-space:normal;overflow-wrap:normal}
   .timetable:not(.comparison-table) td{height:49px;padding:3px 2px}
   .timetable.density-compact:not(.comparison-table) thead th{height:40px}
   .timetable.density-compact:not(.comparison-table) td{height:42px;padding:3px 2px}
