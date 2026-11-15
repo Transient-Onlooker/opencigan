@@ -18,7 +18,7 @@
   import { createMealSession } from './meal-session';
   import { classLessons, teacherLessons, teacherNamesInTimetable } from './timetable-view';
   import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, type LessonTimes } from './lesson-times';
-  import { defaultDisplaySettings, parseDisplaySettings, displaySubject, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
+  import { createClassDisplayPreferences, defaultDisplaySettings, parseDisplaySettings, displaySubject, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
   import { createSettingsBackup, parseSettingsBackup, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
   import { apiNotConfigured, getMeals, getTimetable, getTimetableHistory, searchSchools, searchNeisSchools, timetableSubscriptionUrl, type Meal, type NeisSchool, type School, type TimetableRecord, type TimetableResponse, type TimetableChange } from './api';
 
@@ -42,7 +42,7 @@
   let displaySettings: DisplaySettings = defaultDisplaySettings();
   let schoolDisplaySettings: DisplaySettings = defaultDisplaySettings();
   let useClassDisplay = false;
-  const classDisplayDrafts = new Map<string, DisplaySettings | null>();
+  const classDisplayPreferences = createClassDisplayPreferences(() => localStorage);
   let lessonTimes: LessonTimes = {};
   let lessonTimeDrafts: Record<number, { start: string; end: string }> = {};
   let lessonTimeState = '';
@@ -225,29 +225,19 @@
   $: if (classDisplayKey) loadClassDisplay(classDisplayKey, schoolDisplaySettings);
 
   function loadClassDisplay(key: string, fallback: DisplaySettings) {
-    let saved = classDisplayDrafts.get(key);
-    if (saved === undefined) {
-      try {
-        const raw = localStorage.getItem(key);
-        saved = raw ? parseDisplaySettings(JSON.parse(raw)) : null;
-      } catch { saved = null; }
-    }
-    useClassDisplay = saved !== null;
-    displaySettings = saved ?? fallback;
+    const value = classDisplayPreferences.read(key, fallback);
+    useClassDisplay = value.enabled;
+    displaySettings = value.settings;
   }
   function setClassDisplay(enabled: boolean) {
     if (!classDisplayKey) return;
-    classDisplayDrafts.set(classDisplayKey, enabled ? displaySettings : null);
-    try {
-      if (enabled) localStorage.setItem(classDisplayKey, JSON.stringify(displaySettings));
-      else localStorage.removeItem(classDisplayKey);
-    } catch { /* 현재 페이지에서는 변경을 유지합니다. */ }
+    classDisplayPreferences.set(classDisplayKey, enabled ? displaySettings : null);
     loadClassDisplay(classDisplayKey, schoolDisplaySettings);
   }
   function saveDisplaySettings(next: DisplaySettings) {
     displaySettings = next;
     if (!school) return;
-    if (useClassDisplay) classDisplayDrafts.set(classDisplayKey, next);
+    if (useClassDisplay) classDisplayPreferences.remember(classDisplayKey, next);
     else schoolDisplaySettings = next;
     try { localStorage.setItem(useClassDisplay ? classDisplayKey : 'opensigan-display:' + school.id, JSON.stringify(next)); }
     catch { /* 현재 설정은 페이지에서 유지됩니다. */ }
@@ -308,7 +298,7 @@
         if (targetClass !== classDisplayKey || classError) throw new Error('학급이 변경되어 설정을 적용하지 않았어요.');
         try { localStorage.setItem(targetClass, JSON.stringify(backup.displaySettings)); }
         catch { throw new Error('브라우저 저장소에 설정을 저장하지 못했어요.'); }
-        classDisplayDrafts.set(targetClass, backup.displaySettings);
+        classDisplayPreferences.remember(targetClass, backup.displaySettings);
         loadClassDisplay(targetClass, schoolDisplaySettings);
         settingsBackupState = '현재 학급의 표시 설정을 복원했어요.';
         return;

@@ -89,3 +89,15 @@ test('automatic colors are stable for the same original subject', () => {
   assert.equal(subjectColor('수학', settings), original);
   assert.equal(subjectColor('수학', parseDisplaySettings({ colorMode: 'auto' })), original);
 });
+test('class display preferences remain isolated by school and class when storage is blocked', () => {
+  const fallback = helpers.defaultDisplaySettings();
+  const custom = { ...fallback, showTeachers: false };
+  const unavailable = () => { throw new Error('blocked'); };
+  const prefs = helpers.createClassDisplayPreferences(unavailable);
+  prefs.set('school-a:1:1', custom);
+  assert.equal(prefs.read('school-a:1:1', fallback).settings.showTeachers, false);
+  assert.equal(prefs.read('school-a:1:2', fallback).settings, fallback);
+  assert.equal(prefs.read('school-b:1:1', fallback).settings, fallback);
+  prefs.set('school-a:1:1', null);
+  assert.equal(prefs.read('school-a:1:1', fallback).enabled, false);
+});
