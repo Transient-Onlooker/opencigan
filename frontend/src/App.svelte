@@ -9,7 +9,7 @@
   import ShareTools from './ShareTools.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import TimetablePanel from './TimetablePanel.svelte';
-  import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference } from './preferences';
+  import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference, readFavorites, writeFavorites, type Favorite } from './preferences';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
   import { saveSelection, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
@@ -26,7 +26,6 @@
   import { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
   import { apiNotConfigured, getMeals, getTimetable, getTimetableHistory, searchSchools, searchNeisSchools, timetableSubscriptionUrl, type Meal, type NeisSchool, type School, type TimetableRecord, type TimetableResponse, type TimetableChange } from './api';
 
-  type Favorite = { school: School; grade: number; classroom: number };
   let school: School | null = null;
   let favorites: Favorite[] = [];
   let neis: NeisSchool | null = null;
@@ -358,29 +357,10 @@
   function setAllergenNumbersVisible(value: boolean) { showAllergenNumbers = value; saveMealPreferences(); }
 
   function loadFavorites() {
-    try {
-      const saved: unknown = JSON.parse(localStorage.getItem('opensigan-favorites') || '[]');
-      if (!Array.isArray(saved)) return;
-      const valid: Favorite[] = [];
-      for (const entry of saved) {
-        if (!entry || typeof entry !== 'object') continue;
-        const item = entry as Partial<Favorite>;
-        const value = item.school;
-        if (!value || typeof value.id !== 'string' || !/^[0-9]+:[^:]{1,50}$/.test(value.id) || value.id.length > 100 ||
-            typeof value.name !== 'string' || !value.name.trim() || value.name.length > 50 ||
-            typeof value.region !== 'string' || value.region.length > 100 ||
-            !Number.isInteger(item.grade) || Number(item.grade) < 1 || Number(item.grade) > 6 ||
-            !Number.isInteger(item.classroom) || Number(item.classroom) < 1 || Number(item.classroom) > 99) continue;
-        if (!valid.some((previous) => previous.school.id === value.id && previous.grade === item.grade && previous.classroom === item.classroom)) {
-          valid.push({ school: { id: value.id, name: value.name, region: value.region }, grade: Number(item.grade), classroom: Number(item.classroom) });
-        }
-        if (valid.length === 10) break;
-      }
-      favorites = valid;
-    } catch { favorites = []; }
+    try { favorites = readFavorites(localStorage) ?? favorites; } catch { favorites = []; }
   }
   function saveFavorites() {
-    try { localStorage.setItem('opensigan-favorites', JSON.stringify(favorites)); } catch { /* 브라우저 저장이 차단되어도 현재 화면은 동작합니다. */ }
+    try { writeFavorites(localStorage, favorites); } catch { /* 브라우저 저장이 차단되어도 현재 화면은 동작합니다. */ }
   }
   function addFavorite() {
     if (!school || classError || pendingSharedClass || favorites.length >= 10 ||

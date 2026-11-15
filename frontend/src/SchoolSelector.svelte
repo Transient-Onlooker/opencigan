@@ -38,3 +38,17 @@
   <p id="class-selection" class="quick-class-hint">현재 선택: {grade}학년 {classroom}반 · 반 입력은 편집을 마치면 적용돼요.</p>
   {#if classError}<p id="class-error" class="notice" role="alert">{sharedClassState || '1~99 사이의 반을 입력해 주세요. 시간표가 있는 경우 등록된 반만 선택할 수 있어요.'}</p>{/if}
 </section>
+
+<style>
+.school-panel{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:end;padding:20px;border:1px solid var(--line);margin-bottom:24px}
+.search-field{position:relative;min-width:0}
+.search-wrap{display:flex;align-items:center;gap:10px;padding:0 12px;min-height:50px;border:1px solid var(--line);margin-top:6px}
+.search-wrap:focus-within{outline:2px solid var(--ink);outline-offset:2px}
+.search-wrap input{width:100%;min-width:0;padding:10px 0;border:0;background:transparent;color:var(--ink);font-size:16px}
+.search-wrap input:focus-visible{outline:0}
+.selectors{display:grid;grid-template-columns:100px 92px;gap:12px}
+.selectors input,.selectors select{display:block;width:100%;height:50px;padding:8px 10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:16px;margin-top:6px}
+.school-panel .notice{grid-column:1/-1;margin:0}
+.search-results{position:absolute;top:100%;left:0;width:100%;z-index:5;border:1px solid var(--ink);background:var(--surface);max-height:320px;overflow-y:auto}
+@media(max-width:700px){.school-panel{grid-template-columns:1fr;padding:16px;gap:16px}.selectors{grid-template-columns:1fr 1fr}}
+</style>

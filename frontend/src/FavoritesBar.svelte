@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
   import type { School } from './api';
-  type Favorite = { school: School; grade: number; classroom: number };
+  import type { Favorite } from './preferences';
   export let school: School | null;
   export let grade: number;
   export let classroom: number;

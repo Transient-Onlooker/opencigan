@@ -1,4 +1,32 @@
+import type { School } from './api';
+
+export type Favorite = { school: School; grade: number; classroom: number };
 export type MealPreferences = { view: 'day' | 'week'; types: string[]; showAllergenNumbers: boolean };
+
+export function readFavorites(storage: Pick<Storage, 'getItem'>): Favorite[] | null {
+  const saved: unknown = JSON.parse(storage.getItem('opensigan-favorites') || '[]');
+  if (!Array.isArray(saved)) return null;
+  const valid: Favorite[] = [];
+  for (const entry of saved) {
+    if (!entry || typeof entry !== 'object') continue;
+    const item = entry as Partial<Favorite>;
+    const value = item.school;
+    if (!value || typeof value.id !== 'string' || !/^[0-9]+:[^:]{1,50}$/.test(value.id) || value.id.length > 100 ||
+        typeof value.name !== 'string' || !value.name.trim() || value.name.length > 50 ||
+        typeof value.region !== 'string' || value.region.length > 100 ||
+        !Number.isInteger(item.grade) || Number(item.grade) < 1 || Number(item.grade) > 6 ||
+        !Number.isInteger(item.classroom) || Number(item.classroom) < 1 || Number(item.classroom) > 99) continue;
+    if (!valid.some((previous) => previous.school.id === value.id && previous.grade === item.grade && previous.classroom === item.classroom)) {
+      valid.push({ school: { id: value.id, name: value.name, region: value.region }, grade: Number(item.grade), classroom: Number(item.classroom) });
+    }
+    if (valid.length === 10) break;
+  }
+  return valid;
+}
+
+export function writeFavorites(storage: Pick<Storage, 'setItem'>, favorites: Favorite[]) {
+  storage.setItem('opensigan-favorites', JSON.stringify(favorites));
+}
 
 export function readAllergies(storage: Pick<Storage, 'getItem'>) {
   const allergies: unknown = JSON.parse(storage.getItem('opensigan-allergies') || '[]');

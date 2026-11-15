@@ -38,3 +38,9 @@
         {/if}
       {/if}
     </section>
+
+<style>
+.secondary-actions{border-top:1px solid var(--line);margin-top:28px;padding-top:20px}
+.share-tools{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:16px;font-size:14px}.shared-link{display:grid;gap:4px;margin-bottom:20px}.shared-link input{width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+@media(max-width:700px){.share-tools{margin-bottom:8px;gap:6px}.share-tools .secondary-button{min-height:38px;padding:5px 9px;font-size:12px}}
+</style>
