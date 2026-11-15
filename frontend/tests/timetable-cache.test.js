@@ -48,6 +48,22 @@ test('a new timetable request cancels only the previous request in the same sess
   assert.equal(independent.signal.aborted, false);
 });
 
+test('timetable session publishes independent state snapshots', () => {
+  let first;
+  let second;
+  const session = exports.createTimetableSession((state) => { first = state; });
+  const other = exports.createTimetableSession((state) => { second = state; });
+  session.update({ loading: true, refreshAt: 100 });
+  first.loading = false;
+  session.update({ error: 'offline' });
+  other.update({ fromDevice: true });
+  assert.equal(first.loading, true);
+  assert.equal(first.refreshAt, 100);
+  assert.equal(first.error, 'offline');
+  assert.equal(second.loading, false);
+  assert.equal(second.fromDevice, true);
+});
+
 test('timetable session rejects mismatched responses and ignores cancelled requests', async () => {
   const session = exports.createTimetableSession();
   let resolve;
