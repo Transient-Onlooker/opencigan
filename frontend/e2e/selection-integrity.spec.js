@@ -24,6 +24,34 @@ async function mockApi(page, delayedSearch) {
   });
 }
 
+test('class settings backup restores the selected class without changing another class', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('시간표 표시 설정', { exact: true }).click();
+  await page.getByLabel('1학년 1반만 따로 설정').check();
+  await page.getByLabel('시간표에 교사 표시').uncheck();
+  await page.getByText('설정 백업·복원', { exact: true }).click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: '학급 설정 파일 저장' }).click();
+  const download = await downloadPromise;
+  const chunks = [];
+  for await (const chunk of await download.createReadStream()) chunks.push(chunk);
+  const contents = Buffer.concat(chunks);
+  expect(JSON.parse(contents.toString()).scope).toEqual({ grade: 1, classroom: 1 });
+  await page.getByLabel('시간표에 교사 표시').check();
+  await page.getByLabel('Opencigan 설정 JSON 파일 불러오기').setInputFiles({ name: 'class.json', mimeType: 'application/json', buffer: contents });
+  await expect(page.getByText('현재 학급의 표시 설정을 복원했어요.')).toBeVisible();
+  await expect(page.getByLabel('시간표에 교사 표시')).not.toBeChecked();
+  await page.reload();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('시간표 표시 설정', { exact: true }).click();
+  await expect(page.getByLabel('시간표에 교사 표시')).not.toBeChecked();
+  const otherKey = `opensigan-class-display:${school.id}:1:2`;
+  expect(await page.evaluate((key) => localStorage.getItem(key), otherKey)).toBeNull();
+});
+
 test('invalid shared classroom exposes an error and can be corrected without saving the forged class', async ({ page }) => {
   await mockApi(page);
   await page.goto('/' + sharedHash());
