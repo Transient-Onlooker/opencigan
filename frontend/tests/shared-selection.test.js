@@ -6,6 +6,10 @@ import ts from 'typescript';
 import { personalizationVm } from './helpers/personalization-vm.js';
 import { lessonTimesVm } from './helpers/lesson-times-vm.js';
 
+const selectionSource = await readFile(new URL('../src/selection.ts', import.meta.url), 'utf8');
+const selectionExports = {};
+runInNewContext(ts.transpileModule(selectionSource, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: selectionExports });
+
 const component = await readFile(new URL('../src/App.svelte', import.meta.url), 'utf8');
 const script = component.match(/<script lang="ts">([\s\S]*?)<\/script>/)[1].replace(/^\s*import .*;\s*$/gm, '');
 const source = ts.transpile(`(function(){${script}
@@ -29,7 +33,7 @@ function setup({ fallback = savedSchool, shared = sharedSchool, sharedGrade = 1 
   let mount;
   let search;
   const app = runInNewContext(source, {
-    ...personalizationVm, ...lessonTimesVm,
+    ...personalizationVm, ...lessonTimesVm, ...selectionExports,
     onMount(callback) { mount = callback; },
     readSharedClass: () => ({ school: shared, grade: sharedGrade, classroom: 7 }),
     currentKoreaDate: () => '2026-11-09', monday: () => '2026-11-09',

@@ -4,6 +4,9 @@ import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { personalizationVm } from './helpers/personalization-vm.js';
+const selectionExports = {};
+const selectionSource = await readFile(new URL('../src/selection.ts', import.meta.url), 'utf8');
+runInNewContext(ts.transpileModule(selectionSource, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: selectionExports });
 import { lessonTimesVm } from './helpers/lesson-times-vm.js';
 
 const source = await readFile(new URL('../src/sharing.ts', import.meta.url), 'utf8');
@@ -47,7 +50,7 @@ test('shared class takes precedence at startup even when browser storage is bloc
   const requests = [];
   const javascript = ts.transpile(`(function(){${script}\nreturn { state: () => ({ school, grade, classroom, classError, sharedClassState }), changeTypeText };})()`, { target: ts.ScriptTarget.ES2022 });
   const app = runInNewContext(javascript, {
-    ...personalizationVm,
+    ...personalizationVm, ...selectionExports,
     ...lessonTimesVm,
     ...context.exports, onMount: (callback) => { mount = callback; },
     currentKoreaDate: () => '2026-11-14', monday: () => '2026-11-09',
@@ -91,7 +94,7 @@ test('검증되지 않은 공유 학교는 저장하지 않고 이전 학교 선
   let mount;
   const javascript = ts.transpile(`(function(){${script}\nreturn { state: () => ({ school, grade, classroom, sharedClassState }) };})()`, { target: ts.ScriptTarget.ES2022 });
   const app = runInNewContext(javascript, {
-    ...personalizationVm,
+    ...personalizationVm, ...selectionExports,
     ...lessonTimesVm,
     ...context.exports, onMount: (callback) => { mount = callback; },
     currentKoreaDate: () => '2026-11-14', monday: () => '2026-11-09',
@@ -134,7 +137,7 @@ test('공유 링크의 학급이 실제 시간표에 없으면 이전 학교와 
   let mount;
   const javascript = ts.transpile(`(function(){${script}\nreturn { state: () => ({ school, grade, classroom, classError, sharedClassState }) };})()`, { target: ts.ScriptTarget.ES2022 });
   const app = runInNewContext(javascript, {
-    ...personalizationVm,
+    ...personalizationVm, ...selectionExports,
     ...lessonTimesVm,
     ...context.exports, onMount: (callback) => { mount = callback; },
     currentKoreaDate: () => '2026-11-14', monday: () => '2026-11-09',
@@ -176,7 +179,7 @@ test('저장된 학교가 없어도 존재하지 않는 공유 학급을 자동�
   let mount;
   const javascript = ts.transpile(`(function(){${script}\nreturn { state: () => ({ school, grade, classroom, classError, sharedClassState }) };})()`, { target: ts.ScriptTarget.ES2022 });
   const app = runInNewContext(javascript, {
-    ...personalizationVm,
+    ...personalizationVm, ...selectionExports,
     ...lessonTimesVm,
     ...context.exports, onMount: (callback) => { mount = callback; },
     currentKoreaDate: () => '2026-11-14', monday: () => '2026-11-09',
