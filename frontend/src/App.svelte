@@ -5,7 +5,7 @@
   import MealMenu from './MealMenu.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { verifiedSharedSchool } from './selection';
+  import { saveSelection, verifiedSharedSchool } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -444,11 +444,7 @@
   }
   function persistClassSelection() {
     if (!school || classError || pendingSharedClass) return;
-    try {
-      localStorage.setItem('opensigan-school', JSON.stringify(school));
-      localStorage.setItem('opensigan-grade', String(grade));
-      localStorage.setItem('opensigan-class', String(classroom));
-    } catch { /* 현재 선택은 저장 없이 유지합니다. */ }
+    try { saveSelection(localStorage, school, grade, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
   }
   function chooseSchool(value: School, keepClass = false, keepSharedValidation = false, persistSelection = true) {
     tableRefreshState = '';
@@ -473,11 +469,7 @@
     neis = null; neisResults = []; neisSearchState = ''; neisLoading = false;
     meals = []; hasMeals = false; mealsStale = false; mealState = ''; mealLoading = false; mealDataKey = ''; mealRequestKey = '';
     if (persistSelection) {
-      try {
-        localStorage.setItem('opensigan-school', JSON.stringify(value));
-        localStorage.setItem('opensigan-grade', String(grade));
-        localStorage.setItem('opensigan-class', String(classroom));
-      } catch { /* 현재 선택은 저장 없이 유지합니다. */ }
+      try { saveSelection(localStorage, value, grade, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
     }
     loadTimetable(false, true, true);
     if (school?.id !== value.id) return;
@@ -547,11 +539,7 @@
       classroom = pending.classroom;
       classroomDraft = String(classroom);
       sharedClassState = '';
-      try {
-        localStorage.setItem('opensigan-school', JSON.stringify(school));
-        localStorage.setItem('opensigan-grade', String(grade));
-        localStorage.setItem('opensigan-class', String(classroom));
-      } catch { /* 현재 선택은 저장 없이 유지합니다. */ }
+      if (school) { try { saveSelection(localStorage, school, grade, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ } }
       return;
     }
     const grades = gradesInTimetable(timetable?.records ?? [], school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6);
