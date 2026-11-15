@@ -614,7 +614,16 @@ def dispatch_request(method, path, query_string, cache_instance=None, client=Non
     started = time.perf_counter()
     response = _dispatch_request(method, path, query_string, cache_instance, client, request_origin, request_body, request_headers, shutter_instance)
     if method in ("GET", "HEAD") and path in ("/api/v1/schools", "/api/v1/neis/schools", "/api/v1/timetable", "/api/v1/timetable.ics", "/api/v1/timetable/history", "/api/v1/meals") and os.environ.get("OPENCIGAN_ANALYTICS_DB"):
-        _api_recorder.submit(path, method, response[0], (time.perf_counter() - started) * 1000)
+        metadata = {}
+        if response[1].get("Content-Type", "").startswith("application/json"):
+            try:
+                payload = json.loads(response[2])
+                if isinstance(payload, dict):
+                    metadata = payload
+            except (ValueError, TypeError):
+                pass
+        _api_recorder.submit(path, method, response[0], (time.perf_counter() - started) * 1000,
+                             metadata.get("cacheStatus"), metadata.get("code") if response[0] >= 500 else None)
     if os.environ.get('OPENCIGAN_ACCESS_LOG_DB') and not path.startswith('/api/v1/admin/'):
         origin_class, referrer_origin = classify_origin(request_origin, (request_headers or {}).get('Referer'), os.environ.get('ALLOWED_ORIGIN', ''))
         fields = {}

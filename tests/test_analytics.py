@@ -3,6 +3,8 @@ import unittest
 import io
 import sqlite3
 import threading
+import tempfile
+from pathlib import Path
 from contextlib import closing
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
@@ -30,6 +32,33 @@ class AnalyticsTests(unittest.TestCase):
         self.assertEqual((result["apiRequests"], result["apiErrors"]), (2, 1))
         self.assertEqual(result["apiErrorRate"], 0.5)
         self.assertEqual(len(result["routes"]), 2)
+
+    def test_existing_database_is_migrated_and_new_metrics_are_bounded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "analytics.sqlite"
+            with closing(sqlite3.connect(path)) as db:
+                db.execute("CREATE TABLE api_requests (id INTEGER PRIMARY KEY, day TEXT NOT NULL, route TEXT NOT NULL, method TEXT NOT NULL, status INTEGER NOT NULL, duration_ms REAL NOT NULL, occurred_at TEXT NOT NULL)")
+                db.execute("INSERT INTO api_requests(day, route, method, status, duration_ms, occurred_at) VALUES (?, ?, ?, ?, ?, ?)", (AnalyticsStore._now()[0], "/api/v1/timetable", "GET", 200, 1, "old"))
+                db.commit()
+            store = AnalyticsStore(path, "x" * 40)
+            try:
+                store.record_api("/api/v1/timetable", "GET", 200, 1, "hit")
+                store.record_api("/api/v1/timetable", "GET", 200, 1, "stale")
+                store.record_api("/api/v1/meals", "GET", 503, 1, None, "upstream_unavailable")
+                store.record_api("/api/v1/meals", "GET", 503, 1, "unexpected", "unexpected")
+                result = store.summary(30)
+                self.assertEqual(result["apiRequests"], 5)
+                self.assertEqual(result["cacheStatuses"], {"hit": 1, "stale": 1})
+                self.assertEqual(result["failureKinds"], {"upstream_unavailable": 1})
+            finally:
+                store.close()
+
+    def test_request_metadata_is_forwarded_to_analytics(self):
+        response = (503, {"Content-Type": "application/json; charset=utf-8"}, b'{"code":"service_overloaded"}')
+        with patch("backend.app._dispatch_request", return_value=response), patch("backend.app._api_recorder") as recorder, patch.dict("os.environ", {"OPENCIGAN_ANALYTICS_DB": "enabled"}):
+            dispatch_request("GET", "/api/v1/timetable", "")
+            self.assertEqual(recorder.submit.call_args.args[:3], ("/api/v1/timetable", "GET", 503))
+            self.assertEqual(recorder.submit.call_args.args[4:], (None, "service_overloaded"))
 
     def test_pageview_endpoint_and_admin_authentication(self):
         store = self.store()

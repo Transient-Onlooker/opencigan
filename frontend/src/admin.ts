@@ -3,6 +3,7 @@ import './admin.css';
 interface Summary {
   visitors: number; sessions: number; pageViews: number; apiRequests: number;
   apiErrorRate: number; apiAverageMs: number; droppedApiEvents: number;
+  cacheStatuses?: Record<string, number>; failureKinds?: Record<string, number>;
   daily: { day: string; visitors: number; sessions: number; page_views: number; api_requests: number }[];
   routes: { route: string; requests: number; errors: number; avg_ms: number }[];
 }
@@ -46,10 +47,15 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
     if (controller.signal.aborted) return;
     const metrics = document.querySelector('#metrics')!;
     metrics.replaceChildren();
+    const cache = data.cacheStatuses;
+    const cacheTotal = (cache?.hit ?? 0) + (cache?.miss ?? 0) + (cache?.stale ?? 0);
     const cards: [string, string | number][] = [
       ['방문 브라우저', data.visitors], ['세션', data.sessions], ['페이지 조회', data.pageViews],
       ['API 요청', data.apiRequests], ['API 오류율', `${(data.apiErrorRate * 100).toFixed(2)}%`],
       ['평균 처리 시간', `${data.apiAverageMs} ms`], ['이 프로세스의 누락 이벤트', data.droppedApiEvents],
+      ['시간표 캐시 적중률', cacheTotal ? `${((cache?.hit ?? 0) / cacheTotal * 100).toFixed(1)}%` : '기록 없음'],
+      ['시간표 캐시 적중', cache?.hit ?? 0], ['시간표 캐시 미스', cache?.miss ?? 0], ['이전 캐시 반환', cache?.stale ?? 0],
+      ['데이터 조회 실패', data.failureKinds?.upstream_unavailable ?? 0], ['과부하 차단', data.failureKinds?.service_overloaded ?? 0],
     ];
     for (const [label, value] of cards) {
       const card = document.createElement('div');

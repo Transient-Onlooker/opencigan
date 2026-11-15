@@ -50,6 +50,10 @@ class AnalyticsStore:
                 CREATE INDEX IF NOT EXISTS page_views_day ON page_views(day);
                 CREATE INDEX IF NOT EXISTS api_requests_day ON api_requests(day);
             """)
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(api_requests)")}
+            for name in ("cache_status", "failure_kind"):
+                if name not in columns:
+                    db.execute(f"ALTER TABLE api_requests ADD COLUMN {name} TEXT")
             self._purge_if_due(db, self._now()[0])
             db.commit()
 
@@ -93,12 +97,16 @@ class AnalyticsStore:
                        (day, self._hash(visitor_id), self._hash(session_id), page, occurred_at))
             db.commit()
 
-    def record_api(self, route, method, status, duration_ms):
+    def record_api(self, route, method, status, duration_ms, cache_status=None, failure_kind=None):
+        if cache_status not in (None, "hit", "miss", "stale"):
+            cache_status = None
+        if failure_kind not in (None, "upstream_unavailable", "service_overloaded"):
+            failure_kind = None
         day, occurred_at = self._now()
         with closing(self._connect()) as db:
             self._purge_if_due(db, day)
-            db.execute("INSERT INTO api_requests(day, route, method, status, duration_ms, occurred_at) VALUES (?, ?, ?, ?, ?, ?)",
-                       (day, route, method, status, max(0, duration_ms), occurred_at))
+            db.execute("INSERT INTO api_requests(day, route, method, status, duration_ms, occurred_at, cache_status, failure_kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                       (day, route, method, status, max(0, duration_ms), occurred_at, cache_status, failure_kind))
             db.commit()
 
     def _purge_if_due(self, db, today):
@@ -131,6 +139,8 @@ class AnalyticsStore:
                 FROM (SELECT day FROM page_views WHERE day >= ? UNION SELECT day FROM api_requests WHERE day >= ?) d
                 ORDER BY d.day""", (start, start)).fetchall()
             routes = db.execute("SELECT route, COUNT(*) requests, SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) errors, ROUND(AVG(duration_ms), 2) avg_ms FROM api_requests WHERE day >= ? GROUP BY route ORDER BY requests DESC", (start,)).fetchall()
+            cache = db.execute("SELECT cache_status, COUNT(*) count FROM api_requests WHERE day >= ? AND cache_status IS NOT NULL GROUP BY cache_status", (start,)).fetchall()
+            failures = db.execute("SELECT failure_kind, COUNT(*) count FROM api_requests WHERE day >= ? AND failure_kind IS NOT NULL GROUP BY failure_kind", (start,)).fetchall()
         count = api[0] or 0
         errors = api[1] or 0
         return {
@@ -144,6 +154,8 @@ class AnalyticsStore:
             "apiAverageMs": round(api[2], 2) if api[2] is not None else 0,
             "daily": [dict(row) for row in daily],
             "routes": [dict(row) for row in routes],
+            "cacheStatuses": {row["cache_status"]: row["count"] for row in cache},
+            "failureKinds": {row["failure_kind"]: row["count"] for row in failures},
         }
 
 
