@@ -50,6 +50,32 @@ journalctl --user -u opensigan-preview -n 30 --no-pager
 - `rpi-guard-opensigan.conf`는 특정 LAN 대역·`wlan0`·8080 포트만 허용하도록 설계된 선택적 drop-in입니다. 이는 방화벽 재시작 때 적용되며, 파일을 제거해도 **이미 적용된 nftables 규칙이 즉시 사라지지는 않습니다**. 규칙 삭제 전 반드시 정확한 handle을 확인하세요.
 - 외부 접속 경로나 방화벽 규칙을 변경할 때는 기존 서비스에 미치는 영향과 되돌리는 방법을 먼저 확인합니다.
 
+### 변경 이력 DB 백업·복구
+
+이력 저장은 선택 기능이며 데이터 재제공 조건을 확인하기 전에는 활성화하지 않습니다. 이력은 수집한 시점 사이의 변화를 모두 보장하지 않고 최근 30일만 유지합니다. 새 버전은 이전 `snapshots`를 `snapshot_lessons`로 한 번 복사하며, 이후 새 관측은 새 테이블에만 반영합니다. 따라서 기존 테이블이 남아 있어도 DB를 그대로 둔 채 구버전으로 되돌리면 기준 스냅샷이 오래되어 잘못된 변경이 기록될 수 있습니다.
+
+배포 전에는 실제 `OPENCIGAN_HISTORY_DB` 경로와 보관 권한을 확인하고 SQLite의 온라인 백업 API로 DB 전체를 별도 경로에 복사합니다. WAL 사용 중에는 DB 파일 하나만 복사하면 안 됩니다. 아래 예제의 경로는 운영 환경에 맞게 지정하며, 대상이 이미 있으면 덮어쓰지 않습니다.
+
+```bash
+python3 - "$HISTORY_DB" "$HISTORY_BACKUP" <<'PY'
+import os, sqlite3, sys
+from contextlib import closing
+from pathlib import Path
+source, target = sys.argv[1:]
+if not os.path.isfile(source):
+    raise SystemExit("source database does not exist")
+fd = os.open(target, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+os.close(fd)
+with closing(sqlite3.connect(Path(source).resolve().as_uri() + "?mode=ro", uri=True)) as src, closing(sqlite3.connect(target)) as dst:
+    src.backup(dst)
+    if dst.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+        raise SystemExit("backup integrity check failed")
+print("backup integrity check: ok")
+PY
+```
+
+복구 시에는 서비스와 DB에 쓰는 다른 프로세스를 모두 중지하고, 복구 전 현재 DB도 별도 백업으로 보존합니다. 검증된 배포 전 백업을 **새 경로**에 복사한 뒤 구버전의 `OPENCIGAN_HISTORY_DB`가 그 복사본을 가리키도록 설정하고 재시작합니다. 구버전 실행 중에는 새 DB의 스키마나 WAL 파일을 직접 교체하지 않습니다. 백업 이후 관측한 이력은 복구본에 포함되지 않으므로 보존한 새 DB와 혼동하지 마세요. 적용 전후에는 `PRAGMA integrity_check`와 테스트 학교의 이력 조회를 확인합니다. 이 절차는 운영 DB에서 실행한 검증 결과가 아닙니다.
+
 ## Cloudflare Tunnel 전환 검토 (미적용)
 
 현재 Tailscale Funnel의 대안으로 **Cloudflare Tunnel**을 검토합니다. `cloudflared`가 Raspberry Pi에서 Cloudflare로 아웃바운드 연결을 만들고, 공개 도메인 요청을 로컬 API(`127.0.0.1:8000`)에 전달하는 구성입니다. 외부 포트포워딩 없이 원본 서버 IP 노출을 줄일 수 있고, Cloudflare의 WAF·DDoS 방어·요청 제한 기능과 함께 운영하는 방안을 고려합니다.

@@ -174,6 +174,12 @@ class WsGITests(unittest.TestCase):
         env2 = {**base_env, "HTTP_X_FORWARDED_FOR": "203.0.113.1, , 127.0.0.1"}
         self.assertEqual(resolve_client_ip(env2, trusted), "127.0.0.1")
 
+        # Malformed entries must invalidate the entire chain even before an untrusted hop.
+        env2b = {**base_env, "HTTP_X_FORWARDED_FOR": "not-an-ip, 203.0.113.1, 127.0.0.1"}
+        self.assertEqual(resolve_client_ip(env2b, trusted), "127.0.0.1")
+        env2c = {**base_env, "HTTP_FORWARDED": 'for=invalid, for="203.0.113.1", for=127.0.0.1'}
+        self.assertEqual(resolve_client_ip(env2c, trusted), "127.0.0.1")
+
         # Oversized header (> 1024 chars)
         env3 = {**base_env, "HTTP_X_FORWARDED_FOR": "1.1.1.1, " * 150}
         self.assertEqual(resolve_client_ip(env3, trusted), "127.0.0.1")

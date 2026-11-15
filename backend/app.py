@@ -139,11 +139,12 @@ def resolve_client_ip(environ, trusted_proxies=None):
     if not hops or len(hops) > _MAX_FORWARDED_HOPS:
         return str(immediate_ip)
 
+    parsed_hops = [_clean_ip_str(hop) for hop in hops]
+    if any(hop is None for hop in parsed_hops):
+        return str(immediate_ip)
+
     client_ip = immediate_ip
-    for raw_hop in reversed(hops):
-        hop_ip = _clean_ip_str(raw_hop)
-        if hop_ip is None:
-            return str(immediate_ip)
+    for hop_ip in reversed(parsed_hops):
         if any(hop_ip in net for net in trusted_networks):
             client_ip = hop_ip
             continue

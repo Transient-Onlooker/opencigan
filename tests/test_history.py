@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import os
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 from backend.history import HistoryStore
@@ -48,6 +49,20 @@ class HistoryTests(unittest.TestCase):
         reopened = HistoryStore(path)
         reopened.observe("s", "w", [lesson("Art", "C"), lesson("Science", "B")], base + timedelta(seconds=2))
         self.assertEqual(len(reopened.list("s", "w")["changes"]), 2)
+
+    def test_online_backup_restores_snapshot_and_history_independently(self):
+        base = datetime.now(timezone.utc)
+        self.store.observe("s", "w", [lesson("Math")], base)
+        backup_path = Path(self.temp.name) / "backup.sqlite"
+        with closing(sqlite3.connect(self.store.path)) as source, closing(sqlite3.connect(backup_path)) as backup:
+            source.backup(backup)
+            self.assertEqual(backup.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+        self.store.observe("s", "w", [lesson("Science")], base + timedelta(seconds=1))
+        restored = HistoryStore(backup_path)
+        self.assertEqual(restored.list("s", "w")["changes"], [])
+        restored.observe("s", "w", [lesson("Art")], base + timedelta(seconds=2))
+        self.assertEqual(restored.list("s", "w")["changes"][0]["before"]["subject"], "Math")
+        self.assertEqual(self.store.list("s", "w")["changes"][0]["after"]["subject"], "Science")
 
     def test_baseline_then_add_delete_subject_teacher_and_noop(self):
         week = datetime.now(timezone.utc).date().isoformat()
