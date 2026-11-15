@@ -6,6 +6,7 @@ from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from backend.webhook_store import WebhookStore
 from backend.webhook_worker import deliver_next
@@ -56,6 +57,32 @@ class WebhookStoreTests(unittest.TestCase):
         self.assertEqual(claim["attempt"], 2)
         self.store.finish(claim["id"], claim["leaseToken"], {"delivered": False, "retryable": False, "status": 400}, now=130)
         self.assertIsNone(self.store.claim(now=10000))
+
+    def test_expired_crashes_stop_after_six_attempts_and_old_results_expire(self):
+        self.store.enqueue(self.subscription["id"], "crash", b'{}', now=100)
+        for attempt in range(6):
+            claim = self.store.claim(now=100 + 60 * attempt)
+            self.assertEqual(claim["attempt"], attempt + 1)
+        self.assertIsNone(self.store.claim(now=460))
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute("SELECT state FROM webhook_deliveries").fetchone()[0], "failed")
+        self.store.claim(now=460 + 30 * 24 * 60 * 60 + 1)
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM webhook_deliveries").fetchone()[0], 0)
+
+    def test_queue_limit_drops_new_event_without_breaking_history(self):
+        with patch("backend.webhook_store.MAX_PENDING_PER_SUBSCRIPTION", 1):
+            self.assertTrue(self.store.enqueue(self.subscription["id"], "first", b'{}', now=1))
+            self.assertFalse(self.store.enqueue(self.subscription["id"], "second", b'{}', now=1))
+            history = HistoryStore(self.path)
+            now = datetime.now(timezone.utc)
+            lesson = {"grade": 2, "class": 3, "date": "2026-11-16", "period": 1, "subject": "수학", "teacher": "김"}
+            history.observe("2:예시학교", "2026-11-16", [lesson], now)
+            history.observe("2:예시학교", "2026-11-16", [{**lesson, "subject": "과학"}], now + timedelta(seconds=1))
+            self.assertEqual(len(history.list("2:예시학교", "2026-11-16")["changes"]), 1)
+            self.assertEqual(self.store.get(self.subscription["id"], self.subscription["token"])["dropped_events"], 1)
+            with closing(sqlite3.connect(self.path)) as db:
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM webhook_deliveries").fetchone()[0], 1)
 
     def test_rejects_invalid_external_inputs(self):
         with self.assertRaises(ValueError):

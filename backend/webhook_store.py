@@ -16,6 +16,11 @@ class SubscriptionLimitError(Exception):
     pass
 
 
+MAX_PENDING_PER_SUBSCRIPTION = 1000
+MAX_DELIVERY_ATTEMPTS = 6
+DELIVERY_RETENTION_SECONDS = 30 * 24 * 60 * 60
+
+
 def enqueue_observed_change(db, school, grade, classroom, date, period, kind, before, after, change_id, now):
     subscriptions = db.execute("SELECT id, provider FROM webhook_subscriptions WHERE school=? AND grade=? AND classroom=?",
                                (school, grade, classroom)).fetchall()
@@ -31,6 +36,9 @@ def enqueue_observed_change(db, school, grade, classroom, date, period, kind, be
     # Google Chat interprets angle-bracket tokens as mentions; Discord disables all mentions explicitly.
     safe_text = text.replace("<", "＜").replace(">", "＞")[:1800]
     for subscription in subscriptions:
+        if db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')", (subscription["id"],)).fetchone()[0] >= MAX_PENDING_PER_SUBSCRIPTION:
+            db.execute("UPDATE webhook_subscriptions SET dropped_events=dropped_events+1 WHERE id=?", (subscription["id"],))
+            continue
         payload = {"content": safe_text, "allowed_mentions": {"parse": []}} if subscription["provider"] == "discord" else {"text": safe_text}
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         db.execute("INSERT OR IGNORE INTO webhook_deliveries(subscription_id, event_id, body, next_at) VALUES (?, ?, ?, ?)",
@@ -63,7 +71,11 @@ class WebhookStore:
                     UNIQUE(subscription_id, event_id)
                 );
                 CREATE INDEX IF NOT EXISTS webhook_ready ON webhook_deliveries(state, next_at, lease_until);
+                CREATE INDEX IF NOT EXISTS webhook_subscription_state ON webhook_deliveries(subscription_id, state);
             """)
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(webhook_subscriptions)")}
+            if "dropped_events" not in columns:
+                db.execute("ALTER TABLE webhook_subscriptions ADD COLUMN dropped_events INTEGER NOT NULL DEFAULT 0")
 
     def _connect(self):
         db = sqlite3.connect(self.path, timeout=10, isolation_level=None)
@@ -89,7 +101,7 @@ class WebhookStore:
             try:
                 if db.execute("SELECT COUNT(*) FROM webhook_subscriptions").fetchone()[0] >= 500:
                     raise SubscriptionLimitError()
-                db.execute("INSERT INTO webhook_subscriptions VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                db.execute("INSERT INTO webhook_subscriptions(id, token_hash, school, grade, classroom, destination, provider, signing_secret) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                            (identifier, self._token_hash(token), school, grade, classroom, destination, provider, secrets.token_bytes(32)))
                 db.execute("COMMIT")
             except BaseException:
@@ -99,7 +111,7 @@ class WebhookStore:
 
     def get(self, identifier, token):
         with closing(self._connect()) as db:
-            row = db.execute("SELECT id, school, grade, classroom, provider FROM webhook_subscriptions WHERE id=? AND token_hash=?",
+            row = db.execute("SELECT id, school, grade, classroom, provider, dropped_events FROM webhook_subscriptions WHERE id=? AND token_hash=?",
                              (identifier, self._token_hash(token))).fetchone()
         return dict(row) if row else None
 
@@ -117,8 +129,18 @@ class WebhookStore:
         except (ValueError, UnicodeDecodeError):
             raise ValueError("invalid JSON body") from None
         with closing(self._connect()) as db:
-            return db.execute("INSERT OR IGNORE INTO webhook_deliveries(subscription_id, event_id, body, next_at) VALUES (?, ?, ?, ?)",
-                              (identifier, event_id, body, time.time() if now is None else now)).rowcount == 1
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                if db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')", (identifier,)).fetchone()[0] >= MAX_PENDING_PER_SUBSCRIPTION:
+                    db.execute("COMMIT")
+                    return False
+                inserted = db.execute("INSERT OR IGNORE INTO webhook_deliveries(subscription_id, event_id, body, next_at) VALUES (?, ?, ?, ?)",
+                                      (identifier, event_id, body, time.time() if now is None else now)).rowcount == 1
+                db.execute("COMMIT")
+                return inserted
+            except BaseException:
+                db.execute("ROLLBACK")
+                raise
 
     def claim(self, now=None, lease_seconds=60):
         now = time.time() if now is None else now
@@ -126,6 +148,8 @@ class WebhookStore:
         with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
             try:
+                db.execute("DELETE FROM webhook_deliveries WHERE state IN ('delivered', 'failed') AND next_at<?", (now - DELIVERY_RETENTION_SECONDS,))
+                db.execute("UPDATE webhook_deliveries SET state='failed', next_at=?, lease_token=NULL, lease_until=NULL WHERE state='leased' AND lease_until<=? AND attempts>=?", (now, now, MAX_DELIVERY_ATTEMPTS))
                 row = db.execute("""SELECT d.id, d.event_id, d.body, d.attempts, s.destination, s.signing_secret
                     FROM webhook_deliveries d JOIN webhook_subscriptions s ON s.id=d.subscription_id
                     WHERE (d.state='pending' AND d.next_at<=?) OR (d.state='leased' AND d.lease_until<=?)
@@ -139,7 +163,7 @@ class WebhookStore:
                 raise
         return {**dict(row), "leaseToken": lease_token, "attempt": row["attempts"] + 1} if row else None
 
-    def finish(self, delivery_id, lease_token, result, now=None, max_attempts=6):
+    def finish(self, delivery_id, lease_token, result, now=None, max_attempts=MAX_DELIVERY_ATTEMPTS):
         now = time.time() if now is None else now
         with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
