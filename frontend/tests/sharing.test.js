@@ -6,7 +6,7 @@ import ts from 'typescript';
 import { personalizationVm } from './helpers/personalization-vm.js';
 const selectionExports = {};
 const selectionSource = await readFile(new URL('../src/selection.ts', import.meta.url), 'utf8');
-runInNewContext(ts.transpileModule(selectionSource, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: selectionExports });
+runInNewContext(ts.transpileModule(selectionSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports: selectionExports });
 import { lessonTimesVm } from './helpers/lesson-times-vm.js';
 
 const source = await readFile(new URL('../src/sharing.ts', import.meta.url), 'utf8');

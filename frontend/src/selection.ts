@@ -32,3 +32,13 @@ export function validateSharedClass(timetable: TimetableResponse | null, fromDev
   if (grade < 1 || grade > maxGrade || !records.some((record) => Number(record.grade) === grade && Number(record.class) === classroom)) return 'missing';
   return 'valid';
 }
+
+export function gradesInTimetable(records: TimetableRecord[], maxGrade: number): number[] {
+  return [...new Set(records.map((record) => Number(record.grade))
+    .filter((value) => Number.isInteger(value) && value >= 1 && value <= maxGrade))].sort((a, b) => a - b);
+}
+
+export function classesInGrade(records: TimetableRecord[], grade: number): number[] {
+  return [...new Set(records.filter((record) => Number(record.grade) === Number(grade))
+    .map((record) => Number(record.class)).filter((value) => Number.isInteger(value) && value > 0))].sort((a, b) => a - b);
+}
