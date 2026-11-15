@@ -5,7 +5,7 @@
   import MealMenu from './MealMenu.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { saveSelection, saveGradeAndClass, saveClassToStorage, validateSharedClass, verifiedSharedSchool, gradesInTimetable, classesInGrade } from './selection';
+  import { saveSelection, saveGradeAndClass, saveClassToStorage, validateSharedClass, verifiedSharedSchool, gradesInTimetable, classesInGrade, reconcileClassSelection } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -530,12 +530,10 @@
       if (school) { try { saveSelection(localStorage, school, grade, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ } }
       return;
     }
-    const grades = gradesInTimetable(timetable?.records ?? [], school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6);
     const previousGrade = Number(grade);
     const previousClass = Number(classroom);
-    if (grades.length && !grades.includes(previousGrade)) grade = grades[0];
-    const options = classesInGrade(timetable?.records ?? [], grade);
-    if (options.length && !options.includes(Number(classroom))) classroom = options[0];
+    const reconciled = reconcileClassSelection(timetable?.records ?? [], school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6, grade, classroom);
+    grade = reconciled.grade; classroom = reconciled.classroom;
     classroomDraft = String(classroom);
     if (previousGrade === Number(grade) && previousClass === Number(classroom)) return;
     classError = false;
