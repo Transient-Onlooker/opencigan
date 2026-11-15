@@ -382,7 +382,7 @@
     else { schoolEditorOpen = false; ensureAvailableClass(); }
     classroomDraft = String(classroom);
     persistClassSelection();
-    try { saveSelection(localStorage, { grade, classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
+    persistSelection({ grade, classroom });
   }
 
   function findSchool() {
@@ -406,11 +406,14 @@
     sharedClassState = '';
     subscriptionPanelOpen = false;
   }
+  function persistSelection(selection: { school?: School; grade?: number; classroom: number }) {
+    try { saveSelection(localStorage, selection); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
+  }
   function persistClassSelection() {
     if (!school || classError || pendingSharedClass) return;
-    try { saveSelection(localStorage, { school, grade, classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
+    persistSelection({ school, grade, classroom });
   }
-  function chooseSchool(value: School, keepClass = false, keepSharedValidation = false, persistSelection = true) {
+  function chooseSchool(value: School, keepClass = false, keepSharedValidation = false, shouldPersistSelection = true) {
     tableRefreshState = '';
     exportState = '';
     if (!keepSharedValidation) cancelSharedSelection();
@@ -431,8 +434,8 @@
     settingsBackupState = '';
     historySession.reset(); historyOpen = false;
     mealSession.reset();
-    if (persistSelection) {
-      try { saveSelection(localStorage, { school: value, grade, classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
+    if (shouldPersistSelection) {
+      persistSelection({ school: value, grade, classroom });
     }
     loadTimetable(false, true, true);
     if (school?.id !== value.id) return;
@@ -478,7 +481,7 @@
       selectionState.update({ grade: outcome.grade, classroom: outcome.classroom });
       classroomDraft = String(classroom);
       sharedClassState = '';
-      if (school) { try { saveSelection(localStorage, { school, grade, classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ } }
+      if (school) persistSelection({ school, grade, classroom });
       return;
     }
     const previousGrade = Number(grade);
@@ -489,7 +492,7 @@
     if (previousGrade === Number(grade) && previousClass === Number(classroom)) return;
     classError = false;
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
-    try { saveSelection(localStorage, { grade, classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
+    persistSelection({ grade, classroom });
   }
   function loadTimetable(preserve = false, reuseCachedWeek = false, validateClass = false) {
     validateClass = validateClass || !!pendingSharedClass;
@@ -674,7 +677,7 @@
     if (!classError) selectionState.update({ classroom: input.valueAsNumber });
     classroomDraft = String(classroom);
     input.value = classroomDraft;
-    if (!classError) { try { saveSelection(localStorage, { classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ } }
+    if (!classError) persistSelection({ classroom });
     persistClassSelection();
   }
   function saveGrade() {
@@ -683,7 +686,7 @@
     sharedClassState = '';
     ensureAvailableClass();
     classError = false;
-    try { saveSelection(localStorage, { grade, classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
+    persistSelection({ grade, classroom });
     persistClassSelection();
   }
   function selectGrade(event: Event) { selectionState.update({ grade: Number((event.currentTarget as HTMLSelectElement).value) }); saveGrade(); }
@@ -694,7 +697,7 @@
     classError = false;
     sharedClassState = '';
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
-    try { saveSelection(localStorage, { classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
+    persistSelection({ classroom });
     persistClassSelection();
   }
   async function shareClass() {
