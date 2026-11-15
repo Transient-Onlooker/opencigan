@@ -11,7 +11,7 @@
   import TimetablePanel from './TimetablePanel.svelte';
   import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference, readFavorites, writeFavorites, readTheme, writeTheme, readAnimations, writeAnimations, readMealSchool, writeMealSchool, type Favorite } from './preferences';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { saveSelection, readSelection, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
+  import { saveSelection, readSelection, resolveSharedClass, gradesInTimetable, classesInGrade, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -418,8 +418,7 @@
     exportState = '';
     if (!keepSharedValidation) cancelSharedSelection();
     sharedClassState = '';
-    if (school?.id !== value.id && !keepClass) { selectionState.update({ grade: 1, classroom: 1 }); classError = false; }
-    if (/(?:중학교|고등학교)/.test(value.name) && grade > 3) selectionState.update({ grade: 1 });
+    if (selectionState.prepareSchool(value, keepClass)) classError = false;
     classroomDraft = String(classroom);
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
     schoolRequest?.abort(); clearTimeout(schoolTimer); mealSession.cancel(); historySession.cancel();
@@ -484,12 +483,9 @@
       if (school) persistSelection({ school, grade, classroom });
       return;
     }
-    const previousGrade = Number(grade);
-    const previousClass = Number(classroom);
-    const reconciled = reconcileClassSelection(timetable?.records ?? [], school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6, grade, classroom);
-    selectionState.update({ grade: reconciled.grade, classroom: reconciled.classroom });
+    const changed = selectionState.reconcile(timetable?.records ?? [], school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6);
     classroomDraft = String(classroom);
-    if (previousGrade === Number(grade) && previousClass === Number(classroom)) return;
+    if (!changed) return;
     classError = false;
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
     persistSelection({ grade, classroom });

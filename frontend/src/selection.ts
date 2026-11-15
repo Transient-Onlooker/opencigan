@@ -4,10 +4,23 @@ export type SelectionState = { school: School | null; grade: number; classroom: 
 
 export function createSelectionState(initial: SelectionState, onChange: (state: SelectionState) => void) {
   let state = { ...initial };
+  const update = (change: Partial<SelectionState>) => {
+    state = { ...state, ...change };
+    onChange({ ...state });
+  };
   return {
-    update(change: Partial<SelectionState>) {
-      state = { ...state, ...change };
-      onChange({ ...state });
+    update,
+    prepareSchool(school: School, keepClass: boolean) {
+      const reset = state.school?.id !== school.id && !keepClass;
+      if (reset) update({ grade: 1, classroom: 1 });
+      if (/(?:중학교|고등학교)/.test(school.name) && state.grade > 3) update({ grade: 1 });
+      return reset;
+    },
+    reconcile(records: TimetableRecord[], maxGrade: number) {
+      const previousGrade = Number(state.grade);
+      const previousClassroom = Number(state.classroom);
+      update(reconcileClassSelection(records, maxGrade, state.grade, state.classroom));
+      return previousGrade !== Number(state.grade) || previousClassroom !== Number(state.classroom);
     },
   };
 }

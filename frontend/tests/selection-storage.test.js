@@ -25,6 +25,24 @@ test('selection owners publish independent snapshots without losing unrelated se
   assert.equal(second.classroom, 4);
 });
 
+test('school preparation and timetable reconciliation use the same selection owner', () => {
+  const school = { id: 'old', name: '초등학교' };
+  let current;
+  const owner = exports.createSelectionState({ school, grade: 5, classroom: 8, week: '2026-11-09' }, (state) => { current = state; });
+  assert.equal(owner.prepareSchool({ id: 'new', name: '고등학교' }, true), false);
+  assert.equal(current.grade, 1);
+  assert.equal(current.classroom, 8);
+  owner.update({ school: { id: 'new', name: '고등학교' } });
+  assert.equal(owner.reconcile([{ grade: 2, class: 3 }], 3), true);
+  assert.equal(current.grade, 2);
+  assert.equal(current.classroom, 3);
+  assert.equal(current.week, '2026-11-09');
+  assert.equal(owner.reconcile([{ grade: 2, class: 3 }], 3), false);
+  assert.equal(owner.prepareSchool({ id: 'another', name: '초등학교' }, false), true);
+  assert.equal(current.grade, 1);
+  assert.equal(current.classroom, 1);
+});
+
 test('selection persistence preserves keys, values and write order', () => {
   const writes = [];
   const storage = { setItem: (key, value) => writes.push([key, value]) };
