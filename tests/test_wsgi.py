@@ -4,7 +4,7 @@ import os
 import threading
 import unittest
 from http.client import HTTPConnection
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from backend.app import Handler, ThreadingWSGIServer, make_app, serve, _rate_clients, resolve_client_ip
 from backend.cache import Cache
@@ -107,13 +107,15 @@ class WsGITests(unittest.TestCase):
             self.assertEqual(status, "429 Too Many Requests")
             self.assertEqual(json.loads(body.decode("utf-8"))["code"], "rate_limited")
 
-    def test_opt_in_trusted_proxies_separates_clients(self):
+    @patch.dict(os.environ, {"OPENCIGAN_ACCESS_LOG_DB": "fixture"})
+    @patch("backend.app._access_log_recorder")
+    def test_opt_in_trusted_proxies_separates_clients_and_logs_same_identity(self, recorder: Mock):
         app = make_app(cache_instance=self.cache, trusted_proxies="127.0.0.1, 10.0.0.0/8")
         # Exhaust Client A rate limit through trusted proxy
         for _ in range(60):
             status, _, _ = self._call_app(
                 "GET", "/api/v1/unknown", "",
-                headers={"X-Forwarded-For": "203.0.113.1"},
+                headers={"X-Forwarded-For": f"192.0.2.{_ + 1}, 203.0.113.1, 10.0.0.2"},
                 remote_addr="127.0.0.1", app=app,
             )
             self.assertEqual(status, "404 Not Found")
@@ -131,6 +133,8 @@ class WsGITests(unittest.TestCase):
             remote_addr="127.0.0.1", app=app,
         )
         self.assertEqual(status_b, "404 Not Found")
+        events = [(call.args[0]["client_ip"], call.args[0]["status"]) for call in recorder.submit.call_args_list]
+        self.assertEqual(events, [("203.0.113.1", 404)] * 60 + [("203.0.113.1", 429), ("203.0.113.2", 404)])
 
     def test_untrusted_immediate_peer_ignores_forwarded_headers(self):
         app = make_app(cache_instance=self.cache, trusted_proxies="127.0.0.1")

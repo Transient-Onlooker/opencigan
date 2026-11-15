@@ -66,7 +66,7 @@ test('switching classes updates lessons, PNG and both links', async ({ page }) =
   await expect(history.getByRole('listitem')).toHaveCount(2);
   const download = page.waitForEvent('download');
   await panel.getByRole('button', { name: 'PNG 저장' }).click();
-  expect((await download).suggestedFilename()).toMatch(/\.png$/);
+  expect((await download).suggestedFilename()).toMatch(/봄빛고등학교.*1학년2반.*\.png$/);
   const pdfDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: 'PDF 저장' }).click();
   const pdf = await pdfDownload;
@@ -92,7 +92,102 @@ test('switching classes updates lessons, PNG and both links', async ({ page }) =
   await page.reload();
   await panel.getByRole('button', { name: '이번 주', exact: true }).click();
   await expect(weekTable.getByText('샘플 과학', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '캘린더 구독 링크' }).click();
+  const target = new URL(await subscription.inputValue());
+  expect(target.searchParams.get('school')).toBe(school.id);
+  expect(target.searchParams.get('grade')).toBe('1');
+  expect(target.searchParams.get('class')).toBe('2');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
+});
+
+test('week navigation hides unverified actions and keeps the last row and search result above the mobile menu', async ({ page }) => {
+  const school = { id: '2:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
+  const week = '2026-11-09';
+  let release;
+  const nextWeek = new Promise((resolve) => { release = resolve; });
+  await page.clock.setFixedTime(new Date('2026-11-09T02:00:00Z'));
+  await page.addInitScript((value) => localStorage.setItem('opensigan-school', JSON.stringify(value)), school);
+  await page.route('**/api/v1/timetable?*', async (route) => {
+    const weekStart = new URL(route.request().url()).searchParams.get('week');
+    if (weekStart !== week) await nextWeek;
+    await route.fulfill({ json: { schoolId: school.id, weekStart, fetchedAt: new Date().toISOString(), sourceUpdatedAt: null, stale: false,
+      records: [{ grade: 1, class: 1, date: weekStart, period: 7, subject: '마지막 수학', teacher: null, isChanged: false }] } });
+  });
+  await page.route('**/api/v1/neis/schools?*', (route) => route.fulfill({ json: { schools: [] } }));
+  await page.route('**/api/v1/analytics/pageview', (route) => route.fulfill({ status: 202 }));
+  await page.goto('/');
+  const panel = page.locator('#timetable-panel');
+  const share = page.getByRole('button', { name: '학급 링크 복사' });
+  const subscribe = page.getByRole('button', { name: '캘린더 구독 링크' });
+  const png = panel.getByRole('button', { name: 'PNG 저장' });
+  await expect(panel.getByText(/수업 기록이 없는 평일: 화요일, 수요일, 목요일, 금요일/)).toBeVisible();
+  await subscribe.click();
+  await panel.getByRole('button', { name: '다음 주', exact: true }).click();
+  await expect(share).toBeDisabled();
+  await expect(subscribe).toBeDisabled();
+  await expect(png).toHaveCount(0);
+  await expect(page.getByLabel(/시간표 구독 URL/)).toHaveCount(0);
+  release();
+  await expect(share).toBeEnabled();
+  await expect(png).toBeVisible();
+
+  const menu = page.getByRole('navigation', { name: '캘린더 메뉴', includeHidden: true });
+  const lastRow = panel.getByRole('table').locator('tbody tr').last();
+  await panel.getByText('이 반의 수업 찾기', { exact: true }).click();
+  const input = panel.getByRole('searchbox', { name: '과목명 또는 교사명' });
+  await input.fill('마지막');
+  const result = panel.locator('.lesson-search article').last();
+  for (const viewport of [{ width: 320, height: 600 }, { width: 667, height: 320 }]) {
+    await page.setViewportSize(viewport);
+    await input.focus();
+    await expect(menu).toBeHidden();
+    await input.press('Tab');
+    await expect(menu).toBeVisible();
+    for (const target of [result, lastRow]) {
+      await target.evaluate((element) => element.scrollIntoView({ block: 'end', behavior: 'instant' }));
+      const box = await target.boundingBox();
+      const nav = await menu.boundingBox();
+      expect(box.y + box.height).toBeLessThanOrEqual(nav.y);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+  }
+});
+
+test('a late response from a previous school cannot change the active class or links', async ({ page }) => {
+  const first = { id: '1:첫학교', name: '첫학교', region: '서울' };
+  const second = { id: '2:둘째학교', name: '둘째학교', region: '서울' };
+  const weekStart = '2026-11-09';
+  let release;
+  const firstResponse = new Promise((resolve) => { release = resolve; });
+  await page.clock.setFixedTime(new Date('2026-11-09T02:00:00Z'));
+  await page.route('**/api/v1/**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/v1/schools') return route.fulfill({ json: { schools: [first, second] } });
+    if (url.pathname !== '/api/v1/timetable') return route.fulfill({ json: { schools: [] } });
+    const schoolId = url.searchParams.get('school');
+    if (schoolId === first.id) await firstResponse;
+    const room = schoolId === first.id ? 1 : 2;
+    await route.fulfill({ json: { schoolId, weekStart, fetchedAt: new Date().toISOString(), sourceUpdatedAt: null, stale: false,
+      records: [{ grade: 1, class: room, date: weekStart, period: 1, subject: `학교 과목 ${room}`, teacher: null, isChanged: false }] } });
+  });
+  await page.goto('/');
+  await page.getByRole('searchbox', { name: '학교 찾기' }).fill(first.name);
+  const firstRequest = page.waitForRequest((request) => new URL(request.url()).searchParams.get('school') === first.id);
+  await page.getByRole('button', { name: /첫학교/ }).click();
+  await firstRequest;
+  const subscribe = page.getByRole('button', { name: '캘린더 구독 링크' });
+  await expect(subscribe).toBeDisabled();
+  await page.getByRole('button', { name: '학교 변경', exact: true }).click();
+  await page.getByRole('searchbox', { name: '학교 찾기' }).fill(second.name);
+  await page.getByRole('button', { name: /둘째학교/ }).click();
+  const table = page.locator('#timetable-panel').getByRole('table');
+  await expect(table).toContainText('학교 과목 2');
+  release();
+  await subscribe.click();
+  const url = new URL(await page.getByLabel(/시간표 구독 URL/).inputValue());
+  expect(url.searchParams.get('school')).toBe(second.id);
+  expect(url.searchParams.get('class')).toBe('2');
+  await expect(table).not.toContainText('학교 과목 1');
 });
 });
 

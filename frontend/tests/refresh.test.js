@@ -33,7 +33,9 @@ async function createApp() {
     document: { visibilityState: 'visible' },
     Date: class extends Date { static now() { return now; } },
     localStorage: { getItem: () => null, setItem() {} },
-    getTimetable: (id, week, signal) => pending(calls.timetable, id, { week, signal }),
+    getTimetable: (id, week, signal) => new Promise((resolve, reject) =>
+      calls.timetable.push({ id, week, signal, resolve: (data) => resolve(Object.assign({ schoolId: id, weekStart: week }, data)), reject })),
+    navigator: { onLine: true },
     getMeals: (id, from, to, signal) => pending(calls.meals, id, { from, to, signal }),
     AbortController, setTimeout, clearTimeout,
   };
@@ -87,12 +89,12 @@ test('failed refresh keeps previous results and timetable week changes preserve 
 
   setNow(1_000 + 30 * 60 * 1000);
   app.refreshCalendar();
-  assert.equal(app.state().timetable, table);
+  assert.equal(app.state().timetable.records, table.records);
   assert.equal(app.state().meals[0], meal);
   calls.timetable[1].reject(new Error('offline'));
   calls.meals[1].reject(new Error('offline'));
   await new Promise(setImmediate);
-  assert.equal(app.state().timetable, table);
+  assert.equal(app.state().timetable.records, table.records);
   assert.equal(app.state().meals[0], meal);
   assert.equal(app.state().hasMeals, true);
   assert.ok(app.state().tableState);
@@ -135,7 +137,7 @@ test('returning to this timetable week retains previous results if refreshing fa
   assert.equal(calls.meals.length, 1);
   calls.timetable[1].reject(new Error('offline'));
   await new Promise(setImmediate);
-  assert.equal(app.state().timetable, table);
+  assert.equal(app.state().timetable.records, table.records);
   assert.equal(app.state().meals[0], meal);
   assert.equal(app.state().hasMeals, true);
   assert.ok(app.state().tableState);
@@ -156,7 +158,7 @@ test('revisiting a loaded week uses browser memory while explicit refresh still 
 
   app.changeWeek(-1);
   assert.equal(calls.timetable.length, 2);
-  assert.equal(app.state().timetable, thisWeek);
+  assert.equal(app.state().timetable.records, thisWeek.records);
   assert.equal(app.state().tableLoading, false);
 
   app.currentWeek();
@@ -168,7 +170,7 @@ test('revisiting a loaded week uses browser memory while explicit refresh still 
   assert.equal(calls.timetable.length, 4, '다른 학교는 기존 주간 캐시를 재사용하지 않는다');
   app.chooseSchool(school);
   assert.equal(calls.timetable.length, 4, '기존 학교로 돌아가면 저장한 주간 데이터를 즉시 표시한다');
-  assert.equal(app.state().timetable, thisWeek);
+  assert.equal(app.state().timetable.records, thisWeek.records);
   assert.equal(calls.timetable[3].signal.aborted, true);
 });
 

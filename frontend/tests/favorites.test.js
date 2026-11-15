@@ -28,7 +28,7 @@ function setup(initial = [], recordsBySchool = {}) {
       getItem: (key) => store.get(key) ?? null,
       setItem: (key, value) => store.set(key, value),
     },
-    getTimetable: (id) => { requests.push(id); return Promise.resolve({ schoolId: id, records: recordsBySchool[id] ?? [] }); },
+    getTimetable: (id, weekStart) => { requests.push(id); return Promise.resolve({ schoolId: id, weekStart, records: recordsBySchool[id] ?? [] }); },
     searchNeisSchools: () => new Promise(() => {}),
     AbortController, setTimeout, clearTimeout,
   });

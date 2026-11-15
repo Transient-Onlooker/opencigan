@@ -25,7 +25,7 @@ test('학교 선택 시 저장이 실패해도 이전 학교 데이터가 남지
       setItem: (key, value) => { if (failWrites) throw new Error('storage unavailable'); storage.set(key, value); },
       removeItem: (key) => storage.delete(key),
     },
-    getTimetable: async (id) => ({ schoolId: id, records: [] }),
+    getTimetable: async (id, weekStart) => ({ schoolId: id, weekStart, records: [] }),
     getMeals: async (id) => ({ meals: [{ type: id }], stale: false }),
     AbortController, setTimeout, clearTimeout,
   });

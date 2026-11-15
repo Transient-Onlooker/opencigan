@@ -74,6 +74,8 @@
   let dateError = '';
   let sharedClassState = '';
   let pendingSharedClass: { schoolId: string; grade: number; classroom: number; fallback: { school: School | null; grade: number; classroom: number } } | null = null;
+  let sharedSchoolChecking = false;
+  let classActionsReady = false;
   let theme: 'light' | 'dark' | 'system' = 'light';
   let animationsEnabled = true;
   let systemDark = false;
@@ -127,7 +129,8 @@
   $: teacherSuggestions = teacherNames.filter((name) => [name, displayTeacher(name, displaySettings)].some((label) => label.toLocaleLowerCase('ko-KR').includes(teacherQuery.trim().toLocaleLowerCase('ko-KR'))));
   $: selectedTeacherName = teacherNames.find((name) => name === teacherQuery.trim() || displayTeacher(name, displaySettings) === teacherQuery.trim()) ?? '';
   $: selectedTeacherRecords = selectedTeacherName ? (timetable?.records ?? []).filter((r) => r.teacher?.trim() === selectedTeacherName) : [];
-  $: canExport = !!timetable && !classError && !pendingSharedClass && timetableView !== 'grade' && (timetableView === 'teacher' ? selectedTeacherRecords.length > 0 : timetableView === 'today' ? dayRecords.some((item) => Number(item.grade) === Number(grade) && Number(item.class) === Number(classroom)) : filtered.length > 0);
+  $: classActionsReady = !!school && timetable?.schoolId === school.id && timetable.weekStart === week && filtered.length > 0 && !classError && !pendingSharedClass && !sharedSchoolChecking;
+  $: canExport = !!school && timetable?.schoolId === school.id && timetable.weekStart === week && !classError && !pendingSharedClass && !sharedSchoolChecking && (timetableView === 'teacher' ? selectedTeacherRecords.length > 0 : classActionsReady && (timetableView === 'week' || timetableView === 'today' && selectedClassLessons.length > 0));
   $: teacherPeriods = Array.from({ length: Math.max(0, ...selectedTeacherRecords.map((r) => Number(r.period))) }, (_, i) => i + 1);
   $: teacherDates = Array.from({ length: 5 }, (_, i) => addDays(week, i));
   $: availableGrades = gradesInTimetable(timetable?.records ?? [], school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6);
@@ -135,6 +138,7 @@
   $: availableClasses = [...new Set((timetable?.records ?? []).filter((r) => Number(r.grade) === Number(grade)).map((r) => Number(r.class)).filter((n) => Number.isInteger(n) && n > 0))].sort((a, b) => a - b);
   $: weekendClasses = filtered.some((r) => r.date === addDays(week, 5) || r.date === addDays(week, 6));
   $: dates = Array.from({ length: weekendClasses ? 7 : 5 }, (_, i) => addDays(week, i));
+  $: missingWeekdays = dates.slice(0, 5).filter((date) => !filtered.some((record) => record.date === date));
   $: periods = Array.from({ length: Math.max(0, ...filtered.map((r) => Number(r.period))) }, (_, i) => i + 1);
   $: lessonTimePeriods = Array.from({ length: Math.max(8, ...((timetable?.records ?? []).map((r) => Number(r.period)).filter((period) => Number.isInteger(period) && period > 0 && period <= 20))) }, (_, i) => i + 1);
   $: dayMeals = meals.filter((meal) => meal.date === mealDate);
@@ -428,6 +432,7 @@
   }
   function cancelSharedSelection() {
     sharedSchoolRequest?.abort();
+    sharedSchoolChecking = false;
     pendingSharedClass = null;
     sharedClassState = '';
     subscriptionPanelOpen = false;
@@ -563,8 +568,11 @@
   function loadTimetable(preserve = false, reuseCachedWeek = false, validateClass = false) {
     validateClass = validateClass || !!pendingSharedClass;
     tableRequest?.abort(); if (!preserve) timetable = null; tableState = ''; tableLoading = false;
-    if (!preserve) timetableFromDevice = false;
-    if (!preserve) timetableCheckedAt = '';
+    if (!preserve) {
+      timetableFromDevice = false;
+      timetableCheckedAt = '';
+      shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = ''; subscriptionPanelOpen = false;
+    }
     if (!school) return;
     const key = `${school.id}\u0000${week}`;
     if (reuseCachedWeek) {
@@ -584,6 +592,7 @@
     void getTimetable(school.id, week, controller.signal)
       .then((data) => {
         if (controller.signal.aborted) return;
+        if (data.schoolId !== school?.id || data.weekStart !== week) throw new Error('선택한 학교·주차와 다른 시간표가 도착했어요.');
         timetable = data;
         timetableFromDevice = false;
         if (validateClass) ensureAvailableClass();
@@ -806,22 +815,23 @@
     persistClassSelection();
   }
   async function shareClass() {
-    if (!school || classError || pendingSharedClass) return;
+    if (!school || !classActionsReady) return;
     if (shareUrl) { shareUrl = ''; shareState = ''; return; }
     shareState = ''; subscriptionState = '';
     subscriptionUrl = '';
     subscriptionPanelOpen = false;
-    shareUrl = shareClassUrl(window.location.href, school, Number(grade), Number(classroom));
+    const url = shareClassUrl(window.location.href, school, Number(grade), Number(classroom));
+    shareUrl = url;
     try {
-      await navigator.clipboard.writeText(shareUrl);
-      shareState = '학급 링크를 복사했어요.';
+      await navigator.clipboard.writeText(url);
+      if (url === shareUrl) shareState = '학급 링크를 복사했어요.';
     } catch {
-      shareState = '아래 링크를 선택해 복사해 주세요.';
+      if (url === shareUrl) shareState = '아래 링크를 선택해 복사해 주세요.';
     }
   }
 
   function subscribeTimetable() {
-    if (!school || classError || pendingSharedClass || apiNotConfigured) return;
+    if (!classActionsReady || apiNotConfigured) return;
     if (subscriptionPanelOpen) { subscriptionPanelOpen = false; subscriptionUrl = ''; subscriptionState = ''; return; }
     subscriptionPanelOpen = true;
     shareState = ''; subscriptionState = '';
@@ -871,6 +881,8 @@
       chooseSchool(verified, true, true, false);
     } catch {
       if (!signal.aborted) sharedClassState = '공유 링크의 학교를 확인하지 못해 이전 학교를 유지했어요.';
+    } finally {
+      if (!signal.aborted) sharedSchoolChecking = false;
     }
   }
 
@@ -911,6 +923,7 @@
     } catch { /* 저장소를 사용할 수 없으면 기본 설정으로 시작합니다. */ }
     if (savedSchool) chooseSchool(savedSchool, true);
     sharedSchoolRequest = shared ? new AbortController() : undefined;
+    sharedSchoolChecking = !!shared;
     if (shared && sharedSchoolRequest) void restoreSharedClass(shared, { school: savedSchool, grade: Number(grade), classroom: Number(classroom) }, sharedSchoolRequest.signal);
     if (typeof window.history?.replaceState === 'function') {
       const savedNavigation = !shared ? getNavigationFromHistory(current) : null;
@@ -1070,6 +1083,7 @@
                   <tbody>{#each periods as period}<tr><th scope="row">{period}<span class="sr-only">교시</span></th>{#each dates as date}{@const lessons = slotLessons(filtered, date, period)}<td class:today-column={date === today} class:other-day={displaySettings.dimOtherDays && week === current && date !== today} class:changed={displaySettings.showChangeHighlights && lessons.some((lesson) => lesson.isChanged)}>{#each lessons as lesson}<div class="class-cell"><strong style={subjectStyle(lesson.subject)}>{displaySubject(lesson.subject, displaySettings)}</strong>{#if displaySettings.showTeachers && lesson.teacher}<span>{displayTeacher(lesson.teacher, displaySettings)}</span>{/if}{#if lesson.isChanged && displaySettings.showChangeBadges}<span class="change-label">변동</span>{/if}</div>{:else}<span class="empty-cell" aria-label="수업 없음">—</span>{/each}</td>{/each}</tr>{/each}</tbody>
               </table>
             </div>
+            {#if missingWeekdays.length}<p class="table-hint" role="status">수업 기록이 없는 평일: {missingWeekdays.map((date) => dateText(date, { weekday: 'long' })).join(', ')}. {timetable.stale || timetableFromDevice || tableState ? '저장된 시간표 기준이에요. ' : ''}휴업일인지 원본 자료가 비어 있는지는 확인할 수 없어요.</p>{/if}
             <div class="table-hint">빈 교시 <Help label="빈 교시" text="— 표시는 수집된 수업 기록이 없는 칸입니다. 휴업일인지, 원본 미제공인지, 일부 데이터가 누락됐는지는 확인되지 않습니다." /></div>
           {:else if !tableState}<div class="state-message"><strong>선택한 학급의 시간표 데이터가 없어요.</strong><p>학교와 학년·반을 확인해 주세요. 해당 기간의 원본 데이터가 제공되지 않은 이유는 확인되지 않습니다.</p></div>{/if}
            {#if timetable}<div class="freshness" aria-live="polite">{#if timetableFromDevice}<span>오프라인 · 이 기기에 저장된 시간표</span>{:else if timetable.stale}<span>저장된 시간표 · 최신 정보가 아닐 수 있어요</span>{/if}<span>원본 갱신 {timeText(timetable.sourceUpdatedAt)}</span></div>{/if}
@@ -1231,9 +1245,9 @@
     </div>
     <section class="secondary-actions" aria-label="공유" hidden={view !== 'timetable'}>
       {#if school}
-        <div class="share-tools"><button class="secondary-button" disabled={classError || !!pendingSharedClass} onclick={shareClass} aria-expanded={!!shareUrl}><Icon name="link" /> {shareUrl ? '학급 링크 닫기' : '학급 링크 복사'}</button><button class="secondary-button" disabled={classError || !!pendingSharedClass || apiNotConfigured} onclick={subscribeTimetable} aria-expanded={subscriptionPanelOpen}><Icon name="link" /> {subscriptionPanelOpen ? '구독 링크 닫기' : '캘린더 구독 링크'}</button>{#if canExport}<button class="secondary-button" disabled={exportBusy} onclick={() => exportTimetable('PDF')}><Icon name="save" /> PDF 저장</button>{/if}<span role="status">{shareState || subscriptionState}</span></div>
-        {#if shareUrl}<label class="shared-link">공유 링크<input type="text" readonly value={shareUrl} onfocus={(event) => event.currentTarget.select()} /></label>{/if}
-        {#if subscriptionPanelOpen}
+        <div class="share-tools"><button class="secondary-button" disabled={!classActionsReady} onclick={shareClass} aria-expanded={classActionsReady && !!shareUrl}><Icon name="link" /> {classActionsReady && shareUrl ? '학급 링크 닫기' : '학급 링크 복사'}</button><button class="secondary-button" disabled={!classActionsReady || apiNotConfigured} onclick={subscribeTimetable} aria-expanded={classActionsReady && subscriptionPanelOpen}><Icon name="link" /> {classActionsReady && subscriptionPanelOpen ? '구독 링크 닫기' : '캘린더 구독 링크'}</button>{#if canExport}<button class="secondary-button" disabled={exportBusy} onclick={() => exportTimetable('PDF')}><Icon name="save" /> PDF 저장</button>{/if}<span role="status">{classActionsReady ? shareState || subscriptionState : ''}</span></div>
+        {#if classActionsReady && shareUrl}<label class="shared-link">공유 링크<input type="text" readonly value={shareUrl} onfocus={(event) => event.currentTarget.select()} /></label>{/if}
+        {#if classActionsReady && subscriptionPanelOpen}
           <div class="lesson-search-fields">
             <label>일정 표시 방식<select value={subscriptionMode} onchange={changeSubscriptionMode}><option value="summary">하루 요약</option><option value="periods">교시별 종일 일정</option><option value="timed">입력한 교시 시각</option></select></label>
           </div>
