@@ -8,7 +8,7 @@ import { lessonTimesVm } from './helpers/lesson-times-vm.js';
 
 const selectionSource = await readFile(new URL('../src/selection.ts', import.meta.url), 'utf8');
 const selectionExports = {};
-runInNewContext(ts.transpileModule(selectionSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports: selectionExports });
+runInNewContext(ts.transpileModule(selectionSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports: selectionExports, AbortController });
 
 const component = await readFile(new URL('../src/App.svelte', import.meta.url), 'utf8');
 const script = component.match(/<script lang="ts">([\s\S]*?)<\/script>/)[1].replace(/^\s*import .*;\s*$/gm, '');

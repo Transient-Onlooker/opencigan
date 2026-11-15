@@ -6,7 +6,7 @@ import ts from 'typescript';
 
 const source = await readFile(new URL('../src/selection.ts', import.meta.url), 'utf8');
 const exports = {};
-runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports });
+runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports, AbortController });
 
 test('selection persistence preserves keys, values and write order', () => {
   const writes = [];
@@ -54,6 +54,28 @@ test('shared selection commits only verified classes and otherwise returns the o
     assert.equal(result.reason, reason);
     assert.equal(result.fallback, fallback);
   }
+});
+
+test('shared selection session cancels obsolete checks and publishes pending and cleared states', () => {
+  let state;
+  const session = exports.createSharedSelectionSession((next) => { state = next; });
+  const first = session.begin();
+  const second = session.begin();
+  assert.equal(first.aborted, true);
+  session.finish(first);
+  assert.equal(state.checking, true);
+  const pending = { schoolId: 'next', grade: 1, classroom: 7, fallback: { school: null, grade: 1, classroom: 1 } };
+  session.setPending(pending);
+  session.finish(second);
+  assert.equal(state.checking, false);
+  assert.equal(state.pending, pending);
+  assert.equal(session.consume(), pending);
+  assert.equal(state.pending, null);
+  const third = session.begin();
+  session.cancel();
+  assert.equal(third.aborted, true);
+  assert.equal(state.checking, false);
+  assert.equal(state.pending, null);
 });
 
 test('grade and class options are unique, sorted and limited by school level', () => {

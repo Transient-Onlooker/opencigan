@@ -5,7 +5,7 @@
   import MealMenu from './MealMenu.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { saveSelection, saveGradeAndClass, saveClassToStorage, resolveSharedClass, verifiedSharedSchool, gradesInTimetable, classesInGrade, reconcileClassSelection, type PendingSharedClass } from './selection';
+  import { saveSelection, saveGradeAndClass, saveClassToStorage, resolveSharedClass, verifiedSharedSchool, gradesInTimetable, classesInGrade, reconcileClassSelection, createSharedSelectionSession, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -79,6 +79,7 @@
   let sharedClassState = '';
   let pendingSharedClass: PendingSharedClass | null = null;
   let sharedSchoolChecking = false;
+  const sharedSelection = createSharedSelectionSession((state) => { pendingSharedClass = state.pending; sharedSchoolChecking = state.checking; });
   let classActionsReady = false;
   let inputFocused = false;
   let theme: 'light' | 'dark' | 'system' = 'light';
@@ -105,7 +106,6 @@
   let mealsRefreshAt = 0;
   let schoolTimer: ReturnType<typeof setTimeout>;
   let schoolRequest: AbortController | undefined;
-  let sharedSchoolRequest: AbortController | undefined;
   let neisRequest: AbortController | undefined;
   let mealRequest: AbortController | undefined;
   let historyOpen = false;
@@ -426,9 +426,7 @@
     }, 250);
   }
   function cancelSharedSelection() {
-    sharedSchoolRequest?.abort();
-    sharedSchoolChecking = false;
-    pendingSharedClass = null;
+    sharedSelection.cancel();
     sharedClassState = '';
     subscriptionPanelOpen = false;
   }
@@ -503,8 +501,7 @@
   }
   function ensureAvailableClass() {
     if (pendingSharedClass && pendingSharedClass.schoolId === school?.id) {
-      const pending = pendingSharedClass;
-      pendingSharedClass = null;
+      const pending = sharedSelection.consume()!;
       const outcome = resolveSharedClass(pending, timetable, timetableFromDevice, school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6);
       if (outcome.status === 'rolled-back') {
         const message = outcome.reason === 'missing'
@@ -862,12 +859,12 @@
       grade = shared.grade;
       classroom = shared.classroom;
       classError = false;
-      pendingSharedClass = { schoolId: verified.id, grade: shared.grade, classroom: shared.classroom, fallback };
+      sharedSelection.setPending({ schoolId: verified.id, grade: shared.grade, classroom: shared.classroom, fallback });
       chooseSchool(verified, true, true, false);
     } catch {
       if (!signal.aborted) sharedClassState = '공유 링크의 학교를 확인하지 못해 이전 학교를 유지했어요.';
     } finally {
-      if (!signal.aborted) sharedSchoolChecking = false;
+      sharedSelection.finish(signal);
     }
   }
 
@@ -916,9 +913,7 @@
       const saved = localStorage.getItem('opensigan-school'); if (saved) savedSchool = JSON.parse(saved) as School;
     } catch { /* 저장소를 사용할 수 없으면 기본 설정으로 시작합니다. */ }
     if (savedSchool) chooseSchool(savedSchool, true);
-    sharedSchoolRequest = shared ? new AbortController() : undefined;
-    sharedSchoolChecking = !!shared;
-    if (shared && sharedSchoolRequest) void restoreSharedClass(shared, { school: savedSchool, grade: Number(grade), classroom: Number(classroom) }, sharedSchoolRequest.signal);
+    if (shared) void restoreSharedClass(shared, { school: savedSchool, grade: Number(grade), classroom: Number(classroom) }, sharedSelection.begin());
     if (typeof window.history?.replaceState === 'function') {
       const savedNavigation = !shared ? getNavigationFromHistory(current) : null;
       if (savedNavigation) applyNavigation(savedNavigation);
@@ -929,7 +924,7 @@
       ? subscribeNavigation(current, applyNavigation) : () => {};
     return () => {
       stopNavigation();
-      sharedSchoolRequest?.abort();
+      sharedSelection.cancel();
       clearInterval(calendarTimer); document.removeEventListener('visibilitychange', onVisibilityChange); document.removeEventListener('focusin', onFocusIn); document.removeEventListener('focusout', onFocusOut); window.removeEventListener('focus', onFocus); themeMedia?.removeEventListener?.('change', onThemeMedia); historyRequest?.abort();
       clearTimeout(schoolTimer); schoolRequest?.abort(); neisRequest?.abort(); timetableSession.cancel(); mealRequest?.abort();
     };
