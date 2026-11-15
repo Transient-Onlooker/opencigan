@@ -5,6 +5,7 @@
   import MealMenu from './MealMenu.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
+  import { verifiedSharedSchool } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -889,8 +890,7 @@
     try {
       const result = await searchSchools(shared.school.name, signal);
       if (signal.aborted) return;
-      const verified = !result.stale && result.schools.find((candidate) =>
-        candidate.id === shared.school.id && candidate.name === shared.school.name && candidate.region === shared.school.region);
+      const verified = verifiedSharedSchool(shared.school, result.schools, result.stale);
       if (!verified) {
         sharedClassState = '공유 링크의 학교를 확인하지 못해 이전 학교를 유지했어요.';
         return;
