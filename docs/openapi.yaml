@@ -215,7 +215,10 @@ paths:
         Returns the current week (and optionally the next week) in Asia/Seoul.
         Calendar subscribers may use the same URL across weeks. The feed uses
         the same school/week cache as the JSON timetable endpoint. Individual
-        lessons are all-day events, because the upstream source has no bell times.
+        lessons default to all-day events. In timed mode, user-provided bell times
+        are interpreted in Asia/Seoul and serialized as UTC instants. Missing
+        periods remain explicitly labelled all-day events. Times in the URL are
+        shared with the API and calendar service; no server-side profile is saved.
       parameters:
         - name: school
           in: query
@@ -242,14 +245,19 @@ paths:
           schema: { type: integer, enum: [1, 2], default: 1 }
         - name: mode
           in: query
-          schema: { type: string, enum: [periods, summary], default: periods }
-          description: One all-day event per lesson or one summary per school day.
+          schema: { type: string, enum: [periods, summary, timed], default: periods }
+          description: Per-lesson all-day, daily summary, or supplied bell-time events.
+        - name: times
+          in: query
+          required: false
+          description: 'Timed mode only. Comma-separated period:HHMM-HHMM entries, periods 1..20; unique periods and nonoverlapping ordered times. Example 1:0900-0950,2:1000-1050. Changing times requires replacing the subscription URL.'
+          schema: { type: string, maxLength: 400 }
         - name: If-None-Match
           in: header
           schema: { type: string }
       responses:
         '200':
-          description: UTF-8 RFC 5545 iCalendar feed (all-day events)
+          description: UTF-8 RFC 5545 iCalendar feed
           headers:
             ETag:
               schema: { type: string }

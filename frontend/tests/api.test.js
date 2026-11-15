@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'vite';
 
 test('정규 API 경로, 매개변수와 오류를 처리한다', async (t) => {
-  globalThis.location = { hostname: 'localhost' };
+  globalThis.location = { hostname: 'localhost', origin: 'https://example.test' };
   const requests = [];
   globalThis.fetch = async (url) => {
     requests.push(url);
@@ -12,6 +12,9 @@ test('정규 API 경로, 매개변수와 오류를 처리한다', async (t) => {
   const server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom', optimizeDeps: { noDiscovery: true, include: [] } });
   try {
     const api = await server.ssrLoadModule('/src/api.ts');
+    const calendar = new URL(api.timetableSubscriptionUrl('1:학교', 1, 2, 'timed', { 1: { start: '09:00', end: '09:50' } }));
+    assert.equal(calendar.searchParams.get('mode'), 'timed');
+    assert.equal(calendar.searchParams.get('times'), '1:0900-0950');
     await api.searchSchools('서울 학교');
     await api.searchNeisSchools('서울 학교');
     await api.getTimetable('comci/1', '2026-11-09');

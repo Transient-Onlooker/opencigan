@@ -143,3 +143,24 @@ test('favorites collapse, settings search and keyboard help remain usable at nar
   await page.getByLabel('설정 검색').fill('일치하지않는설정');
   await expect(page.getByText('일치하는 설정이 없어요.')).toBeVisible();
 });
+
+test('timed calendar includes bell times only after explicit consent and closes correctly', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByLabel('설정 검색').fill('교시');
+  await page.getByLabel('1교시 시작', { exact: true }).fill('09:00');
+  await page.getByLabel('1교시 종료', { exact: true }).fill('09:50');
+  await page.getByRole('button', { name: '시각 저장', exact: true }).click();
+  await expect(page.getByText('이 학교의 교시 시각을 저장했어요.')).toBeVisible();
+  await page.getByRole('button', { name: '시간표', exact: true }).click();
+  await page.getByRole('button', { name: '캘린더 구독 링크' }).click();
+  await page.getByLabel('일정 표시 방식').selectOption('timed');
+  const url = page.getByLabel(/시간표 구독 URL/);
+  await expect(url).toHaveCount(0);
+  await page.getByRole('checkbox', { name: /입력한 교시 시각을 구독 URL에 포함/ }).check();
+  await expect(url).toHaveValue(/mode=timed&times=1%3A0900-0950$/);
+  await page.getByRole('button', { name: '구독 링크 닫기' }).click();
+  await expect(page.getByLabel('일정 표시 방식')).toHaveCount(0);
+});
