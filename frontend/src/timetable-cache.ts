@@ -22,6 +22,17 @@ export function createTimetableSession() {
   let request: AbortController | undefined;
   return {
     cache,
+    saveFresh(key: string, data: TimetableResponse, expires: number, storage: () => Storage) {
+      if (data.stale) return;
+      try { storage().setItem('opensigan-offline-timetable', JSON.stringify(data)); } catch { /* Memory cache still works without storage. */ }
+      cache.put(key, data, expires);
+    },
+    restoreOffline(schoolId: string, week: string, storage: () => Storage): TimetableResponse | null {
+      try {
+        const saved = JSON.parse(storage().getItem('opensigan-offline-timetable') || 'null') as TimetableResponse | null;
+        return saved && saved.schoolId === schoolId && saved.weekStart === week && Array.isArray(saved.records) ? saved : null;
+      } catch { return null; }
+    },
     cancel() { request?.abort(); },
     begin() {
       request?.abort();

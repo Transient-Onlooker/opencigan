@@ -576,21 +576,13 @@
           timetableCheckedAt = new Date().toISOString();
           tableRefreshState = data.stale ? '서버에 연결했어요. 저장된 시간표를 표시 중이에요.' : '새로고침 완료';
         }
-        if (!data.stale) {
-          try { localStorage.setItem('opensigan-offline-timetable', JSON.stringify(data)); } catch { /* 오프라인 저장 없이 계속 사용합니다. */ }
-          timetableSession.cache.put(key, data, Date.now() + refreshInterval);
-        }
+        timetableSession.saveFresh(key, data, Date.now() + refreshInterval, () => localStorage);
       })
       .catch((error) => {
         if (controller.signal.aborted) return;
         if (!timetable && navigator.onLine === false) {
-          try {
-            const saved = JSON.parse(localStorage.getItem('opensigan-offline-timetable') || 'null') as TimetableResponse | null;
-            if (saved && saved.schoolId === school?.id && saved.weekStart === week && Array.isArray(saved.records)) {
-              timetable = saved;
-              timetableFromDevice = true;
-            }
-          } catch { /* 저장된 시간표가 없으면 연결 오류를 표시합니다. */ }
+          const saved = school && timetableSession.restoreOffline(school.id, week, () => localStorage);
+          if (saved) { timetable = saved; timetableFromDevice = true; }
         }
         if (validateClass) ensureAvailableClass();
         if (controller.signal.aborted) return;
