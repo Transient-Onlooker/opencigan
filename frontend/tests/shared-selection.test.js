@@ -129,3 +129,18 @@ test('고교의 4학년 공유는 1학년으로 저장되지 않는다', async (
   assert.equal(store.has('opensigan-school'), false);
   cleanup();
 });
+
+for (const mismatch of [{ id: '99:공유고등학교' }, { name: '다른학교' }, { region: '서울' }]) {
+  test(`공유 학교의 ${Object.keys(mismatch)[0]} 불일치는 저장된 학교를 바꾸지 않는다`, async () => {
+    const { app, requests, search, store, cleanup } = setup();
+    requests[0].resolve(data(savedSchool));
+    await flush();
+    search.resolve({ schools: [{ ...sharedSchool, ...mismatch }], stale: false });
+    await flush();
+    assert.equal(app.state().school.id, savedSchool.id);
+    assert.equal(app.state().timetable.schoolId, savedSchool.id);
+    assert.equal(JSON.parse(store.get('opensigan-school')).id, savedSchool.id);
+    assert.equal(requests.length, 1);
+    cleanup();
+  });
+}
