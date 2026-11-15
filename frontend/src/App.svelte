@@ -9,7 +9,7 @@
   import ShareTools from './ShareTools.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import TimetablePanel from './TimetablePanel.svelte';
-  import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference, readFavorites, writeFavorites, readTheme, writeTheme, readAnimations, writeAnimations, type Favorite } from './preferences';
+  import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference, readFavorites, writeFavorites, readTheme, writeTheme, readAnimations, writeAnimations, readMealSchool, writeMealSchool, type Favorite } from './preferences';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
   import { saveSelection, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
@@ -211,7 +211,6 @@
   }
   function changeTypeText(type: string) { return type === 'added' ? '추가' : type === 'deleted' ? '삭제' : type === 'changed' ? '변경' : type; }
   function errorText(error: unknown) { return error instanceof Error ? error.message : '요청을 완료하지 못했어요.'; }
-  function neisKey(id: string) { return 'opensigan-neis:' + id; }
 
   function themeIsDark(preference: 'light' | 'dark' | 'system', prefersDark: boolean) {
     return preference === 'dark' || (preference === 'system' && prefersDark);
@@ -435,11 +434,8 @@
     loadTimetable(false, true, true);
     if (school?.id !== value.id) return;
     try {
-      const saved = localStorage.getItem(neisKey(value.id));
-      if (saved) {
-        const candidate = JSON.parse(saved) as NeisSchool;
-        if (resolveMealSchool(value, [candidate])) { chooseNeis(candidate); return; }
-      }
+      const candidate = readMealSchool(localStorage, value.id);
+      if (candidate && resolveMealSchool(value, [candidate])) { chooseNeis(candidate); return; }
     } catch { /* 사용할 수 없는 저장 정보는 다시 조회합니다. */ }
     void connectMeals(value);
   }
@@ -452,7 +448,7 @@
   function chooseNeis(value: NeisSchool) {
     mealSession.cancelNeis();
     mealSession.update({ neis: value, candidates: [], neisLoading: false, searchState: '급식도 ' + value.name + '로 연결했어요.' });
-    if (school) { try { localStorage.setItem(neisKey(school.id), JSON.stringify(value)); } catch { /* 현재 연결은 저장 없이 유지합니다. */ } }
+    if (school) { try { writeMealSchool(localStorage, school.id, value); } catch { /* 현재 연결은 저장 없이 유지합니다. */ } }
     loadMeals();
   }
   function ensureAvailableClass() {

@@ -1,8 +1,17 @@
-import type { School } from './api';
+import type { NeisSchool, School } from './api';
 
 export type Favorite = { school: School; grade: number; classroom: number };
 export type MealPreferences = { view: 'day' | 'week'; types: string[]; showAllergenNumbers: boolean };
 export type ThemePreference = 'light' | 'dark' | 'system';
+
+export function readMealSchool(storage: Pick<Storage, 'getItem'>, schoolId: string): NeisSchool | null {
+  const saved = storage.getItem('opensigan-neis:' + schoolId);
+  return saved ? JSON.parse(saved) as NeisSchool : null;
+}
+
+export function writeMealSchool(storage: Pick<Storage, 'setItem'>, schoolId: string, school: NeisSchool) {
+  storage.setItem('opensigan-neis:' + schoolId, JSON.stringify(school));
+}
 
 export function readTheme(storage: Pick<Storage, 'getItem'>, fallback: ThemePreference): ThemePreference {
   const value = storage.getItem('opensigan-theme');

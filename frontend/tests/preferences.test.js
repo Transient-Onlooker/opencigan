@@ -30,3 +30,13 @@ test('school preferences isolate keys and recover malformed stored data', () => 
   assert.equal(values.get('pref:a'), '{"value":5}');
   assert.equal(values.get('pref:b'), '{bad');
 });
+
+test('meal school links remain scoped to the selected timetable school', () => {
+  const values = new Map();
+  const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+  const school = { id: 'B10:1234567', name: '학교', region: '서울', address: '주소' };
+  prefs.writeMealSchool(storage, '1:학교', school);
+  assert.equal(prefs.readMealSchool(storage, '1:학교').id, school.id);
+  assert.equal(prefs.readMealSchool(storage, '2:다른학교'), null);
+  assert.equal(JSON.parse(values.get('opensigan-neis:1:학교')).address, '주소');
+});
