@@ -9,6 +9,7 @@
 - 공개 HTTPS 점검: `opencigan.mcv.kr/api/v1/timetable.ics`는 GitHub Pages에서 HTML 404를 반환했다. 이후 RPi API를 `7bd443e` 백엔드로 배포한 뒤 기존 Funnel에서 실제 `text/calendar`, ETag 및 조건부 요청 304를 확인했다. 구독 URL, 터널, DNS는 변경하지 않았다.
 - 로컬: Python 132개, 프런트 단위 101개, Svelte 진단 오류·경고 0. 배포용 빌드 성공. Chromium·WebKit 회귀 39개 통과(학교 전환 중 늦은 응답 포함), 기존 Windows WebKit 오프라인 1개 skip. 기존 미커밋 급식 기능도 같은 작업 트리에서 검사했지만 이 배치와 별개다.
 - RPi 배포: 기존 `release-9372745`를 보존하고 `release-7bd443e`에서 Python 132개 테스트를 통과시킨 후 API 서비스만 전환했다. 이전 API drop-in은 `zz-opencigan-release.conf.backup-9372745`로 보관했다. API 상태와 기존 LAN 미리보기 200을 확인했다. 프런트엔드 변경은 배포하지 않았다.
+- RPi의 실행 중인 API 프로세스에서 이력 DB, 원시 IP 접속 로그 DB, 신뢰 프록시 설정이 모두 비어 있는 것을 값 노출 없이 확인했다. 따라서 이력 저장과 원시 IP 로그는 활성화되지 않았으며 Funnel 사용자의 요청 제한은 실제 사용자별 분리로 확인되지 않았다. [Tailscale의 PROXY protocol 설명](https://tailscale.com/docs/reference/tailscale-cli/funnel)을 검토했으나 운영 터널을 바꾸지 않았다.
 - 기존 급식 작업을 제외한 커밋 대상 파일을 별도 임시 디렉터리에 추출해 재검사했다. Svelte 진단 오류·경고 0, 프런트 단위 98개 통과, Chromium·WebKit 37개 통과·WebKit 오프라인 1개 skip이다.
 
 ## 날짜·공유·학급 선택 신뢰성
