@@ -16,3 +16,17 @@ export function createTimetableCache(limit = 4) {
     },
   };
 }
+
+export function createTimetableSession() {
+  const cache = createTimetableCache();
+  let request: AbortController | undefined;
+  return {
+    cache,
+    cancel() { request?.abort(); },
+    begin() {
+      request?.abort();
+      request = new AbortController();
+      return request;
+    },
+  };
+}
