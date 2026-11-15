@@ -1,20 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Icon from './Icon.svelte';
-  import Help from './Help.svelte';
   import MealsPanel from './MealsPanel.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import CalendarNav from './CalendarNav.svelte';
-  import QuickClass from './QuickClass.svelte';
   import SchoolSelector from './SchoolSelector.svelte';
   import FavoritesBar from './FavoritesBar.svelte';
-  import HistoryPanel from './HistoryPanel.svelte';
   import ShareTools from './ShareTools.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
-  import GradeComparison from './GradeComparison.svelte';
-  import TeacherTimetable from './TeacherTimetable.svelte';
-  import TodayLessons from './TodayLessons.svelte';
-  import WeekGrid from './WeekGrid.svelte';
+  import TimetablePanel from './TimetablePanel.svelte';
   import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference } from './preferences';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
   import { saveSelection, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
@@ -28,7 +22,7 @@
   import { createMealSession } from './meal-session';
   import { classLessons, teacherLessons, teacherNamesInTimetable, gradeLessons, comparisonClasses, missingWeekdayDates } from './timetable-view';
   import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, type LessonTimes } from './lesson-times';
-  import { createClassDisplayPreferences, defaultDisplaySettings, parseDisplaySettings, displaySubject, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
+  import { createClassDisplayPreferences, defaultDisplaySettings, parseDisplaySettings, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
   import { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
   import { apiNotConfigured, getMeals, getTimetable, getTimetableHistory, searchSchools, searchNeisSchools, timetableSubscriptionUrl, type Meal, type NeisSchool, type School, type TimetableRecord, type TimetableResponse, type TimetableChange } from './api';
 
@@ -855,35 +849,7 @@
     <FavoritesBar {school} {grade} {classroom} {favorites} {currentFavorite} disabled={classError || !!pendingSharedClass} {addFavorite} {removeFavorite} {switchToFavorite} />
     <CalendarNav {view} {inputFocused} selectView={(value) => view = value} />
     <div id="calendar" class="calendar-content" tabindex="-1">
-        <section id="timetable-panel" hidden={view !== 'timetable'} aria-labelledby="timetable-title">
-           <div class="section-heading"><div><p class="eyebrow">{week === current ? '이번 주' : '선택한 주'}</p><h2 id="timetable-title">시간표</h2></div><div class="heading-actions"><span class="last-fetched">{timetable ? '마지막 수집 ' + timeText(timetable.fetchedAt) : ''}</span>{#if timetable && timetableView !== 'grade'}<button class="secondary-button" disabled={!canExport || exportBusy} onclick={() => exportTimetable('PNG')}><Icon name="save" /> PNG 저장</button><button class="secondary-button" disabled={!canExport || exportBusy} onclick={sharePng}><Icon name="share" /> 이미지 공유</button>{/if}<button class="secondary-button refresh-button" disabled={!school || tableLoading} onclick={refreshTimetable} aria-label="현재 표시 중인 주의 시간표 새로고침"><svg class:spinning={tableLoading} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.4 9a7.5 7.5 0 0 1 13.3-1.4L20 12M4 12l1.3 4.4A7.5 7.5 0 0 0 18.6 15"/></svg> {tableLoading ? '갱신 중' : '새로고침'}</button><button class="secondary-button" onclick={currentWeek}>이번 주로</button></div></div>
-           {#if tableRefreshState}<p class="refresh-feedback" role="status">{tableRefreshState}{timetableCheckedAt ? ' · 마지막 확인 ' + timeText(timetableCheckedAt, true) : ''}</p>{/if}
-           {#if exportState}<p class="export-feedback" role="status">{exportState}</p>{/if}
-           <div class="view-switch timetable-switch" role="group" aria-label="시간표 보기"><button aria-pressed={timetableView === 'today'} onclick={() => selectTimetableView('today')}>오늘</button><button aria-pressed={timetableView === 'week'} onclick={() => selectTimetableView('week')}>이번 주</button><button aria-pressed={timetableView === 'grade'} onclick={() => selectTimetableView('grade')}>{grade}학년</button><button aria-pressed={timetableView === 'teacher'} onclick={() => selectTimetableView('teacher')}>교사</button></div>
-           {#if school}<QuickClass {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {selectGrade} {selectClass} />{/if}
-           <div class="calendar-toolbar"><button class="arrow-button" onclick={() => changeWeek(-1)} disabled={week <= current} aria-label="이전 주">←</button><div class="calendar-date" aria-live="polite"><strong>{shortDate(week)} ~ {shortDate(addDays(week, weekendClasses ? 6 : 4))}</strong></div><button class="arrow-button" onclick={() => changeWeek(1)} disabled={week >= addDays(current, 7)} aria-label="다음 주">→</button></div>
-           <div class="quick-class-hint">이번 주·다음 주만 조회할 수 있어요. <Help label="시간표 조회 범위" text="원본 서비스가 제공하는 현재 주와 다음 주를 조회합니다. 과거 또는 더 먼 미래의 시간표는 제공하지 않아요." /></div>
-          {#if timetable && !classError && timetableView === 'week'}<details class="lesson-search"><summary>이 반의 수업 찾기</summary><div class="lesson-search-fields"><label>과목명 또는 교사명<input type="search" bind:value={lessonQuery} placeholder="이번 주 수업 검색" maxlength="100" /></label><label>요일<select bind:value={lessonWeekday}><option value="">모든 요일</option>{#each ['일', '월', '화', '수', '목', '금', '토'] as day, index}<option value={String(index)}>{day}요일</option>{/each}</select></label></div>{#if lessonQuery.trim() || lessonWeekday}<p role="status">검색 결과 {matchingLessons.length}개</p>{#if matchingLessons.length}<div class="lesson-list">{#each matchingLessons as lesson}<article><span class="lesson-period">{dateText(lesson.date, { weekday: 'short' })} · {lesson.period}교시</span><strong style={subjectStyle(lesson.subject)}>{displaySubject(lesson.subject, displaySettings)}</strong>{#if displaySettings.showTeachers && lesson.teacher}<span>{displayTeacher(lesson.teacher, displaySettings)}</span>{/if}</article>{/each}</div>{:else}<p>이 반의 이번 주 수업 중 일치하는 결과가 없어요.</p>{/if}{/if}</details>{/if}
-          {#if tableState}<div class="notice" role="alert">{timetable ? '이전 시간표를 표시하고 있어요. ' : ''}{tableState} <button class="text-button" onclick={() => loadTimetable(!!timetable)}>다시 시도</button></div>{/if}
-          {#if tableLoading && timetable}<p class="state-inline" role="status">새 시간표를 확인하는 동안 이전 시간표를 표시하고 있어요.</p>{/if}
-          {#if !school}<div class="state-message"><strong>학교를 먼저 선택해 주세요</strong><p>학교와 학급을 선택하면 시간표가 표시돼요.</p></div>
-          {:else if tableLoading && !timetable}<div class="state-message" role="status"><strong>시간표를 불러오고 있어요.</strong></div>
-          {:else if classError}<div class="state-message">{sharedClassState || '현재 선택은 유지했어요. 시간표에 등록된 반을 선택하거나 반 입력을 확인해 주세요.'}</div>
-          {:else if timetable && timetableView === 'today'}
-            <TodayLessons {week} {selectedDay} {today} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} {lessonTimes} {selectTimetableDate} {dateText} {subjectStyle} />
-          {:else if timetable && timetableView === 'grade'}
-            <GradeComparison {school} {week} {selectedDay} {grade} {comparableClasses} {gradeRecords} {displaySettings} {selectTimetableDate} {dateText} {subjectStyle} />
-           {:else if timetable && timetableView === 'teacher'}
-             <TeacherTimetable bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {displaySettings} {week} {current} {today} {dateText} {subjectStyle} />
-          {:else if timetable && timetableView === 'week' && filtered.length}
-            <WeekGrid {school} {grade} {classroom} {dates} {today} {week} {current} {periods} {filtered} {displaySettings} {missingWeekdays} {timetable} {timetableFromDevice} {tableState} {dateText} {subjectStyle} />
-          {:else if !tableState}<div class="state-message"><strong>선택한 학급의 시간표 데이터가 없어요.</strong><p>학교와 학년·반을 확인해 주세요. 해당 기간의 원본 데이터가 제공되지 않은 이유는 확인되지 않습니다.</p></div>{/if}
-           {#if timetable}<div class="freshness" aria-live="polite">{#if timetableFromDevice}<span>오프라인 · 이 기기에 저장된 시간표</span>{:else if timetable.stale}<span>저장된 시간표 · 최신 정보가 아닐 수 있어요</span>{/if}<span>원본 갱신 {timeText(timetable.sourceUpdatedAt)}</span></div>{/if}
-           {#if timetable?.records.length}<details class="dataset-details"><summary>수업 데이터 규모 · 학급 {observedClassCount}개 · 교사 이름 {teacherNames.length}개</summary><p>선택한 주에 수집된 수업 기록 기준입니다. 학교 전체 학급·교사 수가 아닐 수 있고, 교사 이름 누락이나 동명이인이 있으면 실제 인원과 다를 수 있어요.</p></details>{/if}
-          {#if timetable}
-            <HistoryPanel {historyOpen} {historyDisabled} {historyLoading} {historyError} {historyChanges} {visibleHistory} {historyCursor} bind:historyScope {toggleHistory} {loadHistory} {dateText} {timeText} {changeTypeText} />
-          {/if}
-        </section>
+        <TimetablePanel {view} {timetableView} {school} {timetable} {week} {current} {today} {selectedDay} {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {tableState} {tableRefreshState} {timetableCheckedAt} {timetableFromDevice} {exportState} {exportBusy} {canExport} {weekendClasses} {classError} {sharedClassState} bind:lessonQuery bind:lessonWeekday {matchingLessons} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} {lessonTimes} {comparableClasses} {gradeRecords} bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {dates} {periods} {filtered} {missingWeekdays} {observedClassCount} {teacherNames} {historyOpen} {historyDisabled} {historyLoading} {historyError} {historyChanges} {visibleHistory} {historyCursor} bind:historyScope {exportTimetable} {sharePng} {refreshTimetable} {currentWeek} {selectTimetableView} {selectGrade} {selectClass} {changeWeek} {loadTimetable} {selectTimetableDate} {toggleHistory} {loadHistory} {dateText} {shortDate} {timeText} {changeTypeText} {subjectStyle} />
         <MealsPanel {view} {mealDate} {today} {mealView} {mealDates} {mealDateDraft} {dateError} {neis} {school} {neisSearchState} {neisLoading} {neisResults} {mealState} {hasMeals} {mealLoading} {meals} {visibleMealTypes} {allergySelection} {showAllergenNumbers} {current} {mealsStale} {todayMeals} {setMealView} {changeMealDate} {dateText} {updateMealDateDraft} {selectMealDate} {chooseNeis} {connectMeals} {loadMeals} {selectMealTimetableDate} />
         <SettingsPanel {view} {school} {useClassDisplay} {classError} {grade} {classroom} {theme} {animationsEnabled} {displaySettings} bind:selectedSubject bind:selectedTeacher {subjectNames} {teacherNames} {lessonTimePeriods} {lessonTimeDrafts} {lessonTimeState} {settingsBackupState} {mealTypes} {enabledMealTypes} {showAllergenNumbers} {allergySelection} {setClassDisplay} {setTheme} {setAnimationsEnabled} {setColorMode} {saveAlias} {saveSubjectColor} {clearSubjectColors} {saveDisplaySettings} {editLessonTime} {saveLessonTimes} {clearLessonTimes} {downloadSettingsBackup} {importSettingsFile} {resetDisplaySettings} {toggleMealType} {setAllergenNumbersVisible} {toggleAllergy} />
         {#if school && view === 'timetable'}
