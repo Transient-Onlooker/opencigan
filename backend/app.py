@@ -290,7 +290,7 @@ def _webhook_api(method, path, body, request_headers, client, headers):
                 raise ValueError("invalid payload")
             result = store.create(payload["school"], payload["grade"], payload["class"], payload["destination"])
             return respond(200, result)
-        match = re.fullmatch(r"/api/v1/webhooks/([A-Za-z0-9_-]{24})", path)
+        match = re.fullmatch(r"/api/v1/webhooks/([A-Za-z0-9_-]{24})(/deliveries)?", path)
         if not match:
             return respond(404, {"error": "요청한 경로가 없습니다", "code": "not_found"})
         if method not in ("GET", "HEAD", "DELETE"):
@@ -298,7 +298,12 @@ def _webhook_api(method, path, body, request_headers, client, headers):
         authorization = (request_headers or {}).get("Authorization", "")
         token = authorization[7:] if authorization.startswith("Bearer ") else ""
         identifier = match.group(1)
-        if method == "DELETE":
+        if match.group(2):
+            if method not in ("GET", "HEAD"):
+                return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
+            deliveries = store.deliveries(identifier, token)
+            result = {"deliveries": deliveries} if deliveries is not None else None
+        elif method == "DELETE":
             result = {"deleted": True} if store.delete(identifier, token) else None
         else:
             result = store.get(identifier, token)

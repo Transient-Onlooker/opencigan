@@ -101,3 +101,20 @@ class WebhookApiTests(unittest.TestCase):
             self.assertTrue(deliver_next(WebhookStore(self.path), now=now.timestamp() + 10, sender=sender))
             self.assertIn("과학", sent[0][1]["content"])
             self.assertTrue(sent[0][2].startswith("change_"))
+
+    def test_delivery_history_requires_token_and_omits_secrets_and_payload(self):
+        with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
+            _, _, body = self.request("POST", "/api/v1/webhooks", self.payload)
+            created = json.loads(body)
+            store = WebhookStore(self.path)
+            store.enqueue(created["id"], "event_1", b'{"text":"private lesson"}', now=10)
+            item = store.claim(now=10)
+            store.finish(item["id"], item["leaseToken"], {"delivered": False, "retryable": False, "status": 400}, now=11)
+            path = "/api/v1/webhooks/" + created["id"] + "/deliveries"
+            self.assertEqual(self.request("GET", path, token="wrong")[0], 401)
+            status, headers, body = self.request("GET", path, token=created["token"])
+            self.assertEqual((status, headers["Cache-Control"]), (200, "no-store"))
+            self.assertEqual(json.loads(body)["deliveries"][0]["state"], "failed")
+            for value in (b"private lesson", b"secret", created["token"].encode()):
+                self.assertNotIn(value, body)
+            self.assertEqual(self.request("DELETE", path, token=created["token"])[0], 405)

@@ -72,6 +72,36 @@ paths:
         '200': { description: Subscription and queued deliveries deleted. }
         '401': { description: Invalid subscription or token. }
         '503': { description: Feature disabled or storage unavailable. }
+  /api/v1/webhooks/{id}/deliveries:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
+    get:
+      tags: [System]
+      summary: List recent delivery states for a webhook subscription
+      security: [{ WebhookManagement: [] }]
+      responses:
+        '200':
+          description: At most 50 delivery states; no destination or message body.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deliveries]
+                properties:
+                  deliveries:
+                    type: array
+                    items:
+                      type: object
+                      required: [event_id, state, attempts, next_at, last_status]
+                      properties:
+                        event_id: { type: string }
+                        state: { type: string, enum: [pending, leased, delivered, failed] }
+                        attempts: { type: integer, minimum: 0 }
+                        next_at: { type: number, description: Unix timestamp in seconds. }
+                        last_status: { type: [integer, 'null'] }
+        '401': { description: Invalid subscription or token. }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { description: Feature disabled or storage unavailable. }
   /api/v1/analytics/pageview:
     post:
       tags: [System]

@@ -10,6 +10,8 @@ Webhook 구독 API와 작업자는 로컬에서 개발·검증 중이며 운영 
 
 합성 데이터로만 실험할 때는 기존 이력 DB 경로를 `OPENCIGAN_HISTORY_DB`에 설정하고 `OPENCIGAN_WEBHOOKS_ENABLED=1`을 지정합니다. `POST /api/v1/webhooks`의 JSON 필드는 `school`, `grade`, `class`, `destination`입니다. 응답의 `id`와 일회성 `token`을 보관하고, 조회·삭제 시 `/api/v1/webhooks/{id}`에 `Authorization: Bearer <token>`을 보냅니다. 토큰은 URL이나 로그에 넣지 않습니다. 삭제는 이미 전송 중인 요청을 취소하지 못합니다.
 
+같은 인증 헤더로 `GET /api/v1/webhooks/{id}/deliveries`를 호출하면 최근 최대 50건의 이벤트 ID, 상태, 시도 횟수, 다음 처리 시각(Unix 초), 최종 HTTP 상태를 볼 수 있습니다. 메시지 본문과 전송 대상 주소는 응답하지 않습니다. `pending`은 대기, `leased`는 작업자가 처리 중, `delivered`는 수신 서버가 성공 상태를 반환한 상태, `failed`는 재시도가 중단된 상태입니다.
+
 작업자는 같은 환경 변수를 설정한 별도 프로세스에서 `python -m backend.webhook_worker`로 실행합니다. 시스템 서비스는 아직 제공하거나 활성화하지 않습니다. 최초 관측은 기준만 만들며, 이력과 Webhook DB가 같은 파일이어야 합니다. 자동 조회 기능이 없으므로 누군가 시간표를 조회하고 새 원본 데이터가 수집될 때만 변경을 관측합니다.
 
 구독별 대기·발송 중 항목은 최대 1,000건입니다. 꽉 차면 새 알림은 생략하고 구독 조회의 `dropped_events`가 증가하지만 시간표 이력은 유지됩니다. 전송 시도는 최대 6회이며, 완료·실패 항목은 30일 후 작업자 점검 시 정리됩니다. SQLite 파일의 할당 공간은 삭제 직후 자동으로 줄어들지 않을 수 있습니다.

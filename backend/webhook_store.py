@@ -119,6 +119,14 @@ class WebhookStore:
         with closing(self._connect()) as db:
             return db.execute("DELETE FROM webhook_subscriptions WHERE id=? AND token_hash=?", (identifier, self._token_hash(token))).rowcount == 1
 
+    def deliveries(self, identifier, token):
+        with closing(self._connect()) as db:
+            if not db.execute("SELECT 1 FROM webhook_subscriptions WHERE id=? AND token_hash=?", (identifier, self._token_hash(token))).fetchone():
+                return None
+            rows = db.execute("""SELECT event_id, state, attempts, next_at, last_status FROM webhook_deliveries
+                                 WHERE subscription_id=? ORDER BY id DESC LIMIT 50""", (identifier,)).fetchall()
+        return [dict(row) for row in rows]
+
     def enqueue(self, identifier, event_id, body, now=None):
         if not isinstance(event_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", event_id):
             raise ValueError("invalid event ID")
