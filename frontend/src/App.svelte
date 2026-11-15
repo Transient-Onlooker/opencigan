@@ -5,7 +5,7 @@
   import MealMenu from './MealMenu.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { saveSelection, saveGradeAndClass, saveClassToStorage, resolveSharedClass, verifiedSharedSchool, gradesInTimetable, classesInGrade, reconcileClassSelection, createSharedSelectionSession, type PendingSharedClass } from './selection';
+  import { saveSelection, saveGradeAndClass, saveClassToStorage, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSharedSelectionSession, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -846,26 +846,11 @@
     }
   }
 
-  async function restoreSharedClass(shared: NonNullable<ReturnType<typeof readSharedClass>>, fallback: { school: School | null; grade: number; classroom: number }, signal: AbortSignal) {
-    try {
-      const result = await searchSchools(shared.school.name, signal);
-      if (signal.aborted) return;
-      const verified = verifiedSharedSchool(shared.school, result.schools, result.stale);
-      if (!verified) {
-        sharedClassState = '공유 링크의 학교를 확인하지 못해 이전 학교를 유지했어요.';
-        return;
-      }
-      if (school?.id !== fallback.school?.id) return;
-      grade = shared.grade;
-      classroom = shared.classroom;
-      classError = false;
-      sharedSelection.setPending({ schoolId: verified.id, grade: shared.grade, classroom: shared.classroom, fallback });
+  function restoreSharedClass(shared: NonNullable<ReturnType<typeof readSharedClass>>, fallback: { school: School | null; grade: number; classroom: number }) {
+    return sharedSelection.verifySchool(shared, fallback, () => school?.id, searchSchools, (verified) => {
+      grade = shared.grade; classroom = shared.classroom; classError = false;
       chooseSchool(verified, true, true, false);
-    } catch {
-      if (!signal.aborted) sharedClassState = '공유 링크의 학교를 확인하지 못해 이전 학교를 유지했어요.';
-    } finally {
-      sharedSelection.finish(signal);
-    }
+    }, () => { sharedClassState = '공유 링크의 학교를 확인하지 못해 이전 학교를 유지했어요.'; });
   }
 
   onMount(() => {
@@ -913,7 +898,7 @@
       const saved = localStorage.getItem('opensigan-school'); if (saved) savedSchool = JSON.parse(saved) as School;
     } catch { /* 저장소를 사용할 수 없으면 기본 설정으로 시작합니다. */ }
     if (savedSchool) chooseSchool(savedSchool, true);
-    if (shared) void restoreSharedClass(shared, { school: savedSchool, grade: Number(grade), classroom: Number(classroom) }, sharedSelection.begin());
+    if (shared) void restoreSharedClass(shared, { school: savedSchool, grade: Number(grade), classroom: Number(classroom) });
     if (typeof window.history?.replaceState === 'function') {
       const savedNavigation = !shared ? getNavigationFromHistory(current) : null;
       if (savedNavigation) applyNavigation(savedNavigation);
