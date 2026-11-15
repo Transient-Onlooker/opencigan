@@ -84,6 +84,10 @@ class WebhookApiTests(unittest.TestCase):
                             "HTTP_AUTHORIZATION": "Bearer " + created["token"], "CONTENT_LENGTH": "0"})
             b"".join(make_app()(environ, lambda status, headers: statuses.append(status)))
             self.assertEqual(statuses.pop(), "200 OK")
+            update = b'{"filters":{"period":1}}'
+            environ.update({"REQUEST_METHOD": "PUT", "CONTENT_LENGTH": str(len(update)), "wsgi.input": io.BytesIO(update)})
+            b"".join(make_app()(environ, lambda status, headers: statuses.append(status)))
+            self.assertEqual(statuses.pop(), "200 OK")
 
     def test_api_subscription_receives_observed_change_in_mock_worker(self):
         with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
@@ -138,3 +142,22 @@ class WebhookApiTests(unittest.TestCase):
             self.assertEqual(sent[0][1], event_id)
             self.assertIn("테스트 알림", sent[0][0]["content"])
             self.assertEqual(self.request("POST", path, token=created["token"])[0], 429)
+
+    def test_filter_update_requires_token_and_applies_to_future_changes(self):
+        with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
+            _, _, body = self.request("POST", "/api/v1/webhooks", self.payload)
+            created = json.loads(body)
+            path = "/api/v1/webhooks/" + created["id"]
+            filters = {"subject": "수학", "teacher": "이", "weekday": 1, "period": 1, "type": "changed"}
+            self.assertEqual(self.request("PUT", path, {"filters": filters}, "wrong")[0], 401)
+            self.assertEqual(self.request("PUT", path, {"filters": {"period": True}}, created["token"])[0], 400)
+            self.assertEqual(self.request("PUT", path, {"filters": filters}, created["token"])[0], 200)
+            self.assertEqual(json.loads(self.request("GET", path, token=created["token"])[2])["filters"], filters)
+            history = HistoryStore(self.path)
+            now = datetime.now(timezone.utc)
+            lesson = {"grade": 2, "class": 3, "date": "2026-11-16", "period": 1, "subject": "수학", "teacher": "김"}
+            history.observe(self.payload["school"], "2026-11-16", [lesson], now)
+            history.observe(self.payload["school"], "2026-11-16", [{**lesson, "subject": "과학", "teacher": "이"}], now + timedelta(seconds=1))
+            self.assertEqual(len(WebhookStore(self.path).deliveries(created["id"], created["token"])), 1)
+            history.observe(self.payload["school"], "2026-11-16", [{**lesson, "subject": "영어", "teacher": "박"}], now + timedelta(seconds=2))
+            self.assertEqual(len(WebhookStore(self.path).deliveries(created["id"], created["token"])), 1)

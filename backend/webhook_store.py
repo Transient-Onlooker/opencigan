@@ -8,6 +8,7 @@ import secrets
 import sqlite3
 import time
 from contextlib import closing
+from datetime import date as date_type
 
 from backend.webhook_delivery import validate_destination
 
@@ -21,8 +22,23 @@ MAX_DELIVERY_ATTEMPTS = 6
 DELIVERY_RETENTION_SECONDS = 30 * 24 * 60 * 60
 
 
+def validate_filters(filters):
+    if not isinstance(filters, dict) or set(filters) - {"subject", "teacher", "weekday", "period", "type"}:
+        raise ValueError("invalid filters")
+    for key, value in filters.items():
+        if key in ("subject", "teacher"):
+            if not isinstance(value, str) or not value.strip() or len(value) > 50:
+                raise ValueError("invalid filter")
+        elif key in ("weekday", "period"):
+            if type(value) is not int or not 1 <= value <= (5 if key == "weekday" else 20):
+                raise ValueError("invalid filter")
+        elif value not in ("added", "deleted", "changed"):
+            raise ValueError("invalid filter")
+    return filters
+
+
 def enqueue_observed_change(db, school, grade, classroom, date, period, kind, before, after, change_id, now):
-    subscriptions = db.execute("SELECT id, provider FROM webhook_subscriptions WHERE school=? AND grade=? AND classroom=?",
+    subscriptions = db.execute("SELECT id, provider, filters_json FROM webhook_subscriptions WHERE school=? AND grade=? AND classroom=?",
                                (school, grade, classroom)).fetchall()
     if not subscriptions:
         return
@@ -36,6 +52,13 @@ def enqueue_observed_change(db, school, grade, classroom, date, period, kind, be
     # Google Chat interprets angle-bracket tokens as mentions; Discord disables all mentions explicitly.
     safe_text = text.replace("<", "＜").replace(">", "＞")[:1800]
     for subscription in subscriptions:
+        filters = json.loads(subscription["filters_json"])
+        if any(filters.get(key) is not None and filters[key] != value for key, value in
+               (("period", period), ("type", kind), ("weekday", date_type.fromisoformat(date).isoweekday()))):
+            continue
+        if any(filters.get(key) and not any(filters[key] in (value or {}).get(key, "") for value in (before, after))
+               for key in ("subject", "teacher")):
+            continue
         if db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')", (subscription["id"],)).fetchone()[0] >= MAX_PENDING_PER_SUBSCRIPTION:
             db.execute("UPDATE webhook_subscriptions SET dropped_events=dropped_events+1 WHERE id=?", (subscription["id"],))
             continue
@@ -73,11 +96,19 @@ class WebhookStore:
                 CREATE INDEX IF NOT EXISTS webhook_ready ON webhook_deliveries(state, next_at, lease_until);
                 CREATE INDEX IF NOT EXISTS webhook_subscription_state ON webhook_deliveries(subscription_id, state);
             """)
-            columns = {row["name"] for row in db.execute("PRAGMA table_info(webhook_subscriptions)")}
-            if "dropped_events" not in columns:
-                db.execute("ALTER TABLE webhook_subscriptions ADD COLUMN dropped_events INTEGER NOT NULL DEFAULT 0")
-            if "last_test_at" not in columns:
-                db.execute("ALTER TABLE webhook_subscriptions ADD COLUMN last_test_at REAL")
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                columns = {row["name"] for row in db.execute("PRAGMA table_info(webhook_subscriptions)")}
+                if "dropped_events" not in columns:
+                    db.execute("ALTER TABLE webhook_subscriptions ADD COLUMN dropped_events INTEGER NOT NULL DEFAULT 0")
+                if "last_test_at" not in columns:
+                    db.execute("ALTER TABLE webhook_subscriptions ADD COLUMN last_test_at REAL")
+                if "filters_json" not in columns:
+                    db.execute("ALTER TABLE webhook_subscriptions ADD COLUMN filters_json TEXT NOT NULL DEFAULT '{}' ")
+                db.execute("COMMIT")
+            except BaseException:
+                db.execute("ROLLBACK")
+                raise
 
     def _connect(self):
         db = sqlite3.connect(self.path, timeout=10, isolation_level=None)
@@ -113,9 +144,19 @@ class WebhookStore:
 
     def get(self, identifier, token):
         with closing(self._connect()) as db:
-            row = db.execute("SELECT id, school, grade, classroom, provider, dropped_events FROM webhook_subscriptions WHERE id=? AND token_hash=?",
+            row = db.execute("SELECT id, school, grade, classroom, provider, dropped_events, filters_json FROM webhook_subscriptions WHERE id=? AND token_hash=?",
                              (identifier, self._token_hash(token))).fetchone()
-        return dict(row) if row else None
+        if not row:
+            return None
+        result = dict(row)
+        result["filters"] = json.loads(result.pop("filters_json"))
+        return result
+
+    def update_filters(self, identifier, token, filters):
+        validate_filters(filters)
+        with closing(self._connect()) as db:
+            return db.execute("UPDATE webhook_subscriptions SET filters_json=? WHERE id=? AND token_hash=?",
+                              (json.dumps(filters, ensure_ascii=False), identifier, self._token_hash(token))).rowcount == 1
 
     def delete(self, identifier, token):
         with closing(self._connect()) as db:

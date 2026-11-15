@@ -293,7 +293,7 @@ def _webhook_api(method, path, body, request_headers, client, headers):
         match = re.fullmatch(r"/api/v1/webhooks/([A-Za-z0-9_-]{24})(/deliveries|/test)?", path)
         if not match:
             return respond(404, {"error": "요청한 경로가 없습니다", "code": "not_found"})
-        if method not in ("GET", "HEAD", "DELETE", "POST"):
+        if method not in ("GET", "HEAD", "DELETE", "POST", "PUT"):
             return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
         authorization = (request_headers or {}).get("Authorization", "")
         token = authorization[7:] if authorization.startswith("Bearer ") else ""
@@ -313,6 +313,11 @@ def _webhook_api(method, path, body, request_headers, client, headers):
             result = {"deliveries": deliveries} if deliveries is not None else None
         elif method == "POST":
             return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
+        elif method == "PUT":
+            payload = json.loads(body or b"{}")
+            if not isinstance(payload, dict) or set(payload) != {"filters"}:
+                raise ValueError("invalid payload")
+            result = {"updated": True} if store.update_filters(identifier, token, payload["filters"]) else None
         elif method == "DELETE":
             result = {"deleted": True} if store.delete(identifier, token) else None
         else:
@@ -396,7 +401,7 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
         headers["Access-Control-Expose-Headers"] = "Retry-After, ETag" if path in ("/api/v1/timetable.ics", "/api/v1/timetable/history.rss") else "Retry-After"
 
     if method == "OPTIONS":
-        headers["Access-Control-Allow-Methods"] = "GET, HEAD, POST, DELETE, OPTIONS" if path.startswith("/api/v1/webhooks") else "GET, HEAD, POST, OPTIONS"
+        headers["Access-Control-Allow-Methods"] = "GET, HEAD, POST, PUT, DELETE, OPTIONS" if path.startswith("/api/v1/webhooks") else "GET, HEAD, POST, OPTIONS"
         headers["Access-Control-Allow-Headers"] = (
             "Content-Type, Authorization, If-None-Match" if path in ("/api/v1/timetable.ics", "/api/v1/timetable/history.rss")
             else "Content-Type, Authorization"
@@ -778,7 +783,7 @@ def dispatch_request(method, path, query_string, cache_instance=None, client=Non
 class Handler(BaseHTTPRequestHandler):
     def _unsupported(self):
         parts = urlsplit(self.path)
-        request_body = _read_request_body(self.rfile, self.headers.get("Content-Length")) if self.command == "POST" and (parts.path == "/api/v1/analytics/pageview" or parts.path.startswith("/api/v1/webhooks")) else None
+        request_body = _read_request_body(self.rfile, self.headers.get("Content-Length")) if (self.command == "POST" and parts.path == "/api/v1/analytics/pageview") or (self.command in ("POST", "PUT") and parts.path.startswith("/api/v1/webhooks")) else None
         status_code, headers, body = dispatch_request(self.command, parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_body, {"Authorization": self.headers.get("Authorization", ""), "Referer": self.headers.get("Referer", "")})
         self.send_response(status_code)
         for key, val in headers.items():
@@ -862,7 +867,7 @@ def make_app(cache_instance=None, trusted_proxies=None):
             cache_instance=cache_instance,
             client=client,
             request_origin=environ.get("HTTP_ORIGIN"),
-            request_body=_read_request_body(environ.get("wsgi.input"), environ.get("CONTENT_LENGTH")) if method == "POST" and (path == "/api/v1/analytics/pageview" or path.startswith("/api/v1/webhooks")) else None,
+            request_body=_read_request_body(environ.get("wsgi.input"), environ.get("CONTENT_LENGTH")) if (method == "POST" and path == "/api/v1/analytics/pageview") or (method in ("POST", "PUT") and path.startswith("/api/v1/webhooks")) else None,
             request_headers={"Authorization": environ.get("HTTP_AUTHORIZATION", ""), "If-None-Match": environ.get("HTTP_IF_NONE_MATCH", ""), "Referer": environ.get("HTTP_REFERER", "")},
         )
 
