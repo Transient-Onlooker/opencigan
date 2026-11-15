@@ -129,6 +129,46 @@ test('shared selection session cancels obsolete checks and publishes pending and
   assert.equal(state.pending, null);
 });
 
+test('a newer shared school verification wins when an aborted search resolves late', async () => {
+  let latest;
+  const session = exports.createSharedSelectionSession((state) => { latest = state; });
+  const fallback = { school: { id: 'old' }, grade: 1, classroom: 1 };
+  const firstSchool = { id: 'first', name: '첫 학교', region: '서울' };
+  const secondSchool = { id: 'second', name: '다음 학교', region: '서울' };
+  let release;
+  const delayed = new Promise((resolve) => { release = resolve; });
+  const applied = [];
+  const failures = [];
+  const first = session.verifySchool({ school: firstSchool, grade: 1, classroom: 2 }, fallback, () => 'old', () => delayed, (value) => applied.push(value.id), () => failures.push('first'));
+  const second = session.verifySchool({ school: secondSchool, grade: 2, classroom: 3 }, fallback, () => 'old', async () => ({ schools: [secondSchool], stale: false }), (value) => applied.push(value.id), () => failures.push('second'));
+  await second;
+  release({ schools: [firstSchool], stale: false });
+  await first;
+  assert.deepEqual(applied, ['second']);
+  assert.deepEqual(failures, []);
+  assert.equal(latest.pending.schoolId, 'second');
+  assert.equal(latest.pending.classroom, 3);
+  assert.equal(latest.checking, false);
+});
+
+test('shared verification rejects stale results and ignores results after the active school changes', async () => {
+  let latest;
+  const session = exports.createSharedSelectionSession((state) => { latest = state; });
+  const school = { id: 'shared', name: '공유 학교', region: '서울' };
+  const fallback = { school: { id: 'old' }, grade: 1, classroom: 1 };
+  let applied = 0;
+  let failed = 0;
+  const shared = { school, grade: 1, classroom: 1 };
+  await session.verifySchool(shared, fallback, () => 'old', async () => ({ schools: [school], stale: true }), () => applied++, () => failed++);
+  assert.equal(failed, 1);
+  assert.equal(latest.pending, null);
+  await session.verifySchool(shared, fallback, () => 'another', async () => ({ schools: [school], stale: false }), () => applied++, () => failed++);
+  assert.equal(applied, 0);
+  assert.equal(failed, 1);
+  assert.equal(latest.pending, null);
+  assert.equal(latest.checking, false);
+});
+
 test('grade and class options are unique, sorted and limited by school level', () => {
   const records = [{ grade: 2, class: '11' }, { grade: 2, class: 3 }, { grade: 2, class: 3 },
     { grade: 4, class: 1 }, { grade: 0, class: 1 }, { grade: 2, class: 'bad' }];
