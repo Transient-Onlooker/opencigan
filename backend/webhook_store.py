@@ -76,6 +76,8 @@ class WebhookStore:
             columns = {row["name"] for row in db.execute("PRAGMA table_info(webhook_subscriptions)")}
             if "dropped_events" not in columns:
                 db.execute("ALTER TABLE webhook_subscriptions ADD COLUMN dropped_events INTEGER NOT NULL DEFAULT 0")
+            if "last_test_at" not in columns:
+                db.execute("ALTER TABLE webhook_subscriptions ADD COLUMN last_test_at REAL")
 
     def _connect(self):
         db = sqlite3.connect(self.path, timeout=10, isolation_level=None)
@@ -126,6 +128,33 @@ class WebhookStore:
             rows = db.execute("""SELECT event_id, state, attempts, next_at, last_status FROM webhook_deliveries
                                  WHERE subscription_id=? ORDER BY id DESC LIMIT 50""", (identifier,)).fetchall()
         return [dict(row) for row in rows]
+
+    def enqueue_test(self, identifier, token, now=None):
+        now = time.time() if now is None else now
+        with closing(self._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                row = db.execute("SELECT provider, last_test_at FROM webhook_subscriptions WHERE id=? AND token_hash=?",
+                                 (identifier, self._token_hash(token))).fetchone()
+                if not row:
+                    db.execute("COMMIT")
+                    return None
+                recent = row["last_test_at"] is not None and row["last_test_at"] > now - 60
+                pending = db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')", (identifier,)).fetchone()[0]
+                if recent or pending >= MAX_PENDING_PER_SUBSCRIPTION:
+                    db.execute("COMMIT")
+                    return False
+                event_id = "test_" + secrets.token_urlsafe(18)
+                text = "OpenCigan 테스트 알림입니다. 이 메시지는 시간표 변경이 아닙니다."
+                payload = {"content": text, "allowed_mentions": {"parse": []}} if row["provider"] == "discord" else {"text": text}
+                body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+                db.execute("INSERT INTO webhook_deliveries(subscription_id, event_id, body, next_at) VALUES (?, ?, ?, ?)", (identifier, event_id, body, now))
+                db.execute("UPDATE webhook_subscriptions SET last_test_at=? WHERE id=?", (now, identifier))
+                db.execute("COMMIT")
+                return event_id
+            except BaseException:
+                db.execute("ROLLBACK")
+                raise
 
     def enqueue(self, identifier, event_id, body, now=None):
         if not isinstance(event_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", event_id):

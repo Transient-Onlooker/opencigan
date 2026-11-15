@@ -118,3 +118,23 @@ class WebhookApiTests(unittest.TestCase):
             for value in (b"private lesson", b"secret", created["token"].encode()):
                 self.assertNotIn(value, body)
             self.assertEqual(self.request("DELETE", path, token=created["token"])[0], 405)
+
+    def test_test_notification_is_authenticated_rate_limited_and_delivered_by_worker(self):
+        with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
+            _, _, body = self.request("POST", "/api/v1/webhooks", self.payload)
+            created = json.loads(body)
+            path = "/api/v1/webhooks/" + created["id"] + "/test"
+            self.assertEqual(self.request("POST", path, token="wrong")[0], 401)
+            status, _, body = self.request("POST", path, token=created["token"])
+            self.assertEqual(status, 200)
+            event_id = json.loads(body)["eventId"]
+            self.assertTrue(event_id.startswith("test_"))
+            self.assertEqual(self.request("POST", path, token=created["token"])[0], 429)
+            sent = []
+            def sender(url, body, secret, event):
+                sent.append((json.loads(body), event))
+                return {"delivered": True, "retryable": False, "status": 204, "retryAfter": None}
+            self.assertTrue(deliver_next(WebhookStore(self.path), sender=sender))
+            self.assertEqual(sent[0][1], event_id)
+            self.assertIn("테스트 알림", sent[0][0]["content"])
+            self.assertEqual(self.request("POST", path, token=created["token"])[0], 429)

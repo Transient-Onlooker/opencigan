@@ -72,6 +72,26 @@ paths:
         '200': { description: Subscription and queued deliveries deleted. }
         '401': { description: Invalid subscription or token. }
         '503': { description: Feature disabled or storage unavailable. }
+  /api/v1/webhooks/{id}/test:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
+    post:
+      tags: [System]
+      summary: Enqueue a test notification
+      security: [{ WebhookManagement: [] }]
+      description: Queues a test, not a delivery confirmation; at most one request per subscription per minute.
+      responses:
+        '200':
+          description: Test enqueued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [eventId]
+                properties: { eventId: { type: string } }
+        '401': { description: Invalid subscription or token. }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { description: Feature disabled or storage unavailable. }
   /api/v1/webhooks/{id}/deliveries:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }

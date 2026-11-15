@@ -290,19 +290,29 @@ def _webhook_api(method, path, body, request_headers, client, headers):
                 raise ValueError("invalid payload")
             result = store.create(payload["school"], payload["grade"], payload["class"], payload["destination"])
             return respond(200, result)
-        match = re.fullmatch(r"/api/v1/webhooks/([A-Za-z0-9_-]{24})(/deliveries)?", path)
+        match = re.fullmatch(r"/api/v1/webhooks/([A-Za-z0-9_-]{24})(/deliveries|/test)?", path)
         if not match:
             return respond(404, {"error": "요청한 경로가 없습니다", "code": "not_found"})
-        if method not in ("GET", "HEAD", "DELETE"):
+        if method not in ("GET", "HEAD", "DELETE", "POST"):
             return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
         authorization = (request_headers or {}).get("Authorization", "")
         token = authorization[7:] if authorization.startswith("Bearer ") else ""
         identifier = match.group(1)
-        if match.group(2):
+        if match.group(2) == "/test":
+            if method != "POST":
+                return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
+            event = store.enqueue_test(identifier, token)
+            if event is False:
+                headers["Retry-After"] = "60"
+                return respond(429, {"error": "잠시 후 다시 시도해 주세요", "code": "rate_limited"})
+            result = {"eventId": event} if event is not None else None
+        elif match.group(2) == "/deliveries":
             if method not in ("GET", "HEAD"):
                 return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
             deliveries = store.deliveries(identifier, token)
             result = {"deliveries": deliveries} if deliveries is not None else None
+        elif method == "POST":
+            return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
         elif method == "DELETE":
             result = {"deleted": True} if store.delete(identifier, token) else None
         else:
@@ -768,7 +778,7 @@ def dispatch_request(method, path, query_string, cache_instance=None, client=Non
 class Handler(BaseHTTPRequestHandler):
     def _unsupported(self):
         parts = urlsplit(self.path)
-        request_body = _read_request_body(self.rfile, self.headers.get("Content-Length")) if self.command == "POST" and parts.path in ("/api/v1/analytics/pageview", "/api/v1/webhooks") else None
+        request_body = _read_request_body(self.rfile, self.headers.get("Content-Length")) if self.command == "POST" and (parts.path == "/api/v1/analytics/pageview" or parts.path.startswith("/api/v1/webhooks")) else None
         status_code, headers, body = dispatch_request(self.command, parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_body, {"Authorization": self.headers.get("Authorization", ""), "Referer": self.headers.get("Referer", "")})
         self.send_response(status_code)
         for key, val in headers.items():
@@ -852,7 +862,7 @@ def make_app(cache_instance=None, trusted_proxies=None):
             cache_instance=cache_instance,
             client=client,
             request_origin=environ.get("HTTP_ORIGIN"),
-            request_body=_read_request_body(environ.get("wsgi.input"), environ.get("CONTENT_LENGTH")) if method == "POST" and path in ("/api/v1/analytics/pageview", "/api/v1/webhooks") else None,
+            request_body=_read_request_body(environ.get("wsgi.input"), environ.get("CONTENT_LENGTH")) if method == "POST" and (path == "/api/v1/analytics/pageview" or path.startswith("/api/v1/webhooks")) else None,
             request_headers={"Authorization": environ.get("HTTP_AUTHORIZATION", ""), "If-None-Match": environ.get("HTTP_IF_NONE_MATCH", ""), "Referer": environ.get("HTTP_REFERER", "")},
         )
 
