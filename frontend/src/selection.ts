@@ -42,3 +42,11 @@ export function classesInGrade(records: TimetableRecord[], grade: number): numbe
   return [...new Set(records.filter((record) => Number(record.grade) === Number(grade))
     .map((record) => Number(record.class)).filter((value) => Number.isInteger(value) && value > 0))].sort((a, b) => a - b);
 }
+
+export function reconcileClassSelection(records: TimetableRecord[], maxGrade: number, grade: number, classroom: number) {
+  const grades = gradesInTimetable(records, maxGrade);
+  const nextGrade = grades.length && !grades.includes(Number(grade)) ? grades[0] : grade;
+  const classes = classesInGrade(records, nextGrade);
+  const nextClassroom = classes.length && !classes.includes(Number(classroom)) ? classes[0] : classroom;
+  return { grade: nextGrade, classroom: nextClassroom };
+}

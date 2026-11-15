@@ -48,3 +48,12 @@ test('grade and class options are unique, sorted and limited by school level', (
   assert.deepEqual(Array.from(exports.classesInGrade(records, 2)), [3, 11]);
   assert.deepEqual(Array.from(exports.classesInGrade([], 1)), []);
 });
+
+test('class reconciliation preserves a valid choice and falls back only when options exist', () => {
+  const records = [{ grade: 2, class: 4 }, { grade: 2, class: 2 }, { grade: 3, class: 1 }];
+  const reconcile = (grade, classroom, values = records) => JSON.parse(JSON.stringify(exports.reconcileClassSelection(values, 3, grade, classroom)));
+  assert.deepEqual(reconcile(2, 4), { grade: 2, classroom: 4 });
+  assert.deepEqual(reconcile(2, 9), { grade: 2, classroom: 2 });
+  assert.deepEqual(reconcile(1, 9), { grade: 2, classroom: 2 });
+  assert.deepEqual(reconcile(1, 9, []), { grade: 1, classroom: 9 });
+});
