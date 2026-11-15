@@ -149,6 +149,9 @@
         </section>
 
 <style>
+.settings-search{display:grid;gap:5px;margin:0 0 12px;font-size:13px;color:var(--muted)}
+.settings-search input{min-height:44px;max-width:100%;width:100%;border:1px solid var(--line);padding:8px;background:var(--surface);color:var(--ink)}
+@media(max-width:700px){.settings-search input{font-size:16px}}
 .display-settings{margin:0 0 14px;border:1px solid var(--line);padding:0 14px}
 .display-settings summary{min-height:44px;align-content:center;cursor:pointer;font-size:14px;font-weight:650}
 .display-settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:12px;padding:12px 0}

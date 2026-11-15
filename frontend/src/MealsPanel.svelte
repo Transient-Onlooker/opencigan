@@ -66,3 +66,8 @@
             {#if mealsStale}<p class="notice">저장된 급식 정보예요. 최신 정보가 아닐 수 있습니다.</p>{/if}
           {/if}
         </section>
+
+<style>
+.meal-connection{font-size:14px;color:var(--muted);margin:0 0 18px;overflow-wrap:anywhere}
+.meal-connection:empty{display:none}
+</style>
