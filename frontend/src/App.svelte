@@ -76,6 +76,7 @@
   let pendingSharedClass: { schoolId: string; grade: number; classroom: number; fallback: { school: School | null; grade: number; classroom: number } } | null = null;
   let sharedSchoolChecking = false;
   let classActionsReady = false;
+  let inputFocused = false;
   let theme: 'light' | 'dark' | 'system' = 'light';
   let animationsEnabled = true;
   let systemDark = false;
@@ -894,7 +895,16 @@
     const calendarTimer = setInterval(refreshCalendar, 60_000);
     const onVisibilityChange = () => { if (document.visibilityState === 'visible') refreshCalendar(); };
     const onFocus = () => refreshCalendar();
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target;
+      inputFocused = target instanceof HTMLElement && !!target.closest('main') &&
+        (target instanceof HTMLTextAreaElement && !target.readOnly ||
+         target instanceof HTMLInputElement && !target.readOnly && ['search', 'text', 'number', 'date', 'time', 'url'].includes(target.type));
+    };
+    const onFocusOut = () => { inputFocused = false; };
     document.addEventListener('visibilitychange', onVisibilityChange);
+    document.addEventListener('focusin', onFocusIn);
+    document.addEventListener('focusout', onFocusOut);
     window.addEventListener('focus', onFocus);
     const themeMedia = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-color-scheme: dark)') : null;
     systemDark = themeMedia?.matches ?? false;
@@ -936,7 +946,7 @@
     return () => {
       stopNavigation();
       sharedSchoolRequest?.abort();
-      clearInterval(calendarTimer); document.removeEventListener('visibilitychange', onVisibilityChange); window.removeEventListener('focus', onFocus); themeMedia?.removeEventListener?.('change', onThemeMedia); historyRequest?.abort();
+      clearInterval(calendarTimer); document.removeEventListener('visibilitychange', onVisibilityChange); document.removeEventListener('focusin', onFocusIn); document.removeEventListener('focusout', onFocusOut); window.removeEventListener('focus', onFocus); themeMedia?.removeEventListener?.('change', onThemeMedia); historyRequest?.abort();
       clearTimeout(schoolTimer); schoolRequest?.abort(); neisRequest?.abort(); tableRequest?.abort(); mealRequest?.abort();
     };
   });
@@ -1002,7 +1012,7 @@
       {/if}
     {/if}
     {#if school && !favorites.length}<p class="quick-class-hint">즐겨찾는 학급이 없어요. 현재 학급을 추가하면 바로 전환할 수 있어요.</p>{/if}
-    <nav class="calendar-menu" aria-label="캘린더 메뉴">
+    <nav class="calendar-menu" class:input-focused={inputFocused} aria-label="캘린더 메뉴">
       <span class="menu-label">캘린더</span>
       <button aria-pressed={view === 'timetable'} aria-controls="timetable-panel" onclick={() => view = 'timetable'}><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16"/><path d="M7 3v4m10-4v4M3 10h18M8 14h3m2 0h3m-8 3h3m2 0h3"/></svg> 시간표</button>
       <button aria-pressed={view === 'meals'} aria-controls="meals-panel" onclick={() => view = 'meals'}><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 3v6a3 3 0 0 0 6 0V3M7 3v18M16 21V3c3 1 4 4 4 8h-4"/></svg> 급식</button>
