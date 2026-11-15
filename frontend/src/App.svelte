@@ -107,7 +107,13 @@
   let mealRequestKey = '';
   const mealTypes = ['조식', '중식', '석식'];
   const refreshInterval = 30 * 60 * 1000;
-  const timetableSession = createTimetableSession();
+  const timetableSession = createTimetableSession((state) => {
+    if (timetable !== state.data) timetable = state.data;
+    if (timetableFromDevice !== state.fromDevice) timetableFromDevice = state.fromDevice;
+    if (tableLoading !== state.loading) tableLoading = state.loading;
+    if (tableState !== state.error) tableState = state.error;
+    if (timetableRefreshAt !== state.refreshAt) timetableRefreshAt = state.refreshAt;
+  });
   let timetableRefreshAt = 0;
   let mealsRefreshAt = 0;
   let schoolTimer: ReturnType<typeof setTimeout>;
@@ -174,8 +180,8 @@
     if (state.school && previousSchool !== state.school.id) chooseSchool(state.school, true);
     else if (!state.school) {
       timetableSession.cancel(); neisRequest?.abort(); mealRequest?.abort(); historyRequest?.abort();
-      selectionState.update({ school: null }); timetable = null; neis = null; meals = []; schoolEditorOpen = true;
-      tableLoading = false; mealLoading = false;
+      selectionState.update({ school: null }); timetableSession.update({ data: null, loading: false }); neis = null; meals = []; schoolEditorOpen = true;
+      mealLoading = false;
       try { localStorage.removeItem('opensigan-school'); } catch { /* 현재 탐색을 유지합니다. */ }
     } else {
       if (previousWeek !== week) loadTimetable(false, true, true);
@@ -544,9 +550,9 @@
   }
   function loadTimetable(preserve = false, reuseCachedWeek = false, validateClass = false) {
     validateClass = validateClass || !!pendingSharedClass;
-    timetableSession.cancel(); if (!preserve) timetable = null; tableState = ''; tableLoading = false;
+    timetableSession.cancel(); timetableSession.update({ ...(preserve ? {} : { data: null }), error: '', loading: false });
     if (!preserve) {
-      timetableFromDevice = false;
+      timetableSession.update({ fromDevice: false });
       timetableCheckedAt = '';
       shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = ''; subscriptionPanelOpen = false;
     }
@@ -555,18 +561,16 @@
     if (reuseCachedWeek) {
       const cached = timetableSession.cache.get(key, Date.now());
       if (cached) {
-        timetable = cached.data;
-        timetableFromDevice = false;
+        timetableSession.update({ data: cached.data, fromDevice: false });
         if (validateClass) ensureAvailableClass();
         if (school?.id !== cached.data.schoolId || classError) return;
-        timetableRefreshAt = cached.expires;
+        timetableSession.update({ refreshAt: cached.expires });
         return;
       }
     }
-    timetableRefreshAt = Date.now() + refreshInterval;
+    timetableSession.update({ refreshAt: Date.now() + refreshInterval });
     const { controller, result } = timetableSession.fetch(school.id, week, () => ({ schoolId: school?.id, week }), getTimetable, (data) => {
-        timetable = data;
-        timetableFromDevice = false;
+        timetableSession.update({ data, fromDevice: false });
         if (validateClass) ensureAvailableClass();
         if (controller.signal.aborted || classError) return;
         if (tableRefreshState === '갱신 중') {
@@ -575,20 +579,20 @@
         }
         timetableSession.saveFresh(key, data, Date.now() + refreshInterval, () => localStorage);
       });
-    tableLoading = true;
+    timetableSession.update({ loading: true });
     void result
       .catch((error) => {
         if (controller.signal.aborted) return;
         if (!timetable && navigator.onLine === false) {
           const saved = school && timetableSession.restoreOffline(school.id, week, () => localStorage);
-          if (saved) { timetable = saved; timetableFromDevice = true; }
+          if (saved) timetableSession.update({ data: saved, fromDevice: true });
         }
         if (validateClass) ensureAvailableClass();
         if (controller.signal.aborted) return;
-        if (!timetableFromDevice || navigator.onLine !== false) tableState = errorText(error);
+        if (!timetableFromDevice || navigator.onLine !== false) timetableSession.update({ error: errorText(error) });
         if (tableRefreshState === '갱신 중') tableRefreshState = '새로고침 실패';
       })
-      .finally(() => { if (!controller.signal.aborted) tableLoading = false; });
+      .finally(() => { if (!controller.signal.aborted) timetableSession.update({ loading: false }); });
   }
   async function loadHistory(append = false) {
     if (!school || historyDisabled || historyLoading) return;

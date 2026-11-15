@@ -17,11 +17,18 @@ export function createTimetableCache(limit = 4) {
   };
 }
 
-export function createTimetableSession() {
+export type TimetableSessionState = { data: TimetableResponse | null; fromDevice: boolean; loading: boolean; error: string; refreshAt: number };
+
+export function createTimetableSession(onChange: (state: TimetableSessionState) => void = () => {}) {
   const cache = createTimetableCache();
   let request: AbortController | undefined;
+  let state: TimetableSessionState = { data: null, fromDevice: false, loading: false, error: '', refreshAt: 0 };
   const session = {
     cache,
+    update(change: Partial<TimetableSessionState>) {
+      state = { ...state, ...change };
+      onChange({ ...state });
+    },
     saveFresh(key: string, data: TimetableResponse, expires: number, storage: () => Storage) {
       if (data.stale) return;
       try { storage().setItem('opensigan-offline-timetable', JSON.stringify(data)); } catch { /* Memory cache still works without storage. */ }
