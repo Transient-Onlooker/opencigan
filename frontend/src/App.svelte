@@ -15,6 +15,7 @@
   import { slotLessons } from './timetable-slots';
   import { createTimetableSession } from './timetable-cache';
   import { createHistorySession } from './history-session';
+  import { createMealSession } from './meal-session';
   import { classLessons, teacherLessons, teacherNamesInTimetable } from './timetable-view';
   import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, type LessonTimes } from './lesson-times';
   import { defaultDisplaySettings, parseDisplaySettings, displaySubject, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
@@ -104,8 +105,6 @@
   let mealState = '';
   let tableLoading = false;
   let mealLoading = false;
-  let mealDataKey = '';
-  let mealRequestKey = '';
   const mealTypes = ['조식', '중식', '석식'];
   const refreshInterval = 30 * 60 * 1000;
   const timetableSession = createTimetableSession((state) => {
@@ -119,8 +118,11 @@
   let mealsRefreshAt = 0;
   let schoolTimer: ReturnType<typeof setTimeout>;
   let schoolRequest: AbortController | undefined;
-  let neisRequest: AbortController | undefined;
-  let mealRequest: AbortController | undefined;
+  const mealSession = createMealSession((state) => {
+    neis = state.neis; neisResults = state.candidates; neisSearchState = state.searchState; neisLoading = state.neisLoading;
+    meals = state.meals; hasMeals = state.hasMeals; mealsStale = state.stale; mealState = state.error;
+    mealLoading = state.loading; mealsRefreshAt = state.refreshAt;
+  });
   let historyOpen = false;
   let historyLoading = false;
   let historyDisabled = false;
@@ -182,9 +184,8 @@
     view = state.view; timetableView = state.timetableView;
     if (state.school && previousSchool !== state.school.id) chooseSchool(state.school, true);
     else if (!state.school) {
-      timetableSession.cancel(); neisRequest?.abort(); mealRequest?.abort(); historySession.cancel();
-      selectionState.update({ school: null }); timetableSession.update({ data: null, loading: false }); neis = null; meals = []; schoolEditorOpen = true;
-      mealLoading = false;
+      timetableSession.cancel(); mealSession.cancel(); historySession.cancel();
+      selectionState.update({ school: null }); timetableSession.update({ data: null, loading: false }); mealSession.update({ neis: null, meals: [], loading: false }); schoolEditorOpen = true;
       try { localStorage.removeItem('opensigan-school'); } catch { /* 현재 탐색을 유지합니다. */ }
     } else {
       if (previousWeek !== week) loadTimetable(false, true, true);
@@ -461,7 +462,7 @@
     if (/(?:중학교|고등학교)/.test(value.name) && grade > 3) selectionState.update({ grade: 1 });
     classroomDraft = String(classroom);
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
-    schoolRequest?.abort(); clearTimeout(schoolTimer); neisRequest?.abort(); mealRequest?.abort(); historySession.cancel();
+    schoolRequest?.abort(); clearTimeout(schoolTimer); mealSession.cancel(); historySession.cancel();
     selectionState.update({ school: value }); schoolQuery = value.name; schoolResults = []; schoolSearchState = ''; schoolEditorOpen = false;
     selectedSubject = ''; selectedTeacher = ''; teacherQuery = '';
     try { schoolDisplaySettings = parseDisplaySettings(JSON.parse(localStorage.getItem('opensigan-display:' + value.id) || 'null')); }
@@ -472,8 +473,7 @@
     subscriptionTimesConsent = false;
     settingsBackupState = '';
     historySession.reset(); historyOpen = false;
-    neis = null; neisResults = []; neisSearchState = ''; neisLoading = false;
-    meals = []; hasMeals = false; mealsStale = false; mealState = ''; mealLoading = false; mealDataKey = ''; mealRequestKey = '';
+    mealSession.reset();
     if (persistSelection) {
       try { saveSelection(localStorage, { school: value, grade, classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
     }
@@ -490,27 +490,13 @@
   }
   async function connectMeals(value: School | null = school) {
     if (!value) return;
-    neisRequest?.abort();
-    const controller = new AbortController(); neisRequest = controller;
-    neisLoading = true; neisResults = []; neisSearchState = '같은 학교의 급식을 연결하고 있어요.';
-    try {
-      const result = await searchNeisSchools(value.name, controller.signal);
-      if (controller.signal.aborted || school?.id !== value.id) return;
-      const match = resolveMealSchool(value, result.schools);
-      if (match) chooseNeis(match);
-      else {
-        neisResults = mealSchoolCandidates(value, result.schools);
-        neisSearchState = neisResults.length ? '같은 이름의 학교가 여러 곳이에요. 주소만 확인해 주세요.' : '같은 학교의 급식 정보를 찾지 못했어요.';
-      }
-    } catch (error) {
-      if (!controller.signal.aborted && school?.id === value.id) neisSearchState = errorText(error);
-    } finally {
-      if (!controller.signal.aborted && school?.id === value.id) neisLoading = false;
-    }
+    await mealSession.connect(value, () => school?.id, (name, signal) => searchNeisSchools(name, signal),
+      (selected, candidates) => resolveMealSchool(selected, candidates),
+      (selected, candidates) => mealSchoolCandidates(selected, candidates), chooseNeis, errorText);
   }
   function chooseNeis(value: NeisSchool) {
-    neisRequest?.abort(); neis = value; neisResults = []; neisLoading = false;
-    neisSearchState = '급식도 ' + value.name + '로 연결했어요.';
+    mealSession.cancelNeis();
+    mealSession.update({ neis: value, candidates: [], neisLoading: false, searchState: '급식도 ' + value.name + '로 연결했어요.' });
     if (school) { try { localStorage.setItem(neisKey(school.id), JSON.stringify(value)); } catch { /* 현재 연결은 저장 없이 유지합니다. */ } }
     loadMeals();
   }
@@ -590,17 +576,7 @@
   function loadMeals(preserve = false) {
     if (!school || !neis) return;
     const from = monday(mealDate);
-    const key = neis.id + ':' + from;
-    if (!preserve && hasMeals && mealDataKey === key && !mealLoading && Date.now() < mealsRefreshAt) return;
-    if (mealLoading && mealRequestKey === key && !mealRequest?.signal.aborted) return;
-    mealRequest?.abort();
-    if (!preserve || mealDataKey !== key) { meals = []; mealsStale = false; hasMeals = false; }
-    mealState = ''; mealsRefreshAt = Date.now() + refreshInterval;
-    const controller = new AbortController(); mealRequest = controller; mealLoading = true; mealRequestKey = key;
-    void getMeals(neis.id, from, addDays(from, 6), controller.signal)
-      .then((data) => { if (!controller.signal.aborted) { meals = data.meals; mealsStale = data.stale; hasMeals = true; mealDataKey = key; } })
-      .catch((error) => { if (!controller.signal.aborted) mealState = errorText(error); })
-      .finally(() => { if (!controller.signal.aborted) mealLoading = false; });
+    mealSession.load(neis.id, from, addDays(from, 6), preserve, () => Date.now(), refreshInterval, getMeals, errorText);
   }
   function refreshCalendar(refreshData = true) {
     const previousToday = today;
@@ -881,7 +857,7 @@
       stopNavigation();
       sharedSelection.cancel();
       clearInterval(calendarTimer); document.removeEventListener('visibilitychange', onVisibilityChange); document.removeEventListener('focusin', onFocusIn); document.removeEventListener('focusout', onFocusOut); window.removeEventListener('focus', onFocus); themeMedia?.removeEventListener?.('change', onThemeMedia); historySession.cancel();
-      clearTimeout(schoolTimer); schoolRequest?.abort(); neisRequest?.abort(); timetableSession.cancel(); mealRequest?.abort();
+      clearTimeout(schoolTimer); schoolRequest?.abort(); mealSession.cancel(); timetableSession.cancel();
     };
   });
 </script>
