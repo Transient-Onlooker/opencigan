@@ -98,6 +98,28 @@ test('meal date errors preserve the applied date and valid input fetches the mat
   await expect(input).toHaveAttribute('aria-invalid', 'false');
 });
 
+test('refresh keeps the visible timetable while announcing progress and failure', async ({ page }) => {
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  let calls = 0;
+  await mockApi(page);
+  await page.route('**/api/v1/timetable?*', async (route) => {
+    calls += 1;
+    if (calls === 1) return route.fulfill({ json: timetable });
+    await pending;
+    return route.fulfill({ status: 503, json: { code: 'upstream_unavailable' } });
+  });
+  await page.goto('/' + sharedHash(1));
+  const panel = page.locator('#timetable-panel');
+  await expect(panel.getByRole('table')).toContainText('과목1');
+  await panel.getByRole('button', { name: /시간표 새로고침/ }).click();
+  await expect(panel.getByRole('status').filter({ hasText: '새 시간표를 확인하는 동안' })).toBeVisible();
+  await expect(panel.getByRole('table')).toContainText('과목1');
+  release();
+  await expect(panel.getByRole('alert')).toContainText('이전 시간표를 표시하고 있어요');
+  await expect(panel.getByRole('table')).toContainText('과목1');
+});
+
 test('meal menu search, allergy filters, NEIS details and timetable date link work together', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('opensigan-allergies', '[1]'));
   await mockApi(page);
