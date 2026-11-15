@@ -15,7 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 from backend.cache import Cache
-from backend.http_core import json_response
+from backend.http_core import json_response, make_response_headers, preflight_response
 from backend.analytics import ApiRecorder
 from backend.access_logs import AccessLogRecorder, AccessLogStore, classify_origin
 from backend.ical import render_timetable_ics
@@ -284,24 +284,10 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
     current_cache = cache if cache_instance is None else cache_instance
     origin = os.environ.get("ALLOWED_ORIGIN", "")
 
-    headers = {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "no-store",
-    }
-    if origin:
-        headers["Vary"] = "Origin"
-    if origin and (request_origin is None or request_origin in [item.strip() for item in origin.split(",")]):
-        headers["Access-Control-Allow-Origin"] = request_origin or origin.split(",")[0].strip()
-        headers["Access-Control-Expose-Headers"] = "Retry-After, ETag" if path in ("/api/v1/timetable.ics", "/api/v1/timetable/history.rss") else "Retry-After"
+    headers = make_response_headers(path, origin, request_origin)
 
     if method == "OPTIONS":
-        headers["Access-Control-Allow-Methods"] = "GET, HEAD, POST, PUT, DELETE, OPTIONS" if path.startswith("/api/v1/webhooks") else "GET, HEAD, POST, OPTIONS"
-        headers["Access-Control-Allow-Headers"] = (
-            "Content-Type, Authorization, If-None-Match" if path in ("/api/v1/timetable.ics", "/api/v1/timetable/history.rss")
-            else "Content-Type, Authorization"
-        )
-        headers["Content-Length"] = "0"
-        return 204, headers, b""
+        return preflight_response(path, headers)
 
     if path == '/api/v1/admin/access-logs':
         status, response_headers, body = _access_log_admin(method, query_string, request_headers, headers)
