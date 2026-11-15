@@ -17,6 +17,61 @@ tags:
   - name: Meals
   - name: History
 paths:
+  /api/v1/webhooks:
+    post:
+      tags: [System]
+      summary: Create an experimental webhook subscription
+      description: Disabled by default. The management token is returned once; retain it securely. Do not enable in public production before abuse and storage controls are complete.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [school, grade, class, destination]
+              additionalProperties: false
+              properties:
+                school: { type: string, pattern: '^[0-9]+:[^:\x00-\x1f\x7f]{1,50}$' }
+                grade: { type: integer, minimum: 1, maximum: 6 }
+                class: { type: integer, minimum: 1, maximum: 99 }
+                destination: { type: string, format: uri, maxLength: 2048, description: Only supported Discord or Google Chat HTTPS webhook URLs. }
+      responses:
+        '200':
+          description: Created; token is only returned once.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, token, provider]
+                properties:
+                  id: { type: string }
+                  token: { type: string }
+                  provider: { type: string, enum: [discord, google-chat] }
+        '400': { description: Invalid request. }
+        '413': { description: Body exceeds 4096 bytes. }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { description: Feature disabled, subscription limit reached, or storage unavailable. }
+  /api/v1/webhooks/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
+    get:
+      tags: [System]
+      summary: Read an experimental webhook subscription
+      security: [{ WebhookManagement: [] }]
+      description: Supply this subscription's management token as a Bearer token, not the analytics administrator token.
+      responses:
+        '200': { description: Subscription scope and provider without destination or token. }
+        '401': { description: Invalid subscription or token. }
+        '503': { description: Feature disabled or storage unavailable. }
+    delete:
+      tags: [System]
+      summary: Delete an experimental webhook subscription
+      security: [{ WebhookManagement: [] }]
+      description: Supply this subscription's management token as a Bearer token; in-flight requests cannot be recalled.
+      responses:
+        '200': { description: Subscription and queued deliveries deleted. }
+        '401': { description: Invalid subscription or token. }
+        '503': { description: Feature disabled or storage unavailable. }
   /api/v1/analytics/pageview:
     post:
       tags: [System]
@@ -393,6 +448,10 @@ paths:
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
 components:
   securitySchemes:
+    WebhookManagement:
+      type: http
+      scheme: bearer
+      description: One-time token returned when creating the individual webhook subscription.
     AnalyticsAdmin:
       type: http
       scheme: bearer

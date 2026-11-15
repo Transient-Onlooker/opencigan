@@ -1,0 +1,103 @@
+import io
+import json
+import tempfile
+import unittest
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from unittest.mock import patch
+
+from backend.app import _rate_clients, dispatch_request, make_app
+from backend.history import HistoryStore
+from backend.webhook_store import WebhookStore
+from backend.webhook_worker import deliver_next
+
+
+class WebhookApiTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.path = str(Path(self.temp.name) / "history.sqlite")
+        HistoryStore(self.path)
+        self.payload = {"school": "2:예시학교", "grade": 2, "class": 3,
+                        "destination": "https://discord.com/api/webhooks/123/secret"}
+        _rate_clients.clear()
+
+    def request(self, method, path, payload=None, token=None):
+        body = json.dumps(payload, ensure_ascii=False).encode() if payload is not None else None
+        headers = {"Authorization": "Bearer " + token} if token else {}
+        return dispatch_request(method, path, "", request_body=body, request_headers=headers)
+
+    def test_disabled_by_default_and_requires_existing_history(self):
+        with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": ""}):
+            self.assertEqual(self.request("POST", "/api/v1/webhooks", self.payload)[0], 503)
+        with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path + "missing", "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
+            self.assertEqual(self.request("POST", "/api/v1/webhooks", self.payload)[0], 503)
+            self.assertFalse(Path(self.path + "missing").exists())
+
+    def test_create_authenticate_and_delete_without_exposing_destination(self):
+        with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
+            status, headers, body = self.request("POST", "/api/v1/webhooks", self.payload)
+            self.assertEqual(status, 200)
+            self.assertEqual(headers["Cache-Control"], "no-store")
+            self.assertNotIn(b"secret", body)
+            created = json.loads(body)
+            path = "/api/v1/webhooks/" + created["id"]
+            for token in (None, "wrong"):
+                self.assertEqual(self.request("GET", path, token=token)[0], 401)
+                self.assertEqual(self.request("DELETE", path, token=token)[0], 401)
+            status, _, body = self.request("GET", path, token=created["token"])
+            self.assertEqual(status, 200)
+            self.assertNotIn(b"secret", body)
+            self.assertNotIn(created["token"].encode(), body)
+            self.assertEqual(self.request("DELETE", path, token=created["token"])[0], 200)
+            self.assertEqual(self.request("GET", path, token=created["token"])[0], 401)
+
+    def test_rejects_invalid_destinations_and_large_input(self):
+        with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
+            for destination in ("https://127.0.0.1/", "https://discord.com.evil.test/api/webhooks/1/token"):
+                status, _, body = self.request("POST", "/api/v1/webhooks", {**self.payload, "destination": destination})
+                self.assertEqual(status, 400)
+                self.assertNotIn(destination.encode(), body)
+            self.assertEqual(dispatch_request("POST", "/api/v1/webhooks", "", request_body=b" " * 4097)[0], 413)
+            self.assertEqual(dispatch_request("POST", "/api/v1/webhooks", "", request_body=b"[" * 1500 + b"]" * 1500)[0], 400)
+            self.assertEqual(self.request("POST", "/api/v1/webhooks", {**self.payload, "school": "2:bad\nname"})[0], 400)
+
+    def test_subscription_requests_have_their_own_rate_limit(self):
+        with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
+            for _ in range(60):
+                self.assertEqual(dispatch_request("GET", "/api/v1/webhooks/" + "a" * 24, "", client="test-ip")[0], 401)
+            status, headers, _ = dispatch_request("GET", "/api/v1/webhooks/" + "a" * 24, "", client="test-ip")
+            self.assertEqual(status, 429)
+            self.assertGreater(int(headers["Retry-After"]), 0)
+            self.assertEqual(dispatch_request("GET", "/api/v1/status", "", client="test-ip")[0], 200)
+
+    def test_wsgi_forwards_creation_body_and_auth_header(self):
+        payload = json.dumps(self.payload).encode()
+        environ = {"REQUEST_METHOD": "POST", "PATH_INFO": "/api/v1/webhooks", "QUERY_STRING": "",
+                   "REMOTE_ADDR": "127.0.0.1", "CONTENT_LENGTH": str(len(payload)), "wsgi.input": io.BytesIO(payload)}
+        statuses = []
+        with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
+            body = b"".join(make_app()(environ, lambda status, headers: statuses.append(status)))
+            self.assertEqual(statuses.pop(), "200 OK")
+            created = json.loads(body)
+            environ.update({"REQUEST_METHOD": "GET", "PATH_INFO": "/api/v1/webhooks/" + created["id"],
+                            "HTTP_AUTHORIZATION": "Bearer " + created["token"], "CONTENT_LENGTH": "0"})
+            b"".join(make_app()(environ, lambda status, headers: statuses.append(status)))
+            self.assertEqual(statuses.pop(), "200 OK")
+
+    def test_api_subscription_receives_observed_change_in_mock_worker(self):
+        with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
+            status, _, _ = self.request("POST", "/api/v1/webhooks", self.payload)
+            self.assertEqual(status, 200)
+            history = HistoryStore(self.path)
+            now = datetime.now(timezone.utc)
+            lesson = {"grade": 2, "class": 3, "date": "2026-11-16", "period": 1, "subject": "수학", "teacher": "김"}
+            history.observe(self.payload["school"], "2026-11-16", [lesson], now)
+            history.observe(self.payload["school"], "2026-11-16", [{**lesson, "subject": "과학"}], now + timedelta(seconds=1))
+            sent = []
+            def sender(url, body, secret, event_id):
+                sent.append((url, json.loads(body), event_id))
+                return {"delivered": True, "retryable": False, "status": 204, "retryAfter": None}
+            self.assertTrue(deliver_next(WebhookStore(self.path), now=now.timestamp() + 10, sender=sender))
+            self.assertIn("과학", sent[0][1]["content"])
+            self.assertTrue(sent[0][2].startswith("change_"))

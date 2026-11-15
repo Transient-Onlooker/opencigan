@@ -255,6 +255,64 @@ def _history_store():
     return HistoryStore(path)
 
 
+def _webhook_store():
+    path = os.environ.get("OPENCIGAN_HISTORY_DB", "").strip()
+    if os.environ.get("OPENCIGAN_WEBHOOKS_ENABLED") != "1" or not path or not os.path.isfile(path):
+        return None
+    from backend.webhook_store import WebhookStore
+    return WebhookStore(path)
+
+
+def _webhook_api(method, path, body, request_headers, client, headers):
+    from backend.webhook_store import SubscriptionLimitError
+
+    def respond(status, payload):
+        encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        headers["Content-Length"] = str(len(encoded))
+        return status, headers, encoded
+
+    if client:
+        retry = _rate_allowed(("webhooks", client))
+        if retry:
+            headers["Retry-After"] = str(retry)
+            return respond(429, {"error": "요청이 너무 많습니다", "code": "rate_limited"})
+    if len(body or b"") > 4096:
+        return respond(413, {"error": "요청 본문이 너무 큽니다", "code": "payload_too_large"})
+    try:
+        store = _webhook_store()
+        if store is None:
+            return respond(503, {"error": "Webhook 기능이 활성화되지 않았습니다", "code": "webhooks_disabled"})
+        if path == "/api/v1/webhooks":
+            if method != "POST":
+                return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
+            payload = json.loads(body or b"{}")
+            if not isinstance(payload, dict) or set(payload) != {"school", "grade", "class", "destination"}:
+                raise ValueError("invalid payload")
+            result = store.create(payload["school"], payload["grade"], payload["class"], payload["destination"])
+            return respond(200, result)
+        match = re.fullmatch(r"/api/v1/webhooks/([A-Za-z0-9_-]{24})", path)
+        if not match:
+            return respond(404, {"error": "요청한 경로가 없습니다", "code": "not_found"})
+        if method not in ("GET", "HEAD", "DELETE"):
+            return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
+        authorization = (request_headers or {}).get("Authorization", "")
+        token = authorization[7:] if authorization.startswith("Bearer ") else ""
+        identifier = match.group(1)
+        if method == "DELETE":
+            result = {"deleted": True} if store.delete(identifier, token) else None
+        else:
+            result = store.get(identifier, token)
+        if result is None:
+            return respond(401, {"error": "인증이 필요합니다", "code": "unauthorized"})
+        return respond(200, result)
+    except SubscriptionLimitError:
+        return respond(503, {"error": "구독 한도에 도달했습니다", "code": "subscription_limit"})
+    except (ValueError, TypeError, UnicodeDecodeError, RecursionError):
+        return respond(400, {"error": "요청 값이 올바르지 않습니다", "code": "invalid_request"})
+    except (OSError, sqlite3.Error):
+        return respond(503, {"error": "Webhook 저장소를 사용할 수 없습니다", "code": "webhooks_unavailable"})
+
+
 def _query_param(params, key, limit):
     values = params.get(key, [])
     if len(values) != 1 or not values[0].strip() or len(values[0]) > limit:
@@ -323,7 +381,7 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
         headers["Access-Control-Expose-Headers"] = "Retry-After, ETag" if path in ("/api/v1/timetable.ics", "/api/v1/timetable/history.rss") else "Retry-After"
 
     if method == "OPTIONS":
-        headers["Access-Control-Allow-Methods"] = "GET, HEAD, POST, OPTIONS"
+        headers["Access-Control-Allow-Methods"] = "GET, HEAD, POST, DELETE, OPTIONS" if path.startswith("/api/v1/webhooks") else "GET, HEAD, POST, OPTIONS"
         headers["Access-Control-Allow-Headers"] = (
             "Content-Type, Authorization, If-None-Match" if path in ("/api/v1/timetable.ics", "/api/v1/timetable/history.rss")
             else "Content-Type, Authorization"
@@ -343,6 +401,9 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
             headers["Retry-After"] = str(retry_after)
             headers["Content-Length"] = str(len(body))
             return 503, headers, body
+
+    if path == "/api/v1/webhooks" or path.startswith("/api/v1/webhooks/"):
+        return _webhook_api(method, path, request_body, request_headers, client, headers)
 
     if path == "/api/v1/analytics/pageview":
         if method != "POST":
@@ -702,7 +763,7 @@ def dispatch_request(method, path, query_string, cache_instance=None, client=Non
 class Handler(BaseHTTPRequestHandler):
     def _unsupported(self):
         parts = urlsplit(self.path)
-        request_body = _read_request_body(self.rfile, self.headers.get("Content-Length")) if self.command == "POST" and parts.path == "/api/v1/analytics/pageview" else None
+        request_body = _read_request_body(self.rfile, self.headers.get("Content-Length")) if self.command == "POST" and parts.path in ("/api/v1/analytics/pageview", "/api/v1/webhooks") else None
         status_code, headers, body = dispatch_request(self.command, parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_body, {"Authorization": self.headers.get("Authorization", ""), "Referer": self.headers.get("Referer", "")})
         self.send_response(status_code)
         for key, val in headers.items():
@@ -786,7 +847,7 @@ def make_app(cache_instance=None, trusted_proxies=None):
             cache_instance=cache_instance,
             client=client,
             request_origin=environ.get("HTTP_ORIGIN"),
-            request_body=_read_request_body(environ.get("wsgi.input"), environ.get("CONTENT_LENGTH")) if method == "POST" and path == "/api/v1/analytics/pageview" else None,
+            request_body=_read_request_body(environ.get("wsgi.input"), environ.get("CONTENT_LENGTH")) if method == "POST" and path in ("/api/v1/analytics/pageview", "/api/v1/webhooks") else None,
             request_headers={"Authorization": environ.get("HTTP_AUTHORIZATION", ""), "If-None-Match": environ.get("HTTP_IF_NONE_MATCH", ""), "Referer": environ.get("HTTP_REFERER", "")},
         )
 

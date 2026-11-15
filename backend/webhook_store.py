@@ -12,6 +12,10 @@ from contextlib import closing
 from backend.webhook_delivery import validate_destination
 
 
+class SubscriptionLimitError(Exception):
+    pass
+
+
 def enqueue_observed_change(db, school, grade, classroom, date, period, kind, before, after, change_id, now):
     subscriptions = db.execute("SELECT id, provider FROM webhook_subscriptions WHERE school=? AND grade=? AND classroom=?",
                                (school, grade, classroom)).fetchall()
@@ -75,14 +79,22 @@ class WebhookStore:
 
     def create(self, school, grade, classroom, destination):
         provider = validate_destination(destination)
-        if not isinstance(school, str) or not re.fullmatch(r"[0-9]+:[^:]{1,50}", school):
+        if not isinstance(school, str) or not re.fullmatch(r"[0-9]+:[^:\x00-\x1f\x7f]{1,50}", school):
             raise ValueError("invalid school")
         if type(grade) is not int or not 1 <= grade <= 6 or type(classroom) is not int or not 1 <= classroom <= 99:
             raise ValueError("invalid class")
         identifier, token = secrets.token_urlsafe(18), secrets.token_urlsafe(32)
         with closing(self._connect()) as db:
-            db.execute("INSERT INTO webhook_subscriptions VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                       (identifier, self._token_hash(token), school, grade, classroom, destination, provider, secrets.token_bytes(32)))
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                if db.execute("SELECT COUNT(*) FROM webhook_subscriptions").fetchone()[0] >= 500:
+                    raise SubscriptionLimitError()
+                db.execute("INSERT INTO webhook_subscriptions VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                           (identifier, self._token_hash(token), school, grade, classroom, destination, provider, secrets.token_bytes(32)))
+                db.execute("COMMIT")
+            except BaseException:
+                db.execute("ROLLBACK")
+                raise
         return {"id": identifier, "token": token, "provider": provider}
 
     def get(self, identifier, token):
