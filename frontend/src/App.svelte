@@ -298,9 +298,8 @@
       if (school?.id !== schoolId) throw new Error('학교가 변경되어 설정을 적용하지 않았어요.');
       if (backup.scoped) {
         if (targetClass !== classDisplayKey || classError) throw new Error('학급이 변경되어 설정을 적용하지 않았어요.');
-        try { localStorage.setItem(targetClass, JSON.stringify(backup.displaySettings)); }
+        try { classDisplayPreferences.restore(targetClass, backup.displaySettings); }
         catch { throw new Error('브라우저 저장소에 설정을 저장하지 못했어요.'); }
-        classDisplayPreferences.remember(targetClass, backup.displaySettings);
         loadClassDisplay(targetClass, schoolDisplaySettings);
         settingsBackupState = '현재 학급의 표시 설정을 복원했어요.';
         return;

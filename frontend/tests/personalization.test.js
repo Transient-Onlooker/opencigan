@@ -101,3 +101,23 @@ test('class display preferences remain isolated by school and class when storage
   prefs.set('school-a:1:1', null);
   assert.equal(prefs.read('school-a:1:1', fallback).enabled, false);
 });
+
+test('restoring class settings updates the draft only after persistent storage succeeds', () => {
+  const fallback = helpers.defaultDisplaySettings();
+  const previous = { ...fallback, showTeachers: false };
+  const restored = { ...fallback, density: 'compact' };
+  let blocked = true;
+  const values = new Map();
+  const prefs = helpers.createClassDisplayPreferences(() => ({
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => { if (blocked) throw new Error('blocked'); values.set(key, value); },
+    removeItem: (key) => values.delete(key),
+  }));
+  prefs.set('school:1:1', previous);
+  assert.throws(() => prefs.restore('school:1:1', restored));
+  assert.equal(prefs.read('school:1:1', fallback).settings, previous);
+  blocked = false;
+  prefs.restore('school:1:1', restored);
+  assert.equal(prefs.read('school:1:1', fallback).settings, restored);
+  assert.equal(JSON.parse(values.get('school:1:1')).density, 'compact');
+});

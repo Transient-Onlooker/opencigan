@@ -37,7 +37,10 @@ export function createClassDisplayPreferences(storage: () => Storage) {
         else storage().removeItem(key);
       } catch { /* Keep changes in memory when storage is unavailable. */ }
     },
-    remember(key: string, settings: DisplaySettings) { drafts.set(key, settings); },
+    restore(key: string, settings: DisplaySettings) {
+      storage().setItem(key, JSON.stringify(settings));
+      drafts.set(key, settings);
+    },
   };
 }
 
