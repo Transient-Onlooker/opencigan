@@ -1,4 +1,5 @@
 import functools
+import atexit
 import ipaddress
 import hashlib
 import hmac
@@ -18,6 +19,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from backend.cache import Cache
 from backend.analytics import ApiRecorder
+from backend.access_logs import AccessLogRecorder, AccessLogStore, classify_origin
 from backend.ical import render_timetable_ics
 from backend.shutter import Shutter
 from backend.neis import NEISClient, School
@@ -30,6 +32,8 @@ _rate_lock = threading.Lock()
 _rate_clients = OrderedDict()
 _analytics_lock = threading.Lock()
 _analytics_instance = None
+_access_log_instance = None
+_access_log_lock = threading.Lock()
 _MAX_FORWARDED_HEADER_LEN = 1024
 _MAX_FORWARDED_HOPS = 16
 
@@ -161,6 +165,69 @@ def _analytics_store():
         return _analytics_instance
 
 
+def _access_log_store():
+    global _access_log_instance
+    path = os.environ.get('OPENCIGAN_ACCESS_LOG_DB', '').strip()
+    if not path:
+        return None
+    days = int(os.environ.get('OPENCIGAN_ACCESS_LOG_RETENTION_DAYS', '7'))
+    if not 1 <= days <= 90:
+        raise ValueError('접속 로그 보관 기간은 1~90일이어야 합니다')
+    with _access_log_lock:
+        if _access_log_instance is None or _access_log_instance.path != path or _access_log_instance.retention_days != days:
+            _access_log_instance = AccessLogStore(path, retention_days=days)
+        return _access_log_instance
+
+
+def _access_log_admin(method, query_string, request_headers, headers):
+    if method not in ('GET', 'HEAD'):
+        return 405, headers, b'{"code":"method_not_allowed"}'
+    token = os.environ.get('OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN', '')
+    supplied = (request_headers or {}).get('Authorization', '')
+    if not token or not hmac.compare_digest(supplied.encode(), ('Bearer ' + token).encode()):
+        headers['WWW-Authenticate'] = 'Bearer realm="Opencigan access logs"'
+        return 401, headers, b'{"code":"unauthorized"}'
+    try:
+        values = parse_qs(query_string, keep_blank_values=True, max_num_fields=20)
+        allowed = {'client_ip', 'school_id', 'grade', 'class', 'start_day', 'end_day', 'route', 'status', 'origin_class', 'cache_status', 'cursor', 'limit', 'format'}
+        if set(values) - allowed or any(len(items) != 1 or len(items[0]) > 255 for items in values.values()):
+            raise ValueError('조회 조건이 올바르지 않습니다')
+        filters = {key: item[0] for key, item in values.items() if key not in ('cursor', 'limit', 'format') and item[0]}
+        for key in ('start_day', 'end_day'):
+            if key in filters and date.fromisoformat(filters[key]).isoformat() != filters[key]:
+                raise ValueError('날짜를 확인하세요')
+        if filters.get('start_day', '') > filters.get('end_day', '9999-12-31'):
+            raise ValueError('날짜 범위를 확인하세요')
+        for key, low, high in [('grade', 1, 6), ('class', 1, 99), ('status', 100, 599)]:
+            if key in filters and (not filters[key].isdigit() or not low <= int(filters[key]) <= high):
+                raise ValueError('숫자 조건을 확인하세요')
+        cursor = values.get('cursor', [None])[0]
+        if cursor is not None and (not cursor.isdigit() or int(cursor) <= 0):
+            raise ValueError('커서를 확인하세요')
+        if 'origin_class' in filters and filters['origin_class'] not in ('frontend', 'external', 'unknown'):
+            raise ValueError('출처 조건을 확인하세요')
+        limit = int(values.get('limit', ['50'])[0])
+        if not 1 <= limit <= 100:
+            raise ValueError('조회 건수는 1~100입니다')
+        output = values.get('format', ['json'])[0]
+        if output not in ('json', 'csv'):
+            raise ValueError('형식을 확인하세요')
+        store = _access_log_store()
+        if store is None:
+            return 503, headers, b'{"code":"access_logs_disabled"}'
+        if output == 'csv':
+            headers['Content-Type'] = 'text/csv; charset=utf-8'
+            headers['Content-Disposition'] = 'attachment; filename="opencigan-access.csv"'
+            return 200, headers, ('\ufeff' + store.export_csv(filters, limit=5000)).encode()
+        result = store.query(filters, cursor=cursor, limit=limit)
+        result['dropped'] = _access_log_recorder.dropped
+        return 200, headers, json.dumps(result, ensure_ascii=False).encode()
+    except (ValueError, TypeError):
+        return 400, headers, b'{"code":"invalid_request"}'
+    except (OSError, sqlite3.Error):
+        return 503, headers, b'{"code":"access_logs_unavailable"}'
+
+
 def _rate_allowed(client):
     now = time.monotonic()
     with _rate_lock:
@@ -261,6 +328,11 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
         )
         headers["Content-Length"] = "0"
         return 204, headers, b""
+
+    if path == '/api/v1/admin/access-logs':
+        status, response_headers, body = _access_log_admin(method, query_string, request_headers, headers)
+        response_headers['Content-Length'] = str(len(body))
+        return status, response_headers, body
 
     if path not in ("/api/v1/status", "/api/v1/admin/analytics"):
         allowed, retry_after = (shutter if shutter_instance is None else shutter_instance).check()
@@ -530,13 +602,51 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
 
 
 _api_recorder = ApiRecorder(_analytics_store)
+_access_log_recorder = AccessLogRecorder(_access_log_store)
+atexit.register(_access_log_recorder.close)
 
 
 def dispatch_request(method, path, query_string, cache_instance=None, client=None, request_origin=None, request_body=None, request_headers=None, shutter_instance=None):
+    received_at = datetime.now(timezone(timedelta(hours=9)))
     started = time.perf_counter()
     response = _dispatch_request(method, path, query_string, cache_instance, client, request_origin, request_body, request_headers, shutter_instance)
     if method in ("GET", "HEAD") and path in ("/api/v1/schools", "/api/v1/neis/schools", "/api/v1/timetable", "/api/v1/timetable.ics", "/api/v1/timetable/history", "/api/v1/meals") and os.environ.get("OPENCIGAN_ANALYTICS_DB"):
         _api_recorder.submit(path, method, response[0], (time.perf_counter() - started) * 1000)
+    if os.environ.get('OPENCIGAN_ACCESS_LOG_DB') and not path.startswith('/api/v1/admin/'):
+        origin_class, referrer_origin = classify_origin(request_origin, (request_headers or {}).get('Referer'), os.environ.get('ALLOWED_ORIGIN', ''))
+        fields = {}
+        try:
+            query = parse_qs(query_string, max_num_fields=30)
+            for key in ('school', 'grade', 'class', 'week', 'from', 'to') if path in ('/api/v1/timetable', '/api/v1/timetable.ics', '/api/v1/timetable/history', '/api/v1/meals') else ():
+                items = query.get(key, [])
+                if len(items) == 1 and len(items[0]) <= 100:
+                    value = items[0]
+                    if key == 'school':
+                        if re.fullmatch(r'[A-Z][0-9]{2}:[0-9]{7}' if path == '/api/v1/meals' else r'[0-9]+:[^:\x00-\x1f\x7f]{1,50}', value):
+                            fields[key] = value
+                    elif key in ('grade', 'class'):
+                        if re.fullmatch(r'[1-6]' if key == 'grade' else r'[1-9][0-9]?', value):
+                            fields[key] = value
+                    else:
+                        try:
+                            if date.fromisoformat(value).isoformat() == value:
+                                fields[key] = value
+                        except ValueError:
+                            pass
+        except ValueError:
+            pass
+        cache_status = None
+        if response[0] == 200 and response[1].get('Content-Type', '').startswith('application/json'):
+            cache_status = json.loads(response[2]).get('cacheStatus')
+        _access_log_recorder.submit({
+            'client_ip': client or '', 'method': method,
+            'route': path if path in ('/api/v1/status', '/api/v1/schools', '/api/v1/neis/schools', '/api/v1/timetable', '/api/v1/timetable.ics', '/api/v1/timetable/history', '/api/v1/meals', '/api/v1/analytics/pageview') else '/unknown',
+            'school_id': fields.get('school'), 'grade': fields.get('grade'), 'class_nm': fields.get('class'),
+            'week': fields.get('week'), 'dates': fields.get('from', '') + ('~' + fields['to'] if fields.get('to') else ''),
+            'datatype': 'meals' if path == '/api/v1/meals' else 'timetable' if path.startswith('/api/v1/timetable') else 'other',
+            'status': response[0], 'duration_ms': (time.perf_counter() - started) * 1000,
+            'cache_status': cache_status, 'referrer_origin': referrer_origin, 'origin_class': origin_class,
+        }, received_at=received_at)
     return response
 
 
@@ -544,7 +654,7 @@ class Handler(BaseHTTPRequestHandler):
     def _unsupported(self):
         parts = urlsplit(self.path)
         request_body = _read_request_body(self.rfile, self.headers.get("Content-Length")) if self.command == "POST" and parts.path == "/api/v1/analytics/pageview" else None
-        status_code, headers, body = dispatch_request(self.command, parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_body, {"Authorization": self.headers.get("Authorization", "")})
+        status_code, headers, body = dispatch_request(self.command, parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_body, {"Authorization": self.headers.get("Authorization", ""), "Referer": self.headers.get("Referer", "")})
         self.send_response(status_code)
         for key, val in headers.items():
             self.send_header(key, val)
@@ -555,7 +665,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
         parts = urlsplit(self.path)
-        status_code, headers, body = dispatch_request("OPTIONS", parts.path, parts.query, cache, request_origin=self.headers.get("Origin"))
+        status_code, headers, body = dispatch_request("OPTIONS", parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_headers={"Referer": self.headers.get("Referer", "")})
         self.send_response(status_code)
         for key, val in headers.items():
             self.send_header(key, val)
@@ -563,7 +673,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_HEAD(self):
         parts = urlsplit(self.path)
-        status_code, headers, body = dispatch_request("HEAD", parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_headers={"Authorization": self.headers.get("Authorization", ""), "If-None-Match": self.headers.get("If-None-Match", "")})
+        status_code, headers, body = dispatch_request("HEAD", parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_headers={"Authorization": self.headers.get("Authorization", ""), "If-None-Match": self.headers.get("If-None-Match", ""), "Referer": self.headers.get("Referer", "")})
         self.send_response(status_code)
         for key, val in headers.items():
             self.send_header(key, val)
@@ -571,7 +681,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parts = urlsplit(self.path)
-        status_code, headers, body = dispatch_request("GET", parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_headers={"Authorization": self.headers.get("Authorization", ""), "If-None-Match": self.headers.get("If-None-Match", "")})
+        status_code, headers, body = dispatch_request("GET", parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_headers={"Authorization": self.headers.get("Authorization", ""), "If-None-Match": self.headers.get("If-None-Match", ""), "Referer": self.headers.get("Referer", "")})
         self.send_response(status_code)
         for key, val in headers.items():
             self.send_header(key, val)
@@ -628,7 +738,7 @@ def make_app(cache_instance=None, trusted_proxies=None):
             client=client,
             request_origin=environ.get("HTTP_ORIGIN"),
             request_body=_read_request_body(environ.get("wsgi.input"), environ.get("CONTENT_LENGTH")) if method == "POST" and path == "/api/v1/analytics/pageview" else None,
-            request_headers={"Authorization": environ.get("HTTP_AUTHORIZATION", ""), "If-None-Match": environ.get("HTTP_IF_NONE_MATCH", "")},
+            request_headers={"Authorization": environ.get("HTTP_AUTHORIZATION", ""), "If-None-Match": environ.get("HTTP_IF_NONE_MATCH", ""), "Referer": environ.get("HTTP_REFERER", "")},
         )
 
         status_line = _STATUS_PHRASES.get(status_code, f"{status_code} Unknown")

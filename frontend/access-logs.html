@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<title>접속 로그 조회 · Opencigan</title>
+</head>
+<body>
+<main>
+<header>
+<a href="./">&lt;/&gt; Opencigan</a>
+<h1>접속 로그 조회</h1>
+<p>서버 접속 원시 로그를 조회하고 CSV로 내보냅니다. <a href="./analytics.html">이용 통계로 이동</a></p>
+</header>
+<form id="filter-form">
+<label>관리자 토큰
+<input id="token" type="password" autocomplete="off" required maxlength="512" placeholder="OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN">
+</label>
+<label>클라이언트 IP
+<input id="filter-client-ip" type="text" autocomplete="off" maxlength="64" placeholder="예: 203.0.113.1">
+</label>
+<label>학교 ID
+<input id="filter-school-id" type="text" autocomplete="off" maxlength="100" placeholder="예: 7010057">
+</label>
+<label>학년
+<input id="filter-grade" type="number" min="1" max="6" placeholder="1~6">
+</label>
+<label>반
+<input id="filter-class" type="number" min="1" max="99" placeholder="1~99">
+</label>
+<label>시작일 (KST)
+<input id="filter-start-day" type="date">
+</label>
+<label>종료일 (KST)
+<input id="filter-end-day" type="date">
+</label>
+<label>경로 (Route)
+<input id="filter-route" type="text" autocomplete="off" maxlength="255" placeholder="예: /api/v1/timetable">
+</label>
+<label>HTTP 상태 코드
+<input id="filter-status" type="number" min="100" max="599" placeholder="예: 200">
+</label>
+<label>출처 분류
+<select id="filter-origin-class">
+<option value="" selected>전체</option>
+<option value="frontend">frontend</option>
+<option value="external">external</option>
+<option value="unknown">unknown</option>
+</select>
+</label>
+<label>캐시 상태
+<select id="filter-cache-status">
+<option value="" selected>전체</option>
+<option value="hit">hit</option>
+<option value="miss">miss</option>
+<option value="stale">stale</option>
+</select>
+</label>
+<label>조회 건수
+<input id="filter-limit" type="number" min="1" max="100" value="50">
+</label>
+<button id="search-btn" type="submit">조회</button>
+<button id="csv-btn" type="button">CSV 다운로드</button>
+<button id="lock-btn" type="button">잠금</button>
+</form>
+<p id="state" role="status" aria-live="polite">토큰은 메모리에만 유지되며 저장소나 URL에 남지 않습니다.</p>
+<section id="results" hidden aria-label="접속 로그 목록">
+<div class="scroll" tabindex="0" role="region" aria-label="접속 로그 표">
+<table>
+<thead>
+<tr>
+<th scope="col">일시 (KST)</th>
+<th scope="col">IP</th>
+<th scope="col">메서드</th>
+<th scope="col">경로</th>
+<th scope="col">학교 ID</th>
+<th scope="col">학년</th>
+<th scope="col">반</th>
+<th scope="col">주차</th>
+<th scope="col">일자</th>
+<th scope="col">데이터 유형</th>
+<th scope="col">상태</th>
+<th scope="col">소요 시간</th>
+<th scope="col">캐시</th>
+<th scope="col">리퍼러 출처</th>
+<th scope="col">출처 분류</th>
+</tr>
+</thead>
+<tbody id="logs-body"></tbody>
+</table>
+</div>
+<div id="pagination" style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+<span id="page-info" style="font-size:14px; color:#555;"></span>
+<button id="next-btn" type="button" hidden>더 보기 (다음 페이지)</button>
+</div>
+</section>
+</main>
+<script type="module" src="/src/access-logs.ts"></script>
+</body>
+</html>
