@@ -8,7 +8,7 @@ import secrets
 import sqlite3
 import time
 from contextlib import closing
-from datetime import date as date_type
+from datetime import date as date_type, datetime, timedelta, timezone
 
 from backend.webhook_delivery import validate_destination
 
@@ -23,7 +23,7 @@ DELIVERY_RETENTION_SECONDS = 30 * 24 * 60 * 60
 
 
 def validate_filters(filters):
-    if not isinstance(filters, dict) or set(filters) - {"subject", "teacher", "weekday", "period", "type"}:
+    if not isinstance(filters, dict) or set(filters) - {"subject", "teacher", "weekday", "period", "type", "quietHours"}:
         raise ValueError("invalid filters")
     for key, value in filters.items():
         if key in ("subject", "teacher"):
@@ -32,9 +32,29 @@ def validate_filters(filters):
         elif key in ("weekday", "period"):
             if type(value) is not int or not 1 <= value <= (5 if key == "weekday" else 20):
                 raise ValueError("invalid filter")
+        elif key == "quietHours":
+            if (not isinstance(value, dict) or set(value) != {"start", "end"}
+                    or any(not isinstance(value[k], str) or not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", value[k]) for k in ("start", "end"))
+                    or value["start"] == value["end"]):
+                raise ValueError("invalid quiet hours")
         elif value not in ("added", "deleted", "changed"):
             raise ValueError("invalid filter")
     return filters
+
+
+def quiet_until(now, quiet_hours):
+    if not quiet_hours:
+        return None
+    local = datetime.fromtimestamp(now, timezone(timedelta(hours=9)))
+    current = local.hour * 60 + local.minute
+    start = int(quiet_hours["start"][:2]) * 60 + int(quiet_hours["start"][3:])
+    end = int(quiet_hours["end"][:2]) * 60 + int(quiet_hours["end"][3:])
+    if not (start <= current < end if start < end else current >= start or current < end):
+        return None
+    target = local.replace(hour=end // 60, minute=end % 60, second=0, microsecond=0)
+    if start > end and current >= start:
+        target += timedelta(days=1)
+    return target.timestamp()
 
 
 def enqueue_observed_change(db, school, grade, classroom, date, period, kind, before, after, change_id, now):
@@ -228,10 +248,17 @@ class WebhookStore:
             try:
                 db.execute("DELETE FROM webhook_deliveries WHERE state IN ('delivered', 'failed') AND next_at<?", (now - DELIVERY_RETENTION_SECONDS,))
                 db.execute("UPDATE webhook_deliveries SET state='failed', next_at=?, lease_token=NULL, lease_until=NULL WHERE state='leased' AND lease_until<=? AND attempts>=?", (now, now, MAX_DELIVERY_ATTEMPTS))
-                row = db.execute("""SELECT d.id, d.event_id, d.body, d.attempts, s.destination, s.signing_secret
-                    FROM webhook_deliveries d JOIN webhook_subscriptions s ON s.id=d.subscription_id
-                    WHERE (d.state='pending' AND d.next_at<=?) OR (d.state='leased' AND d.lease_until<=?)
-                    ORDER BY d.next_at, d.id LIMIT 1""", (now, now)).fetchone()
+                while True:
+                    row = db.execute("""SELECT d.id, d.event_id, d.body, d.attempts, s.destination, s.signing_secret, s.filters_json
+                        FROM webhook_deliveries d JOIN webhook_subscriptions s ON s.id=d.subscription_id
+                        WHERE (d.state='pending' AND d.next_at<=?) OR (d.state='leased' AND d.lease_until<=?)
+                        ORDER BY d.next_at, d.id LIMIT 1""", (now, now)).fetchone()
+                    if not row:
+                        break
+                    resume_at = None if row["event_id"].startswith("test_") else quiet_until(now, json.loads(row["filters_json"]).get("quietHours"))
+                    if resume_at is None:
+                        break
+                    db.execute("UPDATE webhook_deliveries SET state='pending', next_at=?, lease_token=NULL, lease_until=NULL WHERE id=?", (resume_at, row["id"]))
                 if row:
                     db.execute("UPDATE webhook_deliveries SET state='leased', attempts=attempts+1, lease_token=?, lease_until=? WHERE id=?",
                                (lease_token, now + lease_seconds, row["id"]))

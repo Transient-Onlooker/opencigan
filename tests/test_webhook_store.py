@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.webhook_store import WebhookStore
+from backend.webhook_store import WebhookStore, quiet_until
 from backend.webhook_worker import deliver_next
 from backend.history import HistoryStore
 
@@ -57,6 +57,30 @@ class WebhookStoreTests(unittest.TestCase):
         self.assertEqual(claim["attempt"], 2)
         self.store.finish(claim["id"], claim["leaseToken"], {"delivered": False, "retryable": False, "status": 400}, now=130)
         self.assertIsNone(self.store.claim(now=10000))
+
+    def test_quiet_hours_defer_due_delivery_and_allow_test_messages(self):
+        kst = timezone(timedelta(hours=9))
+        instant = lambda day, hour, minute=0: datetime(2026, 11, day, hour, minute, tzinfo=kst).timestamp()
+        quiet = {"start": "22:00", "end": "07:00"}
+        self.assertEqual(quiet_until(instant(16, 23), quiet), instant(17, 7))
+        self.assertEqual(quiet_until(instant(17, 6, 59), quiet), instant(17, 7))
+        self.assertIsNone(quiet_until(instant(17, 7), quiet))
+        self.assertEqual(quiet_until(instant(16, 13), {"start": "12:00", "end": "14:00"}), instant(16, 14))
+        identifier, token = self.subscription["id"], self.subscription["token"]
+        self.assertTrue(self.store.update_filters(identifier, token, {"quietHours": quiet}))
+        self.store.enqueue(identifier, "event_1", b'{}', now=instant(16, 21))
+        test_id = self.store.enqueue_test(identifier, token, now=instant(16, 23))
+        test = self.store.claim(now=instant(16, 23))
+        self.assertEqual(test["event_id"], test_id)
+        self.store.finish(test["id"], test["leaseToken"], {"delivered": True, "retryable": False}, now=instant(16, 23))
+        self.assertIsNone(self.store.claim(now=instant(17, 6)))
+        self.assertEqual(self.store.claim(now=instant(17, 7))["event_id"], "event_1")
+
+    def test_quiet_hours_validation(self):
+        identifier, token = self.subscription["id"], self.subscription["token"]
+        for value in ({"start": "07:00", "end": "07:00"}, {"start": "24:00", "end": "07:00"}, {"start": "7:00", "end": "08:00"}):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                self.store.update_filters(identifier, token, {"quietHours": value})
 
     def test_expired_crashes_stop_after_six_attempts_and_old_results_expire(self):
         self.store.enqueue(self.subscription["id"], "crash", b'{}', now=100)
