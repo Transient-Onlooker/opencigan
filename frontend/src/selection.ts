@@ -1,5 +1,17 @@
 import type { School, TimetableRecord, TimetableResponse } from './api';
 
+export type SelectionState = { school: School | null; grade: number; classroom: number; week: string };
+
+export function createSelectionState(initial: SelectionState, onChange: (state: SelectionState) => void) {
+  let state = { ...initial };
+  return {
+    update(change: Partial<SelectionState>) {
+      state = { ...state, ...change };
+      onChange({ ...state });
+    },
+  };
+}
+
 /** A shared link may select only a fresh search result with matching identity. */
 export function verifiedSharedSchool(shared: School, results: School[], stale: boolean): School | undefined {
   if (stale) return undefined;

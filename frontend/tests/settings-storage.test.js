@@ -11,7 +11,7 @@ for (const failure of ['property access', 'storage methods']) {
     const component = await readFile(new URL('../src/App.svelte', import.meta.url), 'utf8');
     const script = component.match(/<script lang="ts">([\s\S]*?)<\/script>/)[1]
       .replace(/^\s*import .*;\s*$/gm, '');
-    const harness = `${script}\nreturn { changeTheme, setTheme, saveGrade, saveClass, setGrade: (value) => grade = value, state: () => ({ theme, dark: themeIsDark(theme, systemDark), grade, classroom, classError }) };`;
+    const harness = `${script}\nreturn { changeTheme, setTheme, saveGrade, saveClass, setGrade: (value) => selectionState.update({ grade: value }), state: () => ({ theme, dark: themeIsDark(theme, systemDark), grade, classroom, classError }) };`;
     const javascript = ts.transpile(`(function () { ${harness} })()`, { target: ts.ScriptTarget.ES2022 });
     let mount;
     let themeChange;
