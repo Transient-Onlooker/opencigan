@@ -436,7 +436,7 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
             headers["Retry-After"] = str(retry)
             headers["Content-Length"] = str(len(body))
             return 429, headers, body
-    query = parse_qs(query_string)
+    query = parse_qs(query_string, keep_blank_values=path == "/api/v1/timetable/history.rss")
     try:
         if path == "/api/v1/status":
             result = {"status": "ok", "scope": "process liveness"}
@@ -533,10 +533,24 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
                 headers["Content-Length"] = str(len(body))
                 return 503, headers, body
             if path.endswith(".rss"):
-                grade_filter, class_filter, teacher_filter = _timetable_filters(query, require_class=True)
-                if teacher_filter is not None or cursor is not None:
-                    raise ValueError("피드에는 교사 필터와 커서를 사용할 수 없습니다")
-                changes = store.list(school, week, grade=grade_filter, classroom=class_filter, include_ids=True)["changes"]
+                grade_filter, class_filter, _ = _timetable_filters({key: value for key, value in query.items() if key != "teacher"}, require_class=True)
+                if cursor is not None:
+                    raise ValueError("피드에는 커서를 사용할 수 없습니다")
+                filters = {key: _query_param(query, key, 50) for key in ("subject", "teacher") if key in query}
+                if "weekday" in query:
+                    filters["weekday"] = _query_param(query, "weekday", 1)
+                    if filters["weekday"] not in ("1", "2", "3", "4", "5"):
+                        raise ValueError("weekday는 1(월)부터 5(금)까지여야 합니다")
+                if "period" in query:
+                    raw_period = _query_param(query, "period", 2)
+                    if not re.fullmatch(r"(?:[1-9]|1[0-9]|20)", raw_period):
+                        raise ValueError("period는 1부터 20까지여야 합니다")
+                    filters["period"] = int(raw_period)
+                if "type" in query:
+                    filters["type"] = _query_param(query, "type", 7)
+                    if filters["type"] not in ("added", "deleted", "changed"):
+                        raise ValueError("type이 올바르지 않습니다")
+                changes = store.list(school, week, grade=grade_filter, classroom=class_filter, include_ids=True, filters=filters)["changes"]
                 body = render_history_feed(school, grade_filter, class_filter, changes)
                 etag = '"' + hashlib.sha256(body).hexdigest() + '"'
                 headers.update({"Content-Type": "application/rss+xml; charset=utf-8", "ETag": etag,

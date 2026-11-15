@@ -149,7 +149,7 @@ class HistoryStore:
                 db.execute("ROLLBACK")
                 raise
 
-    def list(self, school, week, cursor=None, limit=50, grade=None, classroom=None, include_ids=False):
+    def list(self, school, week, cursor=None, limit=50, grade=None, classroom=None, include_ids=False, filters=None):
         if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
             raise ValueError("limit must be a positive integer")
         if cursor is None:
@@ -173,12 +173,23 @@ class HistoryStore:
                 db.execute("DELETE FROM snapshot_lessons WHERE school=? AND week=?", (old["school"], old["week"]))
             db.execute("DELETE FROM observed_weeks WHERE observed_at < ?", (cutoff,))
             db.execute("COMMIT")
+            filters = filters or {}
             rows = db.execute("""SELECT id, observed_at, grade, class_number, date,
                     period, type, before_json, after_json FROM changes
                     WHERE school=? AND week=? AND observed_at>=? AND id<?
                     AND (? IS NULL OR grade=?) AND (? IS NULL OR class_number=?)
+                    AND (? IS NULL OR period=?) AND (? IS NULL OR type=?)
+                    AND (? IS NULL OR strftime('%w', date)=?)
+                    AND (? IS NULL OR instr(COALESCE(json_extract(before_json, '$.subject'), ''), ?) > 0
+                         OR instr(COALESCE(json_extract(after_json, '$.subject'), ''), ?) > 0)
+                    AND (? IS NULL OR instr(COALESCE(json_extract(before_json, '$.teacher'), ''), ?) > 0
+                         OR instr(COALESCE(json_extract(after_json, '$.teacher'), ''), ?) > 0)
                     ORDER BY id DESC LIMIT ?""",
-                (school, week, cutoff, before_id, grade, grade, classroom, classroom, limit + 1)).fetchall()
+                (school, week, cutoff, before_id, grade, grade, classroom, classroom,
+                 filters.get("period"), filters.get("period"), filters.get("type"), filters.get("type"),
+                 filters.get("weekday"), filters.get("weekday"),
+                 filters.get("subject"), filters.get("subject"), filters.get("subject"),
+                 filters.get("teacher"), filters.get("teacher"), filters.get("teacher"), limit + 1)).fetchall()
         more = len(rows) > limit
         rows = rows[:limit]
         changes = [{"observedAt": r["observed_at"], "grade": r["grade"],

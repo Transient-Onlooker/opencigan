@@ -46,7 +46,7 @@ class HistoryFeedTests(unittest.TestCase):
     def test_requires_class_and_disabled_history_is_not_exposed(self):
         with patch("backend.app._history_store", return_value=self.store):
             self.assertEqual(dispatch_request("GET", self.path, urlencode({"school": self.school, "grade": 1}))[0], 400)
-            self.assertEqual(dispatch_request("GET", self.path, self.query + "&teacher=abc")[0], 400)
+            self.assertEqual(dispatch_request("GET", self.path, self.query + "&weekday=0")[0], 400)
             status, _, body = dispatch_request("GET", self.path, urlencode({"school": self.school, "grade": 1, "class": 1}))
             self.assertEqual(status, 200)
             self.assertEqual(len(ElementTree.fromstring(body).findall("channel/item")), 0)
@@ -54,3 +54,20 @@ class HistoryFeedTests(unittest.TestCase):
             status, _, body = dispatch_request("GET", self.path, self.query)
             self.assertEqual(status, 503)
             self.assertIn(b"history_disabled", body)
+
+    def test_combined_filters_run_before_limit_and_match_both_sides(self):
+        records = [dict(grade=1, date=self.week, period=i, subject="공통", teacher="A", **{"class": 1}) for i in range(2, 62)]
+        records.append(dict(grade=1, date=self.week, period=1, subject="수학", teacher="김교사", **{"class": 1}))
+        self.store.observe(self.school, self.week, records, self.now)
+        changed = [{**record, "subject": "과학", "teacher": "박교사"} for record in records]
+        self.store.observe(self.school, self.week, changed, self.now + timedelta(seconds=1))
+        filters = urlencode({"subject": "수학", "teacher": "박교사", "weekday": 1, "period": 1, "type": "changed"})
+        with patch("backend.app._history_store", return_value=self.store):
+            status, _, body = dispatch_request("GET", self.path, self.query + "&" + filters)
+            self.assertEqual(status, 200)
+            items = ElementTree.fromstring(body).findall("channel/item")
+            self.assertEqual(len(items), 1)
+            self.assertIn("수학", items[0].findtext("description"))
+            for bad in ("weekday=6", "period=21", "type=other", "teacher=a&teacher=b", "period=01", "subject="):
+                with self.subTest(bad=bad):
+                    self.assertEqual(dispatch_request("GET", self.path, self.query + "&" + bad)[0], 400)
