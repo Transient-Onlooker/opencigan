@@ -13,3 +13,15 @@ export function saveSelection(storage: Pick<Storage, 'setItem'>, school: School,
     storage.setItem('opensigan-class', String(classroom));
   } catch { /* Storage may be unavailable; the current selection remains usable. */ }
 }
+
+export function saveGradeAndClass(storage: Pick<Storage, 'setItem'>, grade: number, classroom: number): void {
+  try {
+    storage.setItem('opensigan-grade', String(grade));
+    storage.setItem('opensigan-class', String(classroom));
+  } catch { /* Keep the current in-memory selection if storage is unavailable. */ }
+}
+
+export function saveClassToStorage(storage: Pick<Storage, 'setItem'>, classroom: number): void {
+  try { storage.setItem('opensigan-class', String(classroom)); }
+  catch { /* Keep the current in-memory selection if storage is unavailable. */ }
+}

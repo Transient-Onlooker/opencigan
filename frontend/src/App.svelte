@@ -5,7 +5,7 @@
   import MealMenu from './MealMenu.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { saveSelection, verifiedSharedSchool } from './selection';
+  import { saveSelection, saveGradeAndClass, saveClassToStorage, verifiedSharedSchool } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -410,10 +410,7 @@
     else { schoolEditorOpen = false; ensureAvailableClass(); }
     classroomDraft = String(classroom);
     persistClassSelection();
-    try {
-      localStorage.setItem('opensigan-grade', String(grade));
-      localStorage.setItem('opensigan-class', String(classroom));
-    } catch { /* 현재 선택은 저장 없이 유지합니다. */ }
+    try { saveGradeAndClass(localStorage, grade, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
   }
 
   function findSchool() {
@@ -553,7 +550,7 @@
     if (previousGrade === Number(grade) && previousClass === Number(classroom)) return;
     classError = false;
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
-    try { localStorage.setItem('opensigan-grade', String(grade)); localStorage.setItem('opensigan-class', String(classroom)); } catch { /* 현재 선택을 유지합니다. */ }
+    try { saveGradeAndClass(localStorage, grade, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
   }
   function loadTimetable(preserve = false, reuseCachedWeek = false, validateClass = false) {
     validateClass = validateClass || !!pendingSharedClass;
@@ -804,7 +801,7 @@
     if (!classError) classroom = input.valueAsNumber;
     classroomDraft = String(classroom);
     input.value = classroomDraft;
-    if (!classError) { try { localStorage.setItem('opensigan-class', String(classroom)); } catch { /* 현재 선택은 저장 없이 유지합니다. */ } }
+    if (!classError) { try { saveClassToStorage(localStorage, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ } }
     persistClassSelection();
   }
   function saveGrade() {
@@ -813,7 +810,7 @@
     sharedClassState = '';
     ensureAvailableClass();
     classError = false;
-    try { localStorage.setItem('opensigan-grade', String(grade)); localStorage.setItem('opensigan-class', String(classroom)); } catch { /* 현재 선택은 저장 없이 유지합니다. */ }
+    try { saveGradeAndClass(localStorage, grade, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
     persistClassSelection();
   }
   function saveClassFromSelect() {
@@ -822,7 +819,7 @@
     classError = false;
     sharedClassState = '';
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
-    try { localStorage.setItem('opensigan-class', String(classroom)); } catch { /* 현재 선택은 저장 없이 유지합니다. */ }
+    try { saveClassToStorage(localStorage, classroom); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
     persistClassSelection();
   }
   async function shareClass() {
