@@ -11,6 +11,10 @@
   import HistoryPanel from './HistoryPanel.svelte';
   import ShareTools from './ShareTools.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
+  import GradeComparison from './GradeComparison.svelte';
+  import TeacherTimetable from './TeacherTimetable.svelte';
+  import TodayLessons from './TodayLessons.svelte';
+  import WeekGrid from './WeekGrid.svelte';
   import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference } from './preferences';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
   import { saveSelection, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
@@ -19,7 +23,6 @@
   import { trackPageView } from './analytics';
   import { shareClassUrl, readSharedClass, findLessons } from './sharing';
   import { saveTimetablePdf, saveTimetablePng, shareTimetablePng, type ExportOptions } from './export-png';
-  import { slotLessons } from './timetable-slots';
   import { createTimetableSession } from './timetable-cache';
   import { createHistorySession } from './history-session';
   import { createMealSession } from './meal-session';
@@ -867,68 +870,13 @@
           {:else if tableLoading && !timetable}<div class="state-message" role="status"><strong>시간표를 불러오고 있어요.</strong></div>
           {:else if classError}<div class="state-message">{sharedClassState || '현재 선택은 유지했어요. 시간표에 등록된 반을 선택하거나 반 입력을 확인해 주세요.'}</div>
           {:else if timetable && timetableView === 'today'}
-            <div class="day-picker"><label for="today-date">날짜</label><input id="today-date" type="date" min={week} max={addDays(week, 6)} value={selectedDay} onchange={selectTimetableDate} /><span>{selectedDay === today ? '오늘' : dateText(selectedDay, { weekday: 'long' })}</span></div>
-            {#if selectedClassLessons.length}
-              <div class="day-summary" aria-live="polite">
-                <span>총 {dayOverview.total}교시</span>
-                {#if displaySettings.showChangeBadges && dayOverview.changed}<span>변동 {dayOverview.changed}교시</span>{/if}
-                {#if selectedDay === today}
-                  {#if dayOverview.timed}
-                    <span>남은 수업 {dayOverview.remaining}교시</span>
-                    {#if dayOverview.current}<strong>현재 {dayOverview.current.period}교시 · {dayOverview.current.lessons.map((lesson) => displaySubject(lesson.subject, displaySettings)).join(' / ')}</strong>{:else if !dayOverview.next}<span>오늘 수업 종료</span>{/if}
-                    {#if dayOverview.next}<strong>다음 {dayOverview.next.period}교시 · {dayOverview.next.lessons.map((lesson) => displaySubject(lesson.subject, displaySettings)).join(' / ')} <small>{dayOverview.next.time.start} 시작</small></strong>{/if}
-                  {:else}<span>교시 시각 설정 후 현재·다음 수업을 볼 수 있어요.</span>{/if}
-                {/if}
-              </div>
-              <div class="lesson-list" class:density-compact={displaySettings.density === 'compact'} class:density-relaxed={displaySettings.density === 'relaxed'} aria-label="선택한 날짜 시간표">
-                {#each shownClassLessons as item}
-                  <article class:active-lesson={dayOverview.current?.period === Number(item.period)} class:completed-lesson={displaySettings.endedLessonMode === 'dim' && dayOverview.completed.includes(Number(item.period))} class:changed={displaySettings.showChangeHighlights && item.isChanged}>
-                    <span class="lesson-period">{item.period}교시{#if lessonTimes[Number(item.period)]}<small class="lesson-time">{lessonTimes[Number(item.period)].start}–{lessonTimes[Number(item.period)].end}</small>{/if}</span>
-                    <strong style={subjectStyle(item.subject)}>{displaySubject(item.subject, displaySettings)}</strong>
-                    {#if displaySettings.showTeachers && item.teacher}<span>{displayTeacher(item.teacher, displaySettings)}</span>{/if}
-                    {#if item.isChanged && displaySettings.showChangeBadges}<span class="change-label">변동</span>{/if}
-                  </article>
-                {/each}
-              </div>
-              {#if !shownClassLessons.length}<p class="state-inline" role="status">종료된 수업을 모두 숨겼어요. 표시 설정에서 다시 볼 수 있어요.</p>{/if}
-            {:else}<div class="state-message"><strong>이 날짜의 시간표가 없어요</strong><p>다른 날짜를 선택하거나 주간 반 시간표를 확인해 주세요.</p></div>{/if}
+            <TodayLessons {week} {selectedDay} {today} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} {lessonTimes} {selectTimetableDate} {dateText} {subjectStyle} />
           {:else if timetable && timetableView === 'grade'}
-            <div class="day-picker"><label for="grade-date">비교 날짜</label><input id="grade-date" type="date" min={week} max={addDays(week, 6)} value={selectedDay} onchange={selectTimetableDate} /></div>
-            {#if comparableClasses.length}
-              <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-               <div class="table-scroll grade-comparison-scroll" tabindex="0" role="region" aria-label={grade + '학년 학급별 비교 시간표'}><table class="timetable comparison-table" class:no-cell-borders={!displaySettings.showCellBorders} class:density-compact={displaySettings.density === 'compact'} class:density-relaxed={displaySettings.density === 'relaxed'}><caption class="sr-only">{school.name} {grade}학년 {dateText(selectedDay)} 학급별 교시 비교</caption><thead><tr><th scope="col">교시</th>{#each comparableClasses as classNumber}<th scope="col">{classNumber}반</th>{/each}</tr></thead><tbody>{#each Array.from({ length: Math.max(0, ...gradeRecords.map((item) => Number(item.period))) }, (_, index) => index + 1) as period}<tr><th scope="row">{period}교시</th>{#each comparableClasses as classNumber}{@const lessons = slotLessons(gradeRecords, selectedDay, period, classNumber)}<td class:changed={displaySettings.showChangeHighlights && lessons.some((lesson) => lesson.isChanged)}>{#each lessons as lesson}<div class="class-cell"><strong style={subjectStyle(lesson.subject)}>{displaySubject(lesson.subject, displaySettings)}</strong>{#if displaySettings.showTeachers && lesson.teacher}<span>{displayTeacher(lesson.teacher, displaySettings)}</span>{/if}{#if lesson.isChanged && displaySettings.showChangeBadges}<span class="change-label">변동</span>{/if}</div>{:else}<span class="empty-cell">—</span>{/each}</td>{/each}</tr>{/each}</tbody></table></div>
-               <div class="grade-compact" class:no-cell-borders={!displaySettings.showCellBorders} class:density-compact={displaySettings.density === 'compact'} class:density-relaxed={displaySettings.density === 'relaxed'} aria-label={`${grade}학년 ${dateText(selectedDay)} 학급별 비교`}>
-                 {#each Array.from({ length: Math.max(0, ...gradeRecords.map((item) => Number(item.period))) }, (_, index) => index + 1) as period}
-                   <section class="grade-period"><h3>{period}교시</h3><div class="grade-class-grid">
-                     {#each comparableClasses as classNumber}
-                       {@const lessons = slotLessons(gradeRecords, selectedDay, period, classNumber)}
-                        <div class="grade-class" class:changed={displaySettings.showChangeHighlights && lessons.some((lesson) => lesson.isChanged)}><h4>{classNumber}반</h4>
-                          {#each lessons as lesson}<div class="class-cell"><strong style={subjectStyle(lesson.subject)}>{displaySubject(lesson.subject, displaySettings)}</strong>{#if displaySettings.showTeachers && lesson.teacher}<span>{displayTeacher(lesson.teacher, displaySettings)}</span>{/if}{#if lesson.isChanged && displaySettings.showChangeBadges}<span class="change-label">변동</span>{/if}</div>{:else}<span class="empty-cell">—</span>{/each}
-                       </div>
-                     {/each}
-                   </div></section>
-                 {/each}
-               </div>
-             {:else}<div class="state-message"><strong>비교할 시간표가 없어요</strong><p>선택한 날짜에 선택 학년의 수업이 없습니다.</p></div>{/if}
+            <GradeComparison {school} {week} {selectedDay} {grade} {comparableClasses} {gradeRecords} {displaySettings} {selectTimetableDate} {dateText} {subjectStyle} />
            {:else if timetable && timetableView === 'teacher'}
-             <label class="teacher-search" for="teacher-search">교사별 주간 시간표<input id="teacher-search" type="search" bind:value={teacherQuery} placeholder="교사 이름 입력 또는 목록에서 선택" autocomplete="off" /></label>
-              {#if !selectedTeacherRecords.length && teacherSuggestions.length}<div class="teacher-options" aria-label="선택 가능한 교사 목록">{#each teacherSuggestions as teacherName}<button class="secondary-button" onclick={() => teacherQuery = teacherName}>{displayTeacher(teacherName, displaySettings)}</button>{/each}</div>{/if}
-             {#if selectedTeacherRecords.length}
-                <p class="table-hint">{displayTeacher(selectedTeacherName, displaySettings)} 선생님 · 이번 주 수업 (동명이인은 원본 시간표에서 구분할 수 없어요.)</p>
-               <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-                <div class="table-scroll" tabindex="0" role="region" aria-label={`${displayTeacher(selectedTeacherName, displaySettings)} 선생님 주간 시간표`}>
-                   <table class="timetable teacher-table" class:no-cell-borders={!displaySettings.showCellBorders} class:density-compact={displaySettings.density === 'compact'} class:density-relaxed={displaySettings.density === 'relaxed'}><caption class="sr-only">{displayTeacher(selectedTeacherName, displaySettings)} 선생님 주간 시간표</caption><thead><tr><th scope="col">교시</th>{#each teacherDates as date}<th scope="col" class:other-day={displaySettings.dimOtherDays && week === current && date !== today}><span>{dateText(date, { weekday: 'short' })}</span>{#if displaySettings.showDates}<small>{dateText(date)}</small>{:else}<small class="sr-only">{dateText(date)}</small>{/if}</th>{/each}</tr></thead><tbody>{#each teacherPeriods as period}<tr><th scope="row">{period}교시</th>{#each teacherDates as date}{@const teacherLessons = selectedTeacherRecords.filter((r) => r.date === date && Number(r.period) === period)}<td class:other-day={displaySettings.dimOtherDays && week === current && date !== today} class:changed={displaySettings.showChangeHighlights && teacherLessons.some((lesson) => lesson.isChanged)}>{#each teacherLessons as item}<div class="class-cell"><strong><span>{item.grade}학년</span> <span>{item.class}반</span></strong><span style={subjectStyle(item.subject)}>{displaySubject(item.subject, displaySettings)}</span>{#if item.isChanged && displaySettings.showChangeBadges}<span class="change-label">변동</span>{/if}</div>{:else}<span class="empty-cell">—</span>{/each}</td>{/each}</tr>{/each}</tbody></table>
-               </div>
-             {:else if teacherQuery.trim() && !teacherSuggestions.length}<div class="state-message"><strong>검색된 교사가 없어요</strong><p>다른 이름을 입력해 주세요.</p></div>{:else}<p class="table-hint">목록에서 이름을 고르면 월~금 시간표가 표시돼요.</p>{/if}
+             <TeacherTimetable bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {displaySettings} {week} {current} {today} {dateText} {subjectStyle} />
           {:else if timetable && timetableView === 'week' && filtered.length}
-            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-            <div class="table-scroll" tabindex="0" role="region" aria-label="주간 시간표, 좌우로 스크롤 가능">
-               <table class="timetable" class:no-cell-borders={!displaySettings.showCellBorders} class:density-compact={displaySettings.density === 'compact'} class:density-relaxed={displaySettings.density === 'relaxed'}><caption class="sr-only">{school.name} {grade}학년 {classroom}반 주간 시간표</caption><thead><tr><th scope="col">교시</th>{#each dates as date}<th scope="col" class:today-column={date === today} class:other-day={displaySettings.dimOtherDays && week === current && date !== today} aria-current={date === today ? 'date' : undefined}><span>{dateText(date, { weekday: 'short' })}</span>{#if displaySettings.showDates}<small>{dateText(date)}</small>{:else}<small class="sr-only">{dateText(date)}</small>{/if}{#if date === today}<span class="today-label">오늘</span>{/if}</th>{/each}</tr></thead>
-                  <tbody>{#each periods as period}<tr><th scope="row">{period}<span class="sr-only">교시</span></th>{#each dates as date}{@const lessons = slotLessons(filtered, date, period)}<td class:today-column={date === today} class:other-day={displaySettings.dimOtherDays && week === current && date !== today} class:changed={displaySettings.showChangeHighlights && lessons.some((lesson) => lesson.isChanged)}>{#each lessons as lesson}<div class="class-cell"><strong style={subjectStyle(lesson.subject)}>{displaySubject(lesson.subject, displaySettings)}</strong>{#if displaySettings.showTeachers && lesson.teacher}<span>{displayTeacher(lesson.teacher, displaySettings)}</span>{/if}{#if lesson.isChanged && displaySettings.showChangeBadges}<span class="change-label">변동</span>{/if}</div>{:else}<span class="empty-cell" aria-label="수업 없음">—</span>{/each}</td>{/each}</tr>{/each}</tbody>
-              </table>
-            </div>
-            {#if missingWeekdays.length}<p class="table-hint" role="status">수업 기록이 없는 평일: {missingWeekdays.map((date) => dateText(date, { weekday: 'long' })).join(', ')}. {timetable.stale || timetableFromDevice || tableState ? '저장된 시간표 기준이에요. ' : ''}휴업일인지 원본 자료가 비어 있는지는 확인할 수 없어요.</p>{/if}
-            <div class="table-hint">빈 교시 <Help label="빈 교시" text="— 표시는 수집된 수업 기록이 없는 칸입니다. 휴업일인지, 원본 미제공인지, 일부 데이터가 누락됐는지는 확인되지 않습니다." /></div>
+            <WeekGrid {school} {grade} {classroom} {dates} {today} {week} {current} {periods} {filtered} {displaySettings} {missingWeekdays} {timetable} {timetableFromDevice} {tableState} {dateText} {subjectStyle} />
           {:else if !tableState}<div class="state-message"><strong>선택한 학급의 시간표 데이터가 없어요.</strong><p>학교와 학년·반을 확인해 주세요. 해당 기간의 원본 데이터가 제공되지 않은 이유는 확인되지 않습니다.</p></div>{/if}
            {#if timetable}<div class="freshness" aria-live="polite">{#if timetableFromDevice}<span>오프라인 · 이 기기에 저장된 시간표</span>{:else if timetable.stale}<span>저장된 시간표 · 최신 정보가 아닐 수 있어요</span>{/if}<span>원본 갱신 {timeText(timetable.sourceUpdatedAt)}</span></div>{/if}
            {#if timetable?.records.length}<details class="dataset-details"><summary>수업 데이터 규모 · 학급 {observedClassCount}개 · 교사 이름 {teacherNames.length}개</summary><p>선택한 주에 수집된 수업 기록 기준입니다. 학교 전체 학급·교사 수가 아닐 수 있고, 교사 이름 누락이나 동명이인이 있으면 실제 인원과 다를 수 있어요.</p></details>{/if}

@@ -1,0 +1,55 @@
+import hmac
+import json
+import os
+import sqlite3
+from datetime import date
+from urllib.parse import parse_qs
+
+
+def access_log_admin(method, query_string, request_headers, headers, access_log_store, recorder):
+    if method not in ('GET', 'HEAD'):
+        return 405, headers, b'{"code":"method_not_allowed"}'
+    token = os.environ.get('OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN', '')
+    supplied = (request_headers or {}).get('Authorization', '')
+    if not token or not hmac.compare_digest(supplied.encode(), ('Bearer ' + token).encode()):
+        headers['WWW-Authenticate'] = 'Bearer realm="Opencigan access logs"'
+        return 401, headers, b'{"code":"unauthorized"}'
+    try:
+        values = parse_qs(query_string, keep_blank_values=True, max_num_fields=20)
+        allowed = {'client_ip', 'school_id', 'grade', 'class', 'start_day', 'end_day', 'route', 'status', 'origin_class', 'cache_status', 'cursor', 'limit', 'format'}
+        if set(values) - allowed or any(len(items) != 1 or len(items[0]) > 255 for items in values.values()):
+            raise ValueError('조회 조건이 올바르지 않습니다')
+        filters = {key: item[0] for key, item in values.items() if key not in ('cursor', 'limit', 'format') and item[0]}
+        for key in ('start_day', 'end_day'):
+            if key in filters and date.fromisoformat(filters[key]).isoformat() != filters[key]:
+                raise ValueError('날짜를 확인하세요')
+        if filters.get('start_day', '') > filters.get('end_day', '9999-12-31'):
+            raise ValueError('날짜 범위를 확인하세요')
+        for key, low, high in [('grade', 1, 6), ('class', 1, 99), ('status', 100, 599)]:
+            if key in filters and (not filters[key].isdigit() or not low <= int(filters[key]) <= high):
+                raise ValueError('숫자 조건을 확인하세요')
+        cursor = values.get('cursor', [None])[0]
+        if cursor is not None and (not cursor.isdigit() or int(cursor) <= 0):
+            raise ValueError('커서를 확인하세요')
+        if 'origin_class' in filters and filters['origin_class'] not in ('frontend', 'external', 'unknown'):
+            raise ValueError('출처 조건을 확인하세요')
+        limit = int(values.get('limit', ['50'])[0])
+        if not 1 <= limit <= 100:
+            raise ValueError('조회 건수는 1~100입니다')
+        output = values.get('format', ['json'])[0]
+        if output not in ('json', 'csv'):
+            raise ValueError('형식을 확인하세요')
+        store = access_log_store()
+        if store is None:
+            return 503, headers, b'{"code":"access_logs_disabled"}'
+        if output == 'csv':
+            headers['Content-Type'] = 'text/csv; charset=utf-8'
+            headers['Content-Disposition'] = 'attachment; filename="opencigan-access.csv"'
+            return 200, headers, ('\ufeff' + store.export_csv(filters, limit=5000)).encode()
+        result = store.query(filters, cursor=cursor, limit=limit)
+        result['dropped'] = recorder.dropped
+        return 200, headers, json.dumps(result, ensure_ascii=False).encode()
+    except (ValueError, TypeError):
+        return 400, headers, b'{"code":"invalid_request"}'
+    except (OSError, sqlite3.Error):
+        return 503, headers, b'{"code":"access_logs_unavailable"}'
