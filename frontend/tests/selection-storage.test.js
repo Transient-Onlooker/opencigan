@@ -8,6 +8,23 @@ const source = await readFile(new URL('../src/selection.ts', import.meta.url), '
 const exports = {};
 runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports, AbortController });
 
+test('selection owners publish independent snapshots without losing unrelated selection fields', () => {
+  const initial = { school: null, grade: 1, classroom: 1, week: '2026-11-09' };
+  let first;
+  let second;
+  const owner = exports.createSelectionState(initial, (state) => { first = state; });
+  const other = exports.createSelectionState(initial, (state) => { second = state; });
+  owner.update({ grade: 2, classroom: 3 });
+  first.grade = 6;
+  owner.update({ week: '2026-11-16' });
+  other.update({ classroom: 4 });
+  assert.equal(first.grade, 2);
+  assert.equal(first.classroom, 3);
+  assert.equal(first.week, '2026-11-16');
+  assert.equal(second.grade, 1);
+  assert.equal(second.classroom, 4);
+});
+
 test('selection persistence preserves keys, values and write order', () => {
   const writes = [];
   const storage = { setItem: (key, value) => writes.push([key, value]) };

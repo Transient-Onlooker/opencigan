@@ -5,7 +5,7 @@
   import MealMenu from './MealMenu.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { saveSelection, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSharedSelectionSession, type PendingSharedClass } from './selection';
+  import { saveSelection, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -70,6 +70,12 @@
   let selectedDay = today;
   let current = monday(today);
   let week = current;
+  const selectionState = createSelectionState({ school, grade, classroom, week }, (state) => {
+    if (school !== state.school) school = state.school;
+    if (grade !== state.grade) grade = state.grade;
+    if (classroom !== state.classroom) classroom = state.classroom;
+    if (week !== state.week) week = state.week;
+  });
   let mealDate = today;
   let mealDateDraft = today;
   let mealView: 'day' | 'week' = 'day';
@@ -162,13 +168,13 @@
     cancelSharedSelection();
     const previousSchool = school?.id;
     const previousWeek = week;
-    grade = state.grade; classroom = state.classroom; classroomDraft = String(classroom); classError = false;
-    week = state.week; selectedDay = state.selectedDay; mealDate = state.mealDate; mealDateDraft = mealDate; dateError = '';
+    selectionState.update({ grade: state.grade, classroom: state.classroom, week: state.week }); classroomDraft = String(classroom); classError = false;
+    selectedDay = state.selectedDay; mealDate = state.mealDate; mealDateDraft = mealDate; dateError = '';
     view = state.view; timetableView = state.timetableView;
     if (state.school && previousSchool !== state.school.id) chooseSchool(state.school, true);
     else if (!state.school) {
       timetableSession.cancel(); neisRequest?.abort(); mealRequest?.abort(); historyRequest?.abort();
-      school = null; timetable = null; neis = null; meals = []; schoolEditorOpen = true;
+      selectionState.update({ school: null }); timetable = null; neis = null; meals = []; schoolEditorOpen = true;
       tableLoading = false; mealLoading = false;
       try { localStorage.removeItem('opensigan-school'); } catch { /* 현재 탐색을 유지합니다. */ }
     } else {
@@ -400,7 +406,7 @@
   }
   function switchToFavorite(favorite: Favorite) {
     cancelSharedSelection();
-    grade = favorite.grade; classroom = favorite.classroom; classError = false;
+    selectionState.update({ grade: favorite.grade, classroom: favorite.classroom }); classError = false;
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
     if (school?.id !== favorite.school.id) chooseSchool(favorite.school, true);
     else { schoolEditorOpen = false; ensureAvailableClass(); }
@@ -442,12 +448,12 @@
     exportState = '';
     if (!keepSharedValidation) cancelSharedSelection();
     sharedClassState = '';
-    if (school?.id !== value.id && !keepClass) { grade = 1; classroom = 1; classError = false; }
-    if (/(?:중학교|고등학교)/.test(value.name) && grade > 3) grade = 1;
+    if (school?.id !== value.id && !keepClass) { selectionState.update({ grade: 1, classroom: 1 }); classError = false; }
+    if (/(?:중학교|고등학교)/.test(value.name) && grade > 3) selectionState.update({ grade: 1 });
     classroomDraft = String(classroom);
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
     schoolRequest?.abort(); clearTimeout(schoolTimer); neisRequest?.abort(); mealRequest?.abort(); historyRequest?.abort();
-    school = value; schoolQuery = value.name; schoolResults = []; schoolSearchState = ''; schoolEditorOpen = false;
+    selectionState.update({ school: value }); schoolQuery = value.name; schoolResults = []; schoolSearchState = ''; schoolEditorOpen = false;
     selectedSubject = ''; selectedTeacher = ''; teacherQuery = '';
     try { schoolDisplaySettings = parseDisplaySettings(JSON.parse(localStorage.getItem('opensigan-display:' + value.id) || 'null')); }
     catch { schoolDisplaySettings = defaultDisplaySettings(); }
@@ -508,8 +514,7 @@
           ? `공유 링크의 ${pending.grade}학년 ${pending.classroom}반이 선택한 주의 시간표 데이터에 없어 적용하지 않았어요.`
           : '시간표 데이터가 없어 공유 링크의 학년·반을 확인하지 못했어요.';
         if (outcome.fallback.school) {
-          grade = outcome.fallback.grade;
-          classroom = outcome.fallback.classroom;
+          selectionState.update({ grade: outcome.fallback.grade, classroom: outcome.fallback.classroom });
           classError = false;
           chooseSchool(outcome.fallback.school, true);
           sharedClassState = message + ' 이전 학교와 학급을 유지했어요.';
@@ -521,8 +526,7 @@
         return;
       }
       classError = false;
-      grade = outcome.grade;
-      classroom = outcome.classroom;
+      selectionState.update({ grade: outcome.grade, classroom: outcome.classroom });
       classroomDraft = String(classroom);
       sharedClassState = '';
       if (school) { try { saveSelection(localStorage, { school, grade, classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ } }
@@ -531,7 +535,7 @@
     const previousGrade = Number(grade);
     const previousClass = Number(classroom);
     const reconciled = reconcileClassSelection(timetable?.records ?? [], school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6, grade, classroom);
-    grade = reconciled.grade; classroom = reconciled.classroom;
+    selectionState.update({ grade: reconciled.grade, classroom: reconciled.classroom });
     classroomDraft = String(classroom);
     if (previousGrade === Number(grade) && previousClass === Number(classroom)) return;
     classError = false;
@@ -641,7 +645,7 @@
     const validWeek = clampWeek(week, current);
     if (selectedDay === previousToday) selectedDay = today;
     if (validWeek !== week) {
-      week = validWeek;
+      selectionState.update({ week: validWeek });
       selectedDay = selectedDay < week ? week : selectedDay > addDays(week, 6) ? addDays(week, 6) : selectedDay;
       historyRequest?.abort(); historyRequestKey = ''; historyChanges = []; historyCursor = null; historyDisabled = false; historyError = ''; historyLoading = false;
       if (refreshData) {
@@ -659,9 +663,9 @@
   function changeWeek(delta: number) {
     refreshCalendar(false); const next = addDays(week, delta * 7);
     if (next < current || next > addDays(current, 7)) return;
-    tableRefreshState = ''; exportState = ''; teacherQuery = ''; week = next; selectedDay = week === current ? today : week; historyRequest?.abort(); historyRequestKey = ''; historyChanges = []; historyCursor = null; historyDisabled = false; historyError = ''; historyLoading = false; historyOpen = false; loadTimetable(false, true);
+    tableRefreshState = ''; exportState = ''; teacherQuery = ''; selectionState.update({ week: next }); selectedDay = week === current ? today : week; historyRequest?.abort(); historyRequestKey = ''; historyChanges = []; historyCursor = null; historyDisabled = false; historyError = ''; historyLoading = false; historyOpen = false; loadTimetable(false, true);
   }
-  function currentWeek() { refreshCalendar(false); const preserve = week === current; const reopenHistory = historyOpen; tableRefreshState = ''; if (!preserve) teacherQuery = ''; week = current; selectedDay = today; historyRequest?.abort(); historyRequestKey = ''; historyChanges = []; historyCursor = null; historyDisabled = false; historyError = ''; historyLoading = false; loadTimetable(preserve); if (reopenHistory) void loadHistory(); }
+  function currentWeek() { refreshCalendar(false); const preserve = week === current; const reopenHistory = historyOpen; tableRefreshState = ''; if (!preserve) teacherQuery = ''; selectionState.update({ week: current }); selectedDay = today; historyRequest?.abort(); historyRequestKey = ''; historyChanges = []; historyCursor = null; historyDisabled = false; historyError = ''; historyLoading = false; loadTimetable(preserve); if (reopenHistory) void loadHistory(); }
   function changeMealDate(delta: number) {
     const next = addDays(mealDate, delta);
     if (!validMealDate(next)) { dateError = '1900년 이후의 올바른 날짜를 선택해 주세요.'; return; }
@@ -682,7 +686,7 @@
     const targetWeek = monday(value);
     if (targetWeek < current || targetWeek > addDays(current, 7)) return;
     const needsTimetable = targetWeek !== week || timetable?.weekStart !== targetWeek;
-    view = 'timetable'; timetableView = 'today'; week = targetWeek; selectedDay = value;
+    view = 'timetable'; timetableView = 'today'; selectionState.update({ week: targetWeek }); selectedDay = value;
     mealDate = value; mealDateDraft = value; dateError = '';
     if (needsTimetable) {
       tableRefreshState = ''; teacherQuery = '';
@@ -773,7 +777,7 @@
   function saveClass(event: Event) {
     updateClass(event);
     const input = event.currentTarget as HTMLInputElement;
-    if (!classError) classroom = input.valueAsNumber;
+    if (!classError) selectionState.update({ classroom: input.valueAsNumber });
     classroomDraft = String(classroom);
     input.value = classroomDraft;
     if (!classError) { try { saveSelection(localStorage, { classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ } }
@@ -788,6 +792,8 @@
     try { saveSelection(localStorage, { grade, classroom }); } catch { /* 저장소 접근 자체가 차단될 수 있습니다. */ }
     persistClassSelection();
   }
+  function selectGrade(event: Event) { selectionState.update({ grade: Number((event.currentTarget as HTMLSelectElement).value) }); saveGrade(); }
+  function selectClass(event: Event) { selectionState.update({ classroom: Number((event.currentTarget as HTMLSelectElement).value) }); saveClassFromSelect(); }
   function saveClassFromSelect() {
     cancelSharedSelection();
     classroomDraft = String(classroom);
@@ -848,7 +854,7 @@
 
   function restoreSharedClass(shared: NonNullable<ReturnType<typeof readSharedClass>>, fallback: { school: School | null; grade: number; classroom: number }) {
     return sharedSelection.verifySchool(shared, fallback, () => school?.id, searchSchools, (verified) => {
-      grade = shared.grade; classroom = shared.classroom; classError = false;
+      selectionState.update({ grade: shared.grade, classroom: shared.classroom }); classError = false;
       chooseSchool(verified, true, true, false);
     }, () => { sharedClassState = '공유 링크의 학교를 확인하지 못해 이전 학교를 유지했어요.'; });
   }
@@ -893,8 +899,8 @@
       }
       const savedTheme = localStorage.getItem('opensigan-theme'); if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') theme = savedTheme;
       animationsEnabled = localStorage.getItem('opensigan-animations') !== 'off';
-      const savedGrade = Number(localStorage.getItem('opensigan-grade')); if (savedGrade >= 1 && savedGrade <= 6) grade = savedGrade;
-      const savedClass = Number(localStorage.getItem('opensigan-class')); if (Number.isInteger(savedClass) && savedClass >= 1 && savedClass <= 99) classroom = savedClass;
+      const savedGrade = Number(localStorage.getItem('opensigan-grade')); if (savedGrade >= 1 && savedGrade <= 6) selectionState.update({ grade: savedGrade });
+      const savedClass = Number(localStorage.getItem('opensigan-class')); if (Number.isInteger(savedClass) && savedClass >= 1 && savedClass <= 99) selectionState.update({ classroom: savedClass });
       const saved = localStorage.getItem('opensigan-school'); if (saved) savedSchool = JSON.parse(saved) as School;
     } catch { /* 저장소를 사용할 수 없으면 기본 설정으로 시작합니다. */ }
     if (savedSchool) chooseSchool(savedSchool, true);
@@ -945,7 +951,7 @@
           {/if}
         </div>
         <div class="selectors">
-          <label for="grade">학년<select id="grade" bind:value={grade} onchange={saveGrade}>{#each gradeOptions as n}<option value={n}>{n}학년</option>{/each}</select></label>
+          <label for="grade">학년<select id="grade" value={grade} onchange={selectGrade}>{#each gradeOptions as n}<option value={n}>{n}학년</option>{/each}</select></label>
           <label for="classroom">반<input id="classroom" type="number" min="1" max="99" step="1" required value={classroomDraft} oninput={updateClass} onchange={saveClass} aria-invalid={classError} aria-describedby={classError ? 'class-error' : 'class-selection'} /></label>
         </div>
         <p id="class-selection" class="quick-class-hint">현재 선택: {grade}학년 {classroom}반 · 반 입력은 편집을 마치면 적용돼요.</p>
@@ -988,7 +994,7 @@
            {#if tableRefreshState}<p class="refresh-feedback" role="status">{tableRefreshState}{timetableCheckedAt ? ' · 마지막 확인 ' + timeText(timetableCheckedAt, true) : ''}</p>{/if}
            {#if exportState}<p class="export-feedback" role="status">{exportState}</p>{/if}
            <div class="view-switch timetable-switch" role="group" aria-label="시간표 보기"><button aria-pressed={timetableView === 'today'} onclick={() => selectTimetableView('today')}>오늘</button><button aria-pressed={timetableView === 'week'} onclick={() => selectTimetableView('week')}>이번 주</button><button aria-pressed={timetableView === 'grade'} onclick={() => selectTimetableView('grade')}>{grade}학년</button><button aria-pressed={timetableView === 'teacher'} onclick={() => selectTimetableView('teacher')}>교사</button></div>
-           {#if school}<div class="quick-class" aria-label="학급 빠른 전환"><label>학년 <select bind:value={grade} onchange={saveGrade}>{#each gradeOptions as n}<option value={n}>{n}학년</option>{/each}</select></label><label>반 <select bind:value={classroom} onchange={saveClassFromSelect}>{#if !availableClasses.length}<option value={Number(classroom)}>{classroom}반</option>{/if}{#each availableClasses as n}<option value={n}>{n}반</option>{/each}</select></label>{#if !availableClasses.length}<span class="quick-class-hint">{tableLoading ? '학급 정보를 불러오는 중이에요.' : '이 학년의 학급 정보가 없어요.'}</span>{/if}</div>{/if}
+           {#if school}<div class="quick-class" aria-label="학급 빠른 전환"><label>학년 <select value={grade} onchange={selectGrade}>{#each gradeOptions as n}<option value={n}>{n}학년</option>{/each}</select></label><label>반 <select value={classroom} onchange={selectClass}>{#if !availableClasses.length}<option value={Number(classroom)}>{classroom}반</option>{/if}{#each availableClasses as n}<option value={n}>{n}반</option>{/each}</select></label>{#if !availableClasses.length}<span class="quick-class-hint">{tableLoading ? '학급 정보를 불러오는 중이에요.' : '이 학년의 학급 정보가 없어요.'}</span>{/if}</div>{/if}
            <div class="calendar-toolbar"><button class="arrow-button" onclick={() => changeWeek(-1)} disabled={week <= current} aria-label="이전 주">←</button><div class="calendar-date" aria-live="polite"><strong>{shortDate(week)} ~ {shortDate(addDays(week, weekendClasses ? 6 : 4))}</strong></div><button class="arrow-button" onclick={() => changeWeek(1)} disabled={week >= addDays(current, 7)} aria-label="다음 주">→</button></div>
            <div class="quick-class-hint">이번 주·다음 주만 조회할 수 있어요. <Help label="시간표 조회 범위" text="원본 서비스가 제공하는 현재 주와 다음 주를 조회합니다. 과거 또는 더 먼 미래의 시간표는 제공하지 않아요." /></div>
           {#if timetable && !classError && timetableView === 'week'}<details class="lesson-search"><summary>이 반의 수업 찾기</summary><div class="lesson-search-fields"><label>과목명 또는 교사명<input type="search" bind:value={lessonQuery} placeholder="이번 주 수업 검색" maxlength="100" /></label><label>요일<select bind:value={lessonWeekday}><option value="">모든 요일</option>{#each ['일', '월', '화', '수', '목', '금', '토'] as day, index}<option value={String(index)}>{day}요일</option>{/each}</select></label></div>{#if lessonQuery.trim() || lessonWeekday}<p role="status">검색 결과 {matchingLessons.length}개</p>{#if matchingLessons.length}<div class="lesson-list">{#each matchingLessons as lesson}<article><span class="lesson-period">{dateText(lesson.date, { weekday: 'short' })} · {lesson.period}교시</span><strong style={subjectStyle(lesson.subject)}>{displaySubject(lesson.subject, displaySettings)}</strong>{#if displaySettings.showTeachers && lesson.teacher}<span>{displayTeacher(lesson.teacher, displaySettings)}</span>{/if}</article>{/each}</div>{:else}<p>이 반의 이번 주 수업 중 일치하는 결과가 없어요.</p>{/if}{/if}</details>{/if}

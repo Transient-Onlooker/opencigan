@@ -78,6 +78,24 @@ test('invalid manual class edits restore the applied selection on blur', async (
   await expect(page.locator('#timetable-panel').getByRole('table')).toContainText('과목2');
 });
 
+test('grade changes reconcile the class and remain synchronized across both selectors', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/v1/timetable?*', (route) => route.fulfill({ json: {
+    ...timetable,
+    records: [...timetable.records, { grade: 2, class: 3, date: week, period: 1, subject: '2학년 수학', teacher: null, isChanged: false }],
+  } }));
+  await page.goto('/' + sharedHash(1));
+  const grade = page.locator('.quick-class select').nth(0);
+  const classroom = page.locator('.quick-class select').nth(1);
+  await expect(grade).toHaveValue('1');
+  await grade.selectOption('2');
+  await expect(classroom).toHaveValue('3');
+  await expect(page.locator('#timetable-panel').getByRole('table')).toContainText('2학년 수학');
+  await page.getByRole('button', { name: '학교 변경', exact: true }).click();
+  await expect(page.locator('#grade')).toHaveValue('2');
+  expect(await page.evaluate(() => [localStorage.getItem('opensigan-grade'), localStorage.getItem('opensigan-class')])).toEqual(['2', '3']);
+});
+
 test('meal date errors preserve the applied date and valid input fetches the matching week', async ({ page }) => {
   await mockApi(page);
   await page.goto('/' + sharedHash(1));

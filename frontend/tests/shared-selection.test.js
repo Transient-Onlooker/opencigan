@@ -14,7 +14,7 @@ const component = await readFile(new URL('../src/App.svelte', import.meta.url), 
 const script = component.match(/<script lang="ts">([\s\S]*?)<\/script>/)[1].replace(/^\s*import .*;\s*$/gm, '');
 const source = ts.transpile(`(function(){${script}
   return { chooseSchool, switchToFavorite, saveGrade, saveClassFromSelect, updateClass, saveClass, addFavorite, shareClass, subscribeTimetable,
-    setClass: (value) => { classroom = value; },
+    setClass: (value) => { selectionState.update({ classroom: value }); },
     state: () => ({ school, grade, classroom, classroomDraft, timetable, classError, schoolEditorOpen, tableLoading, sharedClassState, pendingSharedClass, favorites, shareUrl, subscriptionUrl }) };
 })()`, { target: ts.ScriptTarget.ES2022 });
 const savedSchool = { id: '1:기존고등학교', name: '기존고등학교', region: '서울' };

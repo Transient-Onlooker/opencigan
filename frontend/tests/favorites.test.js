@@ -11,7 +11,7 @@ const script = component.match(/<script lang="ts">([\s\S]*?)<\/script>/)[1]
   .replace(/^\s*import .*;\s*$/gm, '');
 const source = ts.transpile(`(function () { ${script}
   return { chooseSchool, loadFavorites, addFavorite, removeFavorite, switchToFavorite, updateClass,
-    setClass: (value) => { classroom = value; },
+    setClass: (value) => { selectionState.update({ classroom: value }); },
     setAvailableClasses: (values) => { availableClasses = values; },
     state: () => ({ school, grade, classroom, classError, favorites }) };
 })()`, { target: ts.ScriptTarget.ES2022 });
