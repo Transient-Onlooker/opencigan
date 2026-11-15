@@ -4,6 +4,12 @@
 
 ## P2 — 외부 개발자 연동
 
+
+**2026-11-16 운영 QA 후속** ([NEW-01/02 원인·공개 게이트](../qa-2026-11-16.md))
+
+- [ ] **NEW-02 (출시 필수): 공개 API·ICS 주소 확립**. QA에서 캘린더 기본 주소가 `rpi.tail9802be.ts.net`을 사용하고 `opencigan.mcv.kr/api/v1/timetable.ics`는 Pages 404임을 확인. 공개 API 호스트/프록시·DNS/TLS·CORS·ICS ETag/304·외부 캘린더 갱신을 검증한 뒤 생성 URL·API 문서를 일치시킬 것. 운영/Tailscale 주소를 외부 사용자에게 기본값으로 노출하지 않기.
+- [ ] **NEW-01 (가용성 계측): 프로세스 생존과 외부 의존성 구분**. `/api/v1/status`의 `scope=process liveness` 기존 계약을 보존하고 상류/readiness의 별도 진단 지표·에러 분류·시간대별 실패율/캐시 적중 관측을 추가 검토. 공통 `upstream_unavailable` 코드의 서버 로그 내 원인을 확인할 수 있게 하고 민감한 요청 정보·토큰 노출 금지.
+
 - [x] 시간표 필터 API (`grade`, `class`, `teacher`, 기존 학교·주간 캐시 재사용)
 - [x] iCalendar(.ics) 구독 URL (선택한 학급, 현재/다음 주 자동 이동, 학교·주별 캐시 재사용, 로컬에서 하루 요약과 교시별 종일 일정 모드 지원; 실제 수업 시작·종료 시각 연동은 후속 과제)
 - [x] iframe 임베드 위젯·Embed Builder (2026-11-15: 실제 학년·반 선택, 복수 수업·20교시, 안전한 문자열 표시·취소 경합 브라우저 회귀 검증.)
