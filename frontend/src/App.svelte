@@ -2,13 +2,14 @@
   import { onMount } from 'svelte';
   import Icon from './Icon.svelte';
   import Help from './Help.svelte';
+  import MealMenu from './MealMenu.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
   import { shareClassUrl, readSharedClass, findLessons } from './sharing';
-  import { allergens, allergenMatches, withoutAllergenNumbers } from './allergens';
+  import { allergens } from './allergens';
   import { saveTimetablePdf, saveTimetablePng, shareTimetablePng, type ExportOptions } from './export-png';
   import { slotLessons } from './timetable-slots';
   import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, type LessonTimes } from './lesson-times';
@@ -142,7 +143,6 @@
   $: missingWeekdays = dates.slice(0, 5).filter((date) => !filtered.some((record) => record.date === date));
   $: periods = Array.from({ length: Math.max(0, ...filtered.map((r) => Number(r.period))) }, (_, i) => i + 1);
   $: lessonTimePeriods = Array.from({ length: Math.max(8, ...((timetable?.records ?? []).map((r) => Number(r.period)).filter((period) => Number.isInteger(period) && period > 0 && period <= 20))) }, (_, i) => i + 1);
-  $: dayMeals = meals.filter((meal) => meal.date === mealDate);
   $: visibleMealTypes = mealTypes.filter((type) => enabledMealTypes.includes(type));
   $: mealDates = Array.from({ length: 7 }, (_, index) => addDays(monday(mealDate), index));
   $: matchingLessons = lessonQuery.trim() || lessonWeekday ? findLessons(filtered, lessonQuery, lessonWeekday) : [];
@@ -653,6 +653,10 @@
     timetableView = value;
     exportState = '';
     if (value === 'today' || value === 'grade') selectedDay = week === current ? today : week;
+    if (value === 'today') {
+      mealDate = selectedDay; mealDateDraft = selectedDay; dateError = '';
+      loadMeals();
+    }
   }
   function loadMeals(preserve = false) {
     if (!school || !neis) return;
@@ -705,10 +709,27 @@
   function selectTimetableDate(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
     const value = input.value;
-    if (value && input.validity.valid && value >= week && value <= addDays(week, 6)) selectedDay = value;
-    else input.value = selectedDay;
+    if (value && input.validity.valid && value >= week && value <= addDays(week, 6)) {
+      selectedDay = value; mealDate = value; mealDateDraft = value; dateError = '';
+      loadMeals();
+    } else input.value = selectedDay;
   }
   function todayMeals() { refreshCalendar(); mealDate = today; mealDateDraft = today; dateError = ''; loadMeals(); }
+  function selectMealTimetableDate(value: string) {
+    refreshCalendar(false);
+    if (!validMealDate(value)) return;
+    const targetWeek = monday(value);
+    if (targetWeek < current || targetWeek > addDays(current, 7)) return;
+    const needsTimetable = targetWeek !== week || timetable?.weekStart !== targetWeek;
+    view = 'timetable'; timetableView = 'today'; week = targetWeek; selectedDay = value;
+    mealDate = value; mealDateDraft = value; dateError = '';
+    if (needsTimetable) {
+      tableRefreshState = ''; teacherQuery = '';
+      historyRequest?.abort(); historyRequestKey = ''; historyChanges = []; historyCursor = null; historyDisabled = false; historyError = ''; historyLoading = false; historyOpen = false;
+      loadTimetable(false, true);
+    }
+    loadMeals();
+  }
   function updateMealDateDraft(event: Event) {
     mealDateDraft = (event.currentTarget as HTMLInputElement).value;
   }
@@ -1143,8 +1164,18 @@
             {#if mealState}<div class="notice" role="alert">{hasMeals ? '이전 급식 정보를 표시하고 있어요. ' : ''}{mealState} <button class="text-button" onclick={() => loadMeals(true)}>다시 시도</button></div>{/if}
             {#if mealLoading && !hasMeals}<div class="state-message" role="status">식단을 불러오고 있어요.</div>
             {:else if hasMeals}
-               {#if mealView === 'day'}{#if !dayMeals.some((meal) => visibleMealTypes.includes(meal.type))}<p class="no-meal">이 날짜에 등록된 식단이 없어요.</p>{:else}<div class="meal-cards">{#each visibleMealTypes as type}<article class="meal-card" aria-label={dateText(mealDate) + ' ' + type}><div class="meal-card-heading"><h3>{type}</h3><span>{type === '조식' ? '아침' : type === '중식' ? '점심' : '저녁'}</span></div>{#if dayMeals.some((meal) => meal.type === type)}<ul class="dishes">{#each dayMeals.filter((meal) => meal.type === type) as meal}{#each meal.dishes as dish}{@const matches = allergenMatches(dish, allergySelection)}<li class:allergy-warning={matches.length > 0}>{#if matches.length}<strong class="allergy-label">⚠ 주의: {matches.map(({ id, name }) => `${id}. ${name}`).join(', ')}</strong>{/if}<span>{showAllergenNumbers ? dish : withoutAllergenNumbers(dish)}</span></li>{/each}{/each}</ul>{:else}<p class="no-meal">등록된 {type} 식단이 없어요.</p>{/if}</article>{/each}</div>{/if}
-               {:else}<div class="weekly-meals">{#each mealDates as date}<article class:current-meal-day={date === today}><h3>{dateText(date, { month: 'numeric', day: 'numeric', weekday: 'long' })}{date === today ? ' · 오늘' : ''}</h3>{#if !meals.some((meal) => meal.date === date && visibleMealTypes.includes(meal.type))}<p class="no-meal">등록된 식단이 없어요.</p>{:else}<div class="weekly-meal-types">{#each visibleMealTypes as type}<section aria-label={dateText(date) + ' ' + type}><h4>{type}</h4>{#if meals.some((meal) => meal.date === date && meal.type === type)}<ul class="dishes">{#each meals.filter((meal) => meal.date === date && meal.type === type) as meal}{#each meal.dishes as dish}{@const matches = allergenMatches(dish, allergySelection)}<li class:allergy-warning={matches.length > 0}>{#if matches.length}<strong class="allergy-label">⚠ 주의: {matches.map(({ id, name }) => `${id}. ${name}`).join(', ')}</strong>{/if}<span>{showAllergenNumbers ? dish : withoutAllergenNumbers(dish)}</span></li>{/each}{/each}</ul>{:else}<p class="no-meal">등록된 식단이 없어요.</p>{/if}</section>{/each}</div>{/if}</article>{/each}</div>{/if}
+               <MealMenu
+                 {meals}
+                 dates={mealView === 'week' ? mealDates : [mealDate]}
+                 {today}
+                 visibleTypes={visibleMealTypes}
+                 {allergySelection}
+                 {showAllergenNumbers}
+                 timetableFrom={current}
+                 timetableTo={addDays(current, 13)}
+                 formatDate={(date) => dateText(date, { month: 'numeric', day: 'numeric', weekday: 'long' })}
+                 onDateSelect={selectMealTimetableDate}
+               />
             {/if}
             {#if mealsStale}<p class="notice">저장된 급식 정보예요. 최신 정보가 아닐 수 있습니다.</p>{/if}
           {/if}

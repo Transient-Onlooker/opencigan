@@ -38,7 +38,26 @@ class HistoryStore:
                     ON changes(school, week, id);
                 CREATE INDEX IF NOT EXISTS changes_observed_at
                     ON changes(observed_at);
+                CREATE TABLE IF NOT EXISTS snapshot_lessons (
+                    school TEXT NOT NULL, week TEXT NOT NULL,
+                    grade INTEGER NOT NULL, class_number INTEGER NOT NULL,
+                    date TEXT NOT NULL, period INTEGER NOT NULL, position INTEGER NOT NULL,
+                    subject TEXT NOT NULL, teacher TEXT NOT NULL,
+                    PRIMARY KEY (school, week, grade, class_number, date, period, position)
+                );
+                CREATE TABLE IF NOT EXISTS history_migrations (name TEXT PRIMARY KEY);
             """)
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                migrated = db.execute("SELECT 1 FROM history_migrations WHERE name=?", ("snapshot_lessons_v1",)).fetchone()
+                if not migrated:
+                    db.execute("""INSERT INTO snapshot_lessons
+                        SELECT school, week, grade, class_number, date, period, 0, subject, teacher FROM snapshots""")
+                    db.execute("INSERT INTO history_migrations VALUES (?)", ("snapshot_lessons_v1",))
+                db.execute("COMMIT")
+            except BaseException:
+                db.execute("ROLLBACK")
+                raise
 
     def _connect(self):
         db = sqlite3.connect(self.path, timeout=30, isolation_level=None)
@@ -70,9 +89,9 @@ class HistoryStore:
         current = {}
         for record in records:
             key = (record["grade"], record["class"], record["date"], record["period"])
-            if key in current:
-                raise ValueError("duplicate timetable record key")
-            current[key] = self._value(record)
+            current.setdefault(key, []).append(self._value(record))
+        for values in current.values():
+            values.sort(key=lambda value: (value["subject"], value["teacher"]))
 
         with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
@@ -81,12 +100,15 @@ class HistoryStore:
                 expired = db.execute("SELECT school, week FROM observed_weeks WHERE observed_at < ?", (cutoff,)).fetchall()
                 for old in expired:
                     db.execute("DELETE FROM snapshots WHERE school=? AND week=?", (old["school"], old["week"]))
+                    db.execute("DELETE FROM snapshot_lessons WHERE school=? AND week=?", (old["school"], old["week"]))
                 db.execute("DELETE FROM observed_weeks WHERE observed_at < ?", (cutoff,))
                 prior_rows = db.execute(
-                    "SELECT grade, class_number, date, period, subject, teacher FROM snapshots "
+                    "SELECT grade, class_number, date, period, subject, teacher FROM snapshot_lessons "
                     "WHERE school=? AND week=?", (school, week)).fetchall()
-                prior = {(r["grade"], r["class_number"], r["date"], r["period"]):
-                         {"subject": r["subject"], "teacher": r["teacher"]} for r in prior_rows}
+                prior = {}
+                for row in prior_rows:
+                    key = (row["grade"], row["class_number"], row["date"], row["period"])
+                    prior.setdefault(key, []).append({"subject": row["subject"], "teacher": row["teacher"]})
                 # An absent snapshot is the first observation: establish baseline only.
                 has_baseline = db.execute(
                     "SELECT 1 FROM observed_weeks WHERE school=? AND week=?",
@@ -99,23 +121,29 @@ class HistoryStore:
                         return
                 if has_baseline:
                     for key in sorted(prior.keys() | current.keys()):
-                        before, after = prior.get(key), current.get(key)
-                        if before == after:
-                            continue
-                        kind = "added" if before is None else "deleted" if after is None else "changed"
-                        db.execute("""INSERT INTO changes
+                        old = sorted(prior.get(key, []), key=lambda value: (value["subject"], value["teacher"]))
+                        new = list(current.get(key, []))
+                        for lesson in old[:]:
+                            if lesson in new:
+                                old.remove(lesson)
+                                new.remove(lesson)
+                        while old or new:
+                            before = old.pop(0) if old else None
+                            after = new.pop(0) if new else None
+                            kind = "added" if before is None else "deleted" if after is None else "changed"
+                            db.execute("""INSERT INTO changes
                             (school, week, observed_at, grade, class_number, date, period,
                              type, before_json, after_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                             (school, week, timestamp, *key, kind,
                              json.dumps(before, ensure_ascii=False) if before is not None else None,
                              json.dumps(after, ensure_ascii=False) if after is not None else None))
-                db.execute("DELETE FROM snapshots WHERE school=? AND week=?", (school, week))
+                db.execute("DELETE FROM snapshot_lessons WHERE school=? AND week=?", (school, week))
                 db.execute("INSERT INTO observed_weeks VALUES (?, ?, ?, ?) ON CONFLICT(school, week) DO UPDATE SET observed_at=excluded.observed_at, started_at=excluded.started_at", (school, week, timestamp, request_started))
-                db.executemany("""INSERT INTO snapshots
-                    (school, week, grade, class_number, date, period, subject, teacher)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                    [(school, week, *key, value["subject"], value["teacher"])
-                     for key, value in current.items()])
+                db.executemany("""INSERT INTO snapshot_lessons
+                    (school, week, grade, class_number, date, period, position, subject, teacher)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    [(school, week, *key, position, value["subject"], value["teacher"])
+                     for key, values in current.items() for position, value in enumerate(values)])
                 db.execute("COMMIT")
             except BaseException:
                 db.execute("ROLLBACK")
@@ -142,6 +170,7 @@ class HistoryStore:
             expired = db.execute("SELECT school, week FROM observed_weeks WHERE observed_at < ?", (cutoff,)).fetchall()
             for old in expired:
                 db.execute("DELETE FROM snapshots WHERE school=? AND week=?", (old["school"], old["week"]))
+                db.execute("DELETE FROM snapshot_lessons WHERE school=? AND week=?", (old["school"], old["week"]))
             db.execute("DELETE FROM observed_weeks WHERE observed_at < ?", (cutoff,))
             db.execute("COMMIT")
             rows = db.execute("""SELECT id, observed_at, grade, class_number, date,

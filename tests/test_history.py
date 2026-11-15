@@ -3,6 +3,7 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import os
+import sqlite3
 from pathlib import Path
 
 from backend.history import HistoryStore
@@ -22,6 +23,31 @@ class HistoryTests(unittest.TestCase):
 
     def tearDown(self):
         self.temp.cleanup()
+
+    def test_existing_snapshot_migrates_once_and_retains_baseline(self):
+        path = Path(self.temp.name) / "legacy.sqlite"
+        db = sqlite3.connect(path)
+        db.executescript("""
+            CREATE TABLE snapshots (school TEXT NOT NULL, week TEXT NOT NULL,
+                grade INTEGER NOT NULL, class_number INTEGER NOT NULL, date TEXT NOT NULL,
+                period INTEGER NOT NULL, subject TEXT NOT NULL, teacher TEXT NOT NULL,
+                PRIMARY KEY (school, week, grade, class_number, date, period));
+            CREATE TABLE observed_weeks (school TEXT NOT NULL, week TEXT NOT NULL,
+                observed_at TEXT NOT NULL, started_at TEXT NOT NULL, PRIMARY KEY (school, week));
+        """)
+        base = datetime.now(timezone.utc)
+        row = lesson()
+        db.execute("INSERT INTO snapshots VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                   ("s", "w", 1, 2, row["date"], 1, "Math", "A"))
+        db.execute("INSERT INTO observed_weeks VALUES (?, ?, ?, ?)", ("s", "w", base.isoformat(), base.isoformat()))
+        db.commit()
+        db.close()
+        store = HistoryStore(path)
+        store.observe("s", "w", [lesson("Science", "B"), lesson("Art", "C")], base + timedelta(seconds=1))
+        self.assertEqual(len(store.list("s", "w")["changes"]), 2)
+        reopened = HistoryStore(path)
+        reopened.observe("s", "w", [lesson("Art", "C"), lesson("Science", "B")], base + timedelta(seconds=2))
+        self.assertEqual(len(reopened.list("s", "w")["changes"]), 2)
 
     def test_baseline_then_add_delete_subject_teacher_and_noop(self):
         week = datetime.now(timezone.utc).date().isoformat()
@@ -76,8 +102,17 @@ class HistoryTests(unittest.TestCase):
                 self.store.list("s", "w", cursor=bad)
 
     def test_duplicate_keys_and_retention(self):
-        with self.assertRaises(ValueError):
-            self.store.observe("s", "w", [lesson(), lesson()], datetime.now(timezone.utc))
+        base = datetime.now(timezone.utc)
+        self.store.observe("multi", "w", [lesson("Math", "A"), lesson("Art", "B")], base)
+        self.store.observe("multi", "w", [lesson("Art", "B"), lesson("Math", "A")], base + timedelta(seconds=1))
+        self.assertEqual(self.store.list("multi", "w")["changes"], [])
+        self.store.observe("multi", "w", [lesson("Art", "B"), lesson("Science", "C")], base + timedelta(seconds=2))
+        changes = self.store.list("multi", "w")["changes"]
+        self.assertEqual(len(changes), 1)
+        self.assertEqual(changes[0]["before"]["subject"], "Math")
+        self.assertEqual(changes[0]["after"]["subject"], "Science")
+        self.store.observe("multi", "w", [lesson("Art", "B")], base + timedelta(seconds=3))
+        self.assertEqual(self.store.list("multi", "w")["changes"][0]["type"], "deleted")
         old = (datetime.now(timezone.utc) - timedelta(days=31)).isoformat()
         self.store.observe("s", "w", [lesson()], old)
         self.store.observe("s", "w", [lesson("new")], datetime.now(timezone.utc).isoformat())

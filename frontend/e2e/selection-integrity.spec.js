@@ -19,7 +19,7 @@ async function mockApi(page, delayedSearch) {
     }
     if (url.pathname === '/api/v1/timetable') return route.fulfill({ json: timetable });
     if (url.pathname === '/api/v1/neis/schools') return route.fulfill({ json: { schools: [{ id: 'B10:1234567', name: school.name, region: '서울', address: '서울특별시' }], stale: false } });
-    if (url.pathname === '/api/v1/meals') return route.fulfill({ json: { meals: [{ date: url.searchParams.get('from'), type: '중식', dishes: ['식단 ' + url.searchParams.get('from')] }], stale: false } });
+    if (url.pathname === '/api/v1/meals') return route.fulfill({ json: { meals: [{ date: url.searchParams.get('from'), type: '중식', dishes: ['식단 ' + url.searchParams.get('from'), '계란말이(1.2)', '김치볶음밥(5.6)'], calories: '650 kcal', nutrition: '탄수화물 : 90g<br/>단백질 : 30g', origin: '쌀: 국내산' }], stale: false } });
     return route.fulfill({ json: { schools: [], changes: [], stale: false } });
   });
 }
@@ -96,6 +96,34 @@ test('meal date errors preserve the applied date and valid input fetches the mat
   await requested;
   await expect(input).toHaveValue('2024-02-29');
   await expect(input).toHaveAttribute('aria-invalid', 'false');
+});
+
+test('meal menu search, allergy filters, NEIS details and timetable date link work together', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('opensigan-allergies', '[1]'));
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  await expect(page.getByText('열량(NEIS 원문): 650 kcal')).toBeVisible();
+  const allergyWarning = page.locator('.meal-types li.warning').filter({ hasText: '계란말이' });
+  await expect(allergyWarning).toContainText('⚠ 주의: 1. 난류');
+  await expect(allergyWarning).toHaveCSS('border-left-color', 'rgb(196, 38, 61)');
+  await page.getByRole('searchbox', { name: '메뉴 검색' }).fill('김치');
+  await expect(page.getByText('김치볶음밥(5.6)')).toBeVisible();
+  await expect(page.getByText('계란말이(1.2)')).toHaveCount(0);
+  await page.getByRole('searchbox', { name: '메뉴 검색' }).fill('');
+  await page.getByLabel('알레르기 필터').selectOption('marked');
+  await expect(page.getByText('계란말이(1.2)')).toBeVisible();
+  await expect(page.getByText('김치볶음밥(5.6)')).toHaveCount(0);
+  await page.getByLabel('알레르기 필터').selectOption('unmarked');
+  await expect(page.getByText('김치볶음밥(5.6)')).toBeVisible();
+  await expect(page.getByText('계란말이(1.2)')).toHaveCount(0);
+  await expect(page.getByText(/미표시 메뉴도 안전을 보장하지 않습니다/)).toBeVisible();
+  await page.getByText('영양·원산지 정보').click();
+  await expect(page.locator('.meal-source-text').first()).toContainText('탄수화물 : 90g');
+  await expect(page.getByText('원산지: 쌀: 국내산')).toBeVisible();
+  await page.getByRole('button', { name: '이 날짜 시간표' }).click();
+  await expect(page.locator('#timetable-panel')).toBeVisible();
+  await expect(page.locator('#today-date')).toHaveValue(week);
 });
 
 test('back and forward restore the app tab and class without adding history entries', async ({ page }) => {
