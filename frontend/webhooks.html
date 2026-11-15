@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><title>변경 알림 관리 · Opencigan</title></head>
+<body><main>
+<header><a href="./">&lt;/&gt; Opencigan</a><h1>시간표 변경 알림</h1><p>관측된 시간표 변경을 Discord 또는 Google Chat으로 받습니다. 관측 사이의 변경은 누락될 수 있습니다.</p></header>
+<p>알림 기능은 서버에서 활성화한 경우 사용할 수 있습니다. 관리 정보는 자동 저장되지 않으므로 안전한 곳에 보관하세요.</p>
+<h2>새 구독</h2><form id="create">
+<label>학교 ID<input id="school" required maxlength="100" placeholder="학교코드:학교명"></label>
+<label>학년<input id="grade" type="number" required min="1" max="6" value="1"></label>
+<label>반<input id="classroom" type="number" required min="1" max="99" value="1"></label>
+<label>Webhook 주소<input id="destination" type="password" required maxlength="2048" autocomplete="off" placeholder="Discord 또는 Google Chat 주소"></label>
+<button type="submit">구독 만들기</button></form>
+<h2>구독 관리</h2><form id="connect"><label>구독 ID<input id="id" required autocomplete="off"></label><label>관리 토큰<input id="token" type="password" required autocomplete="off"></label><button type="submit">구독 불러오기</button><button id="lock" type="button">잠금</button></form>
+<p id="state" role="status" aria-live="polite"></p>
+<section id="manage" hidden aria-label="구독 설정"><h2>알림 조건</h2><p id="scope"></p><form id="filters">
+<label>과목 포함<input id="subject" maxlength="50"></label><label>교사 포함<input id="teacher" maxlength="50"></label>
+<label>요일<select id="weekday"><option value="">모든 요일</option><option value="1">월요일</option><option value="2">화요일</option><option value="3">수요일</option><option value="4">목요일</option><option value="5">금요일</option></select></label>
+<label>교시<input id="period" type="number" min="1" max="20"></label><label>변경 유형<select id="kind"><option value="">모든 변경</option><option value="added">추가</option><option value="changed">변경</option><option value="deleted">삭제</option></select></label>
+<label>방해 금지 시작<input id="quiet-start" type="time"></label><label>방해 금지 종료<input id="quiet-end" type="time"></label><button type="submit">조건 저장</button></form>
+<p>방해 금지 시간은 한국 시간 기준입니다. 테스트 알림은 시간 설정을 무시합니다.</p><div class="actions"><button id="test" type="button">테스트 알림</button><button id="refresh" type="button">전송 상태 새로고침</button><button id="delete" type="button">구독 삭제</button></div>
+<h2>최근 전송 상태</h2><div class="scroll" tabindex="0" role="region" aria-label="전송 상태"><table><thead><tr><th scope="col">이벤트</th><th scope="col">상태</th><th scope="col">시도</th><th scope="col">응답</th></tr></thead><tbody id="deliveries"></tbody></table></div></section>
+</main><script type="module" src="/src/webhooks.ts"></script></body></html>

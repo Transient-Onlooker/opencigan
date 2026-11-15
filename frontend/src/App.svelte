@@ -1184,6 +1184,7 @@
         </section>
         <section id="settings-panel" hidden={view !== 'settings'} aria-labelledby="settings-title">
           <h2 id="settings-title">설정</h2>
+          <p><a href="./webhooks.html">시간표 변경 알림 관리</a></p>
           <label class="settings-search">설정 검색<input type="search" bind:value={settingsQuery} oninput={() => { if (settingsQuery.trim()) settingsOpen = { display: true, times: true, backup: true, meals: true, allergies: true }; }} maxlength="60" placeholder="예: 교시, 알레르기, 백업" /></label>
           {#if settingsQuery.trim() && !settingsMatch('시간표 표시 테마 애니메이션 과목 색상 별칭 교사 이름 날짜 변경 변동 배지 테두리 밀도 종료 요일 학교 교시 시각 시간 시작 백업 복원 파일 저장 가져오기 내보내기 초기화 급식 보기 식사 조식 중식 석식 알레르기 번호 주의', settingsQuery)}<p role="status">일치하는 설정이 없어요.</p>{/if}
            {#if school}

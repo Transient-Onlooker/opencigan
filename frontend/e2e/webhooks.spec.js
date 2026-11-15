@@ -1,0 +1,41 @@
+import { expect, test } from '@playwright/test';
+
+test('subscription management uses bearer token and keeps secrets out of storage', async ({ page }) => {
+  const id = 'a'.repeat(24), token = 'b'.repeat(43), calls = [];
+  await page.route('**/api/v1/webhooks**', async (route) => {
+    const request = route.request(), url = new URL(request.url());
+    calls.push({ path: url.pathname, method: request.method(), headers: request.headers(), body: request.postDataJSON() });
+    if (url.pathname === '/api/v1/webhooks') return route.fulfill({ json: { id, token, provider: 'discord' } });
+    if (url.pathname.endsWith('/deliveries')) return route.fulfill({ json: { deliveries: [{ event_id: 'test_1', state: 'delivered', attempts: 1, last_status: 204 }] } });
+    if (url.pathname.endsWith('/test')) return route.fulfill({ json: { eventId: 'test_1' } });
+    if (request.method() === 'PUT') return route.fulfill({ json: { updated: true } });
+    if (request.method() === 'DELETE') return route.fulfill({ json: { deleted: true } });
+    return route.fulfill({ json: { school: '2:예시학교', grade: 2, classroom: 3, provider: 'discord', dropped_events: 0, filters: {} } });
+  });
+  await page.goto('/webhooks.html');
+  await page.getByLabel('학교 ID').fill('2:예시학교');
+  await page.getByLabel('학년', { exact: true }).fill('2');
+  await page.getByLabel('반', { exact: true }).fill('3');
+  await page.getByLabel('Webhook 주소').fill('https://discord.com/api/webhooks/123/secret');
+  await page.getByRole('button', { name: '구독 만들기' }).click();
+  await expect(page.getByLabel('관리 토큰')).toHaveValue(token);
+  await expect(page.getByLabel('Webhook 주소')).toHaveValue('');
+  await expect(page.getByRole('status')).toContainText('안전한 곳');
+  await page.getByRole('button', { name: '구독 불러오기' }).click();
+  await expect(page.getByText('2:예시학교 · 2학년 3반')).toBeVisible();
+  await page.getByLabel('과목 포함').fill('수학');
+  await page.getByLabel('방해 금지 시작').fill('22:00');
+  await page.getByLabel('방해 금지 종료').fill('07:00');
+  await page.getByRole('button', { name: '조건 저장' }).click();
+  await expect(page.getByRole('status')).toContainText('저장');
+  expect(calls.find((call) => call.method === 'PUT').body.filters).toEqual({ subject: '수학', quietHours: { start: '22:00', end: '07:00' } });
+  await page.getByRole('button', { name: '테스트 알림' }).click();
+  await expect(page.getByRole('status')).toContainText('대기열');
+  expect(calls.filter((call) => call.path !== '/api/v1/webhooks').every((call) => call.headers.authorization === `Bearer ${token}`)).toBeTruthy();
+  expect(await page.evaluate(() => JSON.stringify({ local: localStorage, session: sessionStorage, url: location.href }))).not.toContain(token);
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: '구독 삭제' }).click();
+  await expect(page.getByLabel('관리 토큰')).toHaveValue('');
+  await expect(page.getByRole('status')).toContainText('삭제');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
+});
