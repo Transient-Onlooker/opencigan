@@ -67,8 +67,11 @@ npm run dev
 저장소 루트에서 Python 단위·WSGI 테스트:
 
 ```powershell
+.\.venv\Scripts\python -m pip install -r tests\requirements.txt
 .\.venv\Scripts\python -m unittest discover -s tests -v
 ```
+
+테스트 의존성에는 OpenAPI YAML과 JSON Schema 검사기가 포함됩니다. 공개 읽기 API의 정상 응답, 필터 시간표의 오류 응답과 캘린더 구독의 조건부 응답을 합성 데이터로 명세와 대조합니다. 모든 입력·오류 조합을 검사하는 것은 아닙니다.
 
 과거 Worker 모듈 테스트:
 
