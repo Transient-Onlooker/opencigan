@@ -4,6 +4,9 @@
   import Help from './Help.svelte';
   import MealMenu from './MealMenu.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
+  import CalendarNav from './CalendarNav.svelte';
+  import QuickClass from './QuickClass.svelte';
+  import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies } from './preferences';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
   import { saveSelection, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
@@ -16,7 +19,7 @@
   import { createTimetableSession } from './timetable-cache';
   import { createHistorySession } from './history-session';
   import { createMealSession } from './meal-session';
-  import { classLessons, teacherLessons, teacherNamesInTimetable } from './timetable-view';
+  import { classLessons, teacherLessons, teacherNamesInTimetable, gradeLessons, comparisonClasses, missingWeekdayDates } from './timetable-view';
   import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, type LessonTimes } from './lesson-times';
   import { createClassDisplayPreferences, defaultDisplaySettings, parseDisplaySettings, displaySubject, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
   import { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
@@ -142,8 +145,8 @@
   $: selectedClassLessons = classLessons(dayRecords, grade, classroom).sort((a, b) => Number(a.period) - Number(b.period));
   $: dayOverview = dailyLessonOverview(selectedClassLessons, lessonTimes, clockMinute, selectedDay === today);
   $: shownClassLessons = displaySettings.endedLessonMode === 'hide' ? selectedClassLessons.filter((item) => !dayOverview.completed.includes(Number(item.period))) : selectedClassLessons;
-  $: comparableClasses = [...new Set(dayRecords.filter((r) => Number(r.grade) === Number(grade)).map((r) => Number(r.class)))].sort((a, b) => a - b);
-  $: gradeRecords = dayRecords.filter((r) => Number(r.grade) === Number(grade));
+  $: gradeRecords = gradeLessons(dayRecords, grade);
+  $: comparableClasses = comparisonClasses(gradeRecords);
   $: teacherNames = teacherNamesInTimetable(timetable?.records ?? []);
   $: observedClassCount = new Set((timetable?.records ?? []).filter((r) => Number.isInteger(Number(r.grade)) && Number(r.grade) > 0 && Number.isInteger(Number(r.class)) && Number(r.class) > 0).map((r) => `${Number(r.grade)}:${Number(r.class)}`)).size;
   $: subjectNames = [...new Set((timetable?.records ?? []).map((r) => r.subject?.trim()).filter((name): name is string => !!name))].sort((a, b) => a.localeCompare(b, 'ko-KR'));
@@ -159,7 +162,7 @@
   $: availableClasses = classesInGrade(timetable?.records ?? [], grade);
   $: weekendClasses = filtered.some((r) => r.date === addDays(week, 5) || r.date === addDays(week, 6));
   $: dates = Array.from({ length: weekendClasses ? 7 : 5 }, (_, i) => addDays(week, i));
-  $: missingWeekdays = dates.slice(0, 5).filter((date) => !filtered.some((record) => record.date === date));
+  $: missingWeekdays = missingWeekdayDates(filtered, dates);
   $: periods = Array.from({ length: Math.max(0, ...filtered.map((r) => Number(r.period))) }, (_, i) => i + 1);
   $: lessonTimePeriods = Array.from({ length: Math.max(8, ...((timetable?.records ?? []).map((r) => Number(r.period)).filter((period) => Number.isInteger(period) && period > 0 && period <= 20))) }, (_, i) => i + 1);
   $: visibleMealTypes = mealTypes.filter((type) => enabledMealTypes.includes(type));
@@ -340,11 +343,11 @@
 
   function toggleAllergy(id: number, checked: boolean) {
     allergySelection = checked ? [...new Set([...allergySelection, id])].sort((a, b) => a - b) : allergySelection.filter((value) => value !== id);
-    try { localStorage.setItem('opensigan-allergies', JSON.stringify(allergySelection)); } catch { /* 설정은 현재 페이지에서 유지됩니다. */ }
+    try { saveAllergies(localStorage, allergySelection); } catch { /* 설정은 현재 페이지에서 유지됩니다. */ }
   }
 
   function saveMealPreferences() {
-    try { localStorage.setItem('opensigan-meal-preferences', JSON.stringify({ view: mealView, types: enabledMealTypes, showAllergenNumbers })); }
+    try { persistMealPreferences(localStorage, { view: mealView, types: enabledMealTypes, showAllergenNumbers }); }
     catch { /* 설정은 현재 페이지에서 유지됩니다. */ }
   }
   function setMealView(value: 'day' | 'week') { mealView = value; saveMealPreferences(); }
@@ -801,19 +804,11 @@
     themeMedia?.addEventListener?.('change', onThemeMedia);
     loadFavorites();
     try {
-      const savedAllergies: unknown = JSON.parse(localStorage.getItem('opensigan-allergies') || '[]');
-      if (Array.isArray(savedAllergies)) allergySelection = [...new Set(savedAllergies.filter((id): id is number => Number.isInteger(id) && id >= 1 && id <= 19))].sort((a, b) => a - b);
-      const savedMeals: unknown = JSON.parse(localStorage.getItem('opensigan-meal-preferences') || 'null');
-      if (savedMeals && typeof savedMeals === 'object') {
-        const preferences = savedMeals as { view?: unknown; types?: unknown; showAllergenNumbers?: unknown };
-        if (preferences.view === 'day' || preferences.view === 'week') mealView = preferences.view;
-        if (Array.isArray(preferences.types)) {
-          const savedTypes = preferences.types.filter((type): type is string => typeof type === 'string');
-          const validTypes = mealTypes.filter((type) => savedTypes.includes(type));
-          if (validTypes.length) enabledMealTypes = validTypes;
-        }
-        if (typeof preferences.showAllergenNumbers === 'boolean') showAllergenNumbers = preferences.showAllergenNumbers;
-      }
+      allergySelection = readAllergies(localStorage);
+      const savedMealSettings = readMealPreferences(localStorage, mealTypes, { view: mealView, types: enabledMealTypes, showAllergenNumbers });
+      mealView = savedMealSettings.view;
+      enabledMealTypes = savedMealSettings.types;
+      showAllergenNumbers = savedMealSettings.showAllergenNumbers;
       const savedTheme = localStorage.getItem('opensigan-theme'); if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') theme = savedTheme;
       animationsEnabled = localStorage.getItem('opensigan-animations') !== 'off';
       const savedGrade = Number(localStorage.getItem('opensigan-grade')); if (savedGrade >= 1 && savedGrade <= 6) selectionState.update({ grade: savedGrade });
@@ -899,19 +894,14 @@
       {/if}
     {/if}
     {#if school && !favorites.length}<p class="quick-class-hint">즐겨찾는 학급이 없어요. 현재 학급을 추가하면 바로 전환할 수 있어요.</p>{/if}
-    <nav class="calendar-menu" class:input-focused={inputFocused} aria-label="캘린더 메뉴">
-      <span class="menu-label">캘린더</span>
-      <button aria-pressed={view === 'timetable'} aria-controls="timetable-panel" onclick={() => view = 'timetable'}><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16"/><path d="M7 3v4m10-4v4M3 10h18M8 14h3m2 0h3m-8 3h3m2 0h3"/></svg> 시간표</button>
-      <button aria-pressed={view === 'meals'} aria-controls="meals-panel" onclick={() => view = 'meals'}><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 3v6a3 3 0 0 0 6 0V3M7 3v18M16 21V3c3 1 4 4 4 8h-4"/></svg> 급식</button>
-      <button aria-pressed={view === 'settings'} aria-controls="settings-panel" onclick={() => view = 'settings'}><Icon name="settings" /> 설정</button>
-    </nav>
+    <CalendarNav {view} {inputFocused} selectView={(value) => view = value} />
     <div id="calendar" class="calendar-content" tabindex="-1">
         <section id="timetable-panel" hidden={view !== 'timetable'} aria-labelledby="timetable-title">
            <div class="section-heading"><div><p class="eyebrow">{week === current ? '이번 주' : '선택한 주'}</p><h2 id="timetable-title">시간표</h2></div><div class="heading-actions"><span class="last-fetched">{timetable ? '마지막 수집 ' + timeText(timetable.fetchedAt) : ''}</span>{#if timetable && timetableView !== 'grade'}<button class="secondary-button" disabled={!canExport || exportBusy} onclick={() => exportTimetable('PNG')}><Icon name="save" /> PNG 저장</button><button class="secondary-button" disabled={!canExport || exportBusy} onclick={sharePng}><Icon name="share" /> 이미지 공유</button>{/if}<button class="secondary-button refresh-button" disabled={!school || tableLoading} onclick={refreshTimetable} aria-label="현재 표시 중인 주의 시간표 새로고침"><svg class:spinning={tableLoading} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.4 9a7.5 7.5 0 0 1 13.3-1.4L20 12M4 12l1.3 4.4A7.5 7.5 0 0 0 18.6 15"/></svg> {tableLoading ? '갱신 중' : '새로고침'}</button><button class="secondary-button" onclick={currentWeek}>이번 주로</button></div></div>
            {#if tableRefreshState}<p class="refresh-feedback" role="status">{tableRefreshState}{timetableCheckedAt ? ' · 마지막 확인 ' + timeText(timetableCheckedAt, true) : ''}</p>{/if}
            {#if exportState}<p class="export-feedback" role="status">{exportState}</p>{/if}
            <div class="view-switch timetable-switch" role="group" aria-label="시간표 보기"><button aria-pressed={timetableView === 'today'} onclick={() => selectTimetableView('today')}>오늘</button><button aria-pressed={timetableView === 'week'} onclick={() => selectTimetableView('week')}>이번 주</button><button aria-pressed={timetableView === 'grade'} onclick={() => selectTimetableView('grade')}>{grade}학년</button><button aria-pressed={timetableView === 'teacher'} onclick={() => selectTimetableView('teacher')}>교사</button></div>
-           {#if school}<div class="quick-class" aria-label="학급 빠른 전환"><label>학년 <select value={grade} onchange={selectGrade}>{#each gradeOptions as n}<option value={n}>{n}학년</option>{/each}</select></label><label>반 <select value={classroom} onchange={selectClass}>{#if !availableClasses.length}<option value={Number(classroom)}>{classroom}반</option>{/if}{#each availableClasses as n}<option value={n}>{n}반</option>{/each}</select></label>{#if !availableClasses.length}<span class="quick-class-hint">{tableLoading ? '학급 정보를 불러오는 중이에요.' : '이 학년의 학급 정보가 없어요.'}</span>{/if}</div>{/if}
+           {#if school}<QuickClass {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {selectGrade} {selectClass} />{/if}
            <div class="calendar-toolbar"><button class="arrow-button" onclick={() => changeWeek(-1)} disabled={week <= current} aria-label="이전 주">←</button><div class="calendar-date" aria-live="polite"><strong>{shortDate(week)} ~ {shortDate(addDays(week, weekendClasses ? 6 : 4))}</strong></div><button class="arrow-button" onclick={() => changeWeek(1)} disabled={week >= addDays(current, 7)} aria-label="다음 주">→</button></div>
            <div class="quick-class-hint">이번 주·다음 주만 조회할 수 있어요. <Help label="시간표 조회 범위" text="원본 서비스가 제공하는 현재 주와 다음 주를 조회합니다. 과거 또는 더 먼 미래의 시간표는 제공하지 않아요." /></div>
           {#if timetable && !classError && timetableView === 'week'}<details class="lesson-search"><summary>이 반의 수업 찾기</summary><div class="lesson-search-fields"><label>과목명 또는 교사명<input type="search" bind:value={lessonQuery} placeholder="이번 주 수업 검색" maxlength="100" /></label><label>요일<select bind:value={lessonWeekday}><option value="">모든 요일</option>{#each ['일', '월', '화', '수', '목', '금', '토'] as day, index}<option value={String(index)}>{day}요일</option>{/each}</select></label></div>{#if lessonQuery.trim() || lessonWeekday}<p role="status">검색 결과 {matchingLessons.length}개</p>{#if matchingLessons.length}<div class="lesson-list">{#each matchingLessons as lesson}<article><span class="lesson-period">{dateText(lesson.date, { weekday: 'short' })} · {lesson.period}교시</span><strong style={subjectStyle(lesson.subject)}>{displaySubject(lesson.subject, displaySettings)}</strong>{#if displaySettings.showTeachers && lesson.teacher}<span>{displayTeacher(lesson.teacher, displaySettings)}</span>{/if}</article>{/each}</div>{:else}<p>이 반의 이번 주 수업 중 일치하는 결과가 없어요.</p>{/if}{/if}</details>{/if}

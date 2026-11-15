@@ -14,3 +14,16 @@ test('class and teacher selections preserve lesson order and all simultaneous le
   assert.deepEqual(Array.from(view.teacherNamesInTimetable(records)), ['김교사', '이교사']);
   assert.equal(view.teacherLessons(records, '').length, 0);
 });
+
+test('grade comparison and missing weekdays keep scope and ordering', () => {
+  const records = [
+    { grade: 2, class: '10', date: 'mon' },
+    { grade: 1, class: 1, date: 'tue' },
+    { grade: 2, class: 2, date: 'mon' },
+    { grade: 2, class: 2, date: 'sat' },
+  ];
+  const selected = view.gradeLessons(records, 2);
+  assert.deepEqual(Array.from(view.comparisonClasses(selected)), [2, 10]);
+  assert.deepEqual(Array.from(view.missingWeekdayDates(selected, ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])), ['tue', 'wed', 'thu', 'fri']);
+  assert.equal(selected.length, 3);
+});
