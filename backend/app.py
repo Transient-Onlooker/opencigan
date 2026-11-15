@@ -26,6 +26,9 @@ from backend.shutter import Shutter
 from backend.neis import NEISClient, School
 from backend.meal_routes import get_meals, search_meal_schools
 from backend.timetable_routes import get_timetable, search_timetable_schools
+from backend.webhook_routes import webhook_api
+from backend.calendar_routes import timetable_calendar
+from backend.history_routes import timetable_history
 from backend.timetable import fetch_timetable, search_schools, validate_timetable_week
 
 cache = Cache()
@@ -266,73 +269,7 @@ def _webhook_store():
 
 
 def _webhook_api(method, path, body, request_headers, client, headers):
-    from backend.webhook_store import SubscriptionLimitError
-
-    def respond(status, payload):
-        encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        headers["Content-Length"] = str(len(encoded))
-        return status, headers, encoded
-
-    if client:
-        retry = _rate_allowed(("webhooks", client))
-        if retry:
-            headers["Retry-After"] = str(retry)
-            return respond(429, {"error": "요청이 너무 많습니다", "code": "rate_limited"})
-    if len(body or b"") > 4096:
-        return respond(413, {"error": "요청 본문이 너무 큽니다", "code": "payload_too_large"})
-    try:
-        store = _webhook_store()
-        if store is None:
-            return respond(503, {"error": "Webhook 기능이 활성화되지 않았습니다", "code": "webhooks_disabled"})
-        if path == "/api/v1/webhooks":
-            if method != "POST":
-                return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
-            payload = json.loads(body or b"{}")
-            if not isinstance(payload, dict) or set(payload) != {"school", "grade", "class", "destination"}:
-                raise ValueError("invalid payload")
-            result = store.create(payload["school"], payload["grade"], payload["class"], payload["destination"])
-            return respond(200, result)
-        match = re.fullmatch(r"/api/v1/webhooks/([A-Za-z0-9_-]{24})(/deliveries|/test)?", path)
-        if not match:
-            return respond(404, {"error": "요청한 경로가 없습니다", "code": "not_found"})
-        if method not in ("GET", "HEAD", "DELETE", "POST", "PUT"):
-            return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
-        authorization = (request_headers or {}).get("Authorization", "")
-        token = authorization[7:] if authorization.startswith("Bearer ") else ""
-        identifier = match.group(1)
-        if match.group(2) == "/test":
-            if method != "POST":
-                return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
-            event = store.enqueue_test(identifier, token)
-            if event is False:
-                headers["Retry-After"] = "60"
-                return respond(429, {"error": "잠시 후 다시 시도해 주세요", "code": "rate_limited"})
-            result = {"eventId": event} if event is not None else None
-        elif match.group(2) == "/deliveries":
-            if method not in ("GET", "HEAD"):
-                return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
-            deliveries = store.deliveries(identifier, token)
-            result = {"deliveries": deliveries} if deliveries is not None else None
-        elif method == "POST":
-            return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
-        elif method == "PUT":
-            payload = json.loads(body or b"{}")
-            if not isinstance(payload, dict) or set(payload) != {"filters"}:
-                raise ValueError("invalid payload")
-            result = {"updated": True} if store.update_filters(identifier, token, payload["filters"]) else None
-        elif method == "DELETE":
-            result = {"deleted": True} if store.delete(identifier, token) else None
-        else:
-            result = store.get(identifier, token)
-        if result is None:
-            return respond(401, {"error": "인증이 필요합니다", "code": "unauthorized"})
-        return respond(200, result)
-    except SubscriptionLimitError:
-        return respond(503, {"error": "구독 한도에 도달했습니다", "code": "subscription_limit"})
-    except (ValueError, TypeError, UnicodeDecodeError, RecursionError):
-        return respond(400, {"error": "요청 값이 올바르지 않습니다", "code": "invalid_request"})
-    except (OSError, sqlite3.Error):
-        return respond(503, {"error": "Webhook 저장소를 사용할 수 없습니다", "code": "webhooks_unavailable"})
+    return webhook_api(method, path, body, request_headers, client, headers, _rate_allowed, _webhook_store)
 
 
 def _query_param(params, key, limit):
@@ -528,105 +465,11 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
         elif path == "/api/v1/timetable":
             result = get_timetable(query, current_cache, _query_param, validate_timetable_week, _timetable_filters, _cached_timetable)
         elif path == "/api/v1/timetable.ics":
-            school = _query_param(query, "school", 100)
-            if not re.fullmatch(r"[0-9]+:[^:]{1,50}", school):
-                raise ValueError("학교 식별자가 올바르지 않습니다")
-            grade_filter, class_filter, teacher_filter = _timetable_filters(query, require_class=True)
-            weeks = _query_param(query, "weeks", 1) if "weeks" in query else "1"
-            if weeks not in ("1", "2"):
-                raise ValueError("weeks는 1 또는 2여야 합니다")
-            mode = _query_param(query, "mode", 10) if "mode" in query else "periods"
-            if mode not in ("periods", "summary", "timed"):
-                raise ValueError("mode는 periods, summary 또는 timed여야 합니다")
-            lesson_times = {}
-            if "times" in query:
-                if mode != "timed":
-                    raise ValueError("교시 시각은 timed 모드에서만 사용할 수 있습니다")
-                raw_times = _query_param(query, "times", 400)
-                for item in raw_times.split(","):
-                    match = re.fullmatch(r"([1-9]|1[0-9]|20):([0-2][0-9][0-5][0-9])-([0-2][0-9][0-5][0-9])", item)
-                    if not match:
-                        raise ValueError("교시 시각 형식은 1:0900-0950입니다")
-                    period = int(match[1])
-                    start = match[2][:2] + ":" + match[2][2:]
-                    end = match[3][:2] + ":" + match[3][2:]
-                    if period in lesson_times or start >= end or end > "23:59":
-                        raise ValueError("교시 시각의 중복·범위·순서를 확인하세요")
-                    lesson_times[period] = {"start": start, "end": end}
-                ordered = [value for _, value in sorted(lesson_times.items())]
-                if any(value["start"] < ordered[index - 1]["end"] for index, value in enumerate(ordered) if index):
-                    raise ValueError("교시 시각이 겹칩니다")
-            now = datetime.now(timezone(timedelta(hours=9))).date()
-            monday = now - timedelta(days=now.weekday())
-            timetables = []
-            for offset in range(int(weeks)):
-                week = (monday + timedelta(days=offset * 7)).isoformat()
-                timetable, _ = _cached_timetable(school, week, current_cache)
-                if teacher_filter is not None:
-                    timetable = {**timetable, "records": [r for r in timetable["records"]
-                                 if teacher_filter in (r.get("teacher") or "").casefold()]}
-                timetables.append(timetable)
-            body = render_timetable_ics(school, grade_filter, class_filter, timetables, mode=mode, lesson_times=lesson_times)
-            etag = '"' + hashlib.sha256(body).hexdigest() + '"'
-            headers["ETag"] = etag
-            headers["Cache-Control"] = "private, max-age=0, must-revalidate"
-            headers["Content-Type"] = "text/calendar; charset=utf-8"
-            headers["Content-Disposition"] = 'inline; filename="opencigan.ics"'
-            validators = (request_headers or {}).get("If-None-Match", "").strip()
-            if validators == "*" or etag in (tag.strip().removeprefix("W/") for tag in validators.split(",")):
-                return 304, headers, b""
-            headers["Content-Length"] = str(len(body))
-            return 200, headers, body
+            return timetable_calendar(query, current_cache, request_headers, headers, _query_param, _timetable_filters, _cached_timetable, render_timetable_ics)
         elif path in ("/api/v1/timetable/history", "/api/v1/timetable/history.rss"):
-            school = _query_param(query, "school", 100)
-            if not re.fullmatch(r"[0-9]+:[^:]{1,50}", school):
-                raise ValueError("학교 식별자가 올바르지 않습니다")
-            if path.endswith(".rss") and "week" not in query:
-                now = datetime.now(timezone(timedelta(hours=9))).date()
-                week = (now - timedelta(days=now.weekday())).isoformat()
-            else:
-                week = _query_param(query, "week", 10)
-            parsed_week = date.fromisoformat(week)
-            if parsed_week.isoformat() != week or parsed_week.weekday() != 0:
-                raise ValueError("주 시작일이 올바르지 않습니다")
-            cursor = _query_param(query, "cursor", 100) if "cursor" in query else None
-            store = _history_store()
-            if store is None:
-                body = json.dumps({"error": "변경 이력 저장이 활성화되지 않았습니다", "code": "history_disabled"}, ensure_ascii=False).encode("utf-8")
-                headers["Content-Length"] = str(len(body))
-                return 503, headers, body
-            if path.endswith(".rss"):
-                grade_filter, class_filter, _ = _timetable_filters({key: value for key, value in query.items() if key != "teacher"}, require_class=True)
-                if cursor is not None:
-                    raise ValueError("피드에는 커서를 사용할 수 없습니다")
-                filters = {key: _query_param(query, key, 50) for key in ("subject", "teacher") if key in query}
-                if "weekday" in query:
-                    filters["weekday"] = _query_param(query, "weekday", 1)
-                    if filters["weekday"] not in ("1", "2", "3", "4", "5"):
-                        raise ValueError("weekday는 1(월)부터 5(금)까지여야 합니다")
-                if "period" in query:
-                    raw_period = _query_param(query, "period", 2)
-                    if not re.fullmatch(r"(?:[1-9]|1[0-9]|20)", raw_period):
-                        raise ValueError("period는 1부터 20까지여야 합니다")
-                    filters["period"] = int(raw_period)
-                if "type" in query:
-                    filters["type"] = _query_param(query, "type", 7)
-                    if filters["type"] not in ("added", "deleted", "changed"):
-                        raise ValueError("type이 올바르지 않습니다")
-                group = _query_param(query, "group", 7) if "group" in query else "changes"
-                if group not in ("changes", "daily"):
-                    raise ValueError("group은 changes 또는 daily여야 합니다")
-                changes = store.list(school, week, grade=grade_filter, classroom=class_filter, include_ids=True, filters=filters)["changes"]
-                body = render_history_feed(school, grade_filter, class_filter, changes, group=group)
-                etag = '"' + hashlib.sha256(body).hexdigest() + '"'
-                headers.update({"Content-Type": "application/rss+xml; charset=utf-8", "ETag": etag,
-                                "Cache-Control": "private, max-age=0, must-revalidate"})
-                validators = (request_headers or {}).get("If-None-Match", "").strip()
-                if validators == "*" or etag in (tag.strip().removeprefix("W/") for tag in validators.split(",")):
-                    return 304, headers, b""
-                headers["Content-Length"] = str(len(body))
-                return 200, headers, body
-            result = store.list(school, week, cursor=cursor)
+            result = timetable_history(path, query, request_headers, headers, _query_param, _timetable_filters, _history_store, render_history_feed)
+            if isinstance(result, tuple):
+                return result
         elif path == "/api/v1/neis/schools":
             result = search_meal_schools(query, current_cache, _query_param, NEISClient)
         elif path == "/api/v1/meals":
