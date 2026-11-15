@@ -2,6 +2,24 @@ import type { School } from './api';
 
 export type Favorite = { school: School; grade: number; classroom: number };
 export type MealPreferences = { view: 'day' | 'week'; types: string[]; showAllergenNumbers: boolean };
+export type ThemePreference = 'light' | 'dark' | 'system';
+
+export function readTheme(storage: Pick<Storage, 'getItem'>, fallback: ThemePreference): ThemePreference {
+  const value = storage.getItem('opensigan-theme');
+  return value === 'light' || value === 'dark' || value === 'system' ? value : fallback;
+}
+
+export function writeTheme(storage: Pick<Storage, 'setItem'>, theme: ThemePreference) {
+  storage.setItem('opensigan-theme', theme);
+}
+
+export function readAnimations(storage: Pick<Storage, 'getItem'>) {
+  return storage.getItem('opensigan-animations') !== 'off';
+}
+
+export function writeAnimations(storage: Pick<Storage, 'setItem'>, enabled: boolean) {
+  storage.setItem('opensigan-animations', enabled ? 'on' : 'off');
+}
 
 export function readFavorites(storage: Pick<Storage, 'getItem'>): Favorite[] | null {
   const saved: unknown = JSON.parse(storage.getItem('opensigan-favorites') || '[]');

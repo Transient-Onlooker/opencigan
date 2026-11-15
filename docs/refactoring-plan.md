@@ -128,6 +128,8 @@ backend/
 - `AccessLogStore`와 `AccessLogRecorder`는 이미 독립 클래스로 구현됨. 같은 파일이라는 이유만으로 분할하지 않는다. 초기화·보존기간·동시 쓰기·종료/flush·CSV와 관리자 인증 결합도가 문제일 때 최소 변경한다.
 - `ApiRecorder`와 공통 큐의 중복은 종료·유실 정책 차이를 확인한 뒤에만 통합한다. 개인정보 수집 범위·가명/원시 IP 구분·기본 비활성 정책을 변경하지 않는다.
 
+2026-11-16 코드 확인: `AccessLogRecorder`는 입력 시각을 캡처하고 종료 상태·대기 중 작업 완료·시간 제한 종료를 제공한다. `ApiRecorder`는 지연 시작되는 데몬 큐이며 별도의 flush·close 계약이 없다. 종료 및 유실 동작이 다르므로 두 큐는 통합하지 않는다. 두 저장소도 기존 독립 클래스를 유지한다.
+
 ### PR 8 — 과거 코드·바이너리·번들 (`refactor/repository-cleanup`)
 
 - `workers-api/`가 여전히 CI(`test_worker`, `test_d1_cache`, `test_migration`) 대상이므로 선행 참조 확인 없이 삭제하지 않는다. `phase0/`, `phase0-mvp/`와 wheelhouse는 재현·배포 의존성을 조사한 뒤 아카이브/삭제 여부 결정.

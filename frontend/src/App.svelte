@@ -9,7 +9,7 @@
   import ShareTools from './ShareTools.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import TimetablePanel from './TimetablePanel.svelte';
-  import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference, readFavorites, writeFavorites, type Favorite } from './preferences';
+  import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference, readFavorites, writeFavorites, readTheme, writeTheme, readAnimations, writeAnimations, type Favorite } from './preferences';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
   import { saveSelection, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
@@ -619,12 +619,12 @@
   function setTheme(value: string) {
     if (value !== 'light' && value !== 'dark' && value !== 'system') return;
     theme = value;
-    try { localStorage.setItem('opensigan-theme', theme); } catch { /* 현재 선택은 저장 없이 유지합니다. */ }
+    try { writeTheme(localStorage, theme); } catch { /* 현재 선택은 저장 없이 유지합니다. */ }
   }
   function changeTheme() { setTheme(themeIsDark(theme, systemDark) ? 'light' : 'dark'); }
   function setAnimationsEnabled(enabled: boolean) {
     animationsEnabled = enabled;
-    try { localStorage.setItem('opensigan-animations', enabled ? 'on' : 'off'); } catch { /* 현재 선택은 저장 없이 유지합니다. */ }
+    try { writeAnimations(localStorage, enabled); } catch { /* 현재 선택은 저장 없이 유지합니다. */ }
   }
   function refreshTimetable() {
     tableRefreshState = '갱신 중';
@@ -784,8 +784,8 @@
       mealView = savedMealSettings.view;
       enabledMealTypes = savedMealSettings.types;
       showAllergenNumbers = savedMealSettings.showAllergenNumbers;
-      const savedTheme = localStorage.getItem('opensigan-theme'); if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') theme = savedTheme;
-      animationsEnabled = localStorage.getItem('opensigan-animations') !== 'off';
+      theme = readTheme(localStorage, theme);
+      animationsEnabled = readAnimations(localStorage);
       const savedGrade = Number(localStorage.getItem('opensigan-grade')); if (savedGrade >= 1 && savedGrade <= 6) selectionState.update({ grade: savedGrade });
       const savedClass = Number(localStorage.getItem('opensigan-class')); if (Number.isInteger(savedClass) && savedClass >= 1 && savedClass <= 99) selectionState.update({ classroom: savedClass });
       const saved = localStorage.getItem('opensigan-school'); if (saved) savedSchool = JSON.parse(saved) as School;
