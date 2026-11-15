@@ -19,3 +19,14 @@ test('meal preferences preserve valid stored values and keep meal types ordered'
   assert.equal(values.get('opensigan-allergies'), '[1,11]');
   assert.equal(JSON.parse(values.get('opensigan-meal-preferences')).view, 'week');
 });
+
+test('school preferences isolate keys and recover malformed stored data', () => {
+  const values = new Map([['pref:a', '{"value":4}'], ['pref:b', '{bad']]);
+  const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+  const parse = (value) => value ?? { value: 0 };
+  assert.equal(prefs.readSchoolPreference(storage, 'pref:', 'a', parse, () => ({ value: -1 })).value, 4);
+  assert.equal(prefs.readSchoolPreference(storage, 'pref:', 'b', parse, () => ({ value: -1 })).value, -1);
+  prefs.writeSchoolPreference(storage, 'pref:', 'a', { value: 5 });
+  assert.equal(values.get('pref:a'), '{"value":5}');
+  assert.equal(values.get('pref:b'), '{bad');
+});

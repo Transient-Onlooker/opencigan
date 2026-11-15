@@ -6,7 +6,7 @@
   import PersonalTimetable from './PersonalTimetable.svelte';
   import CalendarNav from './CalendarNav.svelte';
   import QuickClass from './QuickClass.svelte';
-  import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies } from './preferences';
+  import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference } from './preferences';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
   import { saveSelection, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
@@ -332,7 +332,7 @@
     lessonTimes = parsed;
     lessonTimeState = '이 학교의 교시 시각을 저장했어요.';
     subscriptionUrl = ''; subscriptionPanelOpen = false; subscriptionTimesConsent = false;
-    try { localStorage.setItem('opensigan-lesson-times:' + school.id, JSON.stringify(lessonTimes)); }
+    try { writeSchoolPreference(localStorage, 'opensigan-lesson-times:', school.id, lessonTimes); }
     catch { lessonTimeState = '현재 화면에만 적용됐어요. 브라우저 저장소를 확인해 주세요.'; }
   }
   function clearLessonTimes() {
@@ -445,9 +445,9 @@
     schoolRequest?.abort(); clearTimeout(schoolTimer); mealSession.cancel(); historySession.cancel();
     selectionState.update({ school: value }); schoolQuery = value.name; schoolResults = []; schoolSearchState = ''; schoolEditorOpen = false;
     selectedSubject = ''; selectedTeacher = ''; teacherQuery = '';
-    try { schoolDisplaySettings = parseDisplaySettings(JSON.parse(localStorage.getItem('opensigan-display:' + value.id) || 'null')); }
+    try { schoolDisplaySettings = readSchoolPreference(localStorage, 'opensigan-display:', value.id, parseDisplaySettings, defaultDisplaySettings); }
     catch { schoolDisplaySettings = defaultDisplaySettings(); }
-    try { lessonTimes = parseLessonTimes(JSON.parse(localStorage.getItem('opensigan-lesson-times:' + value.id) || 'null')); }
+    try { lessonTimes = readSchoolPreference(localStorage, 'opensigan-lesson-times:', value.id, parseLessonTimes, () => ({})); }
     catch { lessonTimes = {}; }
     lessonTimeDrafts = { ...lessonTimes }; lessonTimeState = '';
     subscriptionTimesConsent = false;

@@ -29,3 +29,12 @@ export function saveMealPreferences(storage: Pick<Storage, 'setItem'>, preferenc
 export function saveAllergies(storage: Pick<Storage, 'setItem'>, allergies: number[]) {
   storage.setItem('opensigan-allergies', JSON.stringify(allergies));
 }
+
+export function readSchoolPreference<T>(storage: Pick<Storage, 'getItem'>, prefix: string, schoolId: string, parse: (value: unknown) => T, fallback: () => T): T {
+  try { return parse(JSON.parse(storage.getItem(prefix + schoolId) || 'null')); }
+  catch { return fallback(); }
+}
+
+export function writeSchoolPreference(storage: Pick<Storage, 'setItem'>, prefix: string, schoolId: string, value: unknown) {
+  storage.setItem(prefix + schoolId, JSON.stringify(value));
+}
