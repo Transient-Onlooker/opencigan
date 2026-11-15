@@ -16,7 +16,7 @@ async function loadModule(filename, imports = {}) {
 
 const personalization = await loadModule('personalization.ts');
 const lessonTimes = await loadModule('lesson-times.ts');
-const { createSettingsBackup, parseSettingsBackup, MAX_SETTINGS_BACKUP_BYTES } = await loadModule('settings-backup.ts', {
+const { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, MAX_SETTINGS_BACKUP_BYTES } = await loadModule('settings-backup.ts', {
   './personalization': personalization,
   './lesson-times': lessonTimes,
 });
@@ -24,6 +24,22 @@ const { createSettingsBackup, parseSettingsBackup, MAX_SETTINGS_BACKUP_BYTES } =
 const schoolId = 'test-school-123';
 const display = { ...personalization.defaultDisplaySettings(), showTeachers: false, density: 'compact', subjectAliases: { math: 'M' } };
 const times = { 1: { start: '09:00', end: '09:50' }, 2: { start: '10:00', end: '10:50' } };
+
+test('school settings import restores prior values if the second write fails', () => {
+  const values = new Map([['opensigan-display:' + schoolId, 'old-display'], ['opensigan-lesson-times:' + schoolId, 'old-times']]);
+  let failed = false;
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => {
+      if (key.startsWith('opensigan-lesson-times:') && !failed) { failed = true; throw new Error('blocked'); }
+      values.set(key, value);
+    },
+    removeItem: (key) => values.delete(key),
+  };
+  assert.throws(() => saveSchoolSettingsBackup(storage, schoolId, display, times), /저장하지 못했어요/);
+  assert.equal(values.get('opensigan-display:' + schoolId), 'old-display');
+  assert.equal(values.get('opensigan-lesson-times:' + schoolId), 'old-times');
+});
 
 test('export and import round trip preserves school settings without allergy preferences', () => {
   const exported = createSettingsBackup(schoolId, display, times);
