@@ -50,6 +50,18 @@ test('selection persistence tolerates blocked storage and stops subsequent write
   assert.deepEqual(partial, ['opensigan-school', 'opensigan-grade']);
 });
 
+test('selection restoration preserves read order and applies valid values before a later failure', () => {
+  const reads = [];
+  const changes = [];
+  const values = new Map([['opensigan-grade', '2'], ['opensigan-class', '7'], ['opensigan-school', '{bad']]);
+  const storage = { getItem: (key) => { reads.push(key); return values.get(key) ?? null; } };
+  assert.throws(() => exports.readSelection(storage, (change) => changes.push({ ...change })));
+  assert.deepEqual(reads, ['opensigan-grade', 'opensigan-class', 'opensigan-school']);
+  assert.deepEqual(changes, [{ grade: 2 }, { classroom: 7 }]);
+  values.set('opensigan-school', '{"id":"2:school","name":"school","region":"r"}');
+  assert.equal(exports.readSelection(storage, () => {}).id, '2:school');
+});
+
 test('shared classroom requires fresh matching data and valid school grade', () => {
   const data = { stale: false, records: [{ grade: 1, class: '3' }, { grade: 4, class: 3 }] };
   assert.equal(exports.validateSharedClass(data, false, 3, 1, 3), 'valid');

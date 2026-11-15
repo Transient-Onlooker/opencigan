@@ -26,6 +26,15 @@ export function saveSelection(storage: Pick<Storage, 'setItem'>, selection: { sc
   } catch { /* Storage may be unavailable; the current selection remains usable. */ }
 }
 
+export function readSelection(storage: Pick<Storage, 'getItem'>, update: (change: Partial<SelectionState>) => void): School | null {
+  const grade = Number(storage.getItem('opensigan-grade'));
+  if (grade >= 1 && grade <= 6) update({ grade });
+  const classroom = Number(storage.getItem('opensigan-class'));
+  if (Number.isInteger(classroom) && classroom >= 1 && classroom <= 99) update({ classroom });
+  const school = storage.getItem('opensigan-school');
+  return school ? JSON.parse(school) as School : null;
+}
+
 export function validateSharedClass(timetable: TimetableResponse | null, fromDevice: boolean, maxGrade: number, grade: number, classroom: number): 'valid' | 'missing' | 'unavailable' {
   const records: TimetableRecord[] = timetable?.records ?? [];
   if (!timetable || timetable.stale || fromDevice || !records.length) return 'unavailable';

@@ -11,7 +11,7 @@
   import TimetablePanel from './TimetablePanel.svelte';
   import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference, readFavorites, writeFavorites, readTheme, writeTheme, readAnimations, writeAnimations, readMealSchool, writeMealSchool, type Favorite } from './preferences';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { saveSelection, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
+  import { saveSelection, readSelection, resolveSharedClass, gradesInTimetable, classesInGrade, reconcileClassSelection, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -785,9 +785,7 @@
       showAllergenNumbers = savedMealSettings.showAllergenNumbers;
       theme = readTheme(localStorage, theme);
       animationsEnabled = readAnimations(localStorage);
-      const savedGrade = Number(localStorage.getItem('opensigan-grade')); if (savedGrade >= 1 && savedGrade <= 6) selectionState.update({ grade: savedGrade });
-      const savedClass = Number(localStorage.getItem('opensigan-class')); if (Number.isInteger(savedClass) && savedClass >= 1 && savedClass <= 99) selectionState.update({ classroom: savedClass });
-      const saved = localStorage.getItem('opensigan-school'); if (saved) savedSchool = JSON.parse(saved) as School;
+      savedSchool = readSelection(localStorage, (change) => selectionState.update(change));
     } catch { /* 저장소를 사용할 수 없으면 기본 설정으로 시작합니다. */ }
     if (savedSchool) chooseSchool(savedSchool, true);
     if (shared) void restoreSharedClass(shared, { school: savedSchool, grade: Number(grade), classroom: Number(classroom) });
