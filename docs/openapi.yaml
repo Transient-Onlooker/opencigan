@@ -401,6 +401,11 @@ paths:
           required: false
           description: 'Timed mode only. Comma-separated period:HHMM-HHMM entries, periods 1..20; unique periods and nonoverlapping ordered times. Example 1:0900-0950,2:1000-1050. Changing times requires replacing the subscription URL.'
           schema: { type: string, maxLength: 400 }
+        - name: weekday_times
+          in: query
+          required: false
+          description: 'Timed mode only. Comma-separated ISO weekday.period:HHMM-HHMM overrides, weekday 1=Monday through 7=Sunday. For example 2.1:1000-1050 overrides Tuesday period 1. Other periods use times. Each weekday must remain ordered and nonoverlapping after applying overrides.'
+          schema: { type: string, maxLength: 2400 }
         - name: If-None-Match
           in: header
           schema: { type: string }
