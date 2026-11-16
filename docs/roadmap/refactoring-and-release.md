@@ -64,8 +64,8 @@
 - [ ] **4. Svelte 화면 컴포넌트 분리**: 선택기 → 시간표/급식 → 설정/공유·내보내기 순으로 `App.svelte`에서 UI를 추출. 공유 상태를 양방향으로 중복 소유하지 않고 props/events 또는 명시적 상태 인터페이스로 연결
 - [ ] **5. CSS 정리**: 분리된 컴포넌트 단위로 스타일을 이동하고 `style.css` 중복·미디어쿼리 덮어쓰기를 통합. 320px·가로 화면·라이트/다크·모바일 입력 포커스 시각 회귀
 - [ ] **6. 백엔드 라우팅 분리**: `backend/app.py`의 `_dispatch_request`를 일반 API·관리자·공통 검증/응답 경계로 분리. 상태 코드·오류 코드·헤더·캐시·IP 제한·ICS ETag·로그 계약은 변경하지 않기
-- [ ] **7. 접속 로그 모듈 정리 검토**: `backend/access_logs.py`에서 SQLite 저장·조회/CSV·비동기 기록 큐의 책임과 결합도를 확인하고 필요한 부분만 분리. 쓰기 유실·종료 처리·보관 기한 회귀 유지
-- [ ] **8. 실험 코드·의존성 정리**: `workers-api/`, `phase0/`, `phase0-mvp/`의 CI·배포·참조 여부와 Python/Workers 구현 차이를 확인한 뒤 미사용 코드를 아카이브/정리. 재현에 필요한 wheel과 테스트는 보존
+- [x] **7. 접속 로그 모듈 정리 검토**: `AccessLogStore`와 `AccessLogRecorder`는 이미 분리된 클래스이며 분석 기록기와 종료 정책이 달라 별도로 유지한다. 보관 기한, 큐 포화·flush·종료는 `tests/test_access_logs.py`와 `tests/test_access_log_api.py`로 검증한다. [조사 근거](../refactoring-plan.md#pr-7--로그운영기록-계층-refactorlogging-boundaries-필요할-때만)
+- [x] **8. 실험 코드·의존성 정리**: Workers와 두 실험 경로의 재현 참조를 확인해 보존하고, 중복 wheel을 통합했다. Workers 필수 wheel과 Python/Workers 공통 계약 테스트를 유지한다. [조사 근거와 제한](../refactoring-plan.md#pr-8--과거-코드바이너리번들-refactorrepository-cleanup)
 - [ ] **9. 번들 측정·정리 및 최종 QA**: JS/CSS 청크의 원본·압축 크기와 폰트·선택적 의존성 로딩을 측정하여 개선. 처음 확보한 QA 기준선과 전체 테스트를 다시 수행하고 RPi에서 적용·되돌리기 경로 확인
 
 **진행 규칙:** 1~9단계는 권장 작업 순서이지 하나의 대형 커밋이 아니다. 단계별로 작게 변경하며, 실패한 테스트가 해당 단계의 회귀인지 확인하고 해결한 다음 진행한다. 기능 추가·UI 재설계·API 계약 변경을 리팩터링에 섞지 않는다. 기존 배포 가능한 기준 버전과 롤백 수단을 유지한다.
