@@ -10,7 +10,7 @@ timeline
     기반 기능 : 시간표와 급식, 읽기 API 구현
     개인화·확장 : 설정과 내보내기, 구독 기능 일부 구현
     QA 기준선 : 리팩터링 전 자동 회귀와 배포 상태 기록
-    리팩터링 : 선택과 데이터 세션 분리 PR 병합 : UI와 백엔드 정리 남음
+    리팩터링 : 선택·데이터 세션과 UI·백엔드 경계 분리 : 최종 검증 진행
     UX 개선 : 설정 화면과 기본 사용 흐름 개편 대기
     운영 검증 : Cloudflare Tunnel과 WAF 전환 P0 : 공개 도메인과 실제 IP, 실기기 확인
     후속 기능 : 알림 안정화와 장기 확장
@@ -53,7 +53,7 @@ flowchart LR
 | **P1 · 사용자 경험** | 기존 기능 구현, UI/UX 개선 다수 대기 | [학교·시간표·설정·급식 UX](roadmap/user-experience.md) |
 | **P2 · 외부 개발자 연동** | API·ICS·관리 도구 일부 구현, 외부 운영 검증 대기 | [API·캘린더·로그](roadmap/api-operations.md) |
 | **P3–P4 · 자동화와 확장** | 부분 구현 또는 아이디어·운영 검증 대기 | [알림·장기 확장·아이디어](roadmap/automation-and-future.md) |
-| **코드 품질·배포** | 상태·세션 리팩터링 진행, UI/CSS/백엔드 정리 잔여 | [리팩터링·릴리스 검증](roadmap/refactoring-and-release.md) |
+| **코드 품질·배포** | 상태·화면·백엔드 경계 분리, 최종 회귀·운영 검증 잔여 | [리팩터링·릴리스 검증](roadmap/refactoring-and-release.md) |
 
 ### 최근 사용자 제보와 UX 작업
 
