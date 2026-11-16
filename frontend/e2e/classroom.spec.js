@@ -45,7 +45,7 @@ test('switching classes updates lessons, PNG and both links', async ({ page }) =
   await expect(panel.locator('.refresh-feedback')).toContainText('마지막 확인');
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await expect(page.getByRole('heading', { name: '설정', exact: true })).toBeVisible();
-  await expect(page.getByText('급식 알레르기 설정', { exact: true })).toBeVisible();
+  await expect(page.getByText('급식 설정', { exact: true })).toBeVisible();
   await expect(panel).toBeHidden();
   await page.getByText('시간표 표시 설정', { exact: true }).click();
   await page.getByRole('checkbox', { name: '1학년 1반만 따로 설정' }).check();
