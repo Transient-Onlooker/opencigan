@@ -151,6 +151,7 @@ backend/
 
 - 병합 커밋 `5490a66`을 기준으로 한 후속 브랜치에서 Chromium·WebKit 전체 Playwright 검사를 실행해 65개가 통과했다. WebKit 오프라인 쉘 재시작 1개는 기존 테스트 설정으로 건너뛰었으므로 검증 완료가 아니다.
 - 학교·학급 설정 파일을 실제 다운로드하고 불러온 뒤 새로고침해 유지되는 것을 두 브라우저에서 확인했다. 시간표 PNG는 브라우저에서 디코딩해 크기를 확인하고 PDF는 파싱해 페이지 수와 방향을 확인했다. 실제 iOS·Android 기기와 PDF의 인쇄 결과를 확인한 것은 아니다.
+- 후속 커밋 `2b85f8b`의 Linux GitHub Actions에서는 WebKit 오프라인 복원을 포함해 Playwright 70개가 모두 통과했다. WebKit은 저장된 시간표를 미리 준비해 복원하며, 온라인 조회부터 저장까지의 경로는 Chromium에서 확인한다. Windows WebKit과 실제 모바일 기기 오프라인은 미검증이다.
 
 1. 해당 단계의 기존 동작/데이터/저장 키/API 계약 변화가 없거나, 차이가 있으면 명시적 승인과 별도 변경으로 분리한다.
 2. `python -m unittest discover -s tests -v`, 관련 클라이언트·통합·Workers 테스트, `npm run check`, `npm test`, `npx playwright test`, `npm run build` 및 GitHub Actions의 결과를 확인한다. 실행하지 못한 항목은 미검증이라고 기록한다.
