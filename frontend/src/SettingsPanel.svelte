@@ -110,7 +110,7 @@
               <ul class="settings-results" aria-label="설정 검색 결과">{#each searchResults as result}<li><button type="button" onclick={() => openSearchResult(result)}><span>{result.name}</span><small>{result.category}</small></button></li>{/each}</ul>
             {:else}<p role="status">일치하는 설정이 없어요.</p>{/if}
           {/if}
-          <div bind:this={settingsContent} hidden={!!settingsQuery.trim()}>
+          <div class="settings-cards" bind:this={settingsContent} hidden={!!settingsQuery.trim()}>
           <details class="display-settings" hidden={!settingsMatch('일반 테마 애니메이션', settingsQuery)} bind:open={settingsOpen.general}>
             <summary>일반 설정</summary>
             <div class="display-settings-grid">
@@ -289,5 +289,10 @@
 .allergy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:10px}
 .allergy-grid label{display:flex;align-items:center;gap:8px;min-height:38px;font-size:14px;cursor:pointer}
 .allergy-grid input{width:18px;height:18px;accent-color:var(--ink)}
+.settings-cards>details{box-sizing:border-box;min-width:0;margin:0 0 12px;padding:0 14px;border:1px solid var(--line)}
+.settings-cards>details[open]{padding-bottom:14px}
+.settings-cards>details>summary{min-height:48px;align-content:center;cursor:pointer;font-size:14px;line-height:1.4;font-weight:650}
+.settings-cards summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.settings-cards .display-toggle{display:flex;align-items:center;gap:9px;min-height:44px}
 @media(max-width:700px){.allergy-grid label{min-height:44px}}
 </style>

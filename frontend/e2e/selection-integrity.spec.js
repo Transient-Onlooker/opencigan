@@ -55,6 +55,38 @@ test('settings icon remains visible and aligned in both themes on desktop and mo
   await expect(page.getByRole('heading', { name: '설정', exact: true })).toBeVisible();
 });
 
+test('collapsed settings cards align and remain keyboard accessible across themes and widths', async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript(() => localStorage.setItem('opensigan-theme', 'light'));
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  for (const width of [320, 1366]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const theme of ['light', 'dark']) {
+      if (theme === 'dark') await page.getByRole('button', { name: '다크 모드로 전환' }).click();
+      const boxes = await page.locator('.settings-cards > details').evaluateAll((cards) => cards.map((card) => {
+        const bounds = card.getBoundingClientRect();
+        return { height: bounds.height, left: bounds.left, width: bounds.width, border: getComputedStyle(card).borderTopWidth };
+      }));
+      expect(boxes.length).toBeGreaterThan(4);
+      for (const box of boxes) {
+        expect(Math.abs(box.height - boxes[0].height)).toBeLessThan(1);
+        expect(Math.abs(box.left - boxes[0].left)).toBeLessThan(1);
+        expect(Math.abs(box.width - boxes[0].width)).toBeLessThan(1);
+        expect(box.border).toBe('1px');
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      if (theme === 'dark') await page.getByRole('button', { name: '라이트 모드로 전환' }).click();
+    }
+  }
+  const summary = page.getByText('일반 설정', { exact: true });
+  await summary.focus();
+  await expect(summary).toBeFocused();
+  await summary.press('Enter');
+  await expect(page.getByLabel('테마', { exact: true })).toBeVisible();
+});
+
 test('settings groups keep advanced controls separate and restore expanded state after search', async ({ page }) => {
   await mockApi(page);
   await page.goto('/' + sharedHash(1));
