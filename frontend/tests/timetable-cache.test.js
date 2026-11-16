@@ -103,3 +103,35 @@ test('offline data is restored only for the matching school and week and stale d
   values.set('opensigan-offline-timetable', '{broken');
   assert.equal(session.restoreOffline('a', '2026-11-09', storage), null);
 });
+
+test('week reuse avoids a request until expiry while manual refresh requests fresh data', async () => {
+  let state;
+  let now = 10;
+  let calls = 0;
+  const session = exports.createTimetableSession((value) => { state = value; });
+  const data = { schoolId: 'a', weekStart: '2026-11-09', records: [], stale: false };
+  const storage = () => ({ setItem() {}, getItem: () => null });
+  const options = {
+    schoolId: 'a', week: '2026-11-09', preserve: false, reuseCachedWeek: true, validateClass: false,
+    refreshInterval: 100, now: () => now, storage, online: () => true,
+    current: () => ({ schoolId: 'a', week: '2026-11-09' }),
+    fetch: async () => { calls++; return data; }, validate() {}, classError: () => false,
+    errorText: String, onSuccess() {}, onFailure() {},
+  };
+  const flush = () => new Promise(setImmediate);
+  session.load(options);
+  await flush();
+  assert.equal(calls, 1);
+  assert.equal(state.data, data);
+  session.load(options);
+  assert.equal(calls, 1);
+  assert.equal(state.refreshAt, 110);
+  now = 109;
+  session.load({ ...options, preserve: true, reuseCachedWeek: false });
+  await flush();
+  assert.equal(calls, 2);
+  now = 209;
+  session.load(options);
+  await flush();
+  assert.equal(calls, 3);
+});

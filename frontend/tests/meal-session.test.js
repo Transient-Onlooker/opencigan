@@ -42,3 +42,20 @@ test('meal school connection ignores a late response after switching schools', a
   assert.equal(state.neis, null);
   assert.equal(state.neisLoading, false);
 });
+
+test('choosing a meal school cancels search and loads meals even when storage is blocked', async () => {
+  let state;
+  let resolve;
+  let loads = 0;
+  const session = personalizationVm.createMealSession((next) => { state = next; });
+  const pending = session.connect({ id: 'a', name: 'school', region: '서울' }, () => 'a',
+    () => new Promise((done) => { resolve = done; }), () => null, () => [], () => {}, String);
+  const school = { id: 'neis', name: 'school', region: '서울', address: '서울' };
+  session.choose(school, () => { throw new Error('blocked'); }, () => { loads++; });
+  resolve({ schools: [], stale: false });
+  await pending;
+  assert.equal(state.neis, school);
+  assert.equal(state.neisLoading, false);
+  assert.equal(state.searchState, '급식도 school로 연결했어요.');
+  assert.equal(loads, 1);
+});

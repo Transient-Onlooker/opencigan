@@ -43,6 +43,19 @@ test('school preparation and timetable reconciliation use the same selection own
   assert.equal(current.classroom, 1);
 });
 
+test('class draft validation and commit preserve the selected class until a valid value is committed', () => {
+  let current;
+  const owner = exports.createSelectionState({ school: null, grade: 1, classroom: 2, week: '2026-11-09' }, (state) => { current = state; });
+  for (const value of [NaN, 0, 1.5, 100, 7]) assert.equal(owner.validClass(value, [2, 3]), false);
+  assert.equal(current, undefined);
+  assert.equal(owner.validClass(7, []), true);
+  assert.equal(owner.validClass(3, [2, 3]), true);
+  owner.commitClass(3);
+  assert.equal(current.classroom, 3);
+  assert.equal(current.grade, 1);
+  assert.equal(current.week, '2026-11-09');
+});
+
 test('selection persistence preserves keys, values and write order', () => {
   const writes = [];
   const storage = { setItem: (key, value) => writes.push([key, value]) };
@@ -105,6 +118,21 @@ test('shared selection commits only verified classes and otherwise returns the o
     assert.equal(result.reason, reason);
     assert.equal(result.fallback, fallback);
   }
+});
+
+test('selection owner commits verified shared classes and restores the previous class on rollback', () => {
+  const school = { id: 'shared' };
+  const fallback = { school: { id: 'old' }, grade: 2, classroom: 3 };
+  const pending = { schoolId: school.id, grade: 1, classroom: 7, fallback };
+  let current;
+  const owner = exports.createSelectionState({ school, grade: 1, classroom: 7, week: '2026-11-09' }, (state) => { current = state; });
+  assert.equal(owner.resolveShared(pending, { stale: false, records: [{ grade: 1, class: 7 }] }, false, 3).status, 'committed');
+  assert.equal(current.classroom, 7);
+  assert.equal(owner.resolveShared(pending, { stale: false, records: [{ grade: 1, class: 1 }] }, false, 3).status, 'rolled-back');
+  assert.equal(current.grade, 2);
+  assert.equal(current.classroom, 3);
+  assert.equal(current.school, school);
+  assert.equal(current.week, '2026-11-09');
 });
 
 test('shared selection session cancels obsolete checks and publishes pending and cleared states', () => {

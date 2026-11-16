@@ -11,6 +11,12 @@ class PublicApiTests(unittest.TestCase):
     def setUp(self):
         _rate_clients.clear()
 
+    def test_filter_validation_uses_patchable_query_boundary(self):
+        from backend.app import _timetable_filters
+        with patch('backend.app._query_param', return_value='2') as query_value:
+            self.assertEqual(_timetable_filters({'grade': ['ignored']}), (2, None, None))
+        query_value.assert_called_once_with({'grade': ['ignored']}, 'grade', 1)
+
     def test_cors_restricts_origins_and_options_does_not_use_limit(self):
         with patch.dict('os.environ', {'ALLOWED_ORIGIN': 'https://example.test'}):
             for _ in range(65):
