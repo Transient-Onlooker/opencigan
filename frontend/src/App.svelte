@@ -551,13 +551,14 @@
     if (!validMealDate(next)) { dateError = '1900년 이후의 올바른 날짜를 선택해 주세요.'; return; }
     mealDate = next; mealDateDraft = next; dateError = ''; loadMeals();
   }
-  function selectTimetableDate(event: Event) {
+  function selectTimetableDate(event: Event, editing = false) {
     const input = event.currentTarget as HTMLInputElement;
     const value = input.value;
     if (value && input.validity.valid && value >= week && value <= addDays(week, 6)) {
+      if (selectedDay === value && mealDate === value && !dateError) return;
       selectedDay = value; mealDate = value; mealDateDraft = value; dateError = '';
       loadMeals();
-    } else input.value = selectedDay;
+    } else if (!editing) input.value = selectedDay;
   }
   function todayMeals() { refreshCalendar(); mealDate = today; mealDateDraft = today; dateError = ''; loadMeals(); }
   function selectMealTimetableDate(value: string) {
@@ -577,7 +578,7 @@
     loadMeals();
   }
   function updateMealDateDraft(event: Event) {
-    mealDateDraft = (event.currentTarget as HTMLInputElement).value;
+    if (dateError) dateError = '';
   }
   function validMealDate(value: string) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -591,15 +592,17 @@
     date.setUTCFullYear(year, month - 1, day);
     return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
   }
-  function selectMealDate(event: Event) {
+  function selectMealDate(event: Event, editing = false) {
     const input = event.currentTarget as HTMLInputElement;
     const value = input.value;
     if (!validMealDate(value)) {
+      if (editing) return;
       dateError = '1900년 이후의 올바른 날짜를 선택해 주세요.';
       mealDateDraft = mealDate;
       input.value = mealDate;
       return;
     }
+    if (mealDate === value && !dateError) return;
     mealDate = value; mealDateDraft = value; dateError = ''; loadMeals();
   }
   function setTheme(value: string) {
