@@ -272,14 +272,18 @@ test('meal date errors preserve the applied date and valid input fetches the mat
   await page.getByRole('button', { name: '급식', exact: true }).click();
   const input = page.getByLabel('날짜 선택');
   await expect(input).toHaveValue(week);
+  await input.focus();
   await input.fill('0005-11-13');
-  await input.press('Tab');
+  await input.dispatchEvent('change');
+  await expect(input).toHaveValue('0005-11-13');
+  await expect(page.locator('#meal-date-error')).toHaveCount(0);
+  await input.blur();
   await expect(input).toHaveValue(week);
   await expect(input).toHaveAttribute('aria-invalid', 'true');
   await expect(page.locator('#meal-date-error')).toBeVisible();
   const requested = page.waitForRequest((request) => request.url().includes('/api/v1/meals?') && new URL(request.url()).searchParams.get('from') === '2024-02-26');
   await input.fill('2024-02-29');
-  await input.press('Tab');
+  await input.blur();
   await requested;
   await expect(input).toHaveValue('2024-02-29');
   await expect(input).toHaveAttribute('aria-invalid', 'false');
@@ -401,6 +405,23 @@ test('timed calendar includes bell times only after explicit consent and closes 
   await expect(url).toHaveValue(/mode=timed&times=1%3A0900-0950$/);
   await page.getByRole('button', { name: '구독 링크 닫기' }).click();
   await expect(page.getByLabel('일정 표시 방식')).toHaveCount(0);
+});
+
+test('personal schedule preserves entered dates when saving lessons and events', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await page.getByText('개인 시간표·일정', { exact: true }).click();
+  const personal = page.getByRole('region', { name: '개인 시간표', exact: true });
+  await personal.getByLabel('과목명', { exact: true }).fill('개인 수업');
+  await personal.getByLabel('특정 일자 (선택)').fill(week);
+  await personal.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(personal.getByRole('table')).toContainText('개인 수업');
+  await personal.getByRole('button', { name: /일정 \/ 시험 오버레이/ }).click();
+  await personal.getByLabel('날짜', { exact: true }).fill(week);
+  await personal.getByLabel('제목', { exact: true }).fill('개인 일정');
+  await personal.getByRole('button', { name: '추가', exact: true }).click();
+  await expect(personal.locator('.events-list')).toContainText(week);
+  await expect(personal.locator('.events-list')).toContainText('개인 일정');
 });
 
 test('personal timetable saves, replaces and deletes local lessons without changing source data', async ({ page }) => {
