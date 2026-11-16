@@ -833,7 +833,7 @@
   <main>
     <section class="school-heading" aria-label="선택한 학교">
       <div><p class="eyebrow">내 학교 캘린더</p><h1>{school?.name ?? '어느 학교에 다니나요?'}</h1><p class="school-facts">{school ? school.region + ' · ' + grade + '학년 ' + classroom + '반' : '학교를 한 번 고르면 시간표와 급식을 함께 볼 수 있어요.'}</p></div>
-      {#if school}<button class="secondary-button" onclick={() => schoolEditorOpen = !schoolEditorOpen} aria-expanded={schoolEditorOpen} aria-controls="school-settings"><Icon name="school" /> {schoolEditorOpen ? '학교 선택 닫기' : '학교 변경'}</button>{/if}
+      {#if school}<button class="secondary-button" onclick={() => schoolEditorOpen = !schoolEditorOpen} aria-expanded={schoolEditorOpen} aria-controls="school-settings"><Icon name="school" /> {schoolEditorOpen ? '변경 닫기' : '학교/학년 변경'}</button>{/if}
     </section>
     {#if apiNotConfigured}<p class="notice" role="alert">학교 정보를 불러올 API 주소가 설정되지 않았어요.</p>{/if}
     {#if sharedClassState && !classError}<p class="notice" role="status">{sharedClassState}</p>{/if}

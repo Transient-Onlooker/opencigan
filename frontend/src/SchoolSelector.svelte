@@ -42,7 +42,7 @@
 </section>
 
 <style>
-.school-panel{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:end;padding:20px;border:1px solid var(--line);margin-bottom:24px}
+.school-panel{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;align-items:start;padding:14px 16px;border:1px solid var(--line);margin-bottom:16px}
 .search-field{position:relative;min-width:0}
 .search-wrap{display:flex;align-items:center;gap:10px;padding:0 12px;min-height:50px;border:1px solid var(--line);margin-top:6px}
 .search-wrap:focus-within{outline:2px solid var(--ink);outline-offset:2px}
@@ -51,6 +51,8 @@
 .selectors{display:grid;grid-template-columns:100px 92px;gap:12px}
 .selectors input,.selectors select{display:block;width:100%;height:50px;padding:8px 10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:16px;margin-top:6px}
 .school-panel .notice{grid-column:1/-1;margin:0}
+.school-panel>.quick-class-hint{grid-column:1/-1;margin:0}
+.search-field>.quick-class-hint{margin:6px 0 0}
 .search-results{position:absolute;top:100%;left:0;width:100%;z-index:5;border:1px solid var(--ink);background:var(--surface);max-height:320px;overflow-y:auto}
-@media(max-width:700px){.school-panel{grid-template-columns:1fr;padding:16px;gap:16px}.selectors{grid-template-columns:1fr 1fr}}
+@media(max-width:700px){.school-panel{grid-template-columns:1fr;padding:12px 14px;gap:10px}.selectors{grid-template-columns:1fr 1fr}}
 </style>
