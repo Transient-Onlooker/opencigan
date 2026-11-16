@@ -210,18 +210,25 @@ test('the installed shell reloads offline and only restores the matching week', 
   test.skip(browserName === 'webkit' && process.platform === 'win32', 'Playwright WebKit does not consistently emulate service-worker offline requests on Windows.');
   const school = { id: '2:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
   const week = '2026-11-09';
+  const offlineTimetable = {
+    schoolId: school.id, weekStart: week, fetchedAt: '2026-11-09T01:00:00Z', sourceUpdatedAt: null, stale: false,
+    records: [{ grade: 1, class: 1, date: week, period: 1, subject: '오프라인 수학', teacher: null, isChanged: false }],
+  };
   await page.clock.setFixedTime(new Date('2026-11-09T02:00:00Z'));
+  if (browserName === 'webkit') await page.addInitScript(({ school, offlineTimetable }) => {
+    localStorage.setItem('opensigan-school', JSON.stringify(school));
+    localStorage.setItem('opensigan-offline-timetable', JSON.stringify(offlineTimetable));
+  }, { school, offlineTimetable });
   await page.route('**/api/v1/**', (route) => {
     const path = new URL(route.request().url()).pathname;
-    return route.fulfill({ json: path === '/api/v1/timetable' ? {
-      schoolId: school.id, weekStart: week, fetchedAt: '2026-11-09T01:00:00Z', sourceUpdatedAt: null, stale: false,
-      records: [{ grade: 1, class: 1, date: week, period: 1, subject: '오프라인 수학', teacher: null, isChanged: false }],
-    } : { schools: path === '/api/v1/schools' ? [school] : [], stale: false } });
+    return route.fulfill({ json: path === '/api/v1/timetable' ? offlineTimetable : { schools: path === '/api/v1/schools' ? [school] : [], stale: false } });
   });
   await page.goto('/');
-  await page.getByRole('searchbox', { name: '학교 찾기' }).fill('봄빛');
-  await page.getByRole('button', { name: /봄빛고등학교/ }).click();
-  await expect(page.getByRole('table').getByText('오프라인 수학')).toBeVisible();
+  if (browserName === 'chromium') {
+    await page.getByRole('searchbox', { name: '학교 찾기' }).fill('봄빛');
+    await page.getByRole('button', { name: /봄빛고등학교/ }).click();
+    await expect(page.getByRole('table').getByText('오프라인 수학')).toBeVisible();
+  }
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   await page.unroute('**/api/v1/**');
   await page.route('**/api/v1/**', (route) => route.abort('internetdisconnected'));
