@@ -20,6 +20,7 @@ test('teacher and grade views keep class labels legible on narrow screens', asyn
   const panel = page.locator('#timetable-panel');
   await panel.locator('.quick-class select').first().selectOption('2');
   await panel.getByRole('button', { name: '교사', exact: true }).click();
+  await panel.getByRole('searchbox', { name: '교사별 주간 시간표' }).fill('김');
   await panel.getByRole('button', { name: '김교사', exact: true }).click();
   const table = panel.locator('.teacher-table');
   const pieces = table.locator('tbody tr').first().locator('td').first().locator('strong span');
