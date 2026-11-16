@@ -22,7 +22,7 @@ const { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, sav
 });
 
 const schoolId = 'test-school-123';
-const display = { ...personalization.defaultDisplaySettings(), showTeachers: false, density: 'compact', subjectAliases: { math: 'M' } };
+const display = { ...personalization.defaultDisplaySettings(), showTeachers: false, density: 'compact', colorMode: 'custom', subjectAliases: { math: 'M', science: 'S' }, subjectColors: { math: '#123456', science: '#abcdef' } };
 const times = { 1: { start: '09:00', end: '09:50' }, 2: { start: '10:00', end: '10:50' } };
 
 test('school settings import restores prior values if the second write fails', () => {
@@ -64,6 +64,9 @@ test('export and import round trip preserves school settings without allergy pre
   assert.equal(restored.displaySettings.showTeachers, false);
   assert.equal(restored.displaySettings.density, 'compact');
   assert.equal(restored.displaySettings.subjectAliases.math, 'M');
+  assert.equal(restored.displaySettings.subjectAliases.science, 'S');
+  assert.equal(restored.displaySettings.subjectColors.math, '#123456');
+  assert.equal(restored.displaySettings.subjectColors.science, '#abcdef');
   assert.equal(restored.lessonTimes[2].start, '10:00');
 });
 
@@ -89,6 +92,7 @@ test('classroom backups restore only into the matching class and omit school bel
   assert.equal(JSON.parse(exported).lessonTimes, undefined);
   assert.equal(parseSettingsBackup(exported, schoolId, scope).scoped, true);
   assert.equal(parseSettingsBackup(exported, schoolId, scope).displaySettings.density, 'compact');
+  assert.equal(parseSettingsBackup(exported, schoolId, scope).displaySettings.subjectColors.science, '#abcdef');
   assert.throws(() => parseSettingsBackup(exported, schoolId, { ...scope, classroom: 3 }), /학급/);
   assert.throws(() => parseSettingsBackup(exported, schoolId), /학급/);
 });

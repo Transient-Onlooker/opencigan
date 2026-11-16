@@ -172,6 +172,56 @@ test('settings groups keep advanced controls separate and restore expanded state
   await expect(page.getByLabel('과목 색상', { exact: true })).toHaveValue('auto');
 });
 
+test('subject settings manage several colors and aliases with school and class isolation', async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript((id) => {
+    const key = 'opensigan-display:' + id;
+    if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ subjectAliases: { '이전과목': '이전별칭' } }));
+  }, school.id);
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('과목·교사 상세 설정', { exact: true }).click();
+  await page.getByLabel('과목 색상', { exact: true }).selectOption('custom');
+  await page.getByText('과목 색상·표시 이름 관리', { exact: true }).click();
+  await expect(page.getByLabel('이전과목 표시 이름', { exact: true })).toHaveValue('이전별칭');
+  await page.getByLabel('과목1 표시 이름', { exact: true }).fill('수학');
+  await page.getByLabel('과목1 표시 이름', { exact: true }).press('Tab');
+  await page.getByLabel('과목1 색상', { exact: true }).fill('#123456');
+  await page.getByLabel('과목2 표시 이름', { exact: true }).fill('과학');
+  await page.getByLabel('과목2 표시 이름', { exact: true }).press('Tab');
+  await page.getByLabel('과목2 색상', { exact: true }).fill('#abcdef');
+  await expect(page.getByLabel('과목1 색상', { exact: true })).toHaveValue('#123456');
+  await expect(page.getByLabel('과목2 색상', { exact: true })).toHaveValue('#abcdef');
+  await page.getByLabel('과목 목록 검색').fill('이전별칭');
+  await expect(page.getByLabel('이전과목 표시 이름', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('과목1 표시 이름', { exact: true })).toHaveCount(0);
+  await page.getByLabel('과목 목록 검색').clear();
+  await page.getByRole('button', { name: '과목2 설정 초기화' }).click();
+  await expect(page.getByLabel('과목2 표시 이름', { exact: true })).toHaveValue('');
+  await expect(page.getByLabel('과목1 색상', { exact: true })).toHaveValue('#123456');
+  await page.getByText('시간표 표시 설정', { exact: true }).click();
+  await page.getByLabel('1학년 1반만 따로 설정').check();
+  await page.getByLabel('과목1 표시 이름', { exact: true }).fill('학급 수학');
+  await page.getByLabel('과목1 표시 이름', { exact: true }).press('Tab');
+  await page.getByLabel('1학년 1반만 따로 설정').uncheck();
+  await expect(page.getByLabel('과목1 표시 이름', { exact: true })).toHaveValue('수학');
+  for (const width of [320, 390, 800, 1366]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  }
+  await page.getByRole('button', { name: '다크 모드로 전환' }).click();
+  await expect(page.getByLabel('과목1 색상', { exact: true })).toHaveValue('#123456');
+  await page.reload();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('과목·교사 상세 설정', { exact: true }).click();
+  await page.getByText('과목 색상·표시 이름 관리', { exact: true }).click();
+  await expect(page.getByLabel('과목1 표시 이름', { exact: true })).toHaveValue('수학');
+  await expect(page.getByLabel('과목1 색상', { exact: true })).toHaveValue('#123456');
+  await expect(page.getByLabel('이전과목 표시 이름', { exact: true })).toHaveValue('이전별칭');
+});
+
 test('multiple teacher aliases include saved names and affect timetable search', async ({ page }) => {
   await mockApi(page);
   await page.addInitScript((id) => {

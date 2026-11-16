@@ -17,7 +17,6 @@
   export let theme: 'light' | 'dark' | 'system';
   export let animationsEnabled: boolean;
   export let displaySettings: DisplaySettings;
-  export let selectedSubject: string;
   export let subjectNames: string[];
   export let teacherNames: string[];
   export let lessonTimePeriods: number[];
@@ -34,7 +33,7 @@
   export let setAnimationsEnabled: (value: boolean) => void;
   export let setColorMode: (value: string) => void;
   export let saveAlias: (kind: 'subject' | 'teacher', key: string, value: string) => void;
-  export let saveSubjectColor: (value: string) => void;
+  export let saveSubjectColor: (subject: string, value: string) => void;
   export let clearSubjectColors: () => void;
   export let saveDisplaySettings: (value: DisplaySettings) => void;
   export let editLessonTime: (period: number, part: 'start' | 'end', value: string) => void;
@@ -50,6 +49,11 @@
   export let setAllergenNumbersVisible: (value: boolean) => void;
   export let toggleAllergy: (id: number, checked: boolean) => void;
   let settingsQuery = '';
+  let subjectQuery = '';
+  let subjectSchool = '';
+  $: if ((school?.id ?? '') !== subjectSchool) { subjectSchool = school?.id ?? ''; subjectQuery = ''; }
+  $: managedSubjects = [...new Set([...subjectNames, ...Object.keys(displaySettings.subjectAliases), ...Object.keys(displaySettings.subjectColors)])].sort((a, b) => a.localeCompare(b, 'ko-KR'));
+  $: visibleSubjects = managedSubjects.filter((name) => `${name} ${displaySettings.subjectAliases[name] ?? ''}`.toLocaleLowerCase('ko-KR').includes(subjectQuery.trim().toLocaleLowerCase('ko-KR')));
   let teacherAliasQuery = '';
   let teacherAliasSchool = '';
   $: if ((school?.id ?? '') !== teacherAliasSchool) { teacherAliasSchool = school?.id ?? ''; teacherAliasQuery = ''; }
@@ -69,6 +73,13 @@
   $: rulePreview = calculateLessonTimes(ruleStart, ruleDuration, ruleBreak, ruleLunchAfter, ruleLunch, lessonTimePeriods.length);
   function settingsMatch(labels: string, query: string) {
     return !query.trim() || labels.toLocaleLowerCase('ko-KR').includes(query.trim().toLocaleLowerCase('ko-KR'));
+  }
+  function resetSubject(subject: string) {
+    const subjectAliases = { ...displaySettings.subjectAliases };
+    const subjectColors = { ...displaySettings.subjectColors };
+    delete subjectAliases[subject];
+    delete subjectColors[subject];
+    saveDisplaySettings({ ...displaySettings, subjectAliases, subjectColors });
   }
   function updateSettingsSearch(query: string) {
     settingsQuery = query;
@@ -157,13 +168,26 @@
                <p class="display-settings-hint">{useClassDisplay ? '현재 학급에만 적용돼요.' : '별도 설정이 없는 이 학교 학급에 적용돼요.'}</p>
                <div class="display-settings-grid">
                  <label>과목 색상<select aria-label="과목 색상" value={displaySettings.colorMode} onchange={(event) => setColorMode(event.currentTarget.value)}><option value="none">색상 없음 (기본)</option><option value="auto">자동 색상</option><option value="custom">직접 선택</option></select></label>
-                 <label>과목 선택<select aria-label="과목 선택" bind:value={selectedSubject} disabled={!subjectNames.length}><option value="">과목을 선택하세요</option>{#each subjectNames as subject}<option value={subject}>{subject}</option>{/each}</select></label>
-                 <label>과목 표시 이름<input type="text" value={displaySettings.subjectAliases[selectedSubject] || ''} disabled={!selectedSubject} maxlength="60" placeholder="원본 이름 유지" oninput={(event) => saveAlias('subject', selectedSubject, event.currentTarget.value)} /></label>
                  {#if displaySettings.colorMode === 'custom'}
-                   <label>선택한 과목 색상<input type="color" value={displaySettings.subjectColors[selectedSubject] || '#425a75'} disabled={!selectedSubject} onchange={(event) => saveSubjectColor(event.currentTarget.value)} /></label>
                    <button type="button" class="secondary-button display-reset" onclick={clearSubjectColors}>과목 색상 초기화</button>
                  {/if}
                </div>
+               <details class="subject-settings">
+                 <summary>과목 색상·표시 이름 관리</summary>
+                 <p class="display-settings-hint">원본 과목명은 바뀌지 않아요. 선택한 색상은 과목 색상에서 ‘직접 선택’을 선택하면 적용돼요.</p>
+                 <label class="subject-search">과목 목록 검색<input type="search" bind:value={subjectQuery} placeholder="원본 이름 또는 표시 이름" /></label>
+                 {#if visibleSubjects.length}
+                   <ul class="subject-list" aria-label="과목 색상과 표시 이름 목록">
+                     {#each visibleSubjects as subject (subject)}
+                       <li><div class="subject-original"><strong>{subject}</strong>{#if !subjectNames.includes(subject)} <small>저장된 과목</small>{/if}</div>
+                         <label class="subject-alias"><span class="sr-only">{subject} 표시 이름</span><input aria-label={`${subject} 표시 이름`} type="text" value={displaySettings.subjectAliases[subject] || ''} maxlength="60" placeholder="원본 이름 유지" onchange={(event) => saveAlias('subject', subject, event.currentTarget.value)} /></label>
+                         <label class="subject-color"><span class="sr-only">{subject} 색상</span><input aria-label={`${subject} 색상`} type="color" value={displaySettings.subjectColors[subject] || '#425a75'} onchange={(event) => saveSubjectColor(subject, event.currentTarget.value)} /><small>{displaySettings.subjectColors[subject] || '미설정'}</small></label>
+                         <button class="text-button" type="button" aria-label={`${subject} 설정 초기화`} disabled={!displaySettings.subjectAliases[subject] && !displaySettings.subjectColors[subject]} onclick={() => resetSubject(subject)}>초기화</button>
+                       </li>
+                     {/each}
+                   </ul>
+                 {:else}<p class="display-settings-hint">{managedSubjects.length ? '일치하는 과목이 없어요.' : '시간표에 등록된 과목이 없어요.'}</p>{/if}
+               </details>
                <details class="teacher-alias-settings">
                  <summary>교사 표시 이름 관리</summary>
                  <p class="display-settings-hint">원본 이름은 변경하지 않아요. 이름이 같은 교사는 원본에서 구분되지 않으면 함께 적용됩니다.</p>
@@ -274,7 +298,6 @@
 .display-settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:12px;padding:12px 0}
 .display-settings-grid label{display:grid;gap:5px;align-content:start;font-size:13px;color:var(--muted)}
 .display-settings-grid input:not([type="checkbox"]),.display-settings-grid select{width:100%;min-height:44px;background:var(--surface);color:var(--ink);border:1px solid var(--line);padding:8px;font:inherit;font-size:14px}
-.display-settings-grid input[type="color"]{cursor:pointer;padding:4px}
 .display-settings-grid .display-toggle{display:flex;align-items:center;gap:9px;min-height:44px;cursor:pointer}
 .display-settings-grid .display-reset{align-self:end;min-height:44px}
 .settings-backup{margin:0 0 14px;padding:0 14px 14px;border:1px solid var(--line)}
@@ -307,6 +330,8 @@
 .settings-cards>details>summary{min-height:48px;align-content:center;cursor:pointer;font-size:14px;line-height:1.4;font-weight:650}
 .settings-cards summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .settings-cards .display-toggle{display:flex;align-items:center;gap:9px;min-height:44px}
+.subject-settings{border-top:1px solid var(--line)}.subject-settings summary{cursor:pointer;min-height:44px;align-content:center;font-weight:650;font-size:14px}.subject-search{display:grid;gap:4px;font-size:13px}.subject-alias{min-width:0}.subject-search input,.subject-alias input{box-sizing:border-box;min-width:0;width:100%;min-height:44px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px;font:inherit}.subject-list{list-style:none;margin:12px 0;padding:0;max-height:420px;overflow:auto}.subject-list li{display:grid;grid-template-columns:minmax(70px,1fr) minmax(100px,2fr) auto auto;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}.subject-original{min-width:0;overflow-wrap:anywhere}.subject-original small{display:block;color:var(--muted);font-size:12px}.subject-color{display:flex;align-items:center;gap:4px}.subject-color input{box-sizing:border-box;width:44px;height:44px;padding:3px;border:1px solid var(--line);background:var(--surface);cursor:pointer}.subject-color small{color:var(--muted);font-size:11px}.subject-list button{min-height:44px}
+@media(max-width:500px){.subject-list li{grid-template-columns:minmax(0,1fr) auto auto}.subject-alias{grid-column:1 / -1;grid-row:2}.subject-search input,.subject-alias input{font-size:16px}}
 .teacher-alias-settings{border-top:1px solid var(--line)}.teacher-alias-settings summary{cursor:pointer;min-height:44px;align-content:center;font-weight:650;font-size:14px}.teacher-alias-search{display:grid;gap:4px;font-size:13px}.teacher-alias-settings input{min-width:0;width:100%;min-height:44px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px;font:inherit}.teacher-alias-list{list-style:none;margin:12px 0;padding:0;max-height:360px;overflow:auto}.teacher-alias-list li{display:grid;grid-template-columns:minmax(70px,1fr) minmax(100px,2fr) auto;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}.teacher-alias-list li>div{min-width:0;overflow-wrap:anywhere}.teacher-alias-list small{display:block;color:var(--muted);font-size:12px}.teacher-alias-list button{min-height:44px}
 @media(max-width:700px){.allergy-grid label{min-height:44px}}
 </style>
