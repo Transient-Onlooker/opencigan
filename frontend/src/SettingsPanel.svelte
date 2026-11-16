@@ -56,7 +56,7 @@
     settingsQuery = query;
     searchResults = [];
     if (!query.trim()) return;
-    for (const panel of settingsContent.querySelectorAll<HTMLDetailsElement>(':scope > details')) {
+    for (const panel of settingsContent.querySelectorAll<HTMLDetailsElement>(':scope > details, :scope > details > details')) {
       const summary = panel.querySelector<HTMLElement>(':scope > summary');
       if (!summary) continue;
       const category = summary.textContent?.trim() ?? '';
@@ -65,6 +65,7 @@
       }
       if (panel.classList.contains('personal-timetable-panel')) continue;
       for (const element of panel.querySelectorAll<HTMLElement>('label, button')) {
+        if (element.closest('details') !== panel) continue;
         const target = element.tagName === 'LABEL' ? element.querySelector<HTMLElement>('input,select') : element;
         if (!target) continue;
         const name = target.getAttribute('aria-label') || Array.from(element.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE || (node instanceof HTMLElement && node.tagName === 'SPAN')).map((node) => node.textContent).join('').trim();
@@ -76,6 +77,8 @@
     settingsQuery = '';
     searchResults = [];
     await tick();
+    const parent = result.panel.parentElement?.closest('details');
+    if (parent) parent.open = true;
     result.panel.open = true;
     await tick();
     const target = result.target.matches(':disabled') ? result.panel.querySelector<HTMLElement>('summary') : result.target;
@@ -187,8 +190,13 @@
              </details>
            {/if}
           {#if !school}<p class="display-settings-hint">학교를 선택하면 시간표 설정을 바꿀 수 있어요.</p>{/if}
-             <details class="meal-preferences" hidden={!settingsMatch('급식 보기 식사 조식 중식 석식 알레르기 번호', settingsQuery)} bind:open={settingsOpen.meals}><summary>급식 보기 설정</summary><div class="meal-preference-options" aria-label="표시할 식사"><span>표시할 식사</span>{#each mealTypes as type}<label><input type="checkbox" checked={enabledMealTypes.includes(type)} disabled={enabledMealTypes.length === 1 && enabledMealTypes.includes(type)} onchange={(event) => toggleMealType(type, event.currentTarget.checked)} />{type}</label>{/each}</div><label class="meal-number-toggle"><input type="checkbox" checked={showAllergenNumbers} onchange={(event) => setAllergenNumbersVisible(event.currentTarget.checked)} />메뉴의 알레르기 번호 표시</label><p>하루·주간 보기와 표시 설정은 이 브라우저에 저장돼요. 주의 알레르기 경고는 항상 표시됩니다.</p></details>
-             <details class="allergy-settings" hidden={!settingsMatch('급식 알레르기 주의', settingsQuery)} bind:open={settingsOpen.allergies}><summary>급식 알레르기 설정 {allergySelection.length ? `(${allergySelection.length}개 선택)` : ''}</summary><div class="allergy-grid">{#each allergens as name, index}<label><input type="checkbox" checked={allergySelection.includes(index + 1)} onchange={(event) => toggleAllergy(index + 1, event.currentTarget.checked)} /><span>{index + 1}. {name}</span></label>{/each}</div><p>선택 항목은 이 브라우저에만 저장돼요. NEIS에서 알레르기가 표시되지 않았더라도 안전하다는 뜻은 아니에요.</p></details>
+             <details class="meal-preferences" hidden={!settingsMatch('급식 보기 식사 조식 중식 석식 알레르기 번호', settingsQuery)} bind:open={settingsOpen.meals}>
+               <summary>급식 설정</summary>
+               <div class="meal-preference-options" aria-label="표시할 식사"><span>표시할 식사</span>{#each mealTypes as type}<label><input type="checkbox" checked={enabledMealTypes.includes(type)} disabled={enabledMealTypes.length === 1 && enabledMealTypes.includes(type)} onchange={(event) => toggleMealType(type, event.currentTarget.checked)} />{type}</label>{/each}</div>
+               <label class="meal-number-toggle"><input type="checkbox" checked={showAllergenNumbers} onchange={(event) => setAllergenNumbersVisible(event.currentTarget.checked)} />메뉴의 알레르기 번호 표시</label>
+               <p>하루·주간 보기와 표시 설정은 이 브라우저에 저장돼요. 주의 알레르기 경고는 항상 표시됩니다.</p>
+               <details class="allergy-settings" bind:open={settingsOpen.allergies}><summary>알레르기 관리 {allergySelection.length ? `(${allergySelection.length}개 선택)` : ''}</summary><div class="allergy-grid">{#each allergens as name, index}<label><input type="checkbox" checked={allergySelection.includes(index + 1)} onchange={(event) => toggleAllergy(index + 1, event.currentTarget.checked)} /><span>{index + 1}. {name}</span></label>{/each}</div><p>선택 항목은 이 브라우저에만 저장돼요. NEIS에서 알레르기가 표시되지 않았더라도 안전하다는 뜻은 아니에요.</p></details>
+             </details>
           </div>
         </section>
 
@@ -216,7 +224,7 @@
 .lesson-time-settings{margin:0 0 14px;padding:0 14px 14px;border:1px solid var(--line)}.lesson-time-settings summary{min-height:44px;align-content:center;cursor:pointer;font-size:14px;font-weight:650}.lesson-time-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.lesson-time-row{display:grid;grid-template-columns:50px repeat(2,minmax(0,1fr));gap:8px;align-items:center;min-width:0;font-size:13px}.lesson-time-row>strong{font-size:13px;white-space:nowrap}.lesson-time-row label{display:grid;gap:4px;min-width:0;color:var(--muted)}.lesson-time-row input{min-width:0;width:100%;min-height:44px;padding:7px 8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:16px}.lesson-time-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 0}.lesson-time-settings .state-inline{margin-top:10px}
 @media(max-width:700px){.lesson-time-grid{grid-template-columns:1fr}.lesson-time-row{grid-template-columns:50px repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.display-settings-grid input:not([type="checkbox"]),.display-settings-grid select{font-size:16px}}
-.allergy-settings{border:1px solid var(--line);margin:0 0 16px;padding:0 14px}
+.allergy-settings{border-top:1px solid var(--line);margin:0 0 12px}
 .meal-preferences{border:1px solid var(--line);margin:0 0 12px;padding:0 14px}
 .meal-preferences summary{cursor:pointer;font-size:14px;font-weight:700;min-height:44px;align-content:center}
 .meal-preference-options{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 12px}

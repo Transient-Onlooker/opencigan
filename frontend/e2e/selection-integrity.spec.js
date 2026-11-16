@@ -593,6 +593,33 @@ test('meal menu search, allergy filters, NEIS details and timetable date link wo
   await expect(page.locator('#today-date')).toHaveValue(week);
 });
 
+test('meal settings keep allergy preferences and allow search navigation into the nested panel', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('opensigan-allergies')) localStorage.setItem('opensigan-allergies', '[1]');
+    if (!localStorage.getItem('opensigan-meal-preferences')) localStorage.setItem('opensigan-meal-preferences', JSON.stringify({ view: 'day', types: ['중식'], showAllergenNumbers: true }));
+  });
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('급식 설정', { exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: '중식', exact: true })).toBeChecked();
+  await expect(page.getByText('알레르기 관리 (1개 선택)', { exact: true })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: '1. 난류' })).toBeHidden();
+  await page.getByRole('searchbox', { name: '설정 검색' }).fill('알레르기');
+  await page.getByRole('list', { name: '설정 검색 결과' }).getByRole('button', { name: /알레르기 관리/ }).click();
+  await expect(page.getByRole('checkbox', { name: '1. 난류' })).toBeChecked();
+  await page.getByRole('checkbox', { name: '2. 우유' }).check();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('opensigan-allergies'))).toBe('[1,2]');
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  await expect(page.getByText(/주의: 1\. 난류, 2\. 우유/)).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('급식 설정', { exact: true }).click();
+  await page.getByText('알레르기 관리 (2개 선택)', { exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: '2. 우유' })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: '중식', exact: true })).toBeChecked();
+});
+
 test('back and forward restore the app tab and class without adding history entries', async ({ page }) => {
   await mockApi(page);
   await page.goto('/' + sharedHash(1));
@@ -631,7 +658,7 @@ test('legacy favorites remain stored while settings search and keyboard help wor
   await expect(emptyPeriodHelp.locator('..').getByText(/수집된 수업 기록이 없는 칸/)).toBeVisible();
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByRole('searchbox', { name: '설정 검색' }).fill('알레르기');
-  await expect(page.getByRole('list', { name: '설정 검색 결과' }).getByRole('button', { name: /급식 알레르기 설정/ })).toBeVisible();
+  await expect(page.getByRole('list', { name: '설정 검색 결과' }).getByRole('button', { name: /알레르기 관리/ })).toBeVisible();
   await expect(page.getByText('학교 교시 시각 설정', { exact: true })).toBeHidden();
   for (const width of [320, 800, 1366]) {
     await page.setViewportSize({ width, height: 844 });
