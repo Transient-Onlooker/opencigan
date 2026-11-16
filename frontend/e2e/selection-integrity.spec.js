@@ -176,7 +176,7 @@ test('school settings backup restores display preferences and bell times', async
   await page.getByText('학교 교시 시각 설정', { exact: true }).click();
   await page.getByText('상세 시간 설정하기', { exact: true }).click();
   await page.getByLabel('1교시 시작', { exact: true }).fill('08:30');
-  await page.getByLabel('1교시 종료').fill('09:20');
+  await page.getByLabel('1교시 종료', { exact: true }).fill('09:20');
   await page.getByRole('button', { name: '시각 저장' }).click();
   await page.getByText('설정 백업·복원', { exact: true }).click();
   const downloadPromise = page.waitForEvent('download');
@@ -200,7 +200,7 @@ test('school settings backup restores display preferences and bell times', async
   await page.getByText('학교 교시 시각 설정', { exact: true }).click();
   await page.getByText('상세 시간 설정하기', { exact: true }).click();
   await expect(page.getByLabel('시간표에 교사 표시')).not.toBeChecked();
-  await expect(page.getByLabel('1교시 종료')).toHaveValue('09:20');
+  await expect(page.getByLabel('1교시 종료', { exact: true })).toHaveValue('09:20');
 });
 
 test('older version 1 school settings files can still be imported', async ({ page }) => {
