@@ -21,7 +21,7 @@
   import { createHistorySession } from './history-session';
   import { createMealSession } from './meal-session';
   import { createSchoolSearchSession } from './school-search-session';
-  import { classLessons, teacherLessons, teacherNamesInTimetable, gradeLessons, comparisonClasses, missingWeekdayDates, observedClassCount as countObservedClasses, subjectNamesInTimetable } from './timetable-view';
+  import { classLessons, teacherLessons, teacherNamesInTimetable, teacherSuggestions as findTeacherSuggestions, selectedTeacherName as findSelectedTeacherName, gradeLessons, comparisonClasses, missingWeekdayDates, observedClassCount as countObservedClasses, subjectNamesInTimetable } from './timetable-view';
   import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, type LessonTimes } from './lesson-times';
   import { createClassDisplayPreferences, defaultDisplaySettings, parseDisplaySettings, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
   import { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
@@ -147,8 +147,8 @@
   $: teacherNames = teacherNamesInTimetable(timetable?.records ?? []);
   $: observedClassCount = countObservedClasses(timetable?.records ?? []);
   $: subjectNames = subjectNamesInTimetable(timetable?.records ?? []);
-  $: teacherSuggestions = teacherNames.filter((name) => [name, displayTeacher(name, displaySettings)].some((label) => label.toLocaleLowerCase('ko-KR').includes(teacherQuery.trim().toLocaleLowerCase('ko-KR'))));
-  $: selectedTeacherName = teacherNames.find((name) => name === teacherQuery.trim() || displayTeacher(name, displaySettings) === teacherQuery.trim()) ?? '';
+  $: teacherSuggestions = findTeacherSuggestions(teacherNames, teacherQuery, (name) => displayTeacher(name, displaySettings));
+  $: selectedTeacherName = findSelectedTeacherName(teacherNames, teacherQuery, (name) => displayTeacher(name, displaySettings));
   $: selectedTeacherRecords = teacherLessons(timetable?.records ?? [], selectedTeacherName);
   $: classActionsReady = !!school && timetable?.schoolId === school.id && timetable.weekStart === week && filtered.length > 0 && !classError && !pendingSharedClass && !sharedSchoolChecking;
   $: canExport = !!school && timetable?.schoolId === school.id && timetable.weekStart === week && !classError && !pendingSharedClass && !sharedSchoolChecking && (timetableView === 'teacher' ? selectedTeacherRecords.length > 0 : classActionsReady && (timetableView === 'week' || timetableView === 'today' && selectedClassLessons.length > 0));

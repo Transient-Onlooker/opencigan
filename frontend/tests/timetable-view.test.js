@@ -15,6 +15,16 @@ test('class and teacher selections preserve lesson order and all simultaneous le
   assert.equal(view.teacherLessons(records, '').length, 0);
 });
 
+test('teacher suggestions accept partial original and displayed names but selection requires an exact match', () => {
+  const names = ['김교사', '이교사'];
+  const display = (name) => name === '김교사' ? 'Math T' : name;
+  assert.deepEqual(Array.from(view.teacherSuggestions(names, ' math ', display)), ['김교사']);
+  assert.deepEqual(Array.from(view.teacherSuggestions(names, '교사', display)), names);
+  assert.equal(view.selectedTeacherName(names, ' Math T ', display), '김교사');
+  assert.equal(view.selectedTeacherName(names, '김교사', display), '김교사');
+  assert.equal(view.selectedTeacherName(names, '교사', display), '');
+});
+
 test('grade comparison and missing weekdays keep scope and ordering', () => {
   const records = [
     { grade: 2, class: '10', date: 'mon' },
