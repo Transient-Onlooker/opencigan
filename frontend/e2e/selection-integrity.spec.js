@@ -429,6 +429,32 @@ test('online server failure restores the matching saved timetable and retry reco
   await expect(panel.getByText('이 기기에 저장된 시간표 · 최신 정보가 아닐 수 있어요')).toHaveCount(0);
 });
 
+test('timetable outage without a saved copy leaves meals available and retry recovers', async ({ page }) => {
+  await page.addInitScript((savedSchool) => {
+    localStorage.setItem('opensigan-school', JSON.stringify(savedSchool));
+    localStorage.setItem('opensigan-grade', '1');
+    localStorage.setItem('opensigan-class', '1');
+    localStorage.removeItem('opensigan-offline-timetable');
+  }, school);
+  await mockApi(page);
+  let fail = true;
+  await page.route('**/api/v1/timetable?*', (route) => fail
+    ? route.fulfill({ status: 503, json: { code: 'upstream_unavailable' } })
+    : route.fulfill({ json: timetable }));
+  await page.goto('/');
+  const panel = page.locator('#timetable-panel');
+  await expect(panel.getByRole('alert')).toContainText('이 학교와 주에 저장된 시간표가 없어요');
+  await expect(panel.getByRole('alert')).toContainText('원본에서 데이터를 가져오지');
+  await expect(panel.getByRole('table')).toHaveCount(0);
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  await expect(page.getByText('김치볶음밥(5.6)').first()).toBeVisible();
+  fail = false;
+  await page.getByRole('button', { name: '시간표', exact: true }).click();
+  await panel.getByRole('button', { name: '다시 시도' }).click();
+  await expect(panel.getByRole('table')).toContainText('과목1');
+  await expect(panel.getByRole('alert')).toHaveCount(0);
+});
+
 test('school search shows matching saved results on failure and clears the notice after recovery', async ({ page }) => {
   await mockApi(page);
   let fail = false;
