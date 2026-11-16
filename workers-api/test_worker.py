@@ -171,6 +171,40 @@ class ContractTest(unittest.TestCase):
             self.assertEqual(worker_body, {key: value for key, value in python_body.items() if key != "cacheStatus"})
             self.assertIn(python_body["cacheStatus"], ("hit", "miss", "stale"))
 
+    def test_python_and_worker_share_meal_contract(self):
+        from backend import app as python_app
+        from backend.cache import Cache
+
+        schools = [worker.School("B10", "1234567", "school", "high", "address")]
+        meals = [types.SimpleNamespace(date="2026-11-10", meal_type="lunch", menu="rice(1)<BR />soup(2)",
+                                       calories="500", nutrition="protein", origin="rice")]
+
+        def python_request(url):
+            parts = urlsplit(url)
+            status, _, body = python_app._dispatch_request("GET", parts.path, parts.query, cache_instance=Cache())
+            return status, json.loads(body)
+
+        with patch.dict(os.environ, {"NEIS_API_KEY": "mock-key"}), \
+             patch.object(worker.time, "time", return_value=1000) as clock, \
+             patch.object(worker, "NEISClient") as worker_client, \
+             patch.object(python_app.NEISClient, "from_environment") as python_client:
+            for client in (worker_client.return_value, python_client.return_value):
+                client.search_schools.return_value = schools
+                client.get_meals.return_value = meals
+            url = "/api/v1/neis/schools?q=school"
+            self.assertEqual(self.request(url, key="mock-key"), python_request(url))
+            clock.return_value = 1001
+            url = "/api/v1/meals?school=B10%3A1234567&from=2026-11-09&to=2026-11-15"
+            worker_status, worker_body = self.request(url, key="mock-key")
+            python_status, python_body = python_request(url)
+            self.assertEqual(worker_status, python_status)
+            self.assertEqual(worker_body["stale"], python_body["stale"])
+            self.assertEqual(worker_body["meals"], [
+                {key: meal[key] for key in ("date", "type", "dishes")} for meal in python_body["meals"]
+            ])
+            self.assertEqual({key: python_body["meals"][0][key] for key in ("calories", "nutrition", "origin")},
+                             {"calories": "500", "nutrition": "protein", "origin": "rice"})
+
     def test_school_search_maps_provider_rows_and_caches_result(self):
         fixture = [
             [6347, "region A", "Example", 76524],
