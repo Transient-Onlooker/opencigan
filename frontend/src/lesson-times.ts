@@ -8,6 +8,25 @@ function minutes(value: string): number | null {
   return hours * 60 + part;
 }
 
+export function calculateLessonTimes(start: string, duration: string, breakMinutes: string, lunchAfter: string, lunchMinutes: string, count: number): LessonTimes | null {
+  const initial = minutes(start);
+  if (initial === null || !/^\d+$/.test(duration) || !/^\d+$/.test(breakMinutes) || !Number.isInteger(count) || count < 1 || count > 20) return null;
+  const lesson = Number(duration), pause = Number(breakMinutes);
+  if (lesson < 1 || lesson > 1440 || pause > 1440) return null;
+  const hasLunch = lunchAfter !== '';
+  if (hasLunch && (!/^\d+$/.test(lunchAfter) || !/^\d+$/.test(lunchMinutes) || Number(lunchAfter) < 1 || Number(lunchAfter) >= count || Number(lunchMinutes) > 1440)) return null;
+  const format = (value: number) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
+  const result: LessonTimes = {};
+  let current = initial;
+  for (let period = 1; period <= count; period++) {
+    const end = current + lesson;
+    if (end >= 1440) return null;
+    result[period] = { start: format(current), end: format(end) };
+    current = end + (hasLunch && period === Number(lunchAfter) ? Number(lunchMinutes) : pause);
+  }
+  return result;
+}
+
 export function parseLessonTimes(value: unknown): LessonTimes {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const result: LessonTimes = {};

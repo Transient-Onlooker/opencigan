@@ -3,6 +3,7 @@
   import Icon from './Icon.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import { allergens } from './allergens';
+  import { calculateLessonTimes, type LessonTimes } from './lesson-times';
   import type { School } from './api';
   import type { DisplaySettings } from './personalization';
   export let view: 'timetable' | 'meals' | 'settings';
@@ -37,6 +38,7 @@
   export let clearSubjectColors: () => void;
   export let saveDisplaySettings: (value: DisplaySettings) => void;
   export let editLessonTime: (period: number, part: 'start' | 'end', value: string) => void;
+  export let applyLessonTimeRules: (value: LessonTimes) => void;
   export let saveLessonTimes: () => void;
   export let clearLessonTimes: () => void;
   export let downloadSettingsBackup: (classOnly?: boolean) => void;
@@ -49,6 +51,13 @@
   let settingsOpen = { general: false, display: false, advanced: false, times: false, backup: false, meals: false, allergies: false, personal: false };
   let settingsContent: HTMLElement;
   let searchResults: { name: string; category: string; target: HTMLElement; panel: HTMLDetailsElement }[] = [];
+  let ruleSchool = '';
+  let ruleStart = '', ruleDuration = '', ruleBreak = '', ruleLunchAfter = '', ruleLunch = '';
+  $: if ((school?.id ?? '') !== ruleSchool) {
+    ruleSchool = school?.id ?? '';
+    ruleStart = ''; ruleDuration = ''; ruleBreak = ''; ruleLunchAfter = ''; ruleLunch = '';
+  }
+  $: rulePreview = calculateLessonTimes(ruleStart, ruleDuration, ruleBreak, ruleLunchAfter, ruleLunch, lessonTimePeriods.length);
   function settingsMatch(labels: string, query: string) {
     return !query.trim() || labels.toLocaleLowerCase('ko-KR').includes(query.trim().toLocaleLowerCase('ko-KR'));
   }
@@ -164,6 +173,23 @@
              <details class="lesson-time-settings" hidden={!settingsMatch('학교 교시 시각 시간 시작 종료', settingsQuery)} bind:open={settingsOpen.times}>
                <summary>학교 교시 시각 설정</summary>
                <p class="display-settings-hint">학교에서 확인한 실제 시작·종료 시각을 입력해 주세요. 설정은 이 브라우저의 해당 학교에만 저장되며, 입력하지 않은 교시는 추측하지 않습니다.</p>
+               <div class="lesson-rule-grid">
+                 <label>1교시 시작 시각<input type="time" bind:value={ruleStart} /></label>
+                 <label>수업 시간 (분)<input type="number" min="1" max="1440" step="1" value={ruleDuration} oninput={(event) => ruleDuration = event.currentTarget.value} /></label>
+                 <label>기본 쉬는 시간 (분)<input type="number" min="0" max="1440" step="1" value={ruleBreak} oninput={(event) => ruleBreak = event.currentTarget.value} /></label>
+                 <label>점심시간 시작<select bind:value={ruleLunchAfter}><option value="">점심시간 없음</option>{#each lessonTimePeriods.slice(0, -1) as period}<option value={String(period)}>{period}교시 후</option>{/each}</select></label>
+                 {#if ruleLunchAfter}<label>점심시간 길이 (분)<input type="number" min="0" max="1440" step="1" value={ruleLunch} oninput={(event) => ruleLunch = event.currentTarget.value} /></label>{/if}
+               </div>
+               {#if rulePreview}
+                 <div class="lesson-preview" aria-label="계산된 교시 시각 미리보기">
+                   <strong>계산 미리보기</strong>
+                   <p>학교에서 확인한 시간과 비교해 주세요. 적용하면 아래 입력값이 교체되며 저장 전에는 반영되지 않아요.</p>
+                   <ol>{#each lessonTimePeriods as period}<li>{period}교시 {rulePreview[period].start}–{rulePreview[period].end}</li>{/each}</ol>
+                   <button class="secondary-button" type="button" onclick={() => rulePreview && applyLessonTimeRules(rulePreview)}>계산값 입력란에 적용</button>
+                 </div>
+               {:else if ruleStart || ruleDuration || ruleBreak || ruleLunchAfter || ruleLunch}
+                 <p class="state-inline" role="status">시작 시각과 수업·쉬는 시간을 입력하고, 선택한 점심시간과 하루 범위를 확인해 주세요.</p>
+               {/if}
                <div class="lesson-time-grid">
                  {#each lessonTimePeriods as period}
                    <div class="lesson-time-row">
@@ -222,6 +248,7 @@
 .settings-import input{max-width:100%;min-width:0;font-size:13px}
 .settings-backup .state-inline{margin-top:10px}
 .lesson-time-settings{margin:0 0 14px;padding:0 14px 14px;border:1px solid var(--line)}.lesson-time-settings summary{min-height:44px;align-content:center;cursor:pointer;font-size:14px;font-weight:650}.lesson-time-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.lesson-time-row{display:grid;grid-template-columns:50px repeat(2,minmax(0,1fr));gap:8px;align-items:center;min-width:0;font-size:13px}.lesson-time-row>strong{font-size:13px;white-space:nowrap}.lesson-time-row label{display:grid;gap:4px;min-width:0;color:var(--muted)}.lesson-time-row input{min-width:0;width:100%;min-height:44px;padding:7px 8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:16px}.lesson-time-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 0}.lesson-time-settings .state-inline{margin-top:10px}
+.lesson-rule-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px;margin:12px 0}.lesson-rule-grid label{display:grid;gap:4px;min-width:0;font-size:13px;color:var(--muted)}.lesson-rule-grid input,.lesson-rule-grid select{width:100%;min-width:0;min-height:44px;padding:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:16px}.lesson-preview{margin:12px 0;padding:12px;border:1px solid var(--line)}.lesson-preview p{color:var(--muted);font-size:13px}.lesson-preview ol{display:flex;flex-wrap:wrap;gap:6px 18px;list-style:none;padding:0;font-size:13px}
 @media(max-width:700px){.lesson-time-grid{grid-template-columns:1fr}.lesson-time-row{grid-template-columns:50px repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.display-settings-grid input:not([type="checkbox"]),.display-settings-grid select{font-size:16px}}
 .allergy-settings{border-top:1px solid var(--line);margin:0 0 12px}
