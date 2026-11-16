@@ -119,3 +119,28 @@ for (const theme of ['light', 'dark']) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   });
 }
+
+for (const density of ['compact', 'relaxed']) {
+  test(`mobile ${density} timetable retains its density rules`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 700 });
+    const school = { id: '2:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
+    await page.clock.setFixedTime(new Date('2026-11-09T02:00:00Z'));
+    await page.addInitScript(({ school, density }) => {
+      localStorage.setItem('opensigan-school', JSON.stringify(school));
+      localStorage.setItem('opensigan-display:' + school.id, JSON.stringify({ density }));
+    }, { school, density });
+    await page.route('**/api/v1/**', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname === '/api/v1/timetable') return route.fulfill({ json: {
+        schoolId: school.id, weekStart: url.searchParams.get('week'), fetchedAt: '2026-11-09T01:00:00Z', sourceUpdatedAt: null, stale: false,
+        records: [{ grade: 1, class: 1, date: '2026-11-09', period: 1, subject: '수학', teacher: '김교사', isChanged: false }],
+      } });
+      return route.fulfill({ json: { schools: [], meals: [], changes: [], stale: false } });
+    });
+    await page.goto('/');
+    const cell = page.locator('.timetable .class-cell').first();
+    await expect(cell).toBeVisible();
+    if (density === 'compact') expect(await cell.locator('strong').evaluate((element) => getComputedStyle(element).fontSize)).toBe('11px');
+    else expect(await cell.evaluate((element) => getComputedStyle(element).rowGap)).toBe('8px');
+  });
+}
