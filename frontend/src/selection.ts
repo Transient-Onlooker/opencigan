@@ -65,6 +65,12 @@ export function validateSharedClass(timetable: TimetableResponse | null, fromDev
   return 'valid';
 }
 
+export function validateSharedCandidate(timetable: TimetableResponse | null, school: School, week: string, grade: number, classroom: number): boolean {
+  const maxGrade = /(?:중학교|고등학교)/.test(school.name) ? 3 : 6;
+  return timetable?.schoolId === school.id && timetable.weekStart === week &&
+    validateSharedClass(timetable, false, maxGrade, grade, classroom) === 'valid';
+}
+
 export type PendingSharedClass = {
   schoolId: string;
   grade: number;
