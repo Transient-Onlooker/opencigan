@@ -21,6 +21,9 @@ test('only /api/v1/ routes are forwarded; no open proxy', async () => {
   const { env, calls } = setup();
   assert.equal((await worker.fetch(req('/private?url=http://evil.test'), env)).status, 404);
   assert.equal((await worker.fetch(req('/api/other'), env)).status, 404);
+  assert.equal((await worker.fetch(req('/api/v1/unknown'), env)).status, 404);
+  assert.equal((await worker.fetch(req('/api/v1/%2e%2e/admin'), env)).status, 404);
+  assert.equal((await worker.fetch(req('/api/v1/status', {method: 'POST'}), env)).status, 405);
   assert.equal(calls.length, 0);
 });
 
@@ -69,7 +72,7 @@ test('OPTIONS bypasses rate limits for CORS preflight and still reaches Pi', asy
 
 test('webhook PUT preserves authorization and JSON body', async () => {
   const { env, calls } = setup();
-  const response = await worker.fetch(req('/api/v1/webhooks/abc', {
+  const response = await worker.fetch(req('/api/v1/webhooks/abcdefghijklmnopqrstuvwx', {
     method: 'PUT',
     headers: { 'Authorization': 'Bearer example', 'Content-Type': 'application/json' },
     body: '{"filters":{}}',
@@ -78,6 +81,26 @@ test('webhook PUT preserves authorization and JSON body', async () => {
   assert.equal(calls[0].method, 'PUT');
   assert.equal(calls[0].headers.get('authorization'), 'Bearer example');
   assert.equal(await calls[0].text(), '{"filters":{}}');
+});
+
+test('limits streamed request bodies to the backend 4096 byte limit', async () => {
+  const { env, calls } = setup();
+  const path = '/api/v1/analytics/pageview';
+  const accepted = await worker.fetch(req(path, {method: 'POST', body: 'a'.repeat(4096)}), env);
+  assert.equal(accepted.status, 200);
+  assert.equal((await calls[0].arrayBuffer()).byteLength, 4096);
+  const oversized = await worker.fetch(req(path, {method: 'POST', body: 'a'.repeat(4097)}), env);
+  assert.equal(oversized.status, 413);
+  assert.equal((await oversized.json()).code, 'payload_too_large');
+  assert.equal(calls.length, 1);
+  const stream = new ReadableStream({start(controller) {
+    controller.enqueue(new Uint8Array(4096));
+    controller.enqueue(new Uint8Array(1));
+    controller.close();
+  }});
+  const streamed = await worker.fetch(req(path, {method: 'POST', body: stream, duplex: 'half'}), env);
+  assert.equal(streamed.status, 413);
+  assert.equal(calls.length, 1);
 });
 
 test('private service errors do not expose internal exception messages', async () => {
