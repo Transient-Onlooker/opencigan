@@ -174,6 +174,7 @@ test('school settings backup restores display preferences and bell times', async
   await page.getByText('시간표 표시 설정', { exact: true }).click();
   await page.getByLabel('시간표에 교사 표시').uncheck();
   await page.getByText('학교 교시 시각 설정', { exact: true }).click();
+  await page.getByText('상세 시간 설정하기', { exact: true }).click();
   await page.getByLabel('1교시 시작', { exact: true }).fill('08:30');
   await page.getByLabel('1교시 종료').fill('09:20');
   await page.getByRole('button', { name: '시각 저장' }).click();
@@ -197,6 +198,7 @@ test('school settings backup restores display preferences and bell times', async
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByText('시간표 표시 설정', { exact: true }).click();
   await page.getByText('학교 교시 시각 설정', { exact: true }).click();
+  await page.getByText('상세 시간 설정하기', { exact: true }).click();
   await expect(page.getByLabel('시간표에 교사 표시')).not.toBeChecked();
   await expect(page.getByLabel('1교시 종료')).toHaveValue('09:20');
 });
@@ -674,7 +676,7 @@ test('timed calendar includes bell times only after explicit consent and closes 
   await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByRole('searchbox', { name: '설정 검색' }).fill('교시');
-  await page.getByRole('list', { name: '설정 검색 결과' }).getByRole('button', { name: '1교시 시작 학교 교시 시각 설정', exact: true }).click();
+  await page.getByRole('list', { name: '설정 검색 결과' }).getByRole('button', { name: '1교시 시작 상세 시간 설정하기', exact: true }).click();
   await page.getByLabel('1교시 시작', { exact: true }).fill('09:00');
   await page.getByLabel('1교시 종료', { exact: true }).fill('09:50');
   await page.getByRole('button', { name: '시각 저장', exact: true }).click();
@@ -703,13 +705,22 @@ test('lesson time rules preview lunch and require explicit application and savin
   await page.getByLabel('점심시간 시작').selectOption('4');
   await page.getByLabel('점심시간 길이 (분)').fill('60');
   await expect(page.getByLabel('계산된 교시 시각 미리보기')).toContainText('5교시 13:05–13:55');
+  await page.getByText('상세 시간 설정하기', { exact: true }).click();
   await expect(page.getByLabel('1교시 시작', { exact: true })).toHaveValue('');
   await page.getByRole('button', { name: '계산값 입력란에 적용' }).click();
   await expect(page.getByLabel('5교시 시작', { exact: true })).toHaveValue('13:05');
+  await page.getByLabel('5교시 시작', { exact: true }).fill('13:10');
+  await page.getByRole('button', { name: '5교시 계산값으로 되돌리기' }).click();
+  await expect(page.getByLabel('5교시 시작', { exact: true })).toHaveValue('13:05');
+  await page.getByLabel('5교시 시작', { exact: true }).fill('12:00');
+  await page.getByRole('button', { name: '시각 저장', exact: true }).click();
+  await expect(page.getByText(/시간 순서와 겹침 여부/)).toBeVisible();
+  expect(await page.evaluate((id) => localStorage.getItem('opensigan-lesson-times:' + id), school.id)).toBeNull();
+  await page.getByLabel('5교시 시작', { exact: true }).fill('13:10');
   expect(await page.evaluate((id) => localStorage.getItem('opensigan-lesson-times:' + id), school.id)).toBeNull();
   await page.getByRole('button', { name: '시각 저장', exact: true }).click();
   await expect(page.getByText('이 학교의 교시 시각을 저장했어요.')).toBeVisible();
-  expect(JSON.parse(await page.evaluate((id) => localStorage.getItem('opensigan-lesson-times:' + id), school.id))[5].start).toBe('13:05');
+  expect(JSON.parse(await page.evaluate((id) => localStorage.getItem('opensigan-lesson-times:' + id), school.id))[5].start).toBe('13:10');
 });
 
 test('personal schedule preserves entered dates when saving lessons and events', async ({ page, browserName, context }) => {
