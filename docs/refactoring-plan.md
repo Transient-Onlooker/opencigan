@@ -160,6 +160,8 @@ backend/
 | 운영·실험 코드 | 접속 로그와 분석 기록기의 종료 정책 차이를 검토해 별도로 유지한다. Workers 재현 절차·공동 계약과 wheel 의존성 검토 결과는 위 조사 기록을 따른다. |
 | 최종 적용 | PR의 최신 커밋 CI와 병합 후 Pages 배포는 각각 확인이 필요하다. RPi 운영 버전 교체와 실기기·외부망 검증은 별도로 확인한다. |
 
+2026-11-16 운영 상태 확인: RPi의 `opensigan.service`와 `opensigan-preview.service`는 active이며 작업 디렉터리는 각각 `release-warp-20261116`과 `release-9372745`다. API 릴리스의 Git 기준은 `54f89b935491a404dc251713ca652ad048b0599e`이며 WARP 적용 파일은 미커밋 상태다. `backend/timetable.py`와 `backend/comcigan_proxy.py`의 Git blob 해시는 각각 `39f2c17498f790094dafe6cb4e30cf4c5c240096`, `37ce1b1a1389d1f021697790ffc69ea29a821d0d`로 당시 리팩터링 브랜치와 일치했다. 이는 두 파일만의 비교이며 API 전체가 최신 main과 같다는 뜻이 아니다. 서비스 설정과 파일은 변경하지 않았다. 복귀 절차는 [운영 가이드](operations.md)를 따른다.
+
 ### 브라우저 회귀 기록 — 2026-11-16
 
 - 병합 커밋 `5490a66`을 기준으로 한 후속 브랜치에서 Chromium·WebKit 전체 Playwright 검사를 실행해 65개가 통과했다. WebKit 오프라인 쉘 재시작 1개는 기존 테스트 설정으로 건너뛰었으므로 검증 완료가 아니다.
