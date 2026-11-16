@@ -84,3 +84,38 @@ for (const viewport of [{ width: 320, height: 700 }, { width: 667, height: 375 }
     });
   }
 }
+
+for (const theme of ['light', 'dark']) {
+  test(`mobile settings and meals remain usable in ${theme} mode`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 700 });
+    const school = { id: '2:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
+    await page.clock.setFixedTime(new Date('2026-11-09T02:00:00Z'));
+    await page.addInitScript(({ school, theme }) => {
+      localStorage.setItem('opensigan-school', JSON.stringify(school));
+      localStorage.setItem('opensigan-theme', theme);
+    }, { school, theme });
+    await page.route('**/api/v1/**', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname === '/api/v1/timetable') return route.fulfill({ json: {
+        schoolId: school.id, weekStart: url.searchParams.get('week'), fetchedAt: '2026-11-09T01:00:00Z',
+        sourceUpdatedAt: null, stale: false, records: [{ grade: 1, class: 1, date: '2026-11-09', period: 1, subject: '수학', teacher: null, isChanged: false }],
+      } });
+      if (url.pathname === '/api/v1/neis/schools') return route.fulfill({ json: { schools: [{ id: 'B10:1234567', name: school.name, region: '서울', address: '서울특별시' }], stale: false } });
+      if (url.pathname === '/api/v1/meals') return route.fulfill({ json: { meals: [{ date: '2026-11-09', type: '중식', dishes: ['계란말이(1.2)'] }], stale: false } });
+      return route.fulfill({ json: { schools: [], changes: [], stale: false } });
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: '설정', exact: true }).click();
+    const search = page.getByLabel('설정 검색');
+    await search.focus();
+    await expect(search).toBeFocused();
+    expect(await search.evaluate((element) => getComputedStyle(element).fontSize)).toBe('16px');
+    if (theme === 'dark') await expect(page.locator('.app-shell')).toHaveClass(/dark/);
+    else await expect(page.locator('.app-shell')).not.toHaveClass(/dark/);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+    await search.blur();
+    await page.getByRole('button', { name: '급식', exact: true }).click();
+    await expect(page.getByText('계란말이(1.2)')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  });
+}
