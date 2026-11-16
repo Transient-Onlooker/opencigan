@@ -278,7 +278,7 @@ export async function saveTimetablePdf(options: ExportOptions) {
   downloadFile(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), pdfFilename);
 }
 
-export async function shareTimetablePng(options: ExportOptions): Promise<'shared' | 'downloaded' | 'cancelled'> {
+export async function shareTimetablePng(options: ExportOptions): Promise<'shared' | 'unsupported' | 'failed' | 'cancelled'> {
   const { blob, filename } = await createTimetablePng(options);
   if (typeof File !== 'undefined' && typeof navigator.share === 'function') {
     const file = new File([blob], filename, { type: 'image/png' });
@@ -289,9 +289,10 @@ export async function shareTimetablePng(options: ExportOptions): Promise<'shared
       }
     } catch (error) {
       if (error && typeof error === 'object' && 'name' in error && error.name === 'AbortError') return 'cancelled';
-      // 공유를 지원하지 않거나 사용자 동작이 만료된 브라우저에서는 파일 저장으로 전환합니다.
+      downloadFile(blob, filename);
+      return 'failed';
     }
   }
   downloadFile(blob, filename);
-  return 'downloaded';
+  return 'unsupported';
 }

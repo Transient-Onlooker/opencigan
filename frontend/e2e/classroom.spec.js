@@ -2,6 +2,38 @@ import { expect, test } from '@playwright/test';
 
 test.describe('classroom navigation', () => {
 test.use({ serviceWorkers: 'block' });
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(navigator, 'share', { value: undefined, configurable: true }));
+});
+test('image action offers download after cancelling share', async ({ page }) => {
+  const school = { id: '2:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
+  await page.clock.setFixedTime(new Date('2026-11-09T02:00:00Z'));
+  await page.addInitScript((value) => localStorage.setItem('opensigan-school', JSON.stringify(value)), school);
+  await page.route('**/api/v1/**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/v1/timetable') return route.fulfill({ json: {
+      schoolId: school.id, weekStart: '2026-11-09', fetchedAt: new Date().toISOString(), sourceUpdatedAt: null, stale: false,
+      records: [{ grade: 1, class: 1, date: '2026-11-09', period: 1, subject: '수학', teacher: '김교사', isChanged: false }],
+    } });
+    return route.fulfill({ json: { schools: [], meals: [], stale: false } });
+  });
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto('/');
+  const panel = page.locator('#timetable-panel');
+  const action = panel.getByRole('button', { name: '이미지 저장·공유' });
+  await expect(action).toBeEnabled();
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true });
+    Object.defineProperty(navigator, 'share', { configurable: true, value: async () => { throw new DOMException('cancelled', 'AbortError'); } });
+  });
+  await action.click();
+  await expect(panel.getByRole('status').filter({ hasText: '공유를 취소했어요.' })).toBeVisible();
+  const download = page.waitForEvent('download');
+  await panel.getByRole('button', { name: 'PNG로 저장' }).click();
+  expect((await download).suggestedFilename()).toMatch(/1학년1반.*\.png$/);
+  await expect(panel.getByRole('button', { name: 'PNG로 저장' })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+});
 test('switching classes updates lessons, PNG and both links', async ({ page }) => {
   const school = { id: '2:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
   await page.clock.setFixedTime(new Date('2026-11-09T02:00:00Z'));
@@ -71,7 +103,7 @@ test('switching classes updates lessons, PNG and both links', async ({ page }) =
   await expect(history).toBeHidden();
   await expect(panel.getByRole('button', { name: '시간표 변경 이력 보기' })).toHaveAttribute('aria-expanded', 'false');
   const download = page.waitForEvent('download');
-  await panel.getByRole('button', { name: 'PNG 저장' }).click();
+  await panel.getByRole('button', { name: '이미지 저장·공유' }).click();
   const png = await download;
   expect(png.suggestedFilename()).toMatch(/봄빛고등학교.*1학년2반.*\.png$/);
   const { readFile } = await import('node:fs/promises');
@@ -137,7 +169,7 @@ test('week navigation hides unverified actions and keeps the last row and search
   const panel = page.locator('#timetable-panel');
   const share = page.getByRole('button', { name: '학급 링크 복사' });
   const subscribe = page.getByRole('button', { name: '캘린더 구독 링크' });
-  const png = panel.getByRole('button', { name: 'PNG 저장' });
+  const png = panel.getByRole('button', { name: '이미지 저장·공유' });
   await expect(panel.getByText(/수업 기록이 없는 평일: 화요일, 수요일, 목요일, 금요일/)).toBeVisible();
   await subscribe.click();
   await panel.getByRole('button', { name: '다음 주', exact: true }).click();
@@ -239,7 +271,7 @@ test('the installed shell reloads offline and only restores the matching week', 
   await expect(page.getByText('이 기기에 저장된 시간표 · 최신 정보가 아닐 수 있어요')).toBeVisible();
   await expect(page.getByRole('table').getByText('오프라인 수학')).toBeVisible();
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'PNG 저장' }).click();
+  await page.getByRole('button', { name: '이미지 저장·공유' }).click();
   const download = await downloadPromise;
   const chunks = [];
   for await (const chunk of await download.createReadStream()) chunks.push(chunk);
