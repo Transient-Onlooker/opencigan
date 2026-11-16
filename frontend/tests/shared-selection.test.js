@@ -13,9 +13,9 @@ runInNewContext(ts.transpileModule(selectionSource, { compilerOptions: { module:
 const component = await readFile(new URL('../src/App.svelte', import.meta.url), 'utf8');
 const script = component.match(/<script lang="ts">([\s\S]*?)<\/script>/)[1].replace(/^\s*import .*;\s*$/gm, '');
 const source = ts.transpile(`(function(){${script}
-  return { chooseSchool, switchToFavorite, saveGrade, saveClassFromSelect, updateClass, saveClass, addFavorite, shareClass, subscribeTimetable, changeWeek,
+  return { chooseSchool, saveGrade, saveClassFromSelect, updateClass, saveClass, shareClass, subscribeTimetable, changeWeek,
     setClass: (value) => { selectionState.update({ classroom: value }); },
-    state: () => ({ school, grade, classroom, classroomDraft, timetable, classError, schoolEditorOpen, tableLoading, sharedClassState, pendingSharedClass, favorites, shareUrl, subscriptionUrl }) };
+    state: () => ({ school, grade, classroom, classroomDraft, timetable, classError, schoolEditorOpen, tableLoading, sharedClassState, pendingSharedClass, shareUrl, subscriptionUrl }) };
 })()`, { target: ts.ScriptTarget.ES2022 });
 const savedSchool = { id: '1:기존고등학교', name: '기존고등학교', region: '서울' };
 const sharedSchool = { id: '2:공유고등학교', name: '공유고등학교', region: '경기' };
@@ -116,22 +116,19 @@ test('같은 학교의 기존 시간표가 먼저 도착해도 별도 공유 검
   cleanup();
 });
 
-test('공유 학급 검증 중 같은 학교 즐겨찾기를 선택하면 공유 반을 적용하지 않는다', async () => {
+test('공유 학급 검증 중 직접 학교를 선택하면 공유 반을 적용하지 않는다', async () => {
   const { app, search, requests, store, cleanup } = setup({ fallback: null });
   search.resolve({ schools: [sharedSchool], stale: false });
   await flush();
-  app.addFavorite();
   await app.shareClass();
   app.subscribeTimetable();
-  assert.equal(app.state().favorites.length, 0);
   assert.equal(app.state().shareUrl, '');
   assert.equal(app.state().subscriptionUrl, '');
-  app.switchToFavorite({ school: sharedSchool, grade: 1, classroom: 2 });
+  app.chooseSchool(sharedSchool);
   requests[0].resolve(data(sharedSchool, [{ grade: 1, class: 2 }, { grade: 1, class: 7 }]));
   await flush();
-  assert.equal(app.state().classroom, 2);
-  assert.equal(app.state().classroomDraft, '2');
-  assert.equal(store.get('opensigan-class'), '2');
+  assert.equal(app.state().pendingSharedClass, null);
+  assert.equal(app.state().school.id, sharedSchool.id);
   cleanup();
 });
 
@@ -141,7 +138,8 @@ test('기존 학교에서 공유 시간표를 확인하는 도중 선택을 바�
   await flush();
   search.resolve({ schools: [sharedSchool], stale: false });
   await flush();
-  app.switchToFavorite({ school: savedSchool, grade: 1, classroom: 2 });
+  app.setClass(2);
+  app.saveClassFromSelect();
   assert.equal(requests[1].signal.aborted, true);
   requests[1].resolve(data(sharedSchool, [{ grade: 1, class: 7 }]));
   await flush();

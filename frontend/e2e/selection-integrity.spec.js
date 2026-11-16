@@ -552,14 +552,13 @@ test('back and forward restore the app tab and class without adding history entr
   expect(await page.evaluate(() => history.length)).toBe(length);
 });
 
-test('favorites collapse, settings search and keyboard help remain usable at narrow widths', async ({ page }) => {
+test('legacy favorites remain stored while settings search and keyboard help work at narrow widths', async ({ page }) => {
   await mockApi(page);
+  await page.addInitScript(() => localStorage.setItem('opensigan-favorites', '[{"legacy":true}]'));
   await page.goto('/' + sharedHash(1));
   await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
-  await page.getByRole('button', { name: '현재 학급 즐겨찾기 추가' }).click();
-  await page.getByRole('button', { name: '목록 접기' }).click();
-  await expect(page.locator('#favorite-list')).toBeHidden();
-  await expect(page.getByLabel('즐겨찾는 학급 바로 선택')).toBeVisible();
+  await expect(page.getByRole('button', { name: '현재 학급 즐겨찾기 추가' })).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('opensigan-favorites'))).toBe('[{"legacy":true}]');
   const help = page.getByLabel('시간표 조회 범위 도움말');
   await help.focus();
   await expect(help.locator('..').getByText(/원본 서비스가 제공하는/)).toBeVisible();

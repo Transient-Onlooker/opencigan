@@ -5,12 +5,11 @@
   import PersonalTimetable from './PersonalTimetable.svelte';
   import CalendarNav from './CalendarNav.svelte';
   import SchoolSelector from './SchoolSelector.svelte';
-  import FavoritesBar from './FavoritesBar.svelte';
   import ShareTools from './ShareTools.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import TimetablePanel from './TimetablePanel.svelte';
   import BuildInfo from './BuildInfo.svelte';
-  import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference, readFavorites, writeFavorites, readTheme, writeTheme, readAnimations, writeAnimations, readMealSchool, writeMealSchool, type Favorite } from './preferences';
+  import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference, readTheme, writeTheme, readAnimations, writeAnimations, readMealSchool, writeMealSchool } from './preferences';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
   import { saveSelection, readSelection, gradesInTimetable, classesInGrade, createSelectionState, createSharedSelectionSession, validateSharedCandidate, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
@@ -29,7 +28,6 @@
   import { apiNotConfigured, getMeals, getTimetable, getTimetableHistory, searchSchools, searchNeisSchools, timetableSubscriptionUrl, type Meal, type NeisSchool, type School, type TimetableRecord, type TimetableResponse, type TimetableChange } from './api';
 
   let school: School | null = null;
-  let favorites: Favorite[] = [];
   let neis: NeisSchool | null = null;
   let schoolQuery = '';
   let schoolResults: School[] = [];
@@ -165,7 +163,6 @@
   $: lessonTimePeriods = Array.from({ length: Math.max(8, ...((timetable?.records ?? []).map((r) => Number(r.period)).filter((period) => Number.isInteger(period) && period > 0 && period <= 20))) }, (_, i) => i + 1);
   $: visibleMealTypes = mealTypes.filter((type) => enabledMealTypes.includes(type));
   $: mealDates = Array.from({ length: 7 }, (_, index) => addDays(monday(mealDate), index));
-  $: currentFavorite = favorites.some((item) => item.school.id === school?.id && item.grade === Number(grade) && item.classroom === Number(classroom));
   $: isDark = themeIsDark(theme, systemDark);
   $: if (analyticsReady && view !== 'settings') trackPageView(view === 'meals' ? '/meals' : '/timetable');
   $: if (navigationReady && !applyingNavigation && !classError && !pendingSharedClass) {
@@ -356,33 +353,6 @@
     saveMealPreferences();
   }
   function setAllergenNumbersVisible(value: boolean) { showAllergenNumbers = value; saveMealPreferences(); }
-
-  function loadFavorites() {
-    try { favorites = readFavorites(localStorage) ?? favorites; } catch { favorites = []; }
-  }
-  function saveFavorites() {
-    try { writeFavorites(localStorage, favorites); } catch { /* 브라우저 저장이 차단되어도 현재 화면은 동작합니다. */ }
-  }
-  function addFavorite() {
-    if (!school || classError || pendingSharedClass || favorites.length >= 10 ||
-        favorites.some((item) => item.school.id === school?.id && item.grade === Number(grade) && item.classroom === Number(classroom))) return;
-    favorites = [...favorites, { school: { ...school }, grade: Number(grade), classroom: Number(classroom) }];
-    saveFavorites();
-  }
-  function removeFavorite(favorite: Favorite) {
-    favorites = favorites.filter((item) => !(item.school.id === favorite.school.id && item.grade === favorite.grade && item.classroom === favorite.classroom));
-    saveFavorites();
-  }
-  function switchToFavorite(favorite: Favorite) {
-    cancelSharedSelection();
-    selectionState.update({ grade: favorite.grade, classroom: favorite.classroom }); classError = false;
-    shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
-    if (school?.id !== favorite.school.id) chooseSchool(favorite.school, true);
-    else { schoolEditorOpen = false; ensureAvailableClass(); }
-    classroomDraft = String(classroom);
-    persistClassSelection();
-    persistSelection({ grade, classroom });
-  }
 
   function findSchool() {
     schoolSearchSession.find(() => schoolQuery, searchSchools, errorText);
@@ -793,7 +763,6 @@
     systemDark = themeMedia?.matches ?? false;
     const onThemeMedia = (event: MediaQueryListEvent) => { systemDark = event.matches; };
     themeMedia?.addEventListener?.('change', onThemeMedia);
-    loadFavorites();
     try {
       allergySelection = readAllergies(localStorage);
       const savedMealSettings = readMealPreferences(localStorage, mealTypes, { view: mealView, types: enabledMealTypes, showAllergenNumbers });
@@ -840,7 +809,6 @@
     {#if schoolEditorOpen || !school}
       <SchoolSelector bind:schoolQuery {schoolResults} {schoolSearchState} {schoolSearchRetryable} {grade} {classroom} {classroomDraft} {gradeOptions} {classError} {sharedClassState} {findSchool} cancelSearch={schoolSearchSession.clear} {chooseSchool} {selectGrade} {updateClass} {saveClass} />
     {/if}
-    <FavoritesBar {school} {grade} {classroom} {favorites} {currentFavorite} disabled={classError || !!pendingSharedClass} {addFavorite} {removeFavorite} {switchToFavorite} />
     <CalendarNav {view} {inputFocused} selectView={(value) => view = value} />
     <div id="calendar" class="calendar-content" tabindex="-1">
         <TimetablePanel {view} {timetableView} {school} {timetable} {week} {current} {today} {selectedDay} {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {tableState} {tableRefreshState} {timetableCheckedAt} {timetableFromDevice} {exportState} {exportBusy} {canExport} {weekendClasses} {classError} {sharedClassState} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} {lessonTimes} {comparableClasses} {gradeRecords} bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {dates} {periods} {filtered} {missingWeekdays} {observedClassCount} {teacherNames} {historyOpen} {historyDisabled} {historyLoading} {historyError} {historyChanges} {visibleHistory} {historyCursor} bind:historyScope {exportTimetable} {sharePng} {refreshTimetable} {currentWeek} {selectTimetableView} {selectGrade} {selectClass} {changeWeek} {loadTimetable} {selectTimetableDate} {toggleHistory} {loadHistory} {dateText} {shortDate} {timeText} {changeTypeText} {subjectStyle} />

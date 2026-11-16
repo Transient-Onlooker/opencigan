@@ -96,9 +96,6 @@ test('switching classes updates lessons, PNG and both links', async ({ page }) =
   await expect(subscription).toHaveValue(/class=2&weeks=2$/);
   await classes.selectOption('1');
   await expect(subscription).toHaveCount(0);
-  await page.getByRole('button', { name: '현재 학급 즐겨찾기 추가' }).click();
-  await classes.selectOption('2');
-  await page.getByRole('button', { name: /봄빛고등학교.*1학년 1반/ }).filter({ has: page.locator('strong') }).click();
   await expect(classes).toHaveValue('1');
   await classes.selectOption('2');
   await page.getByRole('button', { name: '학급 링크 복사' }).click();
