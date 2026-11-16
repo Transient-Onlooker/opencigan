@@ -14,10 +14,10 @@ export function createSelectionState(initial: SelectionState, onChange: (state: 
       return Number.isInteger(value) && value >= 1 && value <= 99 && (!available.length || available.includes(value));
     },
     commitClass(value: number) { update({ classroom: value }); },
-    prepareSchool(school: School, keepClass: boolean) {
+    prepareSchool(school: School, keepClass: boolean, deferGradeAdjustment = false) {
       const reset = state.school?.id !== school.id && !keepClass;
       if (reset) update({ grade: 1, classroom: 1 });
-      if (/(?:중학교|고등학교)/.test(school.name) && state.grade > 3) update({ grade: 1 });
+      if (!deferGradeAdjustment && /(?:중학교|고등학교)/.test(school.name) && state.grade > 3) update({ grade: 1 });
       return reset;
     },
     reconcile(records: TimetableRecord[], maxGrade: number) {
@@ -105,7 +105,7 @@ export function createSharedSelectionSession(onChange: (state: { checking: boole
       fallback: PendingSharedClass['fallback'],
       currentSchoolId: () => string | undefined,
       search: (name: string, signal: AbortSignal) => Promise<{ schools: School[]; stale: boolean }>,
-      apply: (school: School) => void,
+      apply: (school: School, signal: AbortSignal) => void | Promise<void>,
       fail: () => void,
     ) {
       const signal = session.begin();
@@ -116,7 +116,7 @@ export function createSharedSelectionSession(onChange: (state: { checking: boole
         if (!verified) { fail(); return; }
         if (currentSchoolId() !== fallback.school?.id) return;
         session.setPending({ schoolId: verified.id, grade: shared.grade, classroom: shared.classroom, fallback });
-        apply(verified);
+        await apply(verified, signal);
       } catch {
         if (!signal.aborted) fail();
       } finally {

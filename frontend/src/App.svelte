@@ -11,7 +11,7 @@
   import TimetablePanel from './TimetablePanel.svelte';
   import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference, readFavorites, writeFavorites, readTheme, writeTheme, readAnimations, writeAnimations, readMealSchool, writeMealSchool, type Favorite } from './preferences';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { saveSelection, readSelection, gradesInTimetable, classesInGrade, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
+  import { saveSelection, readSelection, gradesInTimetable, classesInGrade, createSelectionState, createSharedSelectionSession, validateSharedClass, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -87,6 +87,7 @@
   let dateError = '';
   let sharedClassState = '';
   let pendingSharedClass: PendingSharedClass | null = null;
+  let sharedCandidateRequest: AbortSignal | null = null;
   let sharedSchoolChecking = false;
   const sharedSelection = createSharedSelectionSession((state) => { pendingSharedClass = state.pending; sharedSchoolChecking = state.checking; });
   let classActionsReady = false;
@@ -388,6 +389,7 @@
     schoolSearchSession.find(() => schoolQuery, searchSchools, errorText);
   }
   function cancelSharedSelection() {
+    sharedCandidateRequest = null;
     sharedSelection.cancel();
     sharedClassState = '';
     subscriptionPanelOpen = false;
@@ -404,7 +406,7 @@
     exportState = '';
     if (!keepSharedValidation) cancelSharedSelection();
     sharedClassState = '';
-    if (selectionState.prepareSchool(value, keepClass)) classError = false;
+    if (selectionState.prepareSchool(value, keepClass, keepSharedValidation)) classError = false;
     classroomDraft = String(classroom);
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
     schoolSearchSession.cancel(); mealSession.cancel(); historySession.cancel();
@@ -440,7 +442,7 @@
     mealSession.choose(value, (selected) => { if (school) writeMealSchool(localStorage, school.id, selected); }, loadMeals);
   }
   function ensureAvailableClass() {
-    if (pendingSharedClass && pendingSharedClass.schoolId === school?.id) {
+    if (pendingSharedClass && pendingSharedClass.schoolId === school?.id && !sharedCandidateRequest) {
       const pending = sharedSelection.consume()!;
       const outcome = selectionState.resolveShared(pending, timetable, timetableFromDevice, school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6);
       if (outcome.status === 'rolled-back') {
@@ -521,6 +523,7 @@
     const validWeek = clampWeek(week, current);
     if (selectedDay === previousToday) selectedDay = today;
     if (validWeek !== week) {
+      cancelSharedSelection();
       selectionState.update({ week: validWeek });
       selectedDay = selectedDay < week ? week : selectedDay > addDays(week, 6) ? addDays(week, 6) : selectedDay;
       historySession.reset();
@@ -539,9 +542,10 @@
   function changeWeek(delta: number) {
     refreshCalendar(false); const next = addDays(week, delta * 7);
     if (next < current || next > addDays(current, 7)) return;
+    if (next !== week) cancelSharedSelection();
     tableRefreshState = ''; exportState = ''; teacherQuery = ''; selectionState.update({ week: next }); selectedDay = week === current ? today : week; historySession.reset(); historyOpen = false; loadTimetable(false, true);
   }
-  function currentWeek() { refreshCalendar(false); const preserve = week === current; const reopenHistory = historyOpen; tableRefreshState = ''; if (!preserve) teacherQuery = ''; selectionState.update({ week: current }); selectedDay = today; historySession.reset(); loadTimetable(preserve); if (reopenHistory) void loadHistory(); }
+  function currentWeek() { refreshCalendar(false); const preserve = week === current; const reopenHistory = historyOpen; tableRefreshState = ''; if (!preserve) { cancelSharedSelection(); teacherQuery = ''; } selectionState.update({ week: current }); selectedDay = today; historySession.reset(); loadTimetable(preserve); if (reopenHistory) void loadHistory(); }
   function changeMealDate(delta: number) {
     const next = addDays(mealDate, delta);
     if (!validMealDate(next)) { dateError = '1900년 이후의 올바른 날짜를 선택해 주세요.'; return; }
@@ -562,6 +566,7 @@
     const targetWeek = monday(value);
     if (targetWeek < current || targetWeek > addDays(current, 7)) return;
     const needsTimetable = targetWeek !== week || timetable?.weekStart !== targetWeek;
+    if (targetWeek !== week) cancelSharedSelection();
     view = 'timetable'; timetableView = 'today'; selectionState.update({ week: targetWeek }); selectedDay = value;
     mealDate = value; mealDateDraft = value; dateError = '';
     if (needsTimetable) {
@@ -729,8 +734,35 @@
   }
 
   function restoreSharedClass(shared: NonNullable<ReturnType<typeof readSharedClass>>, fallback: { school: School | null; grade: number; classroom: number }) {
-    return sharedSelection.verifySchool(shared, fallback, () => school?.id, searchSchools, (verified) => {
+    return sharedSelection.verifySchool(shared, fallback, () => school?.id, searchSchools, async (verified, signal) => {
       classError = false;
+      if (fallback.school) {
+        const requestedWeek = week;
+        const cacheKey = verified.id + '\u0000' + requestedWeek;
+        const cached = timetableSession.cache.get(cacheKey, Date.now());
+        let candidate: TimetableResponse | null = cached?.data ?? null;
+        if (!candidate) {
+          sharedCandidateRequest = signal;
+          try { candidate = await getTimetable(verified.id, requestedWeek, signal); } catch { /* The previous selection remains active. */ }
+          finally { if (sharedCandidateRequest === signal) sharedCandidateRequest = null; }
+        }
+        if (signal.aborted) return;
+        if (school?.id !== fallback.school.id || week !== requestedWeek) { sharedSelection.cancel(); return; }
+        const valid = candidate?.schoolId === verified.id && candidate.weekStart === requestedWeek &&
+          validateSharedClass(candidate, false, /(?:중학교|고등학교)/.test(verified.name) ? 3 : 6, shared.grade, shared.classroom) === 'valid';
+        if (!valid || !candidate) {
+          sharedSelection.consume();
+          sharedClassState = '공유 링크의 학급을 확인하지 못해 이전 학교와 학급을 유지했어요.';
+          return;
+        }
+        const expires = cached?.expires ?? Date.now() + refreshInterval;
+        timetableSession.cache.put(cacheKey, candidate, expires);
+        chooseSchool(verified, true, true, false);
+        if (school?.id === verified.id && !pendingSharedClass && !classError) {
+          timetableSession.saveFresh(cacheKey, candidate, expires, () => localStorage);
+        }
+        return;
+      }
       chooseSchool(verified, true, true, false);
     }, () => { sharedClassState = '공유 링크의 학교를 확인하지 못해 이전 학교를 유지했어요.'; });
   }

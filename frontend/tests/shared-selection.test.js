@@ -13,7 +13,7 @@ runInNewContext(ts.transpileModule(selectionSource, { compilerOptions: { module:
 const component = await readFile(new URL('../src/App.svelte', import.meta.url), 'utf8');
 const script = component.match(/<script lang="ts">([\s\S]*?)<\/script>/)[1].replace(/^\s*import .*;\s*$/gm, '');
 const source = ts.transpile(`(function(){${script}
-  return { chooseSchool, switchToFavorite, saveGrade, saveClassFromSelect, updateClass, saveClass, addFavorite, shareClass, subscribeTimetable,
+  return { chooseSchool, switchToFavorite, saveGrade, saveClassFromSelect, updateClass, saveClass, addFavorite, shareClass, subscribeTimetable, changeWeek,
     setClass: (value) => { selectionState.update({ classroom: value }); },
     state: () => ({ school, grade, classroom, classroomDraft, timetable, classError, schoolEditorOpen, tableLoading, sharedClassState, pendingSharedClass, favorites, shareUrl, subscriptionUrl }) };
 })()`, { target: ts.ScriptTarget.ES2022 });
@@ -72,13 +72,47 @@ test('공유 학급은 시간표 검증이 끝나기 전까지 선택과 저장�
   search.resolve({ schools: [sharedSchool], stale: false });
   await flush();
   assert.equal(app.state().pendingSharedClass.classroom, 7);
+  assert.equal(app.state().school.id, savedSchool.id);
+  assert.equal(app.state().timetable.schoolId, savedSchool.id);
   assert.equal(app.state().classroom, 1);
   assert.equal(store.get('opensigan-class'), '1');
   requests[1].resolve(data(sharedSchool, [{ grade: 1, class: 7 }]));
   await flush();
   assert.equal(app.state().pendingSharedClass, null);
+  assert.equal(app.state().school.id, sharedSchool.id);
   assert.equal(app.state().classroom, 7);
   assert.equal(store.get('opensigan-class'), '7');
+  assert.equal(requests.length, 2);
+  cleanup();
+});
+
+test('같은 학교 공유 학급은 유효한 주간 캐시로 검증하고 재요청하지 않는다', async () => {
+  const { app, requests, search, store, cleanup } = setup({ shared: savedSchool });
+  requests[0].resolve(data(savedSchool, [{ grade: 1, class: 1 }, { grade: 1, class: 7 }]));
+  await flush();
+  search.resolve({ schools: [savedSchool], stale: false });
+  await flush();
+  assert.equal(requests.length, 1);
+  assert.equal(app.state().classroom, 7);
+  assert.equal(store.get('opensigan-class'), '7');
+  cleanup();
+});
+
+test('같은 학교의 기존 시간표가 먼저 도착해도 별도 공유 검증 결과를 기다린다', async () => {
+  const { app, requests, search, store, cleanup } = setup({ shared: savedSchool });
+  search.resolve({ schools: [savedSchool], stale: false });
+  await flush();
+  assert.equal(requests.length, 2);
+  requests[0].resolve(data(savedSchool, [{ grade: 1, class: 1 }, { grade: 1, class: 7 }]));
+  await flush();
+  assert.equal(app.state().classroom, 1);
+  assert.equal(app.state().pendingSharedClass.classroom, 7);
+  assert.equal(store.get('opensigan-class'), '1');
+  requests[1].reject(new Error('shared verification failed'));
+  await flush();
+  assert.equal(app.state().classroom, 1);
+  assert.equal(app.state().pendingSharedClass, null);
+  assert.equal(store.get('opensigan-class'), '1');
   cleanup();
 });
 
@@ -98,6 +132,39 @@ test('공유 학급 검증 중 같은 학교 즐겨찾기를 선택하면 공유
   assert.equal(app.state().classroom, 2);
   assert.equal(app.state().classroomDraft, '2');
   assert.equal(store.get('opensigan-class'), '2');
+  cleanup();
+});
+
+test('기존 학교에서 공유 시간표를 확인하는 도중 선택을 바꾸면 늦은 응답을 무시한다', async () => {
+  const { app, requests, search, store, cleanup } = setup();
+  requests[0].resolve(data(savedSchool, [{ grade: 1, class: 1 }, { grade: 1, class: 2 }]));
+  await flush();
+  search.resolve({ schools: [sharedSchool], stale: false });
+  await flush();
+  app.switchToFavorite({ school: savedSchool, grade: 1, classroom: 2 });
+  assert.equal(requests[1].signal.aborted, true);
+  requests[1].resolve(data(sharedSchool, [{ grade: 1, class: 7 }]));
+  await flush();
+  assert.equal(app.state().school.id, savedSchool.id);
+  assert.equal(app.state().classroom, 2);
+  assert.equal(store.get('opensigan-class'), '2');
+  assert.equal(app.state().pendingSharedClass, null);
+  cleanup();
+});
+
+test('공유 시간표 검증 중 주차를 바꾸면 검증을 즉시 취소한다', async () => {
+  const { app, requests, search, cleanup } = setup();
+  requests[0].resolve(data(savedSchool));
+  await flush();
+  search.resolve({ schools: [sharedSchool], stale: false });
+  await flush();
+  app.changeWeek(1);
+  assert.equal(requests[1].signal.aborted, true);
+  assert.equal(app.state().pendingSharedClass, null);
+  requests[1].resolve(data(sharedSchool, [{ grade: 1, class: 7 }]));
+  await flush();
+  assert.equal(app.state().school.id, savedSchool.id);
+  assert.equal(app.state().classroom, 1);
   cleanup();
 });
 
