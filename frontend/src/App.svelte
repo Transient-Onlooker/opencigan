@@ -35,6 +35,7 @@
   let schoolResults: School[] = [];
   let neisResults: NeisSchool[] = [];
   let schoolSearchState = '';
+  let schoolSearchRetryable = false;
   let neisSearchState = '';
   let neisLoading = false;
   let schoolEditorOpen = true;
@@ -119,7 +120,7 @@
   });
   let timetableRefreshAt = 0;
   let mealsRefreshAt = 0;
-  const schoolSearchSession = createSchoolSearchSession((results, message) => { schoolResults = results; schoolSearchState = message; });
+  const schoolSearchSession = createSchoolSearchSession((results, message, retryable = false) => { schoolResults = results; schoolSearchState = message; schoolSearchRetryable = retryable; });
   const mealSession = createMealSession((state) => {
     neis = state.neis; neisResults = state.candidates; neisSearchState = state.searchState; neisLoading = state.neisLoading;
     meals = state.meals; hasMeals = state.hasMeals; mealsStale = state.stale; mealState = state.error;
@@ -411,7 +412,7 @@
     classroomDraft = String(classroom);
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
     schoolSearchSession.cancel(); mealSession.cancel(); historySession.cancel();
-    selectionState.update({ school: value }); schoolQuery = value.name; schoolResults = []; schoolSearchState = ''; schoolEditorOpen = false;
+    selectionState.update({ school: value }); schoolQuery = value.name; schoolResults = []; schoolSearchState = ''; schoolSearchRetryable = false; schoolEditorOpen = false;
     selectedSubject = ''; selectedTeacher = ''; teacherQuery = '';
     try { schoolDisplaySettings = readSchoolPreference(localStorage, 'opensigan-display:', value.id, parseDisplaySettings, defaultDisplaySettings); }
     catch { schoolDisplaySettings = defaultDisplaySettings(); }
@@ -840,7 +841,7 @@
     {#if apiNotConfigured}<p class="notice" role="alert">학교 정보를 불러올 API 주소가 설정되지 않았어요.</p>{/if}
     {#if sharedClassState && !classError}<p class="notice" role="status">{sharedClassState}</p>{/if}
     {#if schoolEditorOpen || !school}
-      <SchoolSelector bind:schoolQuery {schoolResults} {schoolSearchState} {grade} {classroom} {classroomDraft} {gradeOptions} {classError} {sharedClassState} {findSchool} cancelSearch={schoolSearchSession.clear} {chooseSchool} {selectGrade} {updateClass} {saveClass} />
+      <SchoolSelector bind:schoolQuery {schoolResults} {schoolSearchState} {schoolSearchRetryable} {grade} {classroom} {classroomDraft} {gradeOptions} {classError} {sharedClassState} {findSchool} cancelSearch={schoolSearchSession.clear} {chooseSchool} {selectGrade} {updateClass} {saveClass} />
     {/if}
     <FavoritesBar {school} {grade} {classroom} {favorites} {currentFavorite} disabled={classError || !!pendingSharedClass} {addFavorite} {removeFavorite} {switchToFavorite} />
     <CalendarNav {view} {inputFocused} selectView={(value) => view = value} />

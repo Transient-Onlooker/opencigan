@@ -47,7 +47,7 @@ test('school search validates input and clears pending searches', () => {
 test('failed searches reuse only the same query and preserve the error notice', async () => {
   let latest;
   let query = '봄빛';
-  const session = exports.createSchoolSearchSession((results, message) => { latest = { results, message }; });
+  const session = exports.createSchoolSearchSession((results, message, retryable = false) => { latest = { results, message, retryable }; });
   const school = { id: '2:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
   session.find(() => query, async () => ({ schools: [school], stale: false }), String);
   await scheduled();
@@ -55,11 +55,17 @@ test('failed searches reuse only the same query and preserve the error notice', 
   await scheduled();
   assert.equal(latest.results[0].id, school.id);
   assert.match(latest.message, /서버 오류.*저장된 검색 결과.*최신 정보가 아닐 수/);
+  assert.equal(latest.retryable, true);
   query = '다른 학교';
   session.find(() => query, async () => { throw new Error('서버 오류'); }, (error) => error.message);
   await scheduled();
   assert.equal(latest.results.length, 0);
   assert.match(latest.message, /저장된 결과가 없어요/);
+  assert.equal(latest.retryable, true);
+  session.find(() => query, async () => ({ schools: [school], stale: false }), String);
+  assert.equal(latest.retryable, false);
+  await scheduled();
+  assert.equal(latest.retryable, false);
 });
 
 test('an outdated query cannot publish or cache a late search result', async () => {

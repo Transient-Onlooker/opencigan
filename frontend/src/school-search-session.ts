@@ -1,6 +1,6 @@
 import type { School } from './api';
 
-export function createSchoolSearchSession(onChange: (results: School[], message: string) => void) {
+export function createSchoolSearchSession(onChange: (results: School[], message: string, retryable?: boolean) => void) {
   let timer: ReturnType<typeof setTimeout>;
   let request: AbortController | undefined;
   const cache = new Map<string, { schools: School[]; savedAt: number }>();
@@ -30,8 +30,8 @@ export function createSchoolSearchSession(onChange: (results: School[], message:
           const notice = errorText(error);
           if (saved) {
             const time = new Date(saved.savedAt).toLocaleString('ko-KR');
-            onChange(saved.schools.slice(), `${notice} 이 화면에 저장된 검색 결과(${time})예요. 최신 정보가 아닐 수 있습니다.`);
-          } else onChange([], `${notice} 이 검색어의 저장된 결과가 없어요.`);
+            onChange(saved.schools.slice(), `${notice} 이 화면에 저장된 검색 결과(${time})예요. 최신 정보가 아닐 수 있습니다.`, true);
+          } else onChange([], `${notice} 이 검색어의 저장된 결과가 없어요.`, true);
         }
       }, 250);
     },
