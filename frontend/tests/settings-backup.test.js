@@ -79,3 +79,21 @@ test('classroom backups restore only into the matching class and omit school bel
   assert.throws(() => parseSettingsBackup(exported, schoolId, { ...scope, classroom: 3 }), /학급/);
   assert.throws(() => parseSettingsBackup(exported, schoolId), /학급/);
 });
+
+test('weekday overrides use version 2 and validate against the full day without changing version 1', () => {
+  const overrides = { 2: { 1: { start: '08:30', end: '09:20' } } };
+  const text = createSettingsBackup(schoolId, display, times, undefined, overrides);
+  assert.equal(JSON.parse(text).version, 2);
+  const restored = parseSettingsBackup(text, schoolId);
+  assert.equal(restored.lessonTimes[1].start, '09:00');
+  assert.equal(restored.weekdayLessonTimes[2][1].start, '08:30');
+  assert.equal(JSON.parse(createSettingsBackup(schoolId, display, times)).version, 1);
+  assert.equal(parseSettingsBackup(createSettingsBackup(schoolId, display, times), schoolId).weekdayLessonTimes, undefined);
+  const original = JSON.parse(text);
+  for (const invalid of [
+    { 8: overrides[2] }, { 2: { 1: { start: '09:30', end: '10:10' } } },
+    { 2: { 1: { start: '25:00', end: '26:00' } } }, { 2: { 21: times[1] } },
+  ]) assert.throws(() => parseSettingsBackup(JSON.stringify({ ...original, weekdayLessonTimes: invalid }), schoolId));
+  assert.throws(() => parseSettingsBackup(JSON.stringify({ ...original, weekdayLessonTimes: null }), schoolId));
+  assert.throws(() => createSettingsBackup(schoolId, display, times, undefined, { 2: { 1: { start: '09:30', end: '10:10' } } }));
+});

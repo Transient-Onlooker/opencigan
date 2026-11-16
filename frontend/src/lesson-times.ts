@@ -1,6 +1,7 @@
 import type { TimetableRecord } from './api';
 
 export type LessonTimes = Record<number, { start: string; end: string }>;
+export type WeekdayLessonTimes = Record<number, LessonTimes>;
 
 function minutes(value: string): number | null {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return null;
@@ -42,6 +43,20 @@ export function parseLessonTimes(value: unknown): LessonTimes {
   }
   const ordered = Object.entries(result).sort(([a], [b]) => Number(a) - Number(b)).map(([, entry]) => entry);
   if (ordered.some((entry, index) => index > 0 && entry.start < ordered[index - 1].end)) return {};
+  return result;
+}
+
+export function parseWeekdayLessonTimes(value: unknown, common: LessonTimes): WeekdayLessonTimes | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const result: WeekdayLessonTimes = {};
+  for (const [rawDay, rawEntries] of Object.entries(value)) {
+    if (!/^[1-7]$/.test(rawDay) || !rawEntries || typeof rawEntries !== 'object' || Array.isArray(rawEntries)) return null;
+    const entries = parseLessonTimes(rawEntries);
+    if (Object.keys(entries).length !== Object.keys(rawEntries).length) return null;
+    const combined = { ...common, ...entries };
+    if (Object.keys(parseLessonTimes(combined)).length !== Object.keys(combined).length) return null;
+    if (Object.keys(entries).length) result[Number(rawDay)] = entries;
+  }
   return result;
 }
 
