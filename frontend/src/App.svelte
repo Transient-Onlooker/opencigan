@@ -404,7 +404,7 @@
     exportState = '';
     if (!keepSharedValidation) cancelSharedSelection();
     sharedClassState = '';
-    if (selectionState.prepareSchool(value, keepClass)) classError = false;
+    if (selectionState.prepareSchool(value, keepClass, keepSharedValidation)) classError = false;
     classroomDraft = String(classroom);
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
     schoolSearchSession.cancel(); mealSession.cancel(); historySession.cancel();

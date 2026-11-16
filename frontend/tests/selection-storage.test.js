@@ -56,6 +56,18 @@ test('class draft validation and commit preserve the selected class until a vali
   assert.equal(current.week, '2026-11-09');
 });
 
+test('pending shared school verification preserves the prior grade until a class is committed', () => {
+  let current;
+  const school = { id: 'old', name: '초등학교' };
+  const owner = exports.createSelectionState({ school, grade: 5, classroom: 2, week: '2026-11-09' }, (state) => { current = state; });
+  owner.prepareSchool({ id: 'new', name: '고등학교' }, true, true);
+  assert.equal(current, undefined);
+  owner.resolveShared({ schoolId: 'new', grade: 2, classroom: 3, fallback: { school, grade: 5, classroom: 2 } },
+    { stale: false, records: [{ grade: 2, class: 3 }] }, false, 3);
+  assert.equal(current.grade, 2);
+  assert.equal(current.classroom, 3);
+});
+
 test('selection persistence preserves keys, values and write order', () => {
   const writes = [];
   const storage = { setItem: (key, value) => writes.push([key, value]) };
