@@ -82,20 +82,21 @@ PY
 
 복구 시에는 서비스와 DB에 쓰는 다른 프로세스를 모두 중지하고, 복구 전 현재 DB도 별도 백업으로 보존합니다. 검증된 배포 전 백업을 **새 경로**에 복사한 뒤 구버전의 `OPENCIGAN_HISTORY_DB`가 그 복사본을 가리키도록 설정하고 재시작합니다. 구버전 실행 중에는 새 DB의 스키마나 WAL 파일을 직접 교체하지 않습니다. 백업 이후 관측한 이력은 복구본에 포함되지 않으므로 보존한 새 DB와 혼동하지 마세요. 적용 전후에는 `PRAGMA integrity_check`와 테스트 학교의 이력 조회를 확인합니다. 이 절차는 운영 DB에서 실행한 검증 결과가 아닙니다.
 
-## Cloudflare Tunnel 전환 계획 (P0, 미적용)
+## Cloudflare Pages + Workers VPC 전환 계획 (P0, 미적용)
 
-[**오늘 진행용 세부 실행 체크리스트**](cloudflare-tunnel-rollout.md)는 호스트/인증서 선택, cloudflared 설치, WAF 오탐, 프런트·ICS 전환과 개별 롤백을 포함합니다.
+**현재 MCVKR 서브도메인은 사용자가 소유한 DNS zone이 아닙니다.** `mcv.kr` 네임서버 변경 또는 zone-wide WAF 변경을 시도하지 않습니다. [실행 체크리스트](cloudflare-tunnel-rollout.md)에 따라 아래 구성을 병렬 검증합니다.
 
-**2026-11-16부터 공개 API/ICS 제공과 Cloudflare WAF 봇 방어를 P0 우선 작업으로 결정했습니다. 아직 Tunnel·WAF 운영 전환을 완료한 것은 아닙니다.** `cloudflared`가 Raspberry Pi에서 Cloudflare로 아웃바운드 연결을 만들고 로컬 API(`127.0.0.1:8000`)에 전달하는 구성을 우선 검토·구현합니다. 현재 정적 웹의 GitHub Pages 호스트와 분리되는 공개 API 호스트(우선 후보 `opencigan-api.mcv.kr`; Cloudflare zone/TLS 확인 전 미확정)를 사용하면 Pages 경로의 `/api/v1/...` 404 문제를 해소할 수 있습니다. DNS/TLS, CORS, 프런트·OpenAPI·ICS URL은 전환 검증 후 일치시켜야 합니다.
+1. 기존 GitHub Pages와 무관하게 Cloudflare Pages `<project>.pages.dev` 배포 및 `/api/v1/*` Pages Functions를 준비.
+2. Pages Functions의 Service Binding → API Worker. Worker는 Workers VPC Service binding으로 Pi의 로컬 HTTP API에 연결.
+3. Raspberry Pi의 `cloudflared`는 Workers VPC용 비공개 Tunnel을 QUIC로 사용. 공개 Tunnel hostname이나 별도의 Cloudflare 소유 DNS zone은 필수 아님.
+4. Worker 경계에서 요청 경로·메서드 검증과 Rate Limiting binding으로 남용을 제한. `mcv.kr`의 WAF 정책을 사용자 계정이 관리한다고 가정하지 않기.
+5. `pages.dev`에서 프런트·API·ICS와 프록시 IP 신뢰를 검증한 다음 **Cloudflare Pages Custom domains 등록 → MCVKR CNAME만 Pages 주소로 변경**.
 
-- **WAF/봇 방어:** API 호스트의 요청률·학교 검색 남용·반복 오류는 Cloudflare WAF 사용자 정의 규칙과 Rate Limiting으로 방어하는 것을 우선합니다. 학교 검색·시간표·ICS·상태·Webhook·관리자 API는 서로 다른 요청 특성이 있으므로 경로별 정책을 만들고 보안 이벤트와 오탐율을 확인합니다. 사용 가능한 Bot Score/관리 기능은 Cloudflare 계정 플랜을 확인한 후 선택합니다. API/ICS에 브라우저 JS Challenge를 일괄 적용하면 캘린더·기계 클라이언트가 차단될 수 있으므로 금지합니다. Bot Fight Mode의 예외 처리 제약도 검토해야 합니다.
-- **외부 진입과 원본 연결은 별개:** Cloudflare Tunnel/WAF는 방문자→API **수신** 경로입니다. 위의 `OPENCIGAN_COMCIGAN_PROXY`와 WARP는 Pi→컴시간 **송신** 경로이며 서로 대체하지 않습니다.
-- **변경 검증/되돌리기:** DNS/TLS/라우팅, ETag·304·ICS 구독, CORS, JSON API의 정상 및 차단 응답, Rate Limiting·Python 자체 제한 일치, 인증된 관리 페이지, Tailscale Funnel 대비 지연·정책·비용·롤백을 확인합니다. 실제 적용 전에는 기존 구독 URL의 연속성을 고려하세요.
-- **접속자 IP와 로그:** 터널 뒤에서 서버의 `REMOTE_ADDR`는 보통 `cloudflared`의 연결 주소입니다. HTTP 원본 접속 IP는 Cloudflare의 `CF-Connecting-IP` 헤더로 전달되므로, 현재의 [신뢰 프록시 IP 처리](proxy-client-ip.md)와 [접속 로그](access-logs.md)에 **신뢰된 터널에서만** 올바르게 반영되는지 시험합니다. 외부에서 임의로 보낸 헤더를 신뢰하는 구성은 피합니다.
-- **속도·용량:** Tailscale Funnel은 변경 불가능한 대역폭 제한이 있습니다. Cloudflare Tunnel에는 동일한 공개 월간 GB 한도가 명시되지 않았더라도, 플랜·요청 크기·서비스별 사용 정책·운영 서버의 업로드 대역폭과 처리 성능 등 제약이 남습니다. *무제한 트래픽이나 무조건 빠른 응답은 가정하지 않습니다.* 기존 로드맵의 TTFB/p95 벤치마크로 비교합니다.
-- **전환 시 확인:** `opencigan.mcv.kr` DNS/TLS, API CORS, `.ics` 구독, 304/ETag, 관리자 인증, IP별 429 제한과 503 과부하 보호, 터널 재연결, 서비스 중단 시 복귀 방법을 확인합니다. 현재 운영 중인 Funnel·DNS·systemd 설정은 이 검토만으로 변경하지 않습니다.
+기존 Tailscale Funnel과 GitHub Pages, 운영 Pi의 `release-warp-20261116`, 컴시간 전용 WARP 출구 프록시는 검증 전까지 유지합니다. Cloudflare Workers VPC는 2026-11 현재 Free 플랜에서도 사용 가능한 **베타**이므로 가용성·기능 변화를 추적하고, 문제 시 기존 Funnel 경로로 돌릴 수 있게 합니다.
 
-공식 문서: [Cloudflare Tunnel](https://developers.cloudflare.com/tunnel/) · [원본 IP 헤더](https://developers.cloudflare.com/fundamentals/reference/http-headers/) · [Cloudflare Tunnel FAQ](https://developers.cloudflare.com/cloudflare-one/faq/cloudflare-tunnels-faq/) · [Tailscale Funnel 제한](https://tailscale.com/docs/features/tailscale-funnel)
+**클라이언트 IP·보안:** 현재 Python API는 `X-Forwarded-For`/`Forwarded`를 신뢰된 피어에서 파싱하지만 `CF-Connecting-IP`를 직접 파싱하지 않습니다. Worker→Pi 경로의 실제 헤더를 테스트하고 **외부 사용자 임의 헤더를 검증 없이 전달하지 말 것**. 관리자 인증·Webhook 기본 비활성·CORS/ICS 304·429/503 계약을 유지합니다.
+
+공식 문서: [Cloudflare Pages Custom domains](https://developers.cloudflare.com/pages/configuration/custom-domains/) · [Workers VPC](https://developers.cloudflare.com/workers-vpc/) · [Pages Service bindings](https://developers.cloudflare.com/pages/functions/bindings/) · [Worker Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
 
 ## 자동 셔터와 통계
 

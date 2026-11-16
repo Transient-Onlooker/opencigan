@@ -1,103 +1,96 @@
-# Cloudflare Tunnel + WAF — P0 실전 구축 로드맵
+# Cloudflare Pages + Workers VPC + Tunnel — P0 실행 로드맵
 
-> 2026-11-16 사전 작성. **미배포·미검증 작업 계획**이며, 실제 운영 적용은 사용자가 집에서 진행한다. [P0 상세 로드맵](roadmap/core-quality.md) · [운영 가이드](operations.md) · [프록시 클라이언트 IP 정책](proxy-client-ip.md) · [통합 QA](qa-2026-11-16.md).
+> 2026-11-16 수정: **MCVKR은 타사 서브도메인 제공자**이며, `mcv.kr`의 네임서버와 Cloudflare zone을 사용자가 소유하거나 변경할 수 없다. **DNS zone 이전 없이 가능한 방식**으로 변경한다. 아직 Cloudflare 배포·관리 권한·Pi cloudflared 설치는 확인되지 않았다. [P0 로드맵](roadmap/core-quality.md) · [운영 가이드](operations.md) · [프록시 IP 신뢰 정책](proxy-client-ip.md) · [QA](qa-2026-11-16.md).
 
-## 목표 구조
+## 목표 아키텍처 — 사용자 제안 방식
 
 ```mermaid
-flowchart LR
-    Web["GitHub Pages / opencigan.mcv.kr"] --> Edge["Cloudflare DNS/TLS + WAF"]
-    Other["외부 캘린더/API 사용자"] --> Edge
-    Edge --> Tunnel["Cloudflare Tunnel / cloudflared"]
-    Tunnel --> Pi["Raspberry Pi / 127.0.0.1:8000"]
-    Pi --> NEIS["NEIS / 기존 출구"]
-    Pi --> Proxy["컴시간 전용 WARP 출구 프록시"]
-    Proxy --> Comcigan["컴시간"]
+flowchart TD
+  User["브라우저 · API/ICS 클라이언트"] --> Host["opencigan.mcv.kr · MCVKR CNAME"]
+  Host --> Pages["Cloudflare Pages · 정적 프런트 + Functions"]
+  Pages -->|/api/v1/* · Service Binding| Worker["Cloudflare Worker · 제한/검증"]
+  Worker -->|VPC Service binding| VPC["Workers VPC · 비공개 HTTP Service"]
+  VPC --> Tunnel["Cloudflare Tunnel · cloudflared / QUIC"]
+  Tunnel --> Pi["Pi · 127.0.0.1:8000"]
+  Pi --> NEIS["NEIS · 기존 출구"]
+  Pi --> WARP["컴시간 전용 WARP 출구"]
+  WARP --> Comcigan["컴시간"]
 ```
 
-Cloudflare Tunnel + WAF는 **외부 사용자 → Pi API 수신 경로**만 담당한다. 이미 적용된 컴시간 전용 WARP 프록시는 **Pi → 컴시간 송신 경로**이며 서로 대체하지 않는다. Pages 웹사이트와 백엔드는 별개로 배포한다.
+**핵심:** 공개 도메인 없이 먼저 `<project>.pages.dev`에서 Pages/Functions·Worker·Workers VPC·Pi Tunnel을 검증하고, **마지막 단계에서만** MCVKR의 `opencigan.mcv.kr` CNAME을 Pages에 연결한다. 도메인 구매/네임서버 이전/별도 `opencigan-api.mcv.kr` 생성은 이 경로의 필수 조건이 아니다.
 
-## 현재 확인된 기준
+- Cloudflare의 **일반 Tunnel Published Application**은 Cloudflare zone에서 관리되는 CNAME이 필요하므로 여기서는 사용하지 않는다. 외부 MCVKR DNS의 CNAME을 `<UUID>.cfargotunnel.com`에 단순 연결하는 방식도 동작한다고 가정하지 않는다.
+- **Workers VPC**는 Cloudflare Tunnel을 비공개 원본 연결로 이용하는 별도 기능이다. 2026-11-16 기준 Free 플랜에서 이용 가능한 **베타** 기능이며 변경 가능성이 있으므로 먼저 계정에서 지원 여부 확인.
+- Cloudflare Pages Function은 Worker의 **Service Binding**을 호출하고, Worker는 **VPC Service binding**을 호출한다. Pages Functions가 VPC binding을 직접 제공한다고 가정하지 않는다.
+- **보안 범위:** 타사 DNS의 `mcv.kr` zone-wide Cloudflare WAF Rules는 이 계정에서 적용 불가. 대신 Worker의 Rate Limiting binding과 요청 검증/봇 남용 탐지, 기존 Pi의 429/셔터를 조합한다. 정식 WAF zone 정책이 필요해지면 소유 도메인 또는 DNS 위임을 별도 검토.
 
-- [x] GitHub `main`에서 PR #41까지 병합, 최신 CI 성공 확인(2026-11-16 저녁). 이 체크는 **코드/CI 상태**만 뜻한다.
-- [ ] Pi의 현재 실행 상태 재확인. 운영 문서의 마지막 기록은 `release-warp-20261116`(기반 `54f89b9`)이며 최신 main 배포가 아님. 실제 배포 SHA와 systemd drop-in, 이전 릴리스 복귀 지점을 별도 기록.
-- [ ] 기존 Tailscale Funnel 공개 주소와 GitHub Pages의 현재 `API_BASE_URL` 값을 변경 전에 기록. DNS·백엔드·터널 변경은 단계별로 나누기.
+## Phase 0 — 기존 자산 보존 및 계정 확인
 
-## Phase 0 — 도메인·권한·인증서 결정
+- [x] **2026-11-16 23:02 KST 읽기 전용 기록(PR #43):** 공용 DNS 확인 기준 `mcv.kr`의 NS는 `japan.linode.dns.mcv.kr`, `singapore.linode.dns.mcv.kr`; `opencigan.mcv.kr`은 `transient-onlooker.github.io`를 가리키는 CNAME. 이는 Cloudflare가 해당 zone을 관리한다는 뜻이 아니다.
+- [x] **PR #43 읽기 전용 Pi 점검:** 로컬·기존 Funnel 상태 API 정상, WARP 전용 브리지 컴시간 1회 응답 200, 운영 Pi는 `release-warp-20261116` 기반 `54f89b9`(수정·미추적 운영 파일 포함). `cloudflared` 미설치/미발견; sudo 인증·계정 플랜은 미확인.
+- [ ] **잘못 추가한 `mcv.kr` Cloudflare zone은 변경하지 말고 계정에서 정리**. DNS 40개 복사본 편집이나 NS 변경 시도 중단. MCVKR 제공 도메인 전체를 소유한 것이 아님.
+- [ ] Cloudflare Workers & Pages 및 **Workers VPC** 메뉴 접근, Free 플랜/Connectivity Directory 권한 확인. VPC Beta를 계정에서 사용할 수 없으면 여기서 중단하고 기존 Funnel 유지.
+- [ ] 기존 GitHub Pages 배포 설정(`API_BASE_URL`), MCVKR CNAME, Pi 앱·WARP systemd drop-in 및 Tailscale Funnel의 롤백 경로 기록. 토큰·관리 키는 저장소나 채팅에 공유하지 않음.
 
-- [ ] `mcv.kr`의 Cloudflare zone 관리 권한, DNS setup(Full/Partial), 기존 `opencigan.mcv.kr` GitHub Pages CNAME, Cloudflare 플랜을 확인한다. **웹사이트 DNS는 손대지 않는다.**
-- [ ] **우선 API 호스트 후보: `opencigan-api.mcv.kr`**. `mcv.kr`가 Full DNS zone이면 Cloudflare Universal SSL의 루트·1단계 서브도메인 적용 범위에 맞다. 이전 제안 `api.opencigan.mcv.kr`은 Full zone의 2단계 하위 호스트여서 기본 인증서 범위 밖일 수 있다. 실제 zone 또는 인증서 방식에 따라 최종 선택.
-- [ ] 최종 호스트에 대한 DNS/TLS 적용 가능 여부 확인 후에만 Pages의 API 주소를 바꾼다. 새 DNS가 아직 없으면 이름은 **제안**이지 확정이 아니다.
+## Phase 1 — Cloudflare Pages를 기본 주소에서 시험
 
-## Phase 1 — Pi 기준선 및 Tunnel 생성
+- [ ] GitHub 저장소의 Svelte 프런트엔드를 Cloudflare Pages 프로젝트로 빌드·배포하고 `<project>.pages.dev`에서 자산, SPA 경로, 오프라인/PWA, 캐싱·아이콘·OG 미리보기를 확인. **기존 GitHub Pages는 유지**.
+- [ ] 프런트 API base를 같은 출처(`''` 또는 검증된 설정)로 변경해 `/api/v1/*`에 요청하도록 하고, Pages Functions의 경로 매칭/응답·정적 자산 충돌을 확인.
+- [ ] Pages Functions의 `/api/v1/*` 요청을 **Service Binding**으로 API Worker에 전달하도록 설계. 인증 헤더·메서드·URL·쿼리·본문·HEAD/OPTIONS·ETag/304가 손실되지 않는지 테스트.
 
-- [ ] Pi에서 기존 앱 및 프록시 설정을 **조회만** 하고 복구 정보를 보존. WARP는 건드리지 않으며 전역 `http_proxy`/라우팅 변경을 하지 않는다.
-- [ ] Cloudflare 대시보드 **Networking → Tunnels → Create Tunnel**에서 새 터널 생성. 토큰·관리자 키는 대화/Issue/커밋에 기록하지 않는다.
-- [ ] 공식 ARM64용 `cloudflared` 설치 후 터널을 systemd 서비스로 실행. OpenCigan의 사용자 서비스(`systemctl --user`)와 `cloudflared`의 시스템 서비스를 혼동하지 않는다.
-- [ ] Published application hostname → `http://127.0.0.1:8000`으로 지정. 터널 Healthy, Pi 로컬 상태 API, 외부 공개 TLS 인증서, DNS 연결을 각각 확인. **기존 Funnel은 유지**.
+## Phase 2 — Pi Tunnel과 Workers VPC Service 연결
+
+- [ ] Pi에서 `systemctl --user status opensigan`, `systemctl --user cat opensigan`, `curl http://127.0.0.1:8000/api/v1/status`로 원본 상태 확인. WARP 출구는 그대로 둔다.
+- [ ] **Workers VPC → Tunnels**에서 전용 Tunnel 생성. 공식 ARM64용 `cloudflared`를 Pi에 설치하고, 토큰은 비밀로 유지. Workers VPC용 tunnel은 QUIC 연결이 필요하고 UDP 7844 접근 및 cloudflared 2025.7.0 이상을 확인.
+- [ ] **Workers VPC → VPC Services**에 Pi의 비공개 HTTP 원본 `127.0.0.1:8000`을 등록(호스트·IPv4 및 HTTP 포트 8000 지정). Service ID를 기록하되 비밀 토큰과 혼동하지 않는다.
+- [ ] API Worker에서 해당 VPC Service를 `vpc_services` binding으로 연결하고 `env.PRIVATE_API.fetch(...)`로 보낸다. 원본 대상은 공개 MCVKR 주소가 아니라 터널 뒤의 Pi 로컬 HTTP 주소.
+- [ ] 먼저 Worker 로컬/배포 스모크 테스트로 `/api/v1/status` 200, JSON 오류 400, HEAD/OPTIONS를 검증. Pages Functions → Worker Service Binding으로 같은 경로가 정상 작동하는지 확인.
 
 ```bash
-systemctl --user status opensigan opensigan-preview --no-pager
+systemctl --user status opensigan --no-pager
 systemctl --user cat opensigan
 curl --fail --silent --show-error http://127.0.0.1:8000/api/v1/status
 command -v cloudflared && cloudflared --version
-sudo systemctl status cloudflared --no-pager
 ```
 
-마지막 두 명령은 아직 미설치라면 실패할 수 있다. `GET /api/v1/status`의 200은 **프로세스 생존**만 뜻하며 컴시간/NEIS 원본 정상 여부는 보여주지 않는다.
+참고: Workers VPC는 Zero Trust 일반 Published Application의 DNS 라우팅과 다르다. Pi에서 프록시를 열거나 `mcv.kr` NS를 바꿀 필요가 없다.
 
-## Phase 2 — 신규 공개 API 호스트의 기능·보안 검증
+## Phase 3 — API/봇 방어·실제 IP 검증
 
-- [ ] **프런트 배포 변경 전에** 새 호스트의 GET `/api/v1/status` 200, 잘못된 입력 시 JSON 400, OPTIONS/CORS, HEAD, HTTPS를 확인. 응답 503은 원인 코드와 백엔드 예외 로그를 따로 해석한다.
-- [ ] `ALLOWED_ORIGIN`에 정확한 `https://opencigan.mcv.kr`를 허용하고 기존 필요한 Origin은 유지. 브라우저의 CORS 및 미리보기·외부 API·Playground 호환성을 확인한다.
-- [ ] **실제 IP 주의:** 현재 `backend/app.py`의 `resolve_client_ip()`는 신뢰된 직접 피어에서 `X-Forwarded-For`/`Forwarded`를 처리하지만 `CF-Connecting-IP`를 직접 사용하지 않는다. cloudflared가 실제 제공하는 헤더, Waitress `REMOTE_ADDR`, `OPENCIGAN_TRUSTED_PROXIES` 설정을 확인하고 헤더 위조 방지 테스트를 통과한 방식만 적용. 모든 IP 대역을 신뢰하도록 설정하면 안 된다.
-- [ ] 서로 다른 외부망 2곳에서 클라이언트별 IP 로그와 기존 Python 60회/60초 제한의 분리 확인. 기존 셔터 및 Cloudflare 제한이 충돌하지 않게 검증.
-- [ ] 컴시간에 부담을 주는 반복 실측 호출은 삼가고, 모의 원본·캐시된 응답을 우선 사용한다.
+- [ ] **Worker 경계에서 허용 경로·HTTP 메서드·요청 크기 검증**, API 경로 외 URL 포워딩 금지. 관리/웹훅 경로는 기존 인증을 유지하고 필요한 경우 외부 접근을 별도 제한. 임의 URL을 받아 요청하는 범용 오픈 프록시로 만들지 않기.
+- [ ] **Workers Rate Limiting binding**으로 검색·시간표·ICS별 가중치/요청률 제한을 구현. 값은 관측 후 설정, 제한 초과 시 JSON 429 및 재시도 안내. 이 제한은 대략적·PoP별이며 엄밀한 전역 방어가 아니라 기존 Pi 제한과 함께 사용한다.
+- [ ] ICS·공개 API에는 JS/Managed Challenge·Cloudflare Access 로그인 강제 적용 금지. 봇 차단이 정상 학생·캘린더/외부 클라이언트를 차단하지 않는지 검증.
+- [ ] **IP 신뢰 경계:** Pages/Worker의 사용자가 보낸 `X-Forwarded-For`/`Forwarded`를 그대로 Pi에 전달하지 않는다. 실제 엣지 IP 정보 전달 방식을 명확히 설계하고 Worker→Pi 헤더 위변조·프록시 홉·`OPENCIGAN_TRUSTED_PROXIES`를 테스트. 현재 백엔드는 `CF-Connecting-IP`를 직접 사용하지 않음. 다른 외부망 2곳에서 IP별 로그·429 제한을 실측.
+- [ ] **원본 API의 캐시·CORS·ETag·304·HEAD·웹훅 서명·관리자 인증 유지**, Worker 429와 Pi `429 rate_limited`, `503 service_overloaded`, `503 upstream_unavailable` 구분.
+- [ ] Cloudflare Pages의 사용자 지정 도메인에 적용되는 zone WAF는 `mcv.kr` zone의 소유자/운영자가 관리함. Workers 레벨 제한으로 가능한 것과 WAF 보호 범위의 차이를 문서화.
 
-```bash
-# 아래 호스트는 DNS/TLS 확인 후 사용하는 후보 주소
-curl -i --max-time 10 https://opencigan-api.mcv.kr/api/v1/status
-curl -i --max-time 10 -H 'Origin: https://opencigan.mcv.kr' https://opencigan-api.mcv.kr/api/v1/status
-curl -i --max-time 10 -X OPTIONS -H 'Origin: https://opencigan.mcv.kr' -H 'Access-Control-Request-Method: GET' https://opencigan-api.mcv.kr/api/v1/schools
-```
+## Phase 4 — 마지막에 MCVKR CNAME 연결
 
-## Phase 3 — Cloudflare WAF·봇 차단
+- [ ] **MCVKR CNAME을 아직 변경하지 않고** Pages 기본 주소 `<project>.pages.dev`에서 홈페이지 및 `/api/v1/status`, 급식·시간표·학교 검색·공유·PNG/PDF, 관리자/알림, `.ics`를 검증.
+- [ ] Cloudflare Pages 프로젝트의 **Custom domains → Set up a domain**에 `opencigan.mcv.kr` 등록. MCVKR에서 CNAME 대상을 `<project>.pages.dev`로 변경(기존 `transient-onlooker.github.io` 값은 기록/백업). 수동 CNAME만 먼저 바꾸는 것이 아니라 Pages에도 도메인을 등록해야 함.
+- [ ] HTTPS 인증서 활성화·커스텀 도메인 Pages 라우팅·기존 공유 링크·OG 미리보기·리다이렉트·PWA/Service Worker 캐시를 확인.
+- [ ] **API와 ICS를 같은 도메인 `https://opencigan.mcv.kr/api/v1/...`로 제공**. 새 ICS 구독·ETag/304·실제 캘린더 앱 자동 갱신을 테스트. 기존 Tailscale `.ts.net` 구독은 자동 이전되지 않으므로 재등록 안내 또는 한시적 유지.
+- [ ] GitHub Pages/Tailscale Funnel을 즉시 제거하지 않는다. GitHub/Cloudflare Pages 자동 배포 충돌을 막고, 실측 결과에 따라 종료 여부 결정.
 
-- [ ] Cloudflare 계정 플랜에서 실제 제공되는 WAF Custom Rules 및 Rate Limiting 규칙 수·작업 방식 확인. 처음에는 Security Events·기존 서버 429/503 및 정상 요청량을 관측하고 임의의 높은 차단 강도를 정하지 않는다.
-- [ ] **새 API 호스트에만** 경로별 정책 적용: 학교 검색 `/api/v1/schools` 우선, 일반 시간표·급식·ICS, 상태/OPTIONS, 관리자·Webhook을 구분. 고비용 원본 요청과 캐시 적중 요청을 같은 기준으로 무조건 제한하지 않기.
-- [ ] **JSON API·ICS·외부 클라이언트 경로에 JS/Managed Challenge, Cloudflare Access 로그인 강제 적용 금지.** API 클라이언트와 캘린더는 브라우저 챌린지를 풀 수 없다. 차단/제한도 정상 요청·갱신·CORS preflight 오탐 검증 후 적용.
-- [ ] Cloudflare Free Bot Fight Mode는 zone 전체에서 작동하며 WAF Skip 규칙으로 제외할 수 없으므로 기본적으로 **활성화하지 않는다**. Super Bot Fight Mode 또는 bot score 같은 기능은 플랜이 지원할 때만 검토한다.
-- [ ] 운영 로그에서 Cloudflare가 차단한 요청과 백엔드 `429 rate_limited`, `503 service_overloaded`, `503 upstream_unavailable`을 구분한다. 문제 규칙은 개별 해제 가능하도록 기록한다.
+## Phase 5 — 롤백 및 완료 게이트
 
-## Phase 4 — Pages·ICS 공개 주소 변경
+- [ ] Worker 문제가 생기면 Pages Function의 API 경로를 기존 Funnel API로 되돌릴 수 있는 스테이징/배포 복구 방안 확보. CNAME 전환 실패 시 MCVKR CNAME을 기존 GitHub Pages로 되돌리고 이전 호스트 인증서/전파 상태 확인.
+- [ ] Pi 문제는 기존 `release-warp-20261116` 및 구 릴리스의 백업·systemd 복구 절차를 따르되, **컴시간 전용 WARP 프록시는 제거하지 않기**.
+- [ ] 평균/중앙값/p95 응답 시간, 오류·429·503, Worker 제한, Workers VPC 연결·QUIC 재연결, 외부망 2곳 실제 IP와 CORS/ICS 로그를 기록. Private VPC Beta의 버전/제한을 운영 위험으로 남기기.
 
-- [ ] Tunnel/TLS/CORS/외부 API 게이트 통과 후에만 GitHub 저장소 변수 `API_BASE_URL`을 **확정된 공개 API 호스트**로 변경. `.github/workflows/ci.yml`은 이를 `VITE_API_BASE_URL`에 전달하고, `frontend/src/api.ts`의 ICS 생성 URL도 API base를 따른다.
-- [ ] Pages 새 빌드를 배포해 브라우저 Network 패널에서 실제 요청 도메인 확인. 정적 웹 도메인 `opencigan.mcv.kr`은 계속 Pages에 유지한다.
-- [ ] ICS 외부 캘린더 앱의 200/ETag, `If-None-Match` 304, HEAD·시간대·새로고침 검증. **과거 Tailscale 구독 URL은 새 URL로 자동 이전되지 않으므로** 이전 주소 유지 기간 또는 사용자 재등록 안내가 필요하다.
-- [ ] 학교 검색·이번 주/다음 주·급식·공유·PNG/PDF·Playground·관리자 인증·Webhook 기본 비활성 계약이 바뀌지 않았는지 확인. 가능한 범위에서 모바일 실기기와 독립 외부망 재검증.
-- [ ] 기존 Funnel과 새 Tunnel의 정상 캐시 응답 TTFB·총 지연·중앙값·p95와 오류/차단 비율을 같은 조건에서 측정하고, 안정성 판단 후 기존 주소 정리 여부 결정.
-
-## Phase 5 — 롤백·완료 판정
-
-- [ ] **WAF 오탐:** 해당 규칙만 비활성화 → API/ICS 재시험. **Pages 장애:** 보존한 이전 `API_BASE_URL`로 복원 → 재배포. **터널 장애:** 기존 Tailscale Funnel로 우회 → DNS/TLS/CORS·구독 URL 확인.
-- [ ] **Pi API 버전 문제**는 Tunnel 문제와 별도로 운영 가이드의 이전 릴리스·DB 백업 절차로 복구. 컴시간 전용 WARP drop-in은 임의로 제거하지 않기.
-- [ ] 완료 기록에 Tunnel 설정/호스트(비밀 토큰 제외), 실제 Pi SHA, Pages SHA, WAF 규칙·플랜, 외부망 2곳의 IP 분리, JSON/CORS/ICS 200·304, 원본 프록시 분리, 구독 마이그레이션, 측정/롤백 근거를 남기기.
-
-### P0 완료 기준
-
-| 검증 범주 | 완료 요건 |
+| 게이트 | 통과 조건 |
 | --- | --- |
-| DNS/TLS/Tunnel | 공개 API 전용 HTTPS 인증서 유효, cloudflared 연결 안정 |
-| API·Pages | 외부 JSON API·브라우저 호출·CORS·기존 오류 코드 유지 |
-| 캘린더 | 비브라우저 ICS 구독/갱신, ETag·304 정상, 기존 링크 대응 |
-| WAF·남용 방어 | 실제 보안 규칙 작동, 정상 API/ICS 호출을 오탐 차단하지 않음 |
-| 클라이언트 IP | 두 외부망에서 IP/요청 제한 분리, XFF 스푸핑 거부 |
-| 운영 | WARP 독립 유지, 이전 Funnel/Pages 설정으로 되돌리기 가능 |
+| Pages | `pages.dev`에서 프런트·API 경로 정상, custom domain 등록 후 CNAME/TLS 정상 |
+| Workers VPC | cloudflared QUIC 안정, Worker→Pi 비공개 HTTP fetch 정상, Pi 외부 포트 개방 없음 |
+| 보안 | Worker 경로·인증·대략적 Rate Limiting + Pi 자체 제한, 위조 IP 차단 검증 |
+| 데이터 | 학교/시간표/급식 정상, 기존 WARP와 NEIS 동작 보존 |
+| ICS | 실제 캘린더 구독·갱신 및 ETag 304, 기존 링크 재등록 방안 |
+| 운영 | DNS·Pages·Worker·Pi 각각 독립 롤백, 적용 SHA와 증거 기록 |
 
-**모든 항목은 미완료로 시작한다.** 한 항목의 통과가 Cloudflare 전환 전체의 완료를 뜻하지 않는다.
+## 공식 근거 (2026-11-16 검증)
 
-## 공식 참고 자료 (2026-11-16 확인)
-
-- [Cloudflare Tunnel 구축](https://developers.cloudflare.com/tunnel/get-started/) · [Tunnel 라우팅](https://developers.cloudflare.com/tunnel/concepts/routing/) · [ARM64 다운로드](https://developers.cloudflare.com/tunnel/downloads/)
-- [Universal SSL 호스트 적용 범위](https://developers.cloudflare.com/ssl/edge-certificates/universal-ssl/limitations/) · [WAF Rate Limiting](https://developers.cloudflare.com/waf/rate-limiting-rules/)
-- [Bot Fight Mode와 API 오탐 제한](https://developers.cloudflare.com/bots/get-started/bot-fight-mode/) · [Skip 규칙 한계](https://developers.cloudflare.com/waf/custom-rules/skip/options/)
+- [Pages 외부 DNS 서브도메인 CNAME](https://developers.cloudflare.com/pages/configuration/custom-domains/)
+- [Workers VPC 개요 (Free/Beta)](https://developers.cloudflare.com/workers-vpc/) · [Workers VPC 시작](https://developers.cloudflare.com/workers-vpc/get-started/) · [Pi Private API 예제](https://developers.cloudflare.com/workers-vpc/examples/private-api/)
+- [Pages Functions → Worker Service Binding](https://developers.cloudflare.com/pages/functions/bindings/)
+- [Worker Rate Limiting binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
+- [일반 Tunnel의 DNS 제한](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/dns/)
