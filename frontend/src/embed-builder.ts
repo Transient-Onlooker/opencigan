@@ -1,4 +1,5 @@
 import './embed.css';
+import './standalone-theme';
 import { searchSchools, getTimetable, type School, type TimetableRecord } from './api';
 import { currentKoreaDate, monday } from './date';
 

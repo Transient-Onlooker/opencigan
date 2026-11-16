@@ -1,4 +1,5 @@
 import './admin.css';
+import './standalone-theme';
 
 interface AccessLogItem {
   id: number;

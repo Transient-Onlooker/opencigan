@@ -37,6 +37,7 @@
           {/if}
         {/if}
       {/if}
+      <p><a href="./embed-builder.html">시간표 위젯 만들기</a></p>
     </section>
 
 <style>
