@@ -207,7 +207,7 @@ test('a late response from a previous school cannot change the active class or l
 });
 
 test('the installed shell reloads offline and only restores the matching week', async ({ context, page, browserName }) => {
-  test.skip(browserName !== 'chromium', 'Playwright WebKit does not consistently emulate service-worker offline requests on Windows.');
+  test.skip(browserName === 'webkit' && process.platform === 'win32', 'Playwright WebKit does not consistently emulate service-worker offline requests on Windows.');
   const school = { id: '2:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
   const week = '2026-11-09';
   await page.clock.setFixedTime(new Date('2026-11-09T02:00:00Z'));
