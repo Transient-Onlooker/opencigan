@@ -429,6 +429,28 @@ test('online server failure restores the matching saved timetable and retry reco
   await expect(panel.getByText('이 기기에 저장된 시간표 · 최신 정보가 아닐 수 있어요')).toHaveCount(0);
 });
 
+test('school search shows matching saved results on failure and clears the notice after recovery', async ({ page }) => {
+  await mockApi(page);
+  let fail = false;
+  await page.route('**/api/v1/schools?*', (route) => fail
+    ? route.fulfill({ status: 503, json: { code: 'upstream_unavailable' } })
+    : route.fulfill({ json: { schools: [school], stale: false } }));
+  await page.goto('/');
+  const search = page.getByRole('searchbox', { name: '학교 찾기' });
+  await search.fill('봄빛');
+  await expect(page.getByRole('button', { name: /봄빛고등학교/ })).toBeVisible();
+  fail = true;
+  await search.fill('봄빛고');
+  await expect(page.getByText(/이 검색어의 저장된 결과가 없어요/)).toBeVisible();
+  await search.fill('봄빛');
+  await expect(page.getByText(/이 화면에 저장된 검색 결과/)).toBeVisible();
+  await expect(page.getByRole('button', { name: /봄빛고등학교/ })).toBeVisible();
+  fail = false;
+  await search.fill('봄빛고');
+  await expect(page.getByRole('button', { name: /봄빛고등학교/ })).toBeVisible();
+  await expect(page.getByText(/이 화면에 저장된 검색 결과/)).toHaveCount(0);
+});
+
 test('meal menu search, allergy filters, NEIS details and timetable date link work together', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('opensigan-allergies', '[1]'));
   await mockApi(page);
