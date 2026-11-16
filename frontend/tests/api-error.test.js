@@ -30,3 +30,17 @@ test('retains history disabled code and handles non-JSON errors', async () => {
   const unknown = await apiError(new Response('<html>', { status: 502 }));
   assert.match(unknown.message, /502/);
 });
+
+test('uses a valid Retry-After delay without trusting malformed or excessive values', async () => {
+  for (const [value, expected] of [
+    ['17', /17초 후/], ['0', /잠시 후/], ['-2', /잠시 후/],
+    ['999999', /잠시 후/], ['tomorrow', /잠시 후/],
+  ]) {
+    const response = Response.json({ code: 'upstream_unavailable' }, { status: 503, headers: { 'Retry-After': value } });
+    assert.match((await apiError(response)).message, expected);
+  }
+  const limited = Response.json({ code: 'rate_limited' }, { status: 429, headers: { 'Retry-After': '60' } });
+  assert.match((await apiError(limited)).message, /60초 후/);
+  const disabled = Response.json({ code: 'history_disabled' }, { status: 503, headers: { 'Retry-After': '10' } });
+  assert.doesNotMatch((await apiError(disabled)).message, /10초/);
+});

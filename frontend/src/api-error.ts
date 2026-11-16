@@ -11,5 +11,12 @@ export async function apiError(response: Response): Promise<Error> {
     else if (code === 'gateway_unavailable' || code === 'gateway_unconfigured') message = 'API 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.';
     else message = '서비스를 일시적으로 이용할 수 없어요. 잠시 후 다시 시도해 주세요.';
   }
+  if (response.status === 429 || response.status === 503) {
+    const retryAfter = response.headers.get('Retry-After');
+    if (retryAfter && /^\d{1,5}$/.test(retryAfter)) {
+      const seconds = Number(retryAfter);
+      if (seconds > 0 && seconds <= 86400) message = message.replace('잠시 후', `${seconds}초 후`);
+    }
+  }
   return Object.assign(new Error(message), { code });
 }
