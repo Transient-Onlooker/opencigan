@@ -66,13 +66,28 @@ test('switching classes updates lessons, PNG and both links', async ({ page }) =
   await expect(history.getByRole('listitem')).toHaveCount(2);
   const download = page.waitForEvent('download');
   await panel.getByRole('button', { name: 'PNG 저장' }).click();
-  expect((await download).suggestedFilename()).toMatch(/봄빛고등학교.*1학년2반.*\.png$/);
+  const png = await download;
+  expect(png.suggestedFilename()).toMatch(/봄빛고등학교.*1학년2반.*\.png$/);
+  const { readFile } = await import('node:fs/promises');
+  const pngBytes = await readFile(await png.path());
+  const imageSize = await page.evaluate(async (base64) => {
+    const image = new Image();
+    image.src = 'data:image/png;base64,' + base64;
+    await image.decode();
+    return { width: image.naturalWidth, height: image.naturalHeight };
+  }, pngBytes.toString('base64'));
+  expect(imageSize.width).toBeGreaterThan(600);
+  expect(imageSize.height).toBeGreaterThan(300);
   const pdfDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: 'PDF 저장' }).click();
   const pdf = await pdfDownload;
   expect(pdf.suggestedFilename()).toMatch(/\.pdf$/);
-  const { readFile } = await import('node:fs/promises');
-  expect((await readFile(await pdf.path())).subarray(0, 5).toString()).toBe('%PDF-');
+  const pdfBytes = await readFile(await pdf.path());
+  expect(pdfBytes.subarray(0, 5).toString()).toBe('%PDF-');
+  const { PDFDocument } = await import('pdf-lib');
+  const document = await PDFDocument.load(pdfBytes);
+  expect(document.getPageCount()).toBe(1);
+  expect(document.getPage(0).getWidth()).toBeGreaterThan(document.getPage(0).getHeight());
 
   await page.getByRole('button', { name: '캘린더 구독 링크' }).click();
   const subscription = page.getByLabel(/시간표 구독 URL/);
