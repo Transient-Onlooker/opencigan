@@ -31,6 +31,19 @@ class PublicApiTests(unittest.TestCase):
             _, headers, _ = dispatch_request('GET', path, '', request_origin='https://other.test')
             self.assertNotIn('Access-Control-Expose-Headers', headers)
 
+    def test_preflight_preserves_route_specific_methods_and_headers(self):
+        with patch.dict('os.environ', {'ALLOWED_ORIGIN': 'https://first.test, https://second.test'}):
+            status, headers, body = dispatch_request('OPTIONS', '/api/v1/webhooks/abc', '', request_origin='https://second.test')
+            self.assertEqual((status, body), (204, b''))
+            self.assertEqual(headers['Access-Control-Allow-Origin'], 'https://second.test')
+            self.assertEqual(headers['Access-Control-Allow-Methods'], 'GET, HEAD, POST, PUT, DELETE, OPTIONS')
+            self.assertEqual(headers['Content-Length'], '0')
+            status, headers, body = dispatch_request('OPTIONS', '/api/v1/timetable/history.rss', '')
+            self.assertEqual((status, body), (204, b''))
+            self.assertEqual(headers['Access-Control-Allow-Origin'], 'https://first.test')
+            self.assertEqual(headers['Access-Control-Expose-Headers'], 'Retry-After, ETag')
+            self.assertIn('If-None-Match', headers['Access-Control-Allow-Headers'])
+
     def test_rate_limit_and_error_contract(self):
         for _ in range(60):
             status, _, _ = dispatch_request('GET', '/api/v1/schools', '', client='client')

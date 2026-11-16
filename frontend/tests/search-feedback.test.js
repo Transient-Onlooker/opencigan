@@ -5,7 +5,9 @@ import { compile } from 'svelte/compiler';
 
 test('school search announcement stays mounted while results update and meal connection status is announced', async () => {
   const component = await readFile(new URL('../src/App.svelte', import.meta.url), 'utf8');
-  const schoolSearch = component.match(/<input id="school"[\s\S]*?<\/div>([\s\S]*?)<\/div>\s*<div class="selectors">/)?.[0];
+  const selector = await readFile(new URL('../src/SchoolSelector.svelte', import.meta.url), 'utf8');
+  const meals = await readFile(new URL('../src/MealsPanel.svelte', import.meta.url), 'utf8');
+  const schoolSearch = selector.match(/<input id="school"[\s\S]*?<\/div>([\s\S]*?)<\/div>\s*<div class="selectors">/)?.[0];
   assert.ok(schoolSearch, 'school search markup exists');
 
   const liveRegion = schoolSearch.indexOf('aria-live="polite"');
@@ -17,9 +19,11 @@ test('school search announcement stays mounted while results update and meal con
   assert.match(announcement, /schoolResults\.length/);
 
   // Meal connection status announcement region
-  const mealConnection = component.match(/<div class="meal-connection" aria-live="polite">([\s\S]*?)<\/div>/)?.[0];
+  const mealConnection = meals.match(/<div class="meal-connection" aria-live="polite">([\s\S]*?)<\/div>/)?.[0];
   assert.ok(mealConnection, 'meal-connection live region exists');
   assert.match(mealConnection, /neisSearchState/);
 
   assert.doesNotThrow(() => compile(component, { filename: 'App.svelte' }));
+  assert.doesNotThrow(() => compile(selector, { filename: 'SchoolSelector.svelte' }));
+  assert.doesNotThrow(() => compile(meals, { filename: 'MealsPanel.svelte' }));
 });

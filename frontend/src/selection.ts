@@ -4,10 +4,23 @@ export type SelectionState = { school: School | null; grade: number; classroom: 
 
 export function createSelectionState(initial: SelectionState, onChange: (state: SelectionState) => void) {
   let state = { ...initial };
+  const update = (change: Partial<SelectionState>) => {
+    state = { ...state, ...change };
+    onChange({ ...state });
+  };
   return {
-    update(change: Partial<SelectionState>) {
-      state = { ...state, ...change };
-      onChange({ ...state });
+    update,
+    prepareSchool(school: School, keepClass: boolean) {
+      const reset = state.school?.id !== school.id && !keepClass;
+      if (reset) update({ grade: 1, classroom: 1 });
+      if (/(?:중학교|고등학교)/.test(school.name) && state.grade > 3) update({ grade: 1 });
+      return reset;
+    },
+    reconcile(records: TimetableRecord[], maxGrade: number) {
+      const previousGrade = Number(state.grade);
+      const previousClassroom = Number(state.classroom);
+      update(reconcileClassSelection(records, maxGrade, state.grade, state.classroom));
+      return previousGrade !== Number(state.grade) || previousClassroom !== Number(state.classroom);
     },
   };
 }
@@ -24,6 +37,15 @@ export function saveSelection(storage: Pick<Storage, 'setItem'>, selection: { sc
     if (selection.grade !== undefined) storage.setItem('opensigan-grade', String(selection.grade));
     storage.setItem('opensigan-class', String(selection.classroom));
   } catch { /* Storage may be unavailable; the current selection remains usable. */ }
+}
+
+export function readSelection(storage: Pick<Storage, 'getItem'>, update: (change: Partial<SelectionState>) => void): School | null {
+  const grade = Number(storage.getItem('opensigan-grade'));
+  if (grade >= 1 && grade <= 6) update({ grade });
+  const classroom = Number(storage.getItem('opensigan-class'));
+  if (Number.isInteger(classroom) && classroom >= 1 && classroom <= 99) update({ classroom });
+  const school = storage.getItem('opensigan-school');
+  return school ? JSON.parse(school) as School : null;
 }
 
 export function validateSharedClass(timetable: TimetableResponse | null, fromDevice: boolean, maxGrade: number, grade: number, classroom: number): 'valid' | 'missing' | 'unavailable' {

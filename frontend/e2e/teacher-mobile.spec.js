@@ -40,3 +40,47 @@ test('teacher and grade views keep class labels legible on narrow screens', asyn
   await expect(heading).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
+
+for (const viewport of [{ width: 320, height: 700 }, { width: 667, height: 375 }, { width: 1280, height: 800 }]) {
+  for (const theme of ['light', 'dark']) {
+    test(`weekly timetable stays usable at ${viewport.width}px in ${theme} mode`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      const school = { id: '2:봄빛고등학교', name: '아주 긴 이름의 봄빛고등학교', region: '서울' };
+      await page.clock.setFixedTime(new Date('2026-11-09T02:00:00Z'));
+      await page.addInitScript(({ school, theme }) => {
+        localStorage.setItem('opensigan-school', JSON.stringify(school));
+        localStorage.setItem('opensigan-theme', theme);
+      }, { school, theme });
+      await page.route('**/api/v1/**', async (route) => {
+        const url = new URL(route.request().url());
+        if (url.pathname === '/api/v1/timetable') return route.fulfill({ json: {
+          schoolId: school.id, weekStart: url.searchParams.get('week'), fetchedAt: '2026-11-09T01:00:00Z',
+          sourceUpdatedAt: null, stale: false, records: [
+            { grade: 1, class: 1, date: '2026-11-09', period: 1, subject: '아주 긴 과목 이름 하나', teacher: '김교사', isChanged: false },
+            { grade: 1, class: 1, date: '2026-11-09', period: 1, subject: '두 번째 수업', teacher: '이교사', isChanged: false },
+            { grade: 1, class: 1, date: '2026-11-09', period: 7, subject: '마지막 수업', teacher: '김교사', isChanged: false },
+          ],
+        } });
+        return route.fulfill({ json: { schools: [], meals: [], changes: [], stale: false } });
+      });
+      await page.goto('/');
+      const panel = page.locator('#timetable-panel');
+      const table = panel.getByRole('table');
+      await expect(table.getByText('아주 긴 과목 이름 하나')).toBeVisible();
+      await expect(table.getByText('두 번째 수업')).toBeVisible();
+      if (theme === 'dark') await expect(page.locator('.app-shell')).toHaveClass(/dark/);
+      else await expect(page.locator('.app-shell')).not.toHaveClass(/dark/);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+      const last = table.getByText('마지막 수업');
+      await last.scrollIntoViewIfNeeded();
+      const box = await last.boundingBox();
+      const menu = await page.getByRole('navigation', { name: '캘린더 메뉴' }).boundingBox();
+      if (viewport.width <= 700) expect(box.y + box.height).toBeLessThanOrEqual(menu.y + 1);
+      if (viewport.width <= 700) {
+        await page.getByRole('button', { name: '학교 변경' }).click();
+        await page.getByRole('searchbox', { name: '학교 찾기' }).focus();
+        await expect(page.getByRole('navigation', { name: '캘린더 메뉴', includeHidden: true })).toBeHidden();
+      }
+    });
+  }
+}

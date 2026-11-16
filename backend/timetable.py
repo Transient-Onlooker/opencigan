@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
 import threading
 import time
+from backend.comcigan_proxy import configure_comcigan_proxy
 
 _protocol = None
 _protocol_expires = 0.0
@@ -8,6 +9,7 @@ _protocol_lock = threading.Lock()
 
 
 def _search_with_cached_protocol(query, *, retry=True):
+    configure_comcigan_proxy()
     from pycomcigan.helpers import get_comcigan_response_for_codes, school_search
     from pycomcigan.service_page import decode_service_page
     from pycomcigan.service_protocol import parse_service_protocol
@@ -69,6 +71,7 @@ def validate_timetable_week(week):
 
 
 def fetch_timetable(school_id, week):
+    configure_comcigan_proxy()
     from pycomcigan import TimeTable
 
     if not isinstance(school_id, str):

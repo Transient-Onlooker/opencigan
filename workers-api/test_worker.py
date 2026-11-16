@@ -11,6 +11,7 @@ from contextlib import closing
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
+from urllib.parse import urlsplit
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -137,6 +138,38 @@ class ContractTest(unittest.TestCase):
         with patch.object(worker.time, "time", return_value=1001), patch.object(worker, "fetch_timetable", return_value=expected) as fetch:
             self.assertEqual(self.request("/api/v1/timetable?school=1%3Aschool&week=" + week), (200, expected))
             fetch.assert_called_once_with("1:school", week)
+
+    def test_python_and_worker_share_search_and_timetable_contract(self):
+        from backend import app as python_app
+        from backend.cache import Cache
+
+        def python_request(url):
+            parts = urlsplit(url)
+            status, _, body = python_app._dispatch_request("GET", parts.path, parts.query, cache_instance=Cache())
+            return status, json.loads(body)
+
+        today = datetime.now(timezone(timedelta(hours=9))).date()
+        week = (today - timedelta(days=today.weekday())).isoformat()
+        schools = [{"id": "1:school", "name": "school", "region": "r"}]
+        timetable = {"schoolId": "1:school", "weekStart": week, "records": [],
+                     "sourceUpdatedAt": None, "fetchedAt": "2026-11-16T00:00:00Z", "stale": False}
+        with patch.object(worker.time, "time", return_value=1000), \
+             patch.object(worker, "search_schools", return_value=schools), \
+             patch.object(python_app, "search_schools", return_value=schools):
+            self.assertEqual(self.request("/api/v1/schools?q=school"),
+                             python_request("/api/v1/schools?q=school"))
+            self.assertEqual(self.request("/api/v1/schools?q=")[0],
+                             python_request("/api/v1/schools?q=")[0])
+        with patch.object(worker.time, "time", return_value=1001), \
+             patch.object(worker, "fetch_timetable", return_value=timetable), \
+             patch.object(python_app, "fetch_timetable", return_value=timetable), \
+             patch.object(python_app, "_history_store", return_value=None):
+            url = "/api/v1/timetable?school=1%3Aschool&week=" + week
+            worker_status, worker_body = self.request(url)
+            python_status, python_body = python_request(url)
+            self.assertEqual(worker_status, python_status)
+            self.assertEqual(worker_body, {key: value for key, value in python_body.items() if key != "cacheStatus"})
+            self.assertIn(python_body["cacheStatus"], ("hit", "miss", "stale"))
 
     def test_school_search_maps_provider_rows_and_caches_result(self):
         fixture = [

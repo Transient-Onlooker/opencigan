@@ -25,6 +25,24 @@ test('selection owners publish independent snapshots without losing unrelated se
   assert.equal(second.classroom, 4);
 });
 
+test('school preparation and timetable reconciliation use the same selection owner', () => {
+  const school = { id: 'old', name: '초등학교' };
+  let current;
+  const owner = exports.createSelectionState({ school, grade: 5, classroom: 8, week: '2026-11-09' }, (state) => { current = state; });
+  assert.equal(owner.prepareSchool({ id: 'new', name: '고등학교' }, true), false);
+  assert.equal(current.grade, 1);
+  assert.equal(current.classroom, 8);
+  owner.update({ school: { id: 'new', name: '고등학교' } });
+  assert.equal(owner.reconcile([{ grade: 2, class: 3 }], 3), true);
+  assert.equal(current.grade, 2);
+  assert.equal(current.classroom, 3);
+  assert.equal(current.week, '2026-11-09');
+  assert.equal(owner.reconcile([{ grade: 2, class: 3 }], 3), false);
+  assert.equal(owner.prepareSchool({ id: 'another', name: '초등학교' }, false), true);
+  assert.equal(current.grade, 1);
+  assert.equal(current.classroom, 1);
+});
+
 test('selection persistence preserves keys, values and write order', () => {
   const writes = [];
   const storage = { setItem: (key, value) => writes.push([key, value]) };
@@ -48,6 +66,18 @@ test('selection persistence tolerates blocked storage and stops subsequent write
   const failsOnGrade = { setItem: (key) => { partial.push(key); if (key === 'opensigan-grade') throw new Error('blocked'); } };
   exports.saveSelection(failsOnGrade, { school: { id: 'school' }, grade: 1, classroom: 2 });
   assert.deepEqual(partial, ['opensigan-school', 'opensigan-grade']);
+});
+
+test('selection restoration preserves read order and applies valid values before a later failure', () => {
+  const reads = [];
+  const changes = [];
+  const values = new Map([['opensigan-grade', '2'], ['opensigan-class', '7'], ['opensigan-school', '{bad']]);
+  const storage = { getItem: (key) => { reads.push(key); return values.get(key) ?? null; } };
+  assert.throws(() => exports.readSelection(storage, (change) => changes.push({ ...change })));
+  assert.deepEqual(reads, ['opensigan-grade', 'opensigan-class', 'opensigan-school']);
+  assert.deepEqual(changes, [{ grade: 2 }, { classroom: 7 }]);
+  values.set('opensigan-school', '{"id":"2:school","name":"school","region":"r"}');
+  assert.equal(exports.readSelection(storage, () => {}).id, '2:school');
 });
 
 test('shared classroom requires fresh matching data and valid school grade', () => {
@@ -97,6 +127,46 @@ test('shared selection session cancels obsolete checks and publishes pending and
   assert.equal(third.aborted, true);
   assert.equal(state.checking, false);
   assert.equal(state.pending, null);
+});
+
+test('a newer shared school verification wins when an aborted search resolves late', async () => {
+  let latest;
+  const session = exports.createSharedSelectionSession((state) => { latest = state; });
+  const fallback = { school: { id: 'old' }, grade: 1, classroom: 1 };
+  const firstSchool = { id: 'first', name: '첫 학교', region: '서울' };
+  const secondSchool = { id: 'second', name: '다음 학교', region: '서울' };
+  let release;
+  const delayed = new Promise((resolve) => { release = resolve; });
+  const applied = [];
+  const failures = [];
+  const first = session.verifySchool({ school: firstSchool, grade: 1, classroom: 2 }, fallback, () => 'old', () => delayed, (value) => applied.push(value.id), () => failures.push('first'));
+  const second = session.verifySchool({ school: secondSchool, grade: 2, classroom: 3 }, fallback, () => 'old', async () => ({ schools: [secondSchool], stale: false }), (value) => applied.push(value.id), () => failures.push('second'));
+  await second;
+  release({ schools: [firstSchool], stale: false });
+  await first;
+  assert.deepEqual(applied, ['second']);
+  assert.deepEqual(failures, []);
+  assert.equal(latest.pending.schoolId, 'second');
+  assert.equal(latest.pending.classroom, 3);
+  assert.equal(latest.checking, false);
+});
+
+test('shared verification rejects stale results and ignores results after the active school changes', async () => {
+  let latest;
+  const session = exports.createSharedSelectionSession((state) => { latest = state; });
+  const school = { id: 'shared', name: '공유 학교', region: '서울' };
+  const fallback = { school: { id: 'old' }, grade: 1, classroom: 1 };
+  let applied = 0;
+  let failed = 0;
+  const shared = { school, grade: 1, classroom: 1 };
+  await session.verifySchool(shared, fallback, () => 'old', async () => ({ schools: [school], stale: true }), () => applied++, () => failed++);
+  assert.equal(failed, 1);
+  assert.equal(latest.pending, null);
+  await session.verifySchool(shared, fallback, () => 'another', async () => ({ schools: [school], stale: false }), () => applied++, () => failed++);
+  assert.equal(applied, 0);
+  assert.equal(failed, 1);
+  assert.equal(latest.pending, null);
+  assert.equal(latest.checking, false);
 });
 
 test('grade and class options are unique, sorted and limited by school level', () => {

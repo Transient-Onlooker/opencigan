@@ -15,7 +15,10 @@ const cache = readFileSync(new URL('../../src/timetable-cache.ts', import.meta.u
 runInNewContext(ts.transpileModule(cache, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports: personalizationVm, AbortController });
 const timetableView = readFileSync(new URL('../../src/timetable-view.ts', import.meta.url), 'utf8');
 runInNewContext(ts.transpileModule(timetableView, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports: personalizationVm });
+personalizationVm.countObservedClasses = personalizationVm.observedClassCount;
 const history = readFileSync(new URL('../../src/history-session.ts', import.meta.url), 'utf8');
 runInNewContext(ts.transpileModule(history, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports: personalizationVm, AbortController });
 const meal = readFileSync(new URL('../../src/meal-session.ts', import.meta.url), 'utf8');
 runInNewContext(ts.transpileModule(meal, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports: personalizationVm, AbortController });
+const preferences = readFileSync(new URL('../../src/preferences.ts', import.meta.url), 'utf8');
+runInNewContext(ts.transpileModule(preferences, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports: personalizationVm });

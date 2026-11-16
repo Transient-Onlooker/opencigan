@@ -41,7 +41,7 @@ $updatedProject = [regex]::Replace($projectText, '(?m)^\[tool\.uv\.sources\]\r?\
 if ($updatedProject -eq $projectText) { throw 'Expected pycomcigan path source not found in pyproject.toml.' }
 $projectText = $updatedProject
 [IO.File]::WriteAllText($stageProject, $projectText, [Text.UTF8Encoding]::new($false))
-foreach ($name in @('timetable.py', 'neis.py')) {
+foreach ($name in @('timetable.py', 'neis.py', 'comcigan_proxy.py')) {
     Copy-Item -LiteralPath (Join-Path $backend $name) -Destination (Join-Path $stage "backend\$name")
 }
 foreach ($name in @('pycomcigan-1.4.4-py3-none-any.whl', 'pycryptodomex-3.24.2-cp37-abi3-pyemscripten_2026_0_wasm32.whl')) {

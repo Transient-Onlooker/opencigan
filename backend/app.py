@@ -1,13 +1,10 @@
 import functools
 import atexit
 import ipaddress
-import hashlib
-import hmac
 import json
 import logging
 import os
 import re
-import sqlite3
 import socketserver
 import threading
 import time
@@ -18,12 +15,20 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 from backend.cache import Cache
+from backend.http_core import json_response, make_response_headers, preflight_response
 from backend.analytics import ApiRecorder
 from backend.access_logs import AccessLogRecorder, AccessLogStore, classify_origin
 from backend.ical import render_timetable_ics
 from backend.history_feed import render_history_feed
 from backend.shutter import Shutter
 from backend.neis import NEISClient, School
+from backend.meal_routes import get_meals, search_meal_schools
+from backend.timetable_routes import get_timetable, search_timetable_schools
+from backend.webhook_routes import webhook_api
+from backend.calendar_routes import timetable_calendar
+from backend.history_routes import timetable_history
+from backend.analytics_routes import record_pageview, analytics_summary
+from backend.admin_routes import access_log_admin
 from backend.timetable import fetch_timetable, search_schools, validate_timetable_week
 
 cache = Cache()
@@ -182,52 +187,7 @@ def _access_log_store():
 
 
 def _access_log_admin(method, query_string, request_headers, headers):
-    if method not in ('GET', 'HEAD'):
-        return 405, headers, b'{"code":"method_not_allowed"}'
-    token = os.environ.get('OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN', '')
-    supplied = (request_headers or {}).get('Authorization', '')
-    if not token or not hmac.compare_digest(supplied.encode(), ('Bearer ' + token).encode()):
-        headers['WWW-Authenticate'] = 'Bearer realm="Opencigan access logs"'
-        return 401, headers, b'{"code":"unauthorized"}'
-    try:
-        values = parse_qs(query_string, keep_blank_values=True, max_num_fields=20)
-        allowed = {'client_ip', 'school_id', 'grade', 'class', 'start_day', 'end_day', 'route', 'status', 'origin_class', 'cache_status', 'cursor', 'limit', 'format'}
-        if set(values) - allowed or any(len(items) != 1 or len(items[0]) > 255 for items in values.values()):
-            raise ValueError('조회 조건이 올바르지 않습니다')
-        filters = {key: item[0] for key, item in values.items() if key not in ('cursor', 'limit', 'format') and item[0]}
-        for key in ('start_day', 'end_day'):
-            if key in filters and date.fromisoformat(filters[key]).isoformat() != filters[key]:
-                raise ValueError('날짜를 확인하세요')
-        if filters.get('start_day', '') > filters.get('end_day', '9999-12-31'):
-            raise ValueError('날짜 범위를 확인하세요')
-        for key, low, high in [('grade', 1, 6), ('class', 1, 99), ('status', 100, 599)]:
-            if key in filters and (not filters[key].isdigit() or not low <= int(filters[key]) <= high):
-                raise ValueError('숫자 조건을 확인하세요')
-        cursor = values.get('cursor', [None])[0]
-        if cursor is not None and (not cursor.isdigit() or int(cursor) <= 0):
-            raise ValueError('커서를 확인하세요')
-        if 'origin_class' in filters and filters['origin_class'] not in ('frontend', 'external', 'unknown'):
-            raise ValueError('출처 조건을 확인하세요')
-        limit = int(values.get('limit', ['50'])[0])
-        if not 1 <= limit <= 100:
-            raise ValueError('조회 건수는 1~100입니다')
-        output = values.get('format', ['json'])[0]
-        if output not in ('json', 'csv'):
-            raise ValueError('형식을 확인하세요')
-        store = _access_log_store()
-        if store is None:
-            return 503, headers, b'{"code":"access_logs_disabled"}'
-        if output == 'csv':
-            headers['Content-Type'] = 'text/csv; charset=utf-8'
-            headers['Content-Disposition'] = 'attachment; filename="opencigan-access.csv"'
-            return 200, headers, ('\ufeff' + store.export_csv(filters, limit=5000)).encode()
-        result = store.query(filters, cursor=cursor, limit=limit)
-        result['dropped'] = _access_log_recorder.dropped
-        return 200, headers, json.dumps(result, ensure_ascii=False).encode()
-    except (ValueError, TypeError):
-        return 400, headers, b'{"code":"invalid_request"}'
-    except (OSError, sqlite3.Error):
-        return 503, headers, b'{"code":"access_logs_unavailable"}'
+    return access_log_admin(method, query_string, request_headers, headers, _access_log_store, _access_log_recorder)
 
 
 def _rate_allowed(client):
@@ -264,73 +224,7 @@ def _webhook_store():
 
 
 def _webhook_api(method, path, body, request_headers, client, headers):
-    from backend.webhook_store import SubscriptionLimitError
-
-    def respond(status, payload):
-        encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        headers["Content-Length"] = str(len(encoded))
-        return status, headers, encoded
-
-    if client:
-        retry = _rate_allowed(("webhooks", client))
-        if retry:
-            headers["Retry-After"] = str(retry)
-            return respond(429, {"error": "요청이 너무 많습니다", "code": "rate_limited"})
-    if len(body or b"") > 4096:
-        return respond(413, {"error": "요청 본문이 너무 큽니다", "code": "payload_too_large"})
-    try:
-        store = _webhook_store()
-        if store is None:
-            return respond(503, {"error": "Webhook 기능이 활성화되지 않았습니다", "code": "webhooks_disabled"})
-        if path == "/api/v1/webhooks":
-            if method != "POST":
-                return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
-            payload = json.loads(body or b"{}")
-            if not isinstance(payload, dict) or set(payload) != {"school", "grade", "class", "destination"}:
-                raise ValueError("invalid payload")
-            result = store.create(payload["school"], payload["grade"], payload["class"], payload["destination"])
-            return respond(200, result)
-        match = re.fullmatch(r"/api/v1/webhooks/([A-Za-z0-9_-]{24})(/deliveries|/test)?", path)
-        if not match:
-            return respond(404, {"error": "요청한 경로가 없습니다", "code": "not_found"})
-        if method not in ("GET", "HEAD", "DELETE", "POST", "PUT"):
-            return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
-        authorization = (request_headers or {}).get("Authorization", "")
-        token = authorization[7:] if authorization.startswith("Bearer ") else ""
-        identifier = match.group(1)
-        if match.group(2) == "/test":
-            if method != "POST":
-                return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
-            event = store.enqueue_test(identifier, token)
-            if event is False:
-                headers["Retry-After"] = "60"
-                return respond(429, {"error": "잠시 후 다시 시도해 주세요", "code": "rate_limited"})
-            result = {"eventId": event} if event is not None else None
-        elif match.group(2) == "/deliveries":
-            if method not in ("GET", "HEAD"):
-                return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
-            deliveries = store.deliveries(identifier, token)
-            result = {"deliveries": deliveries} if deliveries is not None else None
-        elif method == "POST":
-            return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
-        elif method == "PUT":
-            payload = json.loads(body or b"{}")
-            if not isinstance(payload, dict) or set(payload) != {"filters"}:
-                raise ValueError("invalid payload")
-            result = {"updated": True} if store.update_filters(identifier, token, payload["filters"]) else None
-        elif method == "DELETE":
-            result = {"deleted": True} if store.delete(identifier, token) else None
-        else:
-            result = store.get(identifier, token)
-        if result is None:
-            return respond(401, {"error": "인증이 필요합니다", "code": "unauthorized"})
-        return respond(200, result)
-    except SubscriptionLimitError:
-        return respond(503, {"error": "구독 한도에 도달했습니다", "code": "subscription_limit"})
-    except (ValueError, TypeError, UnicodeDecodeError, RecursionError):
-        return respond(400, {"error": "요청 값이 올바르지 않습니다", "code": "invalid_request"})
-    except (OSError, sqlite3.Error):
-        return respond(503, {"error": "Webhook 저장소를 사용할 수 없습니다", "code": "webhooks_unavailable"})
+    return webhook_api(method, path, body, request_headers, client, headers, _rate_allowed, _webhook_store)
 
 
 def _query_param(params, key, limit):
@@ -390,24 +284,10 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
     current_cache = cache if cache_instance is None else cache_instance
     origin = os.environ.get("ALLOWED_ORIGIN", "")
 
-    headers = {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "no-store",
-    }
-    if origin:
-        headers["Vary"] = "Origin"
-    if origin and (request_origin is None or request_origin in [item.strip() for item in origin.split(",")]):
-        headers["Access-Control-Allow-Origin"] = request_origin or origin.split(",")[0].strip()
-        headers["Access-Control-Expose-Headers"] = "Retry-After, ETag" if path in ("/api/v1/timetable.ics", "/api/v1/timetable/history.rss") else "Retry-After"
+    headers = make_response_headers(path, origin, request_origin)
 
     if method == "OPTIONS":
-        headers["Access-Control-Allow-Methods"] = "GET, HEAD, POST, PUT, DELETE, OPTIONS" if path.startswith("/api/v1/webhooks") else "GET, HEAD, POST, OPTIONS"
-        headers["Access-Control-Allow-Headers"] = (
-            "Content-Type, Authorization, If-None-Match" if path in ("/api/v1/timetable.ics", "/api/v1/timetable/history.rss")
-            else "Content-Type, Authorization"
-        )
-        headers["Content-Length"] = "0"
-        return 204, headers, b""
+        return preflight_response(path, headers)
 
     if path == '/api/v1/admin/access-logs':
         status, response_headers, body = _access_log_admin(method, query_string, request_headers, headers)
@@ -417,309 +297,53 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
     if path not in ("/api/v1/status", "/api/v1/admin/analytics"):
         allowed, retry_after = (shutter if shutter_instance is None else shutter_instance).check()
         if not allowed:
-            body = json.dumps({"error": "요청이 집중되어 일시적으로 중단되었습니다. 잠시 후 다시 시도해 주세요.", "code": "service_overloaded", "retry_after": retry_after}, ensure_ascii=False).encode("utf-8")
             headers["Retry-After"] = str(retry_after)
-            headers["Content-Length"] = str(len(body))
-            return 503, headers, body
+            return json_response(503, headers, {"error": "요청이 집중되어 일시적으로 중단되었습니다. 잠시 후 다시 시도해 주세요.", "code": "service_overloaded", "retry_after": retry_after})
 
     if path == "/api/v1/webhooks" or path.startswith("/api/v1/webhooks/"):
         return _webhook_api(method, path, request_body, request_headers, client, headers)
 
     if path == "/api/v1/analytics/pageview":
-        if method != "POST":
-            body = json.dumps({"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"}, ensure_ascii=False).encode("utf-8")
-            headers["Content-Length"] = str(len(body))
-            return 405, headers, body
-        if len(request_body or b"") > 4096:
-            body = json.dumps({"error": "요청 본문이 너무 큽니다", "code": "payload_too_large"}, ensure_ascii=False).encode("utf-8")
-            headers["Content-Length"] = str(len(body))
-            return 413, headers, body
-        try:
-            store = _analytics_store()
-        except (OSError, sqlite3.Error):
-            store = None
-        if store is None:
-            body = json.dumps({"error": "분석 저장소가 설정되지 않았습니다", "code": "analytics_disabled"}, ensure_ascii=False).encode("utf-8")
-            headers["Content-Length"] = str(len(body))
-            return 503, headers, body
-        if client:
-            retry = _rate_allowed(("analytics", client))
-            if retry:
-                body = json.dumps({"error": "요청이 너무 많습니다", "code": "rate_limited"}, ensure_ascii=False).encode("utf-8")
-                headers["Retry-After"] = str(retry)
-                headers["Content-Length"] = str(len(body))
-                return 429, headers, body
-        try:
-            payload = json.loads(request_body or b"{}")
-            if not isinstance(payload, dict):
-                raise ValueError("analytics payload must be an object")
-            store.record_pageview(payload.get("visitorId"), payload.get("sessionId"), payload.get("page"))
-        except (ValueError, TypeError, AttributeError):
-            body = json.dumps({"error": "분석 이벤트가 올바르지 않습니다", "code": "invalid_request"}, ensure_ascii=False).encode("utf-8")
-            headers["Content-Length"] = str(len(body))
-            return 400, headers, body
-        except (OSError, sqlite3.Error):
-            body = b'{"error":"Analytics temporarily unavailable","code":"analytics_unavailable"}'
-            headers["Content-Length"] = str(len(body))
-            return 503, headers, body
-        body = b'{"accepted":true}'
-        headers["Content-Length"] = str(len(body))
-        return 202, headers, body
+        return record_pageview(method, request_body, client, headers, _analytics_store, _rate_allowed)
 
     if path == "/api/v1/admin/analytics":
-        if method not in ("GET", "HEAD"):
-            body = json.dumps({"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"}, ensure_ascii=False).encode("utf-8")
-            headers["Content-Length"] = str(len(body))
-            return 405, headers, body
-        token = os.environ.get("OPENCIGAN_ANALYTICS_ADMIN_TOKEN", "")
-        supplied = (request_headers or {}).get("Authorization", "")
-        if not token or not hmac.compare_digest(supplied.encode("utf-8"), f"Bearer {token}".encode("utf-8")):
-            headers["WWW-Authenticate"] = 'Bearer realm="OpenSigan analytics"'
-            body = json.dumps({"error": "인증이 필요합니다", "code": "unauthorized"}, ensure_ascii=False).encode("utf-8")
-            headers["Content-Length"] = str(len(body))
-            return 401, headers, body
-        try:
-            store = _analytics_store()
-        except (OSError, sqlite3.Error):
-            store = None
-        if store is None:
-            body = json.dumps({"error": "분석 저장소가 설정되지 않았습니다", "code": "analytics_disabled"}, ensure_ascii=False).encode("utf-8")
-            headers["Content-Length"] = str(len(body))
-            return 503, headers, body
-        try:
-            values = parse_qs(query_string, keep_blank_values=True).get("days", ["30"])
-            if len(values) != 1 or not re.fullmatch(r"(?:[1-9]|[1-8][0-9]|90)", values[0]):
-                raise ValueError("조회 기간은 1~90일이어야 합니다")
-            days = int(values[0])
-            result = store.summary(days)
-            result["droppedApiEvents"] = _api_recorder.dropped
-        except (ValueError, TypeError):
-            body = json.dumps({"error": "조회 기간은 1~90일이어야 합니다", "code": "invalid_request"}, ensure_ascii=False).encode("utf-8")
-            headers["Content-Length"] = str(len(body))
-            return 400, headers, body
-        except (OSError, sqlite3.Error):
-            body = b'{"error":"Analytics temporarily unavailable","code":"analytics_unavailable"}'
-            headers["Content-Length"] = str(len(body))
-            return 503, headers, body
-        body = json.dumps(result, ensure_ascii=False).encode("utf-8")
-        headers["Content-Length"] = str(len(body))
-        return 200, headers, body
+        return analytics_summary(method, query_string, request_headers, headers, _analytics_store, _api_recorder)
 
     if method not in ("GET", "HEAD"):
-        body = json.dumps({"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"}, ensure_ascii=False).encode("utf-8")
-        headers["Content-Length"] = str(len(body))
-        return 405, headers, body
+        return json_response(405, headers, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
 
     if client and path != "/api/v1/status":
         retry = _rate_allowed(client)
         if retry:
-            body = json.dumps({"error": "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.", "code": "rate_limited"}, ensure_ascii=False).encode("utf-8")
             headers["Retry-After"] = str(retry)
-            headers["Content-Length"] = str(len(body))
-            return 429, headers, body
+            return json_response(429, headers, {"error": "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.", "code": "rate_limited"})
     query = parse_qs(query_string, keep_blank_values=path == "/api/v1/timetable/history.rss")
     try:
         if path == "/api/v1/status":
             result = {"status": "ok", "scope": "process liveness"}
         elif path == "/api/v1/schools":
-            name = _query_param(query, "q", 50)
-
-            def fetch_school_search():
-                try:
-                    return {"schools": search_schools(name), "stale": False}
-                except ValueError as exc:
-                    raise RuntimeError("school search failed") from exc
-
-            result = current_cache.get(("school_search", name), fetch_school_search)
+            result = search_timetable_schools(query, current_cache, _query_param, search_schools)
         elif path == "/api/v1/timetable":
-            school = _query_param(query, "school", 100)
-            if not re.fullmatch(r"[0-9]+:[^:]{1,50}", school):
-                raise ValueError("학교 식별자가 올바르지 않습니다")
-            week = _query_param(query, "week", 10)
-            validate_timetable_week(week)
-            grade_filter, class_filter, teacher_filter = _timetable_filters(query)
-            timetable, cache_status = _cached_timetable(school, week, current_cache)
-            result = {**timetable, "cacheStatus": cache_status}
-            if grade_filter is not None or class_filter is not None or teacher_filter is not None:
-                result["records"] = [record for record in timetable["records"]
-                                     if (grade_filter is None or int(record["grade"]) == grade_filter)
-                                     and (class_filter is None or int(record["class"]) == class_filter)
-                                     and (teacher_filter is None or teacher_filter in (record.get("teacher") or "").casefold())]
+            result = get_timetable(query, current_cache, _query_param, validate_timetable_week, _timetable_filters, _cached_timetable)
         elif path == "/api/v1/timetable.ics":
-            school = _query_param(query, "school", 100)
-            if not re.fullmatch(r"[0-9]+:[^:]{1,50}", school):
-                raise ValueError("학교 식별자가 올바르지 않습니다")
-            grade_filter, class_filter, teacher_filter = _timetable_filters(query, require_class=True)
-            weeks = _query_param(query, "weeks", 1) if "weeks" in query else "1"
-            if weeks not in ("1", "2"):
-                raise ValueError("weeks는 1 또는 2여야 합니다")
-            mode = _query_param(query, "mode", 10) if "mode" in query else "periods"
-            if mode not in ("periods", "summary", "timed"):
-                raise ValueError("mode는 periods, summary 또는 timed여야 합니다")
-            lesson_times = {}
-            if "times" in query:
-                if mode != "timed":
-                    raise ValueError("교시 시각은 timed 모드에서만 사용할 수 있습니다")
-                raw_times = _query_param(query, "times", 400)
-                for item in raw_times.split(","):
-                    match = re.fullmatch(r"([1-9]|1[0-9]|20):([0-2][0-9][0-5][0-9])-([0-2][0-9][0-5][0-9])", item)
-                    if not match:
-                        raise ValueError("교시 시각 형식은 1:0900-0950입니다")
-                    period = int(match[1])
-                    start = match[2][:2] + ":" + match[2][2:]
-                    end = match[3][:2] + ":" + match[3][2:]
-                    if period in lesson_times or start >= end or end > "23:59":
-                        raise ValueError("교시 시각의 중복·범위·순서를 확인하세요")
-                    lesson_times[period] = {"start": start, "end": end}
-                ordered = [value for _, value in sorted(lesson_times.items())]
-                if any(value["start"] < ordered[index - 1]["end"] for index, value in enumerate(ordered) if index):
-                    raise ValueError("교시 시각이 겹칩니다")
-            now = datetime.now(timezone(timedelta(hours=9))).date()
-            monday = now - timedelta(days=now.weekday())
-            timetables = []
-            for offset in range(int(weeks)):
-                week = (monday + timedelta(days=offset * 7)).isoformat()
-                timetable, _ = _cached_timetable(school, week, current_cache)
-                if teacher_filter is not None:
-                    timetable = {**timetable, "records": [r for r in timetable["records"]
-                                 if teacher_filter in (r.get("teacher") or "").casefold()]}
-                timetables.append(timetable)
-            body = render_timetable_ics(school, grade_filter, class_filter, timetables, mode=mode, lesson_times=lesson_times)
-            etag = '"' + hashlib.sha256(body).hexdigest() + '"'
-            headers["ETag"] = etag
-            headers["Cache-Control"] = "private, max-age=0, must-revalidate"
-            headers["Content-Type"] = "text/calendar; charset=utf-8"
-            headers["Content-Disposition"] = 'inline; filename="opencigan.ics"'
-            validators = (request_headers or {}).get("If-None-Match", "").strip()
-            if validators == "*" or etag in (tag.strip().removeprefix("W/") for tag in validators.split(",")):
-                return 304, headers, b""
-            headers["Content-Length"] = str(len(body))
-            return 200, headers, body
+            return timetable_calendar(query, current_cache, request_headers, headers, _query_param, _timetable_filters, _cached_timetable, render_timetable_ics)
         elif path in ("/api/v1/timetable/history", "/api/v1/timetable/history.rss"):
-            school = _query_param(query, "school", 100)
-            if not re.fullmatch(r"[0-9]+:[^:]{1,50}", school):
-                raise ValueError("학교 식별자가 올바르지 않습니다")
-            if path.endswith(".rss") and "week" not in query:
-                now = datetime.now(timezone(timedelta(hours=9))).date()
-                week = (now - timedelta(days=now.weekday())).isoformat()
-            else:
-                week = _query_param(query, "week", 10)
-            parsed_week = date.fromisoformat(week)
-            if parsed_week.isoformat() != week or parsed_week.weekday() != 0:
-                raise ValueError("주 시작일이 올바르지 않습니다")
-            cursor = _query_param(query, "cursor", 100) if "cursor" in query else None
-            store = _history_store()
-            if store is None:
-                body = json.dumps({"error": "변경 이력 저장이 활성화되지 않았습니다", "code": "history_disabled"}, ensure_ascii=False).encode("utf-8")
-                headers["Content-Length"] = str(len(body))
-                return 503, headers, body
-            if path.endswith(".rss"):
-                grade_filter, class_filter, _ = _timetable_filters({key: value for key, value in query.items() if key != "teacher"}, require_class=True)
-                if cursor is not None:
-                    raise ValueError("피드에는 커서를 사용할 수 없습니다")
-                filters = {key: _query_param(query, key, 50) for key in ("subject", "teacher") if key in query}
-                if "weekday" in query:
-                    filters["weekday"] = _query_param(query, "weekday", 1)
-                    if filters["weekday"] not in ("1", "2", "3", "4", "5"):
-                        raise ValueError("weekday는 1(월)부터 5(금)까지여야 합니다")
-                if "period" in query:
-                    raw_period = _query_param(query, "period", 2)
-                    if not re.fullmatch(r"(?:[1-9]|1[0-9]|20)", raw_period):
-                        raise ValueError("period는 1부터 20까지여야 합니다")
-                    filters["period"] = int(raw_period)
-                if "type" in query:
-                    filters["type"] = _query_param(query, "type", 7)
-                    if filters["type"] not in ("added", "deleted", "changed"):
-                        raise ValueError("type이 올바르지 않습니다")
-                group = _query_param(query, "group", 7) if "group" in query else "changes"
-                if group not in ("changes", "daily"):
-                    raise ValueError("group은 changes 또는 daily여야 합니다")
-                changes = store.list(school, week, grade=grade_filter, classroom=class_filter, include_ids=True, filters=filters)["changes"]
-                body = render_history_feed(school, grade_filter, class_filter, changes, group=group)
-                etag = '"' + hashlib.sha256(body).hexdigest() + '"'
-                headers.update({"Content-Type": "application/rss+xml; charset=utf-8", "ETag": etag,
-                                "Cache-Control": "private, max-age=0, must-revalidate"})
-                validators = (request_headers or {}).get("If-None-Match", "").strip()
-                if validators == "*" or etag in (tag.strip().removeprefix("W/") for tag in validators.split(",")):
-                    return 304, headers, b""
-                headers["Content-Length"] = str(len(body))
-                return 200, headers, body
-            result = store.list(school, week, cursor=cursor)
+            result = timetable_history(path, query, request_headers, headers, _query_param, _timetable_filters, _history_store, render_history_feed)
+            if isinstance(result, tuple):
+                return result
         elif path == "/api/v1/neis/schools":
-            name = _query_param(query, "q", 50)
-            if not os.environ.get("NEIS_API_KEY", "").strip():
-                raise RuntimeError("NEIS API key is not configured")
-
-            def fetch_schools():
-                try:
-                    schools = NEISClient.from_environment().search_schools(name)
-                except ValueError as exc:
-                    raise RuntimeError("NEIS school search failed") from exc
-                return {
-                    "schools": [
-                        {
-                            "id": f"{s.office_code}:{s.school_code}",
-                            "name": s.name,
-                            "region": s.kind,
-                            "address": s.address,
-                        }
-                        for s in schools
-                    ],
-                    "stale": False,
-                }
-
-            result = current_cache.get(("neis_school_search", name), fetch_schools)
+            result = search_meal_schools(query, current_cache, _query_param, NEISClient)
         elif path == "/api/v1/meals":
-            school_id = _query_param(query, "school", 20)
-            if not re.fullmatch(r"[A-Z]\d{2}:\d{7}", school_id):
-                raise ValueError("급식 학교 식별자가 올바르지 않습니다")
-            start = date.fromisoformat(_query_param(query, "from", 10))
-            end = date.fromisoformat(_query_param(query, "to", 10))
-            if end < start or (end - start).days > 6:
-                raise ValueError("급식은 최대 7일 동안 조회할 수 있습니다")
-            office, code = school_id.split(":")
-            school = School(office, code, "")
-            if not os.environ.get("NEIS_API_KEY", "").strip():
-                raise RuntimeError("NEIS API key is not configured")
-
-            def fetch_meals():
-                meals = NEISClient.from_environment().get_meals(school, start, end)
-                return {
-                    "meals": [
-                        {
-                            "date": m.date,
-                            "type": m.meal_type,
-                            "dishes": re.split(r"<br\s*/?>", m.menu, flags=re.I),
-                            "calories": m.calories,
-                            "nutrition": m.nutrition,
-                            "origin": m.origin,
-                        }
-                        for m in meals
-                    ],
-                    "stale": False,
-                }
-
-            result = current_cache.get(("meals", school_id, start, end), fetch_meals)
+            result = get_meals(query, current_cache, _query_param, NEISClient, School)
         else:
-            body = json.dumps({"error": "요청한 경로가 없습니다", "code": "not_found"}, ensure_ascii=False).encode("utf-8")
-            headers["Content-Length"] = str(len(body))
-            return 404, headers, body
+            return json_response(404, headers, {"error": "요청한 경로가 없습니다", "code": "not_found"})
 
-        body = json.dumps(result, ensure_ascii=False).encode("utf-8")
-        headers["Content-Length"] = str(len(body))
-        return 200, headers, body
+        return json_response(200, headers, result)
     except ValueError as exc:
-        body = json.dumps({"error": str(exc), "code": "invalid_request"}, ensure_ascii=False).encode("utf-8")
-        headers["Content-Length"] = str(len(body))
-        return 400, headers, body
+        return json_response(400, headers, {"error": str(exc), "code": "invalid_request"})
     except Exception:
         logger.exception("upstream request failed")
-        body = json.dumps(
-            {"error": "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", "code": "upstream_unavailable"},
-            ensure_ascii=False,
-        ).encode("utf-8")
-        headers["Content-Length"] = str(len(body))
-        return 503, headers, body
+        return json_response(503, headers, {"error": "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", "code": "upstream_unavailable"})
 
 
 _api_recorder = ApiRecorder(_analytics_store)

@@ -6,6 +6,7 @@ $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $source = Join-Path $root '..\backend\timetable.py'
 $neisSource = Join-Path $root '..\backend\neis.py'
+$proxySource = Join-Path $root '..\backend\comcigan_proxy.py'
 $venv = Join-Path $root '.venv-workers'
 $vendor = Join-Path $root 'python_modules'
 $project = Join-Path $root 'pyproject.toml'
@@ -24,6 +25,7 @@ $stage = Join-Path $root ('.runtime\stage-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path (Join-Path $stage 'backend') -Force | Out-Null
 Copy-Item -LiteralPath $source -Destination (Join-Path $stage 'backend\timetable.py')
 Copy-Item -LiteralPath $neisSource -Destination (Join-Path $stage 'backend\neis.py')
+Copy-Item -LiteralPath $proxySource -Destination (Join-Path $stage 'backend\comcigan_proxy.py')
 foreach ($name in @('worker.py', 'd1_cache.py', 'schema.sql', 'wrangler.toml', 'pyproject.toml', 'pylock.toml')) {
     Copy-Item -LiteralPath (Join-Path $root $name) -Destination (Join-Path $stage $name)
 }

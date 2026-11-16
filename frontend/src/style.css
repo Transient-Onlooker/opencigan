@@ -1,8 +1,7 @@
 @import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 :root{font-family:"Pretendard Variable",system-ui,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-synthesis:none;text-rendering:optimizeLegibility;color:#111;background:#fff}
 *{box-sizing:border-box}
-.weekly-meals{display:grid;gap:16px}.weekly-meals>article{border:1px solid var(--line)}.weekly-meals>article.current-meal-day{border:2px solid var(--ink)}.weekly-meals h3{font-size:16px;margin:0;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--soft)}.weekly-meal-types{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.weekly-meal-types section{padding:16px;min-width:0;border-right:1px solid var(--line)}.weekly-meal-types section:last-child{border-right:0}.weekly-meal-types h4{margin:0 0 12px;font-size:15px}.weekly-meal-types .dishes{font-size:15px}@media(max-width:540px){.weekly-meal-types{grid-template-columns:1fr}.weekly-meal-types section{border-right:0;border-bottom:1px solid var(--line)}.weekly-meal-types section:last-child{border-bottom:0}}
-.share-tools{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:16px;font-size:14px}.shared-link{display:grid;gap:4px;margin-bottom:20px}.shared-link input{width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}.lesson-search{border:1px solid var(--line);padding:12px 16px;margin:0 0 20px}.lesson-search summary{cursor:pointer;min-height:44px;display:list-item;align-content:center;font-weight:650}.lesson-search-fields{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}.lesson-search-fields label{display:grid;gap:4px;flex:1;min-width:min(160px,100%)}.lesson-search-fields input,.lesson-search-fields select{min-height:44px;width:100%;padding:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}.lesson-search p{font-size:14px;color:var(--muted)}summary:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.lesson-search-fields{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}.lesson-search-fields label{display:grid;gap:4px;flex:1;min-width:min(160px,100%)}.lesson-search-fields input,.lesson-search-fields select{min-height:44px;width:100%;padding:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}summary:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 body{margin:0;min-width:320px}
 button,input,select{font:inherit}
 [hidden]{display:none!important}
@@ -20,25 +19,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,.table-scroll:focu
 .theme-toggle:hover,.secondary-button:hover,.arrow-button:hover,.school-option:hover{background:var(--soft);border-color:var(--ink)}
 .theme-toggle:active,.secondary-button:active,.arrow-button:active{background:var(--ink);color:var(--surface)}
 main{width:min(960px,calc(100% - 40px));margin:0 auto}
-.favorite-save{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:0 0 18px}.favorite-save span{font-size:13px;color:var(--muted)}
-.favorites-bar{border:1px solid var(--line);padding:16px;margin-bottom:20px;min-width:0}
-.favorites-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:12px}.favorites-heading h2{font-size:17px}.favorites-heading span{color:var(--muted);font-size:13px}
-.favorite-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(250px,100%),1fr));gap:8px}
-.favorite-picker,.settings-search{display:grid;gap:5px;margin:0 0 12px;font-size:13px;color:var(--muted)}
 .personal-timetable-panel{margin-top:20px;border:1px solid var(--line);padding:12px;min-width:0}
 .personal-timetable-panel>summary{min-height:44px;align-content:center;cursor:pointer;font-weight:650}
-.favorite-picker select,.settings-search input{min-height:44px;max-width:100%;width:100%;border:1px solid var(--line);padding:8px;background:var(--surface);color:var(--ink)}
 .secondary-button>.icon{width:17px;height:17px;margin-right:4px}
 .context-help{position:relative;display:inline-block;vertical-align:middle;font-size:13px;font-weight:400}
 .context-help button{display:grid;place-items:center;width:44px;min-height:44px;cursor:pointer;color:var(--muted);background:var(--surface);border:0}
 .context-help p{display:none;position:absolute;z-index:8;inset:auto 0 auto auto;width:min(280px,70vw);padding:12px;margin:0;background:var(--surface);color:var(--ink);border:1px solid var(--ink);line-height:1.5;font-weight:400}
 .context-help.help-open p,.context-help:focus-within p{display:block}
 @media(hover:hover){.context-help:hover p{display:block}}
-.favorite-item{display:flex;min-width:0;border:1px solid var(--line)}
-.favorite-switch{display:flex;flex:1;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;min-height:52px;padding:9px 12px;text-align:left;border:0;background:var(--surface);color:var(--ink);overflow-wrap:anywhere}
-.favorite-switch strong{font-size:14px}.favorite-switch span{color:var(--muted);font-size:13px}.favorite-switch:hover{background:var(--soft)}
-.favorite-switch[aria-pressed=true]{background:var(--ink);color:var(--surface)}.favorite-switch[aria-pressed=true] span{color:var(--surface)}
-.favorite-remove{flex:none;width:44px;min-height:52px;border:0;border-left:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:23px}.favorite-remove:hover{background:var(--soft)}
 .school-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:32px 0 22px}
 .school-heading>div{min-width:0}
 .eyebrow{font-size:13px;font-weight:650;color:var(--muted);margin:0 0 5px}
@@ -48,90 +36,24 @@ h2{font-size:24px;line-height:1.3;letter-spacing:-.025em;margin:0}
 h3{font-size:20px;line-height:1.3;margin:0}
 .school-facts{color:var(--muted);font-size:15px;margin:0;overflow-wrap:anywhere}
 .school-heading .secondary-button{flex:none}
-.school-panel{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:end;padding:20px;border:1px solid var(--line);margin-bottom:24px}
-.search-field{position:relative;min-width:0}
 label{font-size:14px;font-weight:650}
-.search-wrap{display:flex;align-items:center;gap:10px;padding:0 12px;min-height:50px;border:1px solid var(--line);margin-top:6px}
-.search-wrap:focus-within{outline:2px solid var(--ink);outline-offset:2px}
-.search-wrap>span{font-size:24px}
-.search-wrap input{width:100%;min-width:0;padding:10px 0;border:0;background:transparent;color:var(--ink);font-size:16px}
-.search-wrap input:focus-visible{outline:0}
-.selectors{display:grid;grid-template-columns:100px 92px;gap:12px}
-.selectors input,.selectors select{display:block;width:100%;height:50px;padding:8px 10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:16px;margin-top:6px}
-.school-panel .notice{grid-column:1/-1;margin:0}
-.search-results{position:absolute;top:100%;left:0;width:100%;z-index:5;border:1px solid var(--ink);background:var(--surface);max-height:320px;overflow-y:auto}
 .school-option{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;width:100%;min-height:60px;gap:3px;padding:12px 14px;text-align:left;border:0;border-bottom:1px solid var(--line);background:var(--surface);color:var(--ink);overflow-wrap:anywhere}
 .school-option strong{font-size:16px}
 .school-option span{font-size:14px;color:var(--muted)}
 .school-option:focus-visible{outline-offset:-3px}
 .search-results p{margin:0;padding:14px;font-size:15px}
-.calendar-menu{display:flex;align-items:center;gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:28px}
-.menu-label{margin-right:auto;padding-right:20px;font-size:14px;font-weight:750}
-.calendar-menu button{min-width:144px;min-height:52px;padding:12px 22px;border:0;border-left:1px solid var(--line);background:var(--surface);color:var(--muted);font-size:16px;font-weight:750}
-.calendar-menu button .icon{margin-right:5px}
-.calendar-menu button[aria-pressed=true]{color:var(--surface);background:var(--ink)}
-.calendar-menu button:hover{color:var(--surface);background:var(--muted)}
 .calendar-content{min-width:0;min-height:350px}
-.secondary-actions{border-top:1px solid var(--line);margin-top:28px;padding-top:20px}
 .view-switch{display:flex;flex-wrap:wrap;border:1px solid var(--line);margin:0 0 16px}.view-switch button{flex:1;min-width:110px;min-height:44px;padding:8px 12px;border:0;border-right:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:14px;font-weight:700}.view-switch button:last-child{border-right:0}.view-switch button[aria-pressed=true]{background:var(--ink);color:var(--surface)}
-.day-picker,.teacher-search{display:flex;align-items:center;gap:10px;margin:0 0 16px;font-weight:650}.day-picker input,.teacher-search input{min-height:44px;max-width:100%;border:1px solid var(--line);padding:8px 10px;color:var(--ink);background:var(--surface)}.teacher-search{align-items:stretch;flex-direction:column;max-width:440px}.teacher-search input{width:100%;font-weight:400}
-.lesson-list{display:grid;border-top:1px solid var(--line)}.lesson-list article{display:grid;grid-template-columns:90px minmax(0,1fr) minmax(0,1fr) auto;gap:12px;align-items:center;min-height:68px;padding:12px 14px;border-bottom:1px solid var(--line)}.lesson-list article strong{font-size:16px;overflow-wrap:anywhere}.lesson-list article>span:not(.lesson-period):not(.change-label){color:var(--muted);font-size:14px;overflow-wrap:anywhere}.lesson-period{font-size:14px;font-weight:750;white-space:nowrap}.comparison-table{min-width:550px}.history-section{margin-top:24px;border:1px solid var(--line);padding:16px}.history-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}.history-heading h3{font-size:17px}.history-heading p,.state-inline{margin:4px 0 0;color:var(--muted);font-size:14px}.history-list{list-style:none;margin:14px 0 0;padding:0;border-top:1px solid var(--line)}.history-list li{padding:12px 0;border-bottom:1px solid var(--line)}.history-list li>div{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.history-list li>div span{font-size:12px;color:var(--muted)}.history-list li p{margin:6px 0 0;overflow-wrap:anywhere}.history-more{margin-top:12px}
+.day-picker{display:flex;align-items:center;gap:10px;margin:0 0 16px;font-weight:650}.day-picker input{min-height:44px;max-width:100%;border:1px solid var(--line);padding:8px 10px;color:var(--ink);background:var(--surface)}
+.lesson-list{display:grid;border-top:1px solid var(--line)}.lesson-list article{display:grid;grid-template-columns:90px minmax(0,1fr) minmax(0,1fr) auto;gap:12px;align-items:center;min-height:68px;padding:12px 14px;border-bottom:1px solid var(--line)}.lesson-list article strong{font-size:16px;overflow-wrap:anywhere}.lesson-list article>span:not(.lesson-period):not(.change-label){color:var(--muted);font-size:14px;overflow-wrap:anywhere}.lesson-period{font-size:14px;font-weight:750;white-space:nowrap}.comparison-table{min-width:550px}.state-inline{margin:4px 0 0;color:var(--muted);font-size:14px}
 .calendar-content:focus{outline:0}
-.last-fetched{font-size:12px;color:var(--muted);white-space:nowrap}
-.dataset-details{margin:8px 0 0;font-size:12px;color:var(--muted)}
-.dataset-details summary{display:list-item;width:fit-content;min-height:36px;align-content:center;cursor:pointer}
-.dataset-details summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-.dataset-details p{margin:0 0 8px;line-height:1.6}
-.refresh-button{display:inline-flex;align-items:center;gap:6px}
-.refresh-button svg{width:17px;height:17px;flex:none}
-.refresh-button svg.spinning{animation:refresh-spin .85s linear infinite}
-@keyframes refresh-spin{to{transform:rotate(360deg)}}
-.refresh-feedback{margin:-10px 0 10px;color:var(--muted);font-size:12px;text-align:right}
-.export-feedback{margin:-6px 0 10px;color:var(--muted);font-size:12px;text-align:right}
-.quick-class{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:-4px 0 14px}
-.quick-class label{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)}
-.quick-class select{min-height:40px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:6px 9px;font-size:14px}
 .quick-class-hint{font-size:12px;color:var(--muted)}
-.display-settings{margin:0 0 14px;border:1px solid var(--line);padding:0 14px}
-.display-settings summary{min-height:44px;align-content:center;cursor:pointer;font-size:14px;font-weight:650}
-.display-settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:12px;padding:12px 0}
-.display-settings-grid label{display:grid;gap:5px;align-content:start;font-size:13px;color:var(--muted)}
-.display-settings-grid input:not([type="checkbox"]),.display-settings-grid select{width:100%;min-height:44px;background:var(--surface);color:var(--ink);border:1px solid var(--line);padding:8px;font:inherit;font-size:14px}
-.display-settings-grid input[type="color"]{cursor:pointer;padding:4px}
-.display-settings-grid .display-toggle{display:flex;align-items:center;gap:9px;min-height:44px;cursor:pointer}
 .display-toggle input{width:18px;height:18px;accent-color:var(--ink)}
-.display-settings-grid .display-reset{align-self:end;min-height:44px}
 .display-settings-hint{font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 12px}
-.settings-backup{margin:0 0 14px;padding:0 14px 14px;border:1px solid var(--line)}
-.settings-backup summary{min-height:44px;align-content:center;cursor:pointer;font-size:14px;font-weight:650}
-.settings-backup .lesson-time-actions{margin-top:0}
-.settings-import{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:44px;font-size:14px;color:var(--ink)}
-.settings-import input{max-width:100%;min-width:0;font-size:13px}
-.settings-backup .state-inline{margin-top:10px}
-.day-summary{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:-2px 0 12px;padding:10px 12px;border:1px solid var(--line);background:var(--soft);font-size:13px;line-height:1.5}.day-summary strong{font-size:13px;font-weight:750;overflow-wrap:anywhere}.day-summary small{font-size:12px;font-weight:500;color:var(--muted)}.lesson-time{display:block;margin-top:4px;font-size:11px;font-weight:500;color:var(--muted);white-space:normal}.lesson-list article.active-lesson{border-left:4px solid var(--ink);background:var(--soft);padding-left:10px}.lesson-list article.completed-lesson:not(.active-lesson){opacity:.6}.lesson-time-settings{margin:0 0 14px;padding:0 14px 14px;border:1px solid var(--line)}.lesson-time-settings summary{min-height:44px;align-content:center;cursor:pointer;font-size:14px;font-weight:650}.lesson-time-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.lesson-time-row{display:grid;grid-template-columns:50px repeat(2,minmax(0,1fr));gap:8px;align-items:center;min-width:0;font-size:13px}.lesson-time-row>strong{font-size:13px;white-space:nowrap}.lesson-time-row label{display:grid;gap:4px;min-width:0;color:var(--muted)}.lesson-time-row input{min-width:0;width:100%;min-height:44px;padding:7px 8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:16px}.lesson-time-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 0}.lesson-time-settings .state-inline{margin-top:10px}
-@media(max-width:700px){.lesson-time-grid{grid-template-columns:1fr}.lesson-time-row{grid-template-columns:50px repeat(2,minmax(0,1fr))}.day-summary{padding:9px 10px}.day-summary>strong{flex-basis:100%}}
+.day-summary{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:-2px 0 12px;padding:10px 12px;border:1px solid var(--line);background:var(--soft);font-size:13px;line-height:1.5}.day-summary strong{font-size:13px;font-weight:750;overflow-wrap:anywhere}.day-summary small{font-size:12px;font-weight:500;color:var(--muted)}.lesson-time{display:block;margin-top:4px;font-size:11px;font-weight:500;color:var(--muted);white-space:normal}.lesson-list article.active-lesson{border-left:4px solid var(--ink);background:var(--soft);padding-left:10px}.lesson-list article.completed-lesson:not(.active-lesson){opacity:.6}
+@media(max-width:700px){.day-summary{padding:9px 10px}.day-summary>strong{flex-basis:100%}}
 .class-cell strong[style],.class-cell span[style],.lesson-list strong[style]{border-radius:3px;padding:3px 6px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
-.teacher-options{display:flex;gap:8px;flex-wrap:wrap;max-height:190px;overflow-y:auto;overscroll-behavior:contain;margin:0 0 18px;padding:2px}
-.teacher-options button{min-height:40px;padding:7px 12px}
 .teacher-table .class-cell+.class-cell{border-top:1px solid var(--line);padding-top:8px;margin-top:8px}
-.allergy-settings{border:1px solid var(--line);margin:0 0 16px;padding:0 14px}
-.meal-preferences{border:1px solid var(--line);margin:0 0 12px;padding:0 14px}
-.meal-preferences summary{cursor:pointer;font-size:14px;font-weight:700;min-height:44px;align-content:center}
-.meal-preference-options{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 12px}
-.meal-preference-options>span{font-size:13px;color:var(--muted);margin-right:4px}
-.meal-preference-options label,.meal-number-toggle{display:inline-flex;align-items:center;min-height:44px;gap:8px;font-size:14px;cursor:pointer}
-.meal-preferences input{width:18px;height:18px;accent-color:var(--ink)}
-.meal-preferences p{font-size:12px;line-height:1.6;color:var(--muted);margin:4px 0 12px}
-.allergy-settings summary{cursor:pointer;font-size:14px;font-weight:700;min-height:44px;align-content:center}
-.allergy-settings summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-.allergy-settings p{font-size:12px;line-height:1.6;color:var(--muted);margin:12px 0}
-.allergy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:10px}
-.allergy-grid label{display:flex;align-items:center;gap:8px;min-height:38px;font-size:14px;cursor:pointer}
-.allergy-grid input{width:18px;height:18px;accent-color:var(--ink)}
-.dishes li{min-width:0}
-.dishes li.allergy-warning{display:grid;gap:3px;color:#a11125;background:#fff1f2;border-left:3px solid #c4263d;padding:6px 10px;margin-left:-10px}
-.allergy-label{font-size:12px;line-height:1.5;font-weight:800}
-.app-shell.dark .dishes li.allergy-warning{color:#ffc0ca;background:#34151d;border-color:#ff788d}
 .section-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}
 .heading-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px}
 .calendar-toolbar{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;gap:12px;align-items:center;padding:16px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:20px}
@@ -141,9 +63,6 @@ label{font-size:14px;font-weight:650}
 .calendar-date>span{display:block;font-size:13px;color:var(--muted);margin-top:2px}
 .date-picker{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;margin-top:8px;font-size:13px;color:var(--muted)}
 .date-picker input{min-width:0;max-width:100%;min-height:44px;border:1px solid var(--line);padding:6px 10px;color:var(--ink);background:var(--surface);font-size:16px}
-.history-filters label{flex:0 1 13rem}
-.history-list li p{display:flex;flex-wrap:wrap;gap:4px 16px}
-.history-list li p>span{min-width:0}
 .table-scroll{width:100%;overflow:auto;border:1px solid var(--line)}
 .timetable{width:100%;min-width:600px;table-layout:fixed;border-collapse:separate;border-spacing:0}
 .timetable th,.timetable td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:center}
@@ -167,7 +86,6 @@ label{font-size:14px;font-weight:650}
 .class-cell>span{font-size:13px;color:var(--muted)}
 .class-cell .change-label{font-size:11px;padding:1px 5px;background:var(--ink);color:var(--surface);font-weight:750}
 .timetable .class-cell+.class-cell{border-top:1px solid var(--line);padding-top:8px;margin-top:8px}
-.grade-compact{display:none}
 .empty-cell{color:var(--muted)}
 .table-hint,.meal-note{font-size:13px;color:var(--muted);line-height:1.7;margin:12px 0}
 .freshness{display:flex;justify-content:flex-end;gap:4px 18px;font-size:12px;color:var(--muted);padding:12px 0;border-top:1px solid var(--line)}
@@ -177,15 +95,7 @@ label{font-size:14px;font-weight:650}
 .state-message p{margin:0;font-size:15px}
 .notice{border:1px solid var(--line);border-left:3px solid var(--ink);padding:14px 16px;margin:0 0 18px;background:var(--soft);font-size:15px;overflow-wrap:anywhere}
 .text-button{min-height:44px;border:0;background:transparent;color:var(--ink);font-size:15px;padding:8px;text-decoration:underline;text-underline-offset:4px}
-.analytics-note{margin:24px 0 0;padding:12px 0;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}.analytics-note .text-button{min-height:36px;font-size:13px;padding:4px 6px}
-.meal-connection{font-size:14px;color:var(--muted);margin:0 0 18px;overflow-wrap:anywhere}.meal-connection:empty{display:none}
 .connection-options{border:1px solid var(--line);padding:6px}
-.meal-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.meal-card{border:1px solid var(--line);min-width:0}
-.meal-card-heading{padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--soft);border-bottom:1px solid var(--line)}
-.meal-card-heading>span{font-size:14px;color:var(--muted)}
-.dishes{list-style:none;padding:18px;margin:0;display:grid;gap:9px;font-size:16px;line-height:1.65;overflow-wrap:anywhere}
-.no-meal{padding:22px 18px;margin:0;color:var(--muted);font-size:15px}
 footer{border-top:1px solid var(--line);font-size:13px;color:var(--muted);margin-top:36px;padding:18px 0 30px}
 .api-doc-footer{margin:0;padding:0 0 22px;border:0}.api-doc-footer a{display:inline-flex;min-height:44px;align-items:center;color:var(--ink);font-weight:650;text-underline-offset:4px}
 footer>p{margin-bottom:22px}.footer-open{display:flex;gap:12px;align-items:flex-start}.github-icon{width:24px;height:24px;flex:none;color:var(--ink)}.footer-open strong{font-size:15px;color:var(--ink)}.footer-open p{margin:4px 0 8px}.footer-links{display:flex;flex-wrap:wrap;gap:4px 18px}.footer-links a{display:inline-flex;align-items:center;min-height:44px;color:var(--ink);font-weight:650;text-underline-offset:4px}.footer-links a:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
@@ -199,28 +109,16 @@ button,.school-option,.footer-links a{transition:background-color .16s ease,colo
   .topbar{min-height:62px;padding:10px 16px}.brand{font-size:16px}.theme-toggle{font-size:13px;padding:8px 10px}
   main{width:calc(100% - 32px);padding-bottom:var(--mobile-menu-space)}
   .school-heading{padding:10px 0 8px;align-items:center;flex-wrap:wrap;gap:8px}.school-heading .eyebrow{display:none}h1{font-size:22px}h2{font-size:20px}.school-facts{font-size:13px}
-  .favorite-save,.share-tools{margin-bottom:8px;gap:6px}
-  .favorite-save>span{font-size:12px}
-  .favorite-save .secondary-button,.share-tools .secondary-button{min-height:38px;padding:5px 9px;font-size:12px}
-  .favorites-bar{padding:10px;margin-bottom:12px}
-  .school-heading .secondary-button{font-size:13px}.school-panel{grid-template-columns:1fr;padding:16px;gap:16px}.selectors{grid-template-columns:1fr 1fr}
-  .calendar-menu{position:fixed;z-index:10;bottom:0;left:0;width:100%;margin:0;background:var(--surface);border-top:1px solid var(--ink);padding:0 env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
-  .menu-label{display:none}.calendar-menu button{flex:1 1 0;min-width:0;min-height:62px;padding-inline:8px;border-left:0;font-size:16px}.calendar-menu button+button{border-left:1px solid var(--line)}
-  .calendar-menu.input-focused{visibility:hidden;pointer-events:none}
-  .section-heading{margin-bottom:10px;flex-wrap:wrap}.section-heading .heading-actions{width:100%;justify-content:flex-end;gap:6px}.heading-actions .secondary-button{padding:7px 9px;min-height:40px}.last-fetched{flex:1;min-width:0;white-space:normal;text-align:left;font-size:11px}.calendar-toolbar{gap:8px;grid-template-columns:44px minmax(0,1fr) 44px;padding:8px 0;margin-bottom:12px}.calendar-date strong{font-size:17px}
-  .timetable:not(.comparison-table){min-width:0}.timetable:not(.comparison-table) thead th:first-child,.timetable:not(.comparison-table) tbody th{width:35px;font-size:12px}.timetable:not(.comparison-table) thead th{height:48px;font-size:13px}.timetable:not(.comparison-table) thead th small{font-size:10px;margin-top:0}.timetable:not(.comparison-table) td{height:70px;padding:5px 2px}.timetable:not(.comparison-table) .class-cell{gap:2px}.timetable:not(.comparison-table) .class-cell strong{font-size:12px;line-height:1.32;word-break:break-word}.timetable:not(.comparison-table) .class-cell>span{font-size:10px;line-height:1.3}.table-hint span{display:block}
-  .grade-comparison-scroll{display:none}.grade-compact{display:grid;gap:12px}.grade-period{border:1px solid var(--line);min-width:0}.grade-period h3{background:var(--soft);font-size:15px;padding:8px 12px;border-bottom:1px solid var(--line)}.grade-class-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.grade-class{min-width:0;padding:9px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);overflow-wrap:anywhere}.grade-class:nth-child(even){border-right:0}.grade-class:last-child,.grade-class:nth-last-child(2):nth-child(odd){border-bottom:0}.grade-class h4{font-size:13px;font-weight:800;margin:0 0 4px}.grade-class .class-cell{align-items:flex-start;gap:2px}.grade-class .class-cell strong{font-size:14px;line-height:1.4}.grade-class .class-cell>span{font-size:12px}.grade-class .class-cell+.class-cell{border-top:1px solid var(--line);margin-top:7px;padding-top:7px}.grade-class.changed{box-shadow:inset 3px 0 var(--ink)}
-  .timetable-switch button{min-width:0;font-size:13px;padding:7px 5px;border-bottom:0}.timetable-switch button:nth-child(2){border-right:1px solid var(--line)}
-  .quick-class{gap:8px;margin-bottom:10px}.quick-class select{min-height:44px;font-size:16px}
-  .display-settings-grid input:not([type="checkbox"]),.display-settings-grid select,.lesson-search-fields input,.lesson-search-fields select{font-size:16px}
-  .allergy-grid label{min-height:44px}
-  .meal-cards{grid-template-columns:1fr;gap:14px}.meal-card-heading{padding:14px 16px}.dishes{padding:16px;font-size:17px;gap:8px}.no-meal{padding:18px 16px}
-  .view-switch button{min-width:calc(50% - 1px);border-bottom:1px solid var(--line)}.view-switch button:nth-child(2){border-right:0}.view-switch button:nth-child(n+3){border-bottom:0}.timetable-switch button{min-width:0;min-height:44px;flex:1 1 0;border-bottom:0}.timetable-switch button:nth-child(2){border-right:1px solid var(--line)}.lesson-list article{grid-template-columns:64px minmax(0,1fr);gap:4px 10px}.lesson-list article>span:not(.lesson-period):not(.change-label){grid-column:2}.lesson-list article .change-label{grid-column:2;justify-self:start}.history-section{padding:12px}.history-heading{align-items:flex-start}.history-heading .secondary-button{flex:none;padding-inline:9px}
+  .school-heading .secondary-button{font-size:13px}
+  .section-heading{margin-bottom:10px;flex-wrap:wrap}.section-heading .heading-actions{width:100%;gap:6px}.heading-actions .secondary-button{padding:7px 9px;min-height:40px}.calendar-toolbar{gap:8px;grid-template-columns:44px minmax(0,1fr) 44px;padding:8px 0;margin-bottom:12px}.calendar-date strong{font-size:17px}
+  .timetable:not(.comparison-table){min-width:0}.timetable:not(.comparison-table) thead th:first-child,.timetable:not(.comparison-table) tbody th{width:35px;font-size:12px}.timetable:not(.comparison-table) thead th{height:48px;font-size:13px}.timetable:not(.comparison-table) thead th small{font-size:10px;margin-top:0}.timetable:not(.comparison-table) .class-cell{gap:2px}.timetable:not(.comparison-table) .class-cell strong{font-size:12px;line-height:1.32;word-break:break-word}.timetable:not(.comparison-table) .class-cell>span{font-size:10px;line-height:1.3}.table-hint span{display:block}
+  .timetable-switch button{font-size:13px;padding:7px 5px}
+  .lesson-search-fields input,.lesson-search-fields select{font-size:16px}
+  .view-switch button{min-width:calc(50% - 1px);border-bottom:1px solid var(--line)}.view-switch button:nth-child(2){border-right:0}.view-switch button:nth-child(n+3){border-bottom:0}.timetable-switch button{min-width:0;min-height:44px;flex:1 1 0;border-bottom:0}.timetable-switch button:nth-child(2){border-right:1px solid var(--line)}.lesson-list article{grid-template-columns:64px minmax(0,1fr);gap:4px 10px}.lesson-list article>span:not(.lesson-period):not(.change-label){grid-column:2}.lesson-list article .change-label{grid-column:2;justify-self:start}
   footer{margin-top:28px}
 }
 @media(max-width:390px){main{width:calc(100% - 24px)}.topbar{padding-inline:12px}.calendar-date strong{font-size:17px}.date-picker{gap:4px}.section-heading{gap:8px}.section-heading .secondary-button{padding-inline:8px}.school-heading h1{font-size:20px}}
 .timetable.no-cell-borders th,.timetable.no-cell-borders td{border-right:0;border-bottom:0}
-.grade-compact.no-cell-borders .grade-period,.grade-compact.no-cell-borders .grade-period h3,.grade-compact.no-cell-borders .grade-class{border:0}
 .lesson-list article.changed:not(.active-lesson){box-shadow:inset 3px 0 var(--ink)}
 .lesson-list article.active-lesson{animation:current-lesson-emphasis 1s ease-out both}
 @keyframes current-lesson-emphasis{0%{box-shadow:0 0 0 0 var(--line)}50%{box-shadow:0 0 0 3px var(--line)}100%{box-shadow:0 0 0 0 transparent}}
@@ -234,13 +132,8 @@ button,.school-option,.footer-links a{transition:background-color .16s ease,colo
 .timetable.density-relaxed thead th{height:78px}
 .timetable.density-relaxed td{height:110px;padding:15px 8px}
 .timetable.density-relaxed .class-cell{gap:8px}
-.grade-compact.density-compact{gap:8px}
-.grade-compact.density-compact .grade-class{padding:6px 8px}
-.grade-compact.density-relaxed{gap:16px}
-.grade-compact.density-relaxed .grade-class{padding:15px 12px}
 @media(max-width:700px){
   .section-heading .heading-actions{justify-content:flex-start}
-  .heading-actions .last-fetched{flex:0 0 100%;white-space:normal;overflow-wrap:normal}
   .timetable:not(.comparison-table) td{height:49px;padding:3px 2px}
   .timetable.density-compact:not(.comparison-table) thead th{height:40px}
   .timetable.density-compact:not(.comparison-table) td{height:42px;padding:3px 2px}
@@ -248,8 +141,6 @@ button,.school-option,.footer-links a{transition:background-color .16s ease,colo
   .timetable.density-relaxed:not(.comparison-table) td{height:94px;padding:10px 4px}
   .timetable.teacher-table:not(.comparison-table) .class-cell strong{font-size:11px;word-break:keep-all;overflow-wrap:normal;line-height:1.4}
   .teacher-table .class-cell strong span{display:inline-block;white-space:nowrap}
-  .settings-search input,.favorite-picker select{font-size:16px}
-  .grade-class h4{white-space:nowrap}
   .lesson-list.density-compact article{gap:4px 8px}
   .lesson-list.density-relaxed article{gap:8px 12px}
 }

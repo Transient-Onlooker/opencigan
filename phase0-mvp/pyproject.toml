@@ -8,7 +8,7 @@ dependencies = ["pycomcigan==1.4.4", "pycryptodomex==3.24.2"]
 find-links = ["wheelhouse"]
 
 [tool.uv.sources]
-pycomcigan = { path = "wheelhouse/pycomcigan-1.4.4-py3-none-any.whl" }
+pycomcigan = { path = "../workers-api/wheelhouse/pycomcigan-1.4.4-py3-none-any.whl" }
 pycryptodomex = [{ index = "pypi", marker = "sys_platform != 'emscripten'" }]
 
 [[tool.uv.index]]
