@@ -51,7 +51,7 @@ flowchart LR
 | --- | --- | --- |
 | **P0 · 핵심 기능·보안·공개 인프라** | **Cloudflare Tunnel 전환 및 WAF 봇 방어 우선**, 공개 API/ICS·가용성 검증 잔여 | [P0 공개 전 필수 작업](roadmap/core-quality.md) |
 | **P1 · 사용자 경험** | 기존 기능 구현, UI/UX 개선 다수 대기 | [학교·시간표·설정·급식 UX](roadmap/user-experience.md) |
-| **P2 · 외부 개발자 연동** | API·ICS·관리 도구 일부 구현, 외부 운영 검증 대기 | [API·캘린더·터널·로그](roadmap/api-operations.md) |
+| **P2 · 외부 개발자 연동** | API·ICS·관리 도구 일부 구현, 외부 운영 검증 대기 | [API·캘린더·로그](roadmap/api-operations.md) |
 | **P3–P4 · 자동화와 확장** | 부분 구현 또는 아이디어·운영 검증 대기 | [알림·장기 확장·아이디어](roadmap/automation-and-future.md) |
 | **코드 품질·배포** | 상태·세션 리팩터링 진행, UI/CSS/백엔드 정리 잔여 | [리팩터링·릴리스 검증](roadmap/refactoring-and-release.md) |
 

@@ -16,7 +16,7 @@
 
 **공개 전 필요**
 
-**P0 — Cloudflare Tunnel 공개 API 전환·엣지 봇 방어 (2026-11-16 우선순위 상향)**
+### P0 — Cloudflare Tunnel 공개 API 전환·엣지 봇 방어 (2026-11-16 우선순위 상향)
 
 > 현재 Tailscale Funnel을 대체할 **우선 구현 경로**로 Cloudflare Tunnel을 채택합니다. 아직 운영 전환 또는 검증 완료를 뜻하지 않습니다. 아래는 기존 P2의 Tunnel 검토·비교 항목을 P0으로 이동한 것입니다. [운영 절차와 위험](../operations.md#cloudflare-tunnel-전환-계획-p0-미적용).
 
