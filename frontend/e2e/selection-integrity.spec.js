@@ -67,14 +67,19 @@ test('settings groups keep advanced controls separate and restore expanded state
   await expect(page.getByLabel('과목 색상', { exact: true })).toBeHidden();
   const search = page.getByLabel('설정 검색');
   await search.fill('과목');
-  await expect(page.getByLabel('과목 색상', { exact: true })).toBeVisible();
+  const results = page.getByRole('list', { name: '설정 검색 결과' });
+  await expect(results.getByRole('button', { name: /과목 색상/ })).toBeVisible();
+  await expect(results.getByRole('button', { name: /교사 표시 이름/ })).toHaveCount(0);
   await expect(page.getByLabel('시간표에 교사 표시')).toBeHidden();
   await expect(page.getByText('학교 교시 시각 설정', { exact: true })).toBeHidden();
   await search.clear();
   await expect(page.getByLabel('테마', { exact: true })).toBeVisible();
   await expect(page.getByLabel('시간표에 교사 표시')).toBeVisible();
   await expect(page.getByLabel('과목 색상', { exact: true })).toBeHidden();
-  await page.getByText('과목·교사 상세 설정', { exact: true }).click();
+  await search.fill('과목 색상');
+  await results.getByRole('button', { name: /과목 색상/ }).first().focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByLabel('과목 색상', { exact: true })).toBeFocused();
   await page.getByLabel('과목 색상', { exact: true }).selectOption('auto');
   await page.reload();
   await page.getByRole('button', { name: '설정', exact: true }).click();
@@ -626,7 +631,7 @@ test('legacy favorites remain stored while settings search and keyboard help wor
   await expect(emptyPeriodHelp.locator('..').getByText(/수집된 수업 기록이 없는 칸/)).toBeVisible();
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByLabel('설정 검색').fill('알레르기');
-  await expect(page.getByText('급식 알레르기 설정', { exact: true })).toBeVisible();
+  await expect(page.getByRole('list', { name: '설정 검색 결과' }).getByRole('button', { name: /급식 알레르기 설정/ })).toBeVisible();
   await expect(page.getByText('학교 교시 시각 설정', { exact: true })).toBeHidden();
   for (const width of [320, 800, 1366]) {
     await page.setViewportSize({ width, height: 844 });
@@ -642,6 +647,7 @@ test('timed calendar includes bell times only after explicit consent and closes 
   await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByLabel('설정 검색').fill('교시');
+  await page.getByRole('list', { name: '설정 검색 결과' }).getByRole('button', { name: /1교시 시작/ }).click();
   await page.getByLabel('1교시 시작', { exact: true }).fill('09:00');
   await page.getByLabel('1교시 종료', { exact: true }).fill('09:50');
   await page.getByRole('button', { name: '시각 저장', exact: true }).click();
