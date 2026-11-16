@@ -72,13 +72,17 @@ test('공유 학급은 시간표 검증이 끝나기 전까지 선택과 저장�
   search.resolve({ schools: [sharedSchool], stale: false });
   await flush();
   assert.equal(app.state().pendingSharedClass.classroom, 7);
+  assert.equal(app.state().school.id, savedSchool.id);
+  assert.equal(app.state().timetable.schoolId, savedSchool.id);
   assert.equal(app.state().classroom, 1);
   assert.equal(store.get('opensigan-class'), '1');
   requests[1].resolve(data(sharedSchool, [{ grade: 1, class: 7 }]));
   await flush();
   assert.equal(app.state().pendingSharedClass, null);
+  assert.equal(app.state().school.id, sharedSchool.id);
   assert.equal(app.state().classroom, 7);
   assert.equal(store.get('opensigan-class'), '7');
+  assert.equal(requests.length, 2);
   cleanup();
 });
 
@@ -98,6 +102,23 @@ test('공유 학급 검증 중 같은 학교 즐겨찾기를 선택하면 공유
   assert.equal(app.state().classroom, 2);
   assert.equal(app.state().classroomDraft, '2');
   assert.equal(store.get('opensigan-class'), '2');
+  cleanup();
+});
+
+test('기존 학교에서 공유 시간표를 확인하는 도중 선택을 바꾸면 늦은 응답을 무시한다', async () => {
+  const { app, requests, search, store, cleanup } = setup();
+  requests[0].resolve(data(savedSchool, [{ grade: 1, class: 1 }, { grade: 1, class: 2 }]));
+  await flush();
+  search.resolve({ schools: [sharedSchool], stale: false });
+  await flush();
+  app.switchToFavorite({ school: savedSchool, grade: 1, classroom: 2 });
+  assert.equal(requests[1].signal.aborted, true);
+  requests[1].resolve(data(sharedSchool, [{ grade: 1, class: 7 }]));
+  await flush();
+  assert.equal(app.state().school.id, savedSchool.id);
+  assert.equal(app.state().classroom, 2);
+  assert.equal(store.get('opensigan-class'), '2');
+  assert.equal(app.state().pendingSharedClass, null);
   cleanup();
 });
 

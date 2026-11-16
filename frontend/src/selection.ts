@@ -105,7 +105,7 @@ export function createSharedSelectionSession(onChange: (state: { checking: boole
       fallback: PendingSharedClass['fallback'],
       currentSchoolId: () => string | undefined,
       search: (name: string, signal: AbortSignal) => Promise<{ schools: School[]; stale: boolean }>,
-      apply: (school: School) => void,
+      apply: (school: School, signal: AbortSignal) => void | Promise<void>,
       fail: () => void,
     ) {
       const signal = session.begin();
@@ -116,7 +116,7 @@ export function createSharedSelectionSession(onChange: (state: { checking: boole
         if (!verified) { fail(); return; }
         if (currentSchoolId() !== fallback.school?.id) return;
         session.setPending({ schoolId: verified.id, grade: shared.grade, classroom: shared.classroom, fallback });
-        apply(verified);
+        await apply(verified, signal);
       } catch {
         if (!signal.aborted) fail();
       } finally {

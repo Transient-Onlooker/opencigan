@@ -11,7 +11,7 @@
   import TimetablePanel from './TimetablePanel.svelte';
   import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference, readFavorites, writeFavorites, readTheme, writeTheme, readAnimations, writeAnimations, readMealSchool, writeMealSchool, type Favorite } from './preferences';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { saveSelection, readSelection, gradesInTimetable, classesInGrade, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
+  import { saveSelection, readSelection, gradesInTimetable, classesInGrade, createSelectionState, createSharedSelectionSession, validateSharedClass, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -729,8 +729,30 @@
   }
 
   function restoreSharedClass(shared: NonNullable<ReturnType<typeof readSharedClass>>, fallback: { school: School | null; grade: number; classroom: number }) {
-    return sharedSelection.verifySchool(shared, fallback, () => school?.id, searchSchools, (verified) => {
+    return sharedSelection.verifySchool(shared, fallback, () => school?.id, searchSchools, async (verified, signal) => {
       classError = false;
+      if (fallback.school) {
+        const requestedWeek = week;
+        let candidate: TimetableResponse | null = null;
+        try { candidate = await getTimetable(verified.id, requestedWeek, signal); } catch { /* The previous selection remains active. */ }
+        if (signal.aborted) return;
+        if (school?.id !== fallback.school.id || week !== requestedWeek) { sharedSelection.cancel(); return; }
+        const valid = candidate?.schoolId === verified.id && candidate.weekStart === requestedWeek &&
+          validateSharedClass(candidate, false, /(?:중학교|고등학교)/.test(verified.name) ? 3 : 6, shared.grade, shared.classroom) === 'valid';
+        if (!valid || !candidate) {
+          sharedSelection.consume();
+          sharedClassState = '공유 링크의 학급을 확인하지 못해 이전 학교와 학급을 유지했어요.';
+          return;
+        }
+        const cacheKey = verified.id + '\u0000' + requestedWeek;
+        const expires = Date.now() + refreshInterval;
+        timetableSession.cache.put(cacheKey, candidate, expires);
+        chooseSchool(verified, true, true, false);
+        if (school?.id === verified.id && !pendingSharedClass && !classError) {
+          timetableSession.saveFresh(cacheKey, candidate, expires, () => localStorage);
+        }
+        return;
+      }
       chooseSchool(verified, true, true, false);
     }, () => { sharedClassState = '공유 링크의 학교를 확인하지 못해 이전 학교를 유지했어요.'; });
   }
