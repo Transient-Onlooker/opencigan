@@ -55,6 +55,33 @@ test('settings icon remains visible and aligned in both themes on desktop and mo
   await expect(page.getByRole('heading', { name: '설정', exact: true })).toBeVisible();
 });
 
+test('settings groups keep advanced controls separate and restore expanded state after search', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('일반 설정', { exact: true }).click();
+  await expect(page.getByLabel('테마', { exact: true })).toBeVisible();
+  await page.getByText('시간표 표시 설정', { exact: true }).click();
+  await expect(page.getByLabel('시간표에 교사 표시')).toBeVisible();
+  await expect(page.getByLabel('과목 색상', { exact: true })).toBeHidden();
+  const search = page.getByLabel('설정 검색');
+  await search.fill('과목');
+  await expect(page.getByLabel('과목 색상', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('시간표에 교사 표시')).toBeHidden();
+  await expect(page.getByText('학교 교시 시각 설정', { exact: true })).toBeHidden();
+  await search.clear();
+  await expect(page.getByLabel('테마', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('시간표에 교사 표시')).toBeVisible();
+  await expect(page.getByLabel('과목 색상', { exact: true })).toBeHidden();
+  await page.getByText('과목·교사 상세 설정', { exact: true }).click();
+  await page.getByLabel('과목 색상', { exact: true }).selectOption('auto');
+  await page.reload();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('과목·교사 상세 설정', { exact: true }).click();
+  await expect(page.getByLabel('과목 색상', { exact: true })).toHaveValue('auto');
+});
+
 test('shared school and class stay pending until the matching timetable is verified', async ({ page }) => {
   const previous = { id: '1:봄빛초등학교', name: '봄빛초등학교', region: '서울' };
   let release;
