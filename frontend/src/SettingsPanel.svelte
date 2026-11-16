@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import Icon from './Icon.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import { allergens } from './allergens';
@@ -46,24 +47,40 @@
   export let toggleAllergy: (id: number, checked: boolean) => void;
   let settingsQuery = '';
   let settingsOpen = { general: false, display: false, advanced: false, times: false, backup: false, meals: false, allergies: false, personal: false };
-  let beforeSearch = { ...settingsOpen };
+  let settingsContent: HTMLElement;
+  let searchResults: { name: string; category: string; target: HTMLElement; panel: HTMLDetailsElement }[] = [];
   function settingsMatch(labels: string, query: string) {
     return !query.trim() || labels.toLocaleLowerCase('ko-KR').includes(query.trim().toLocaleLowerCase('ko-KR'));
   }
   function updateSettingsSearch(query: string) {
-    if (!settingsQuery.trim() && query.trim()) beforeSearch = { ...settingsOpen };
     settingsQuery = query;
-    if (!query.trim()) { settingsOpen = { ...beforeSearch }; return; }
-    settingsOpen = {
-      general: settingsMatch('일반 테마 애니메이션', query),
-      display: settingsMatch('시간표 표시 교사 날짜 변경 변동 배지 테두리 밀도 종료 요일 학급', query),
-      advanced: settingsMatch('데이터 고급 과목 색상 별칭 교사 이름 상세', query),
-      times: settingsMatch('학교 교시 시각 시간 시작 종료', query),
-      backup: settingsMatch('설정 백업 복원 파일 저장 가져오기 내보내기 초기화', query),
-      meals: settingsMatch('급식 보기 식사 조식 중식 석식 알레르기 번호', query),
-      allergies: settingsMatch('급식 알레르기 주의', query),
-      personal: false,
-    };
+    searchResults = [];
+    if (!query.trim()) return;
+    for (const panel of settingsContent.querySelectorAll<HTMLDetailsElement>(':scope > details')) {
+      const summary = panel.querySelector<HTMLElement>(':scope > summary');
+      if (!summary) continue;
+      const category = summary.textContent?.trim() ?? '';
+      if ((panel.classList.contains('personal-timetable-panel') || panel.classList.contains('allergy-settings')) && settingsMatch(category, query)) {
+        searchResults.push({ name: category, category, target: summary, panel });
+      }
+      if (panel.classList.contains('personal-timetable-panel')) continue;
+      for (const element of panel.querySelectorAll<HTMLElement>('label, button')) {
+        const target = element.tagName === 'LABEL' ? element.querySelector<HTMLElement>('input,select') : element;
+        if (!target) continue;
+        const name = target.getAttribute('aria-label') || Array.from(element.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE || (node instanceof HTMLElement && node.tagName === 'SPAN')).map((node) => node.textContent).join('').trim();
+        if (name && settingsMatch(name, query)) searchResults.push({ name, category, target, panel });
+      }
+    }
+  }
+  async function openSearchResult(result: typeof searchResults[number]) {
+    settingsQuery = '';
+    searchResults = [];
+    await tick();
+    result.panel.open = true;
+    await tick();
+    const target = result.target.matches(':disabled') ? result.panel.querySelector<HTMLElement>('summary') : result.target;
+    target?.focus();
+    target?.scrollIntoView({ block: 'center' });
   }
 </script>
 
@@ -71,7 +88,12 @@
           <h2 id="settings-title">설정</h2>
           <p><a href="./webhooks.html">시간표 변경 알림 관리</a></p>
           <label class="settings-search">설정 검색<input type="search" value={settingsQuery} oninput={(event) => updateSettingsSearch(event.currentTarget.value)} maxlength="60" placeholder="예: 교시, 알레르기, 백업" /></label>
-          {#if settingsQuery.trim() && !settingsMatch('일반 시간표 표시 테마 애니메이션 데이터 고급 상세 학급 과목 색상 별칭 교사 이름 날짜 변경 변동 배지 테두리 밀도 종료 요일 학교 교시 시각 시간 시작 백업 복원 파일 저장 가져오기 내보내기 초기화 급식 보기 식사 조식 중식 석식 알레르기 번호 주의 개인 일정 시험', settingsQuery)}<p role="status">일치하는 설정이 없어요.</p>{/if}
+          {#if settingsQuery.trim()}
+            {#if searchResults.length}
+              <ul class="settings-results" aria-label="설정 검색 결과">{#each searchResults as result}<li><button type="button" onclick={() => openSearchResult(result)}><span>{result.name}</span><small>{result.category}</small></button></li>{/each}</ul>
+            {:else}<p role="status">일치하는 설정이 없어요.</p>{/if}
+          {/if}
+          <div bind:this={settingsContent} hidden={!!settingsQuery.trim()}>
           <details class="display-settings" hidden={!settingsMatch('일반 테마 애니메이션', settingsQuery)} bind:open={settingsOpen.general}>
             <summary>일반 설정</summary>
             <div class="display-settings-grid">
@@ -167,11 +189,15 @@
           {#if !school}<p class="display-settings-hint">학교를 선택하면 시간표 설정을 바꿀 수 있어요.</p>{/if}
              <details class="meal-preferences" hidden={!settingsMatch('급식 보기 식사 조식 중식 석식 알레르기 번호', settingsQuery)} bind:open={settingsOpen.meals}><summary>급식 보기 설정</summary><div class="meal-preference-options" aria-label="표시할 식사"><span>표시할 식사</span>{#each mealTypes as type}<label><input type="checkbox" checked={enabledMealTypes.includes(type)} disabled={enabledMealTypes.length === 1 && enabledMealTypes.includes(type)} onchange={(event) => toggleMealType(type, event.currentTarget.checked)} />{type}</label>{/each}</div><label class="meal-number-toggle"><input type="checkbox" checked={showAllergenNumbers} onchange={(event) => setAllergenNumbersVisible(event.currentTarget.checked)} />메뉴의 알레르기 번호 표시</label><p>하루·주간 보기와 표시 설정은 이 브라우저에 저장돼요. 주의 알레르기 경고는 항상 표시됩니다.</p></details>
              <details class="allergy-settings" hidden={!settingsMatch('급식 알레르기 주의', settingsQuery)} bind:open={settingsOpen.allergies}><summary>급식 알레르기 설정 {allergySelection.length ? `(${allergySelection.length}개 선택)` : ''}</summary><div class="allergy-grid">{#each allergens as name, index}<label><input type="checkbox" checked={allergySelection.includes(index + 1)} onchange={(event) => toggleAllergy(index + 1, event.currentTarget.checked)} /><span>{index + 1}. {name}</span></label>{/each}</div><p>선택 항목은 이 브라우저에만 저장돼요. NEIS에서 알레르기가 표시되지 않았더라도 안전하다는 뜻은 아니에요.</p></details>
+          </div>
         </section>
 
 <style>
 .settings-search{display:grid;gap:5px;margin:0 0 12px;font-size:13px;color:var(--muted)}
 .settings-search input{min-height:44px;max-width:100%;width:100%;border:1px solid var(--line);padding:8px;background:var(--surface);color:var(--ink)}
+.settings-results{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.settings-results button{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;min-height:44px;padding:10px 8px;border:0;border-bottom:1px solid var(--line);background:var(--surface);color:var(--ink);text-align:left;cursor:pointer}
+.settings-results button:hover{background:var(--soft)}.settings-results small{color:var(--muted);text-align:right}
 @media(max-width:700px){.settings-search input{font-size:16px}}
 .display-settings{margin:0 0 14px;border:1px solid var(--line);padding:0 14px}
 .display-settings summary{min-height:44px;align-content:center;cursor:pointer;font-size:14px;font-weight:650}
