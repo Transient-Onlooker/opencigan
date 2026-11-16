@@ -119,6 +119,45 @@ test('settings groups keep advanced controls separate and restore expanded state
   await expect(page.getByLabel('과목 색상', { exact: true })).toHaveValue('auto');
 });
 
+test('multiple teacher aliases include saved names and affect timetable search', async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript((id) => {
+    const key = 'opensigan-display:' + id;
+    if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ teacherAliases: { '이전교사': '이전별칭' } }));
+  }, school.id);
+  await page.route('**/api/v1/timetable?*', (route) => route.fulfill({ json: {
+    ...timetable, records: timetable.records.map((record, index) => ({ ...record, teacher: index ? '이교사' : '김교사' })),
+  } }));
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('과목·교사 상세 설정', { exact: true }).click();
+  await page.getByText('교사 표시 이름 관리', { exact: true }).click();
+  await expect(page.getByLabel('이전교사 표시 이름', { exact: true })).toHaveValue('이전별칭');
+  await page.getByLabel('김교사 표시 이름', { exact: true }).fill('김T');
+  await page.getByLabel('김교사 표시 이름', { exact: true }).press('Tab');
+  await page.getByLabel('이교사 표시 이름', { exact: true }).fill('이T');
+  await page.getByLabel('이교사 표시 이름', { exact: true }).press('Tab');
+  await page.getByLabel('교사 목록 검색').fill('이전별칭');
+  await expect(page.getByLabel('이전교사 표시 이름', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('김교사 표시 이름', { exact: true })).toHaveCount(0);
+  await page.getByLabel('교사 목록 검색').clear();
+  await page.getByRole('button', { name: '이교사 표시 이름 초기화' }).click();
+  await expect(page.getByLabel('이교사 표시 이름', { exact: true })).toHaveValue('');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  await page.getByRole('button', { name: '시간표', exact: true }).click();
+  await page.getByRole('group', { name: '시간표 보기' }).getByRole('button', { name: '교사', exact: true }).click();
+  await page.getByLabel('교사별 주간 시간표').fill('김T');
+  await expect(page.getByRole('region', { name: /김T 선생님 주간 시간표/ })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('과목·교사 상세 설정', { exact: true }).click();
+  await page.getByText('교사 표시 이름 관리', { exact: true }).click();
+  await expect(page.getByLabel('김교사 표시 이름', { exact: true })).toHaveValue('김T');
+  await expect(page.getByLabel('이전교사 표시 이름', { exact: true })).toHaveValue('이전별칭');
+});
+
 test('shared school and class stay pending until the matching timetable is verified', async ({ page }) => {
   const previous = { id: '1:봄빛초등학교', name: '봄빛초등학교', region: '서울' };
   let release;
