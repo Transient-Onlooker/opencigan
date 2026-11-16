@@ -18,7 +18,6 @@
   export let animationsEnabled: boolean;
   export let displaySettings: DisplaySettings;
   export let selectedSubject: string;
-  export let selectedTeacher: string;
   export let subjectNames: string[];
   export let teacherNames: string[];
   export let lessonTimePeriods: number[];
@@ -51,6 +50,11 @@
   export let setAllergenNumbersVisible: (value: boolean) => void;
   export let toggleAllergy: (id: number, checked: boolean) => void;
   let settingsQuery = '';
+  let teacherAliasQuery = '';
+  let teacherAliasSchool = '';
+  $: if ((school?.id ?? '') !== teacherAliasSchool) { teacherAliasSchool = school?.id ?? ''; teacherAliasQuery = ''; }
+  $: aliasTeachers = [...new Set([...teacherNames, ...Object.keys(displaySettings.teacherAliases)])].sort((a, b) => a.localeCompare(b, 'ko-KR'));
+  $: visibleAliasTeachers = aliasTeachers.filter((name) => `${name} ${displaySettings.teacherAliases[name] ?? ''}`.toLocaleLowerCase('ko-KR').includes(teacherAliasQuery.trim().toLocaleLowerCase('ko-KR')));
   let settingsOpen = { general: false, display: false, advanced: false, times: false, backup: false, meals: false, allergies: false, personal: false };
   let settingsContent: HTMLElement;
   let searchResults: { name: string; category: string; target: HTMLElement; panel: HTMLDetailsElement }[] = [];
@@ -159,14 +163,23 @@
                    <label>선택한 과목 색상<input type="color" value={displaySettings.subjectColors[selectedSubject] || '#425a75'} disabled={!selectedSubject} onchange={(event) => saveSubjectColor(event.currentTarget.value)} /></label>
                    <button type="button" class="secondary-button display-reset" onclick={clearSubjectColors}>과목 색상 초기화</button>
                  {/if}
-                 <label>교사 선택
-                   <select bind:value={selectedTeacher} disabled={!teacherNames.length}>
-                     <option value="">교사를 선택하세요</option>{#each teacherNames as teacher}<option value={teacher}>{teacher}</option>{/each}
-                   </select>
-                 </label>
-                 <label>교사 표시 이름
-                   <input type="text" value={displaySettings.teacherAliases[selectedTeacher] || ''} disabled={!selectedTeacher} maxlength="60" placeholder="원본 이름 유지" oninput={(event) => saveAlias('teacher', selectedTeacher, event.currentTarget.value)} />
-                 </label>
+               </div>
+               <details class="teacher-alias-settings">
+                 <summary>교사 표시 이름 관리</summary>
+                 <p class="display-settings-hint">원본 이름은 변경하지 않아요. 이름이 같은 교사는 원본에서 구분되지 않으면 함께 적용됩니다.</p>
+                 <label class="teacher-alias-search">교사 목록 검색<input type="search" bind:value={teacherAliasQuery} placeholder="원본 이름 또는 표시 이름" /></label>
+                 {#if visibleAliasTeachers.length}
+                   <ul class="teacher-alias-list" aria-label="교사 표시 이름 목록">
+                     {#each visibleAliasTeachers as teacher (teacher)}
+                       <li><div><strong>{teacher}</strong>{#if displaySettings.teacherAliases[teacher]} <small>변경됨</small>{/if}{#if !teacherNames.includes(teacher)} <small>저장된 이름</small>{/if}</div>
+                         <label><span class="sr-only">{teacher} 표시 이름</span><input aria-label={`${teacher} 표시 이름`} type="text" value={displaySettings.teacherAliases[teacher] || ''} maxlength="60" placeholder="원본 이름 유지" onchange={(event) => saveAlias('teacher', teacher, event.currentTarget.value)} /></label>
+                         <button class="text-button" type="button" aria-label={`${teacher} 표시 이름 초기화`} disabled={!displaySettings.teacherAliases[teacher]} onclick={() => saveAlias('teacher', teacher, '')}>초기화</button>
+                       </li>
+                     {/each}
+                   </ul>
+                 {:else}<p class="display-settings-hint">{aliasTeachers.length ? '일치하는 교사가 없어요.' : '시간표에 등록된 교사 이름이 없어요.'}</p>{/if}
+               </details>
+               <div class="display-settings-grid" aria-label="교사 이름 공통 규칙">
                  <label>모든 교사 이름 앞에 추가
                    <input type="text" value={displaySettings.teacherPrefix} maxlength="30" placeholder="예: 선생님 " oninput={(event) => saveDisplaySettings({ ...displaySettings, teacherPrefix: event.currentTarget.value })} />
                  </label>
@@ -294,5 +307,6 @@
 .settings-cards>details>summary{min-height:48px;align-content:center;cursor:pointer;font-size:14px;line-height:1.4;font-weight:650}
 .settings-cards summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .settings-cards .display-toggle{display:flex;align-items:center;gap:9px;min-height:44px}
+.teacher-alias-settings{border-top:1px solid var(--line)}.teacher-alias-settings summary{cursor:pointer;min-height:44px;align-content:center;font-weight:650;font-size:14px}.teacher-alias-search{display:grid;gap:4px;font-size:13px}.teacher-alias-settings input{min-width:0;width:100%;min-height:44px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px;font:inherit}.teacher-alias-list{list-style:none;margin:12px 0;padding:0;max-height:360px;overflow:auto}.teacher-alias-list li{display:grid;grid-template-columns:minmax(70px,1fr) minmax(100px,2fr) auto;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}.teacher-alias-list li>div{min-width:0;overflow-wrap:anywhere}.teacher-alias-list small{display:block;color:var(--muted);font-size:12px}.teacher-alias-list button{min-height:44px}
 @media(max-width:700px){.allergy-grid label{min-height:44px}}
 </style>
