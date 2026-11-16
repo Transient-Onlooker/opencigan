@@ -28,6 +28,7 @@ jobs:
       - run: npm ci
         working-directory: frontend
       - run: node --experimental-strip-types clients/ts/tests/client.test.ts
+      - run: node --test cloudflare-gateway/test/*.test.mjs
       - run: python -m unittest discover -s tests/integration -v
       - run: npm run check
         working-directory: frontend
