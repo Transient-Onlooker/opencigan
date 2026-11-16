@@ -192,7 +192,7 @@ test('disabled history is compact without hiding source change badges', async ({
   await page.goto('/' + sharedHash(1));
   const panel = page.locator('#timetable-panel');
   await expect(panel.locator('.change-label').first()).toBeVisible();
-  await panel.getByRole('button', { name: '이력 보기' }).click();
+  await panel.getByRole('button', { name: '시간표 변경 이력 보기' }).click();
   await expect(panel.getByRole('status').filter({ hasText: '변경 이력은 현재 제공되지 않아요.' })).toBeVisible();
   await expect(panel.locator('.history-section')).toHaveCount(0);
   await expect(panel.locator('.change-label').first()).toBeVisible();
