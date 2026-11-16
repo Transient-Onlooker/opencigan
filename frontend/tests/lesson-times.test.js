@@ -8,7 +8,7 @@ const source = await readFile(new URL('../src/lesson-times.ts', import.meta.url)
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const exports = {};
 runInNewContext(compiled, { exports, Intl });
-const { dailyLessonOverview, parseLessonTimes, koreaClockMinutes, calculateLessonTimes } = exports;
+const { dailyLessonOverview, parseLessonTimes, koreaClockMinutes, calculateLessonTimes, lessonTimesForDate } = exports;
 
 const records = [
   { date: '2026-11-16', grade: 1, class: 1, period: 1, subject: '국어', isChanged: false },
@@ -60,6 +60,13 @@ test('설정이 없거나 오늘이 아닌 경우 현재 수업을 추정하지 
 
 test('한국 시간대의 시각으로 현재 교시를 계산한다', () => {
   assert.equal(koreaClockMinutes(new Date('2026-11-16T01:20:00Z')), 10 * 60 + 20);
+});
+
+test('요일별 예외는 해당 날짜에만 공통 교시 시각보다 우선한다', () => {
+  const weekdays = { 2: { 1: { start: '08:30', end: '09:20' } } };
+  assert.equal(lessonTimesForDate(times, weekdays, '2026-11-09')[1].start, '09:00');
+  assert.equal(lessonTimesForDate(times, weekdays, '2026-11-10')[1].start, '08:30');
+  assert.equal(lessonTimesForDate(times, weekdays, '2026-11-10')[2].start, '10:00');
 });
 
 test('교시 규칙은 점심에 기본 쉬는 시간을 더하지 않고 입력과 하루 범위를 검증한다', () => {

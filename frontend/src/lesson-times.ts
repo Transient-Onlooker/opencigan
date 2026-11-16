@@ -3,6 +3,11 @@ import type { TimetableRecord } from './api';
 export type LessonTimes = Record<number, { start: string; end: string }>;
 export type WeekdayLessonTimes = Record<number, LessonTimes>;
 
+export function lessonTimesForDate(common: LessonTimes, weekdays: WeekdayLessonTimes, date: string): LessonTimes {
+  const weekday = new Date(`${date}T00:00:00Z`).getUTCDay() || 7;
+  return { ...common, ...(weekdays[weekday] ?? {}) };
+}
+
 function minutes(value: string): number | null {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return null;
   const [hours, part] = value.split(':').map(Number);

@@ -21,9 +21,9 @@
   import { createMealSession } from './meal-session';
   import { createSchoolSearchSession } from './school-search-session';
   import { classLessons, teacherLessons, teacherNamesInTimetable, teacherSuggestions as findTeacherSuggestions, selectedTeacherName as findSelectedTeacherName, gradeLessons, comparisonClasses, missingWeekdayDates, observedClassCount as countObservedClasses, subjectNamesInTimetable } from './timetable-view';
-  import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, type LessonTimes } from './lesson-times';
+  import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, parseWeekdayLessonTimes, lessonTimesForDate, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
   import { createClassDisplayPreferences, defaultDisplaySettings, parseDisplaySettings, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
-  import { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
+  import { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, saveLessonTimePreferences, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
   import { apiNotConfigured, getMeals, getTimetable, getTimetableHistory, searchSchools, searchNeisSchools, timetableSubscriptionUrl, type Meal, type NeisSchool, type School, type TimetableRecord, type TimetableResponse, type TimetableChange } from './api';
 
   let school: School | null = null;
@@ -44,6 +44,8 @@
   let useClassDisplay = false;
   const classDisplayPreferences = createClassDisplayPreferences(() => localStorage);
   let lessonTimes: LessonTimes = {};
+  let weekdayLessonTimes: WeekdayLessonTimes = {};
+  let weekdayTimeDrafts: WeekdayLessonTimes = {};
   let lessonTimeDrafts: Record<number, { start: string; end: string }> = {};
   let lessonTimeState = '';
   let settingsBackupState = '';
@@ -138,7 +140,8 @@
   $: filtered = classLessons(timetable?.records ?? [], grade, classroom);
   $: dayRecords = (timetable?.records ?? []).filter((r) => r.date === selectedDay);
   $: selectedClassLessons = classLessons(dayRecords, grade, classroom).sort((a, b) => Number(a.period) - Number(b.period));
-  $: dayOverview = dailyLessonOverview(selectedClassLessons, lessonTimes, clockMinute, selectedDay === today);
+  $: selectedDayTimes = lessonTimesForDate(lessonTimes, weekdayLessonTimes, selectedDay);
+  $: dayOverview = dailyLessonOverview(selectedClassLessons, selectedDayTimes, clockMinute, selectedDay === today);
   $: shownClassLessons = displaySettings.endedLessonMode === 'hide' ? selectedClassLessons.filter((item) => !dayOverview.completed.includes(Number(item.period))) : selectedClassLessons;
   $: gradeRecords = gradeLessons(dayRecords, grade);
   $: comparableClasses = comparisonClasses(gradeRecords);
@@ -269,7 +272,7 @@
   function downloadSettingsBackup(classOnly = false) {
     if (!school) return;
     const scope = classOnly ? { grade: Number(grade), classroom: Number(classroom) } : undefined;
-    const contents = createSettingsBackup(school.id, classOnly ? displaySettings : schoolDisplaySettings, lessonTimes, scope);
+    const contents = createSettingsBackup(school.id, classOnly ? displaySettings : schoolDisplaySettings, lessonTimes, scope, weekdayLessonTimes);
     const url = URL.createObjectURL(new Blob([contents], { type: 'application/json;charset=utf-8' }));
     const link = document.createElement('a');
     link.href = url;
@@ -292,7 +295,6 @@
       if (file.size > MAX_SETTINGS_BACKUP_BYTES) throw new Error('설정 파일은 64KB 이하여야 해요.');
       const backup = parseSettingsBackup(await file.text(), schoolId, scope);
       if (school?.id !== schoolId) throw new Error('학교가 변경되어 설정을 적용하지 않았어요.');
-      if (backup.weekdayLessonTimes !== undefined) throw new Error('요일별 교시 시각이 포함된 설정은 아직 불러올 수 없어요. 기존 설정은 유지됩니다.');
       if (backup.scoped) {
         if (targetClass !== classDisplayKey || classError) throw new Error('학급이 변경되어 설정을 적용하지 않았어요.');
         try { classDisplayPreferences.restore(targetClass, backup.displaySettings); }
@@ -301,9 +303,13 @@
         settingsBackupState = '현재 학급의 표시 설정을 복원했어요.';
         return;
       }
-      saveSchoolSettingsBackup(localStorage, schoolId, backup.displaySettings, backup.lessonTimes);
+      const restoredWeekdays = parseWeekdayLessonTimes(backup.weekdayLessonTimes ?? weekdayLessonTimes, backup.lessonTimes);
+      if (!restoredWeekdays) throw new Error('기존 요일별 시각이 백업의 공통 시각과 겹쳐 복원하지 않았어요.');
+      saveSchoolSettingsBackup(localStorage, schoolId, backup.displaySettings, backup.lessonTimes, restoredWeekdays);
       schoolDisplaySettings = backup.displaySettings;
       lessonTimes = backup.lessonTimes;
+      weekdayLessonTimes = restoredWeekdays;
+      weekdayTimeDrafts = { ...weekdayLessonTimes };
       lessonTimeDrafts = { ...backup.lessonTimes };
       lessonTimeState = '';
       settingsBackupState = '현재 학교의 설정을 복원했어요.';
@@ -320,6 +326,16 @@
     lessonTimeDrafts = value;
     lessonTimeState = '계산된 시각을 입력했어요. 확인 후 시각 저장을 눌러 주세요.';
   }
+  function editWeekdayTime(day: number, period: number, part: 'start' | 'end', value: string) {
+    const entry = weekdayTimeDrafts[day]?.[period] ?? { start: '', end: '' };
+    weekdayTimeDrafts = { ...weekdayTimeDrafts, [day]: { ...weekdayTimeDrafts[day], [period]: { ...entry, [part]: value } } };
+    lessonTimeState = '';
+  }
+  function clearWeekdayTime(day: number, period: number) {
+    const entries = { ...weekdayTimeDrafts[day] }; delete entries[period];
+    weekdayTimeDrafts = { ...weekdayTimeDrafts, [day]: entries };
+    lessonTimeState = '';
+  }
   function saveLessonTimes() {
     if (!school) return;
     const entries = Object.entries(lessonTimeDrafts).filter(([, entry]) => entry.start || entry.end);
@@ -328,16 +344,19 @@
       lessonTimeState = '각 교시의 시작·종료 시각을 모두 입력하고, 시간 순서와 겹침 여부를 확인해 주세요.';
       return;
     }
+    const weekday = parseWeekdayLessonTimes(weekdayTimeDrafts, parsed);
+    if (!weekday) { lessonTimeState = '요일별 시작·종료 시각과 공통 시각의 순서·겹침을 확인해 주세요.'; return; }
     lessonTimes = parsed;
+    weekdayLessonTimes = weekday;
     lessonTimeState = '이 학교의 교시 시각을 저장했어요.';
     subscriptionUrl = ''; subscriptionPanelOpen = false; subscriptionTimesConsent = false;
-    try { writeSchoolPreference(localStorage, 'opensigan-lesson-times:', school.id, lessonTimes); }
+    try { saveLessonTimePreferences(localStorage, school.id, lessonTimes, weekdayLessonTimes); }
     catch { lessonTimeState = '현재 화면에만 적용됐어요. 브라우저 저장소를 확인해 주세요.'; }
   }
   function clearLessonTimes() {
-    lessonTimeDrafts = {}; lessonTimes = {}; lessonTimeState = '교시 시각을 초기화했어요.';
+    lessonTimeDrafts = {}; lessonTimes = {}; weekdayTimeDrafts = {}; weekdayLessonTimes = {}; lessonTimeState = '교시 시각을 초기화했어요.';
     subscriptionUrl = ''; subscriptionPanelOpen = false; subscriptionTimesConsent = false;
-    if (school) { try { localStorage.removeItem('opensigan-lesson-times:' + school.id); } catch { /* 현재 화면에서 삭제했습니다. */ } }
+    if (school) { try { saveLessonTimePreferences(localStorage, school.id, {}, {}); } catch { lessonTimeState = '현재 화면에만 적용됐어요. 브라우저 저장소를 확인해 주세요.'; } }
   }
 
   function toggleAllergy(id: number, checked: boolean) {
@@ -389,6 +408,9 @@
     catch { schoolDisplaySettings = defaultDisplaySettings(); }
     try { lessonTimes = readSchoolPreference(localStorage, 'opensigan-lesson-times:', value.id, parseLessonTimes, () => ({})); }
     catch { lessonTimes = {}; }
+    try { weekdayLessonTimes = readSchoolPreference(localStorage, 'opensigan-weekday-lesson-times:', value.id, (raw) => parseWeekdayLessonTimes(raw, lessonTimes) ?? {}, () => ({})); }
+    catch { weekdayLessonTimes = {}; }
+    weekdayTimeDrafts = { ...weekdayLessonTimes };
     lessonTimeDrafts = { ...lessonTimes }; lessonTimeState = '';
     subscriptionTimesConsent = false;
     settingsBackupState = '';
@@ -688,6 +710,12 @@
   function updateSubscriptionUrl() {
     if (!school) return;
     if (subscriptionMode === 'timed' && !subscriptionTimesConsent) { subscriptionUrl = ''; return; }
+    if (subscriptionMode === 'timed' && Object.keys(weekdayLessonTimes).length) {
+      subscriptionUrl = '';
+      subscriptionState = '요일별 시각을 반영하는 구독 링크는 서버 업데이트 후 사용할 수 있어요.';
+      return;
+    }
+    subscriptionState = '';
     subscriptionUrl = timetableSubscriptionUrl(school.id, Number(grade), Number(classroom), subscriptionMode, lessonTimes);
   }
 
@@ -815,9 +843,9 @@
     {/if}
     <CalendarNav {view} {inputFocused} selectView={(value) => view = value} />
     <div id="calendar" class="calendar-content" tabindex="-1">
-        <TimetablePanel {view} {timetableView} {school} {timetable} {week} {current} {today} {selectedDay} {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {tableState} {tableRefreshState} {timetableCheckedAt} {timetableFromDevice} {exportState} {exportBusy} {canExport} {weekendClasses} {classError} {sharedClassState} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} {lessonTimes} {comparableClasses} {gradeRecords} bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {dates} {periods} {filtered} {missingWeekdays} {observedClassCount} {teacherNames} {historyOpen} {historyDisabled} {historyLoading} {historyError} {historyChanges} {visibleHistory} {historyCursor} bind:historyScope {exportTimetable} {sharePng} {refreshTimetable} {currentWeek} {selectTimetableView} {selectGrade} {selectClass} {changeWeek} {loadTimetable} {selectTimetableDate} {toggleHistory} {loadHistory} {dateText} {shortDate} {timeText} {changeTypeText} {subjectStyle} />
+        <TimetablePanel {view} {timetableView} {school} {timetable} {week} {current} {today} {selectedDay} {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {tableState} {tableRefreshState} {timetableCheckedAt} {timetableFromDevice} {exportState} {exportBusy} {canExport} {weekendClasses} {classError} {sharedClassState} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} lessonTimes={selectedDayTimes} {comparableClasses} {gradeRecords} bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {dates} {periods} {filtered} {missingWeekdays} {observedClassCount} {teacherNames} {historyOpen} {historyDisabled} {historyLoading} {historyError} {historyChanges} {visibleHistory} {historyCursor} bind:historyScope {exportTimetable} {sharePng} {refreshTimetable} {currentWeek} {selectTimetableView} {selectGrade} {selectClass} {changeWeek} {loadTimetable} {selectTimetableDate} {toggleHistory} {loadHistory} {dateText} {shortDate} {timeText} {changeTypeText} {subjectStyle} />
         <MealsPanel {view} {mealDate} {today} {mealView} {mealDates} {mealDateDraft} {dateError} {neis} {school} {neisSearchState} {neisLoading} {neisResults} {mealState} {hasMeals} {mealLoading} {meals} {visibleMealTypes} {allergySelection} {showAllergenNumbers} {current} {mealsStale} {todayMeals} {setMealView} {changeMealDate} {dateText} {updateMealDateDraft} {selectMealDate} {chooseNeis} {connectMeals} {loadMeals} {selectMealTimetableDate} />
-        <SettingsPanel {view} {school} {week} dark={isDark} {useClassDisplay} {classError} {grade} {classroom} {theme} {animationsEnabled} {displaySettings} bind:selectedSubject bind:selectedTeacher {subjectNames} {teacherNames} {lessonTimePeriods} {lessonTimeDrafts} {lessonTimeState} {settingsBackupState} {mealTypes} {enabledMealTypes} {showAllergenNumbers} {allergySelection} {setClassDisplay} {setTheme} {setAnimationsEnabled} {setColorMode} {saveAlias} {saveSubjectColor} {clearSubjectColors} {saveDisplaySettings} {editLessonTime} {applyLessonTimeRules} {saveLessonTimes} {clearLessonTimes} {downloadSettingsBackup} {importSettingsFile} {resetDisplaySettings} {toggleMealType} {setAllergenNumbersVisible} {toggleAllergy} />
+        <SettingsPanel {view} {school} {week} dark={isDark} {useClassDisplay} {classError} {grade} {classroom} {theme} {animationsEnabled} {displaySettings} bind:selectedSubject bind:selectedTeacher {subjectNames} {teacherNames} {lessonTimePeriods} {lessonTimeDrafts} {weekdayTimeDrafts} {lessonTimeState} {settingsBackupState} {mealTypes} {enabledMealTypes} {showAllergenNumbers} {allergySelection} {setClassDisplay} {setTheme} {setAnimationsEnabled} {setColorMode} {saveAlias} {saveSubjectColor} {clearSubjectColors} {saveDisplaySettings} {editLessonTime} {editWeekdayTime} {clearWeekdayTime} {applyLessonTimeRules} {saveLessonTimes} {clearLessonTimes} {downloadSettingsBackup} {importSettingsFile} {resetDisplaySettings} {toggleMealType} {setAllergenNumbersVisible} {toggleAllergy} />
     </div>
     <ShareTools {view} {school} {classActionsReady} {apiNotConfigured} {shareUrl} {shareState} {subscriptionUrl} {subscriptionState} {subscriptionPanelOpen} {subscriptionMode} {subscriptionTimesConsent} {canExport} {exportBusy} {shareClass} {subscribeTimetable} {exportTimetable} {changeSubscriptionMode} setSubscriptionTimesConsent={(value) => { subscriptionTimesConsent = value; updateSubscriptionUrl(); }} {copySubscription} />
     <footer><div class="footer-open"><svg class="github-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .75a11.25 11.25 0 0 0-3.56 21.92c.56.1.77-.24.77-.54v-2.1c-3.13.68-3.79-1.33-3.79-1.33-.51-1.3-1.25-1.64-1.25-1.64-1.02-.7.08-.69.08-.69 1.13.08 1.72 1.16 1.72 1.16 1 1.72 2.63 1.22 3.27.93.1-.72.39-1.22.7-1.5-2.5-.28-5.13-1.25-5.13-5.56 0-1.23.44-2.24 1.16-3.03-.12-.28-.5-1.43.11-2.98 0 0 .95-.3 3.1 1.16A10.8 10.8 0 0 1 12 6.17c.96 0 1.92.13 2.82.38 2.15-1.46 3.1-1.16 3.1-1.16.61 1.55.23 2.7.11 2.98.72.79 1.16 1.8 1.16 3.03 0 4.32-2.63 5.27-5.14 5.55.4.35.76 1.03.76 2.08v3.1c0 .3.2.65.78.54A11.25 11.25 0 0 0 12 .75Z"/></svg><div><strong>함께 만드는 오픈소스</strong><p>Opencigan은 오픈소스 프로젝트예요. GitHub에서 함께 기여해 주세요.</p><div class="footer-links"><a href="https://github.com/Transient-Onlooker/opencigan">Opencigan GitHub ↗</a><a href="https://github.com/hegelty/pycomcigan">pycomcigan ↗</a><a href="https://opencigan.mcv.kr/">Opencigan 사이트 ↗</a><a href="/api-docs.html">API 문서</a></div></div></div></footer>

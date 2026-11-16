@@ -16,7 +16,7 @@ async function loadModule(filename, imports = {}) {
 
 const personalization = await loadModule('personalization.ts');
 const lessonTimes = await loadModule('lesson-times.ts');
-const { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, MAX_SETTINGS_BACKUP_BYTES } = await loadModule('settings-backup.ts', {
+const { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, saveLessonTimePreferences, MAX_SETTINGS_BACKUP_BYTES } = await loadModule('settings-backup.ts', {
   './personalization': personalization,
   './lesson-times': lessonTimes,
 });
@@ -39,6 +39,19 @@ test('school settings import restores prior values if the second write fails', (
   assert.throws(() => saveSchoolSettingsBackup(storage, schoolId, display, times), /저장하지 못했어요/);
   assert.equal(values.get('opensigan-display:' + schoolId), 'old-display');
   assert.equal(values.get('opensigan-lesson-times:' + schoolId), 'old-times');
+});
+
+test('요일별 저장 실패 시 공통 시각과 요일별 시각을 이전 값으로 되돌린다', () => {
+  const key = 'opensigan-lesson-times:' + schoolId, weekdayKey = 'opensigan-weekday-lesson-times:' + schoolId;
+  const values = new Map([[key, 'old-times'], [weekdayKey, 'old-weekdays']]);
+  let failed = false;
+  const storage = { getItem: (k) => values.get(k) ?? null, removeItem: (k) => values.delete(k), setItem: (k, v) => {
+    if (k === weekdayKey && !failed) { failed = true; throw new Error('blocked'); }
+    values.set(k, v);
+  } };
+  assert.throws(() => saveLessonTimePreferences(storage, schoolId, times, { 2: { 1: times[1] } }), /저장하지 못했어요/);
+  assert.equal(values.get(key), 'old-times');
+  assert.equal(values.get(weekdayKey), 'old-weekdays');
 });
 
 test('export and import round trip preserves school settings without allergy preferences', () => {
