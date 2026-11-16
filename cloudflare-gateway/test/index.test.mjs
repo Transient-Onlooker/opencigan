@@ -7,6 +7,7 @@ function setup({search = true, general = true, failFetch = false, blockedKey = '
   const calls = [];
   const limits = [];
   const env = {
+    ALLOWED_ORIGINS: 'https://opencigan.mcv.kr,https://transient-onlooker.github.io',
     PRIVATE_API: { fetch: async (request) => {
       calls.push(request);
       if (failFetch) throw new Error('private origin unreachable: do not disclose');
@@ -64,6 +65,26 @@ test('school search is separately rate limited', async () => {
   assert.equal((await response.json()).code, 'edge_rate_limited');
   assert.equal(response.headers.get('retry-after'), '60');
   assert.equal(calls.length, 0);
+});
+
+test('gateway errors expose retry information only to allowed origins', async () => {
+  const { env } = setup({search: false});
+  for (const [origin, expected] of [
+    ['https://opencigan.mcv.kr', 'https://opencigan.mcv.kr'],
+    ['https://opencigan.mcv.kr.evil.example', null],
+    ['null', null],
+  ]) {
+    const response = await worker.fetch(req('/api/v1/schools', {headers: {Origin: origin}}), env);
+    assert.equal(response.status, 429);
+    assert.equal(response.headers.get('access-control-allow-origin'), expected);
+    assert.equal(response.headers.get('access-control-expose-headers'), expected ? 'Retry-After' : null);
+    assert.equal(response.headers.get('vary'), 'Origin');
+  }
+  const unconfigured = await worker.fetch(req('/api/v1/status', {headers: {Origin: 'https://opencigan.mcv.kr'}}), {
+    ALLOWED_ORIGINS: 'https://opencigan.mcv.kr',
+  });
+  assert.equal(unconfigured.status, 503);
+  assert.equal(unconfigured.headers.get('access-control-allow-origin'), 'https://opencigan.mcv.kr');
 });
 
 test('timetable and calendar use separate category budgets alongside the general cap', async () => {

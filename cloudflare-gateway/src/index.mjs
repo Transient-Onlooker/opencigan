@@ -13,15 +13,23 @@ const FORWARD_HEADERS = [
 ];
 const ORIGIN = 'http://127.0.0.1:8000';
 
-function jsonError(code, status, method, extraHeaders = {}) {
+function jsonError(code, status, request, allowedOrigins, extraHeaders = {}) {
+  const headers = new Headers({ 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Vary': 'Origin', ...extraHeaders });
+  const origin = request.headers.get('Origin');
+  if (origin && allowedOrigins.includes(origin)) {
+    headers.set('Access-Control-Allow-Origin', origin);
+    headers.set('Access-Control-Expose-Headers', 'Retry-After');
+  }
   return new Response(
-    method === 'HEAD' ? null : JSON.stringify({ code, message: 'API 연결을 처리하지 못했어요.' }),
-    { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...extraHeaders } },
+    request.method === 'HEAD' ? null : JSON.stringify({ code, message: 'API 연결을 처리하지 못했어요.' }),
+    { status, headers },
   );
 }
 
 export default {
   async fetch(request, env) {
+    const allowedOrigins = (env?.ALLOWED_ORIGINS || '').split(',').map(origin => origin.trim()).filter(Boolean);
+    const error = (code, status, headers) => jsonError(code, status, request, allowedOrigins, headers);
     const url = new URL(request.url);
     const path = url.pathname;
     const webhook = path.match(/^\/api\/v1\/webhooks\/([A-Za-z0-9_-]{24})(\/deliveries|\/test)?$/);
@@ -31,14 +39,14 @@ export default {
     else if (webhook?.[2] === '/deliveries') methods = ['GET', 'HEAD'];
     else if (webhook?.[2] === '/test') methods = ['POST'];
     else if (webhook) methods = ['GET', 'HEAD', 'PUT', 'DELETE'];
-    else return jsonError('not_found', 404, request.method);
+    else return error('not_found', 404);
     if (request.method !== 'OPTIONS' && !methods.includes(request.method)) {
-      return jsonError('method_not_allowed', 405, request.method);
+      return error('method_not_allowed', 405);
     }
 
     if (!env?.PRIVATE_API || typeof env.PRIVATE_API.fetch !== 'function' ||
         !env.SEARCH_RATE || !env.GENERAL_RATE || !env.TIMETABLE_RATE || !env.CALENDAR_RATE) {
-      return jsonError('gateway_unconfigured', 503, request.method);
+      return error('gateway_unconfigured', 503);
     }
 
     // Only the Cloudflare-injected client IP is used for the edge limiter.
@@ -56,10 +64,10 @@ export default {
         const categoryAllowed = success && category
           ? (await categoryLimiter.limit({ key: clientKey })).success : true;
         if (!success || !categoryAllowed) {
-          return jsonError('edge_rate_limited', 429, request.method, { 'Retry-After': '60' });
+          return error('edge_rate_limited', 429, { 'Retry-After': '60' });
         }
       } catch {
-        return jsonError('gateway_unavailable', 503, request.method);
+        return error('gateway_unavailable', 503);
       }
     }
 
@@ -75,12 +83,12 @@ export default {
           size += value.byteLength;
           if (size > MAX_BODY_BYTES) {
             reader.cancel().catch(() => {});
-            return jsonError('payload_too_large', 413, request.method);
+            return error('payload_too_large', 413);
           }
           chunks.push(value);
         }
       } catch {
-        return jsonError('invalid_request', 400, request.method);
+        return error('invalid_request', 400);
       }
       body = new Uint8Array(size);
       let offset = 0;
@@ -109,7 +117,7 @@ export default {
       });
       return await env.PRIVATE_API.fetch(outbound);
     } catch {
-      return jsonError('gateway_unavailable', 503, request.method);
+      return error('gateway_unavailable', 503);
     }
   },
 };

@@ -4,6 +4,9 @@
   "main": "src/index.mjs",
   "compatibility_date": "2026-11-16",
   "workers_dev": false,
+  "vars": {
+    "ALLOWED_ORIGINS": "https://opencigan.mcv.kr,http://opencigan.mcv.kr,https://transient-onlooker.github.io"
+  },
   "vpc_services": [
     {
       "binding": "PRIVATE_API",
