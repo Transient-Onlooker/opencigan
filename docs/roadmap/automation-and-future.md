@@ -7,7 +7,7 @@
 - [ ] Webhook 구독·삭제·인증·HMAC 서명·재시도·중복 방지 (기본 비활성 API·이력 관측·별도 작업자 로컬 구현 및 모의 테스트. 저장 공간 상한·악용 방지·운영 검증 남음)
 - [ ] 기존 [timetable-watcher](https://github.com/Transient-Onlooker/timetable-watcher)의 Google Chat 전송·변경 비교·메시지 생성·중복 알림 방지 로직을 OpenCigan에 재사용
 - [ ] 로그인 없이 비밀 관리 링크로 Webhook 구독 생성·수정·삭제하기
-- [ ] Webhook 알림 메시지 꾸미기 — 학교·학년·반·날짜·교시·변경 전후 값 등 템플릿 변수, 메시지 미리보기, 변경 유형별 문구, Discord Embed·Google Chat 등 채널별 서식
+- [ ] **Webhook 사용자 지정 메시지 템플릿·미리보기 (아직 미구현)** — 학교·학년·반·날짜·교시·변경 전후 과목·교사·변경 유형 등의 **허용 변수만** 사용하는 구독별 메시지 템플릿 편집, 변경 유형별 문구·Discord Embed·Google Chat 전용 포맷, 실전 전송 없이 샘플 값으로 미리보기 및 테스트 발송, 기본 템플릿으로 되돌리기. 길이·이스케이프·멘션 방지·URL/HTML 삽입 보호와 미정 변수 오류를 검증. 현재 `backend/webhook_store.py`의 메시지는 고정 문구로 생성하고 `frontend/src/webhooks.ts`에서는 필터/방해 금지 시간만 수정 가능하므로 **현재 커스텀 메시지 작성 UI는 없음**. 이 기능과 함께 [P1 개발자용 메뉴 분리](user-experience.md)를 진행.
 - [ ] Discord·Google Chat Webhook 알림
 - [ ] 학급·변경 수업 필터, 방해 금지 시간, RSS/Atom 피드 (학급별 RSS·Webhook 필터·KST 방해 금지 시간 로컬 구현; 설정 화면·운영 검증 남음)
 - [ ] Webhook 설정에서 테스트 알림 보내기와 최근 성공·실패·재전송 이력을 확인하는 기능 (인증된 전송 상태·테스트 큐 API 및 설정 화면 로컬 구현. 운영 검증 남음)
