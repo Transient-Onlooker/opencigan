@@ -1,6 +1,6 @@
 # Cloudflare Tunnel + WAF — P0 실전 구축 로드맵
 
-> 2026-11-16 사전 작성. **미배포·미검증 작업 계획**이며, 실제 운영 적용은 사용자가 집에서 진행한다. [P0 상세 로드맵](roadmap/core-quality.md) · [운영 가이드](operations.md) · [프록시 클라이언트 IP 정책](proxy-client-ip.md) · [통합 QA](qa-2026-11-16.md).
+> 2026-11-16 사전 작성. **Cloudflare 전환은 미배포·미검증**이며, 각 단계의 선행 조건과 롤백 경로를 확인한 후 진행한다. [P0 상세 로드맵](roadmap/core-quality.md) · [운영 가이드](operations.md) · [프록시 클라이언트 IP 정책](proxy-client-ip.md) · [통합 QA](qa-2026-11-16.md).
 
 ## 목표 구조
 
@@ -28,6 +28,15 @@ Cloudflare Tunnel + WAF는 **외부 사용자 → Pi API 수신 경로**만 담�
 - [ ] `mcv.kr`의 Cloudflare zone 관리 권한, DNS setup(Full/Partial), 기존 `opencigan.mcv.kr` GitHub Pages CNAME, Cloudflare 플랜을 확인한다. **웹사이트 DNS는 손대지 않는다.**
 - [ ] **우선 API 호스트 후보: `opencigan-api.mcv.kr`**. `mcv.kr`가 Full DNS zone이면 Cloudflare Universal SSL의 루트·1단계 서브도메인 적용 범위에 맞다. 이전 제안 `api.opencigan.mcv.kr`은 Full zone의 2단계 하위 호스트여서 기본 인증서 범위 밖일 수 있다. 실제 zone 또는 인증서 방식에 따라 최종 선택.
 - [ ] 최종 호스트에 대한 DNS/TLS 적용 가능 여부 확인 후에만 Pages의 API 주소를 바꾼다. 새 DNS가 아직 없으면 이름은 **제안**이지 확정이 아니다.
+
+### 2026-11-16 23:02 KST 읽기 전용 점검
+
+- 공용 DNS `1.1.1.1` 기준 `mcv.kr`의 NS는 `japan.linode.dns.mcv.kr`과 `singapore.linode.dns.mcv.kr`이며, `opencigan.mcv.kr`은 `transient-onlooker.github.io`의 CNAME이다. 이는 현재 위임 상태이며 Cloudflare 계정의 zone 존재·플랜·Partial 구성 여부까지 증명하지는 않는다.
+- 후보 `opencigan-api.mcv.kr`은 NXDOMAIN이다. `mcv.kr`의 CAA 질의는 NOERROR·답변 없음이었으나 새 호스트의 실제 Cloudflare 인증서 발급 가능 여부는 미검증이다.
+- GitHub `API_BASE_URL`은 `https://rpi.tail9802be.ts.net`이고 기존 Funnel은 해당 호스트의 `/api`를 `127.0.0.1:8000/api`로 전달한다. Pages main의 최근 배포 워크플로는 성공했다.
+- Pi `opensigan.service`는 `release-warp-20261116`에서 실행 중이며 Git 기준은 `54f89b935491a404dc251713ca652ad048b0599e`다. `backend/timetable.py` 수정과 `backend/comcigan_proxy.py` 등 미추적 파일이 있으므로 이 SHA만으로 실행 코드가 main과 동일하다고 판단하지 않는다. 미리보기 서비스도 실행 중이다.
+- 로컬 및 기존 Funnel `/api/v1/status`는 프로세스 생존을 응답했고, WARP 서비스는 active이며 컴시간 전용 HTTP 브리지 경유 단일 요청은 200이었다. 이 검사는 다른 외부 의존성 전체의 정상 여부를 보장하지 않는다.
+- Pi에서 `cloudflared` 명령과 시스템 서비스는 발견되지 않았고, 일반 사용자 `~/.cloudflared`도 없다. 루트의 인증 설정은 비대화형 sudo가 허용되지 않아 확인하지 못했다. Cloudflare zone 권한·플랜·인증서 설정은 확인되지 않았다.
 
 ## Phase 1 — Pi 기준선 및 Tunnel 생성
 
