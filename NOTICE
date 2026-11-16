@@ -5,7 +5,7 @@ This product includes software developed by Transient-Onlooker.
 Opencigan code is licensed under the GNU Affero General Public License
 version 3 only (AGPL-3.0-only), with the Section 7(b) term below.
 Third-party components retain their own licenses and copyright notices.
-Source repository: https://github.com/Transient-Onlooker/opensigan
+Source repository: https://github.com/Transient-Onlooker/opencigan
 
 ================================================================================
 Section 7(b) Attribution Requirement Under AGPL-3.0
@@ -18,7 +18,7 @@ Public deployments of this covered work and modified versions, including
 interactive web services and client applications derived from it, must retain
 a reasonable and clearly visible author attribution and clickable hyperlink
 pointing to the original author (Transient-Onlooker) and the source repository
-(https://github.com/Transient-Onlooker/opensigan).
+(https://github.com/Transient-Onlooker/opencigan).
 
 - For websites and web applications: Display the attribution prominently in
   the primary landing page footer or equivalent visible interface.

@@ -2,7 +2,7 @@
 
 Opencigan은 학교 시간표와 급식을 한곳에서 보는 웹앱입니다. 시간표는 컴시간, 급식은 NEIS 데이터를 사용합니다. 로그인 없이 학교와 학급을 선택할 수 있습니다.
 
-[Opencigan 열기](https://opencigan.mcv.kr/) · [문제 제보](https://github.com/Transient-Onlooker/opensigan/issues) · [기여하기](CONTRIBUTING.md)
+[Opencigan 열기](https://opencigan.mcv.kr/) · [문제 제보](https://github.com/Transient-Onlooker/opencigan/issues) · [기여하기](CONTRIBUTING.md)
 
 ## 사용 방법
 
@@ -51,4 +51,4 @@ flowchart LR
 
 Opencigan 코드는 [AGPL-3.0-only](LICENSE)로 배포합니다. Copyright (c) 2026 Transient-Onlooker. 제3자 구성요소는 각자의 라이선스와 고지를 따릅니다.
 
-이 저작물·수정본의 웹 푸터나 앱 정보 화면에는 제7조(b)에 따른 원작자·[원본 저장소](https://github.com/Transient-Onlooker/opensigan) 표시 조건이 적용됩니다. 코드 라이선스는 컴시간·NEIS 데이터 이용 허락을 부여하지 않습니다. 범위와 고지는 [라이선스 안내](docs/licensing.md) 및 [NOTICE](NOTICE)를 확인하세요.
+이 저작물·수정본의 웹 푸터나 앱 정보 화면에는 제7조(b)에 따른 원작자·[원본 저장소](https://github.com/Transient-Onlooker/opencigan) 표시 조건이 적용됩니다. 코드 라이선스는 컴시간·NEIS 데이터 이용 허락을 부여하지 않습니다. 범위와 고지는 [라이선스 안내](docs/licensing.md) 및 [NOTICE](NOTICE)를 확인하세요.
