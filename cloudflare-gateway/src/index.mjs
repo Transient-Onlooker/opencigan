@@ -1,6 +1,12 @@
 // Service-binding-only Worker for Cloudflare Pages -> Workers VPC -> Pi.
 // Never expose a direct *.workers.dev route for this gateway.
-const VALID_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'POST', 'PUT', 'DELETE']);
+const READ_PATHS = new Set([
+  '/api/v1/status', '/api/v1/schools', '/api/v1/neis/schools',
+  '/api/v1/timetable', '/api/v1/timetable.ics', '/api/v1/timetable/history',
+  '/api/v1/timetable/history.rss', '/api/v1/meals',
+  '/api/v1/admin/analytics', '/api/v1/admin/access-logs',
+]);
+const MAX_BODY_BYTES = 4096;
 const FORWARD_HEADERS = [
   'accept', 'accept-language', 'authorization', 'content-type', 'origin',
   'referer', 'if-none-match', 'if-modified-since',
@@ -17,8 +23,18 @@ function jsonError(code, status, method) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (!url.pathname.startsWith('/api/v1/')) return jsonError('not_found', 404, request.method);
-    if (!VALID_METHODS.has(request.method)) return jsonError('method_not_allowed', 405, request.method);
+    const path = url.pathname;
+    const webhook = path.match(/^\/api\/v1\/webhooks\/([A-Za-z0-9_-]{24})(\/deliveries|\/test)?$/);
+    let methods;
+    if (READ_PATHS.has(path)) methods = ['GET', 'HEAD'];
+    else if (path === '/api/v1/analytics/pageview' || path === '/api/v1/webhooks') methods = ['POST'];
+    else if (webhook?.[2] === '/deliveries') methods = ['GET', 'HEAD'];
+    else if (webhook?.[2] === '/test') methods = ['POST'];
+    else if (webhook) methods = ['GET', 'HEAD', 'PUT', 'DELETE'];
+    else return jsonError('not_found', 404, request.method);
+    if (request.method !== 'OPTIONS' && !methods.includes(request.method)) {
+      return jsonError('method_not_allowed', 405, request.method);
+    }
 
     if (!env?.PRIVATE_API || typeof env.PRIVATE_API.fetch !== 'function' ||
         !env.SEARCH_RATE || !env.GENERAL_RATE) {
@@ -40,6 +56,33 @@ export default {
       }
     }
 
+    let body;
+    if (request.body) {
+      const reader = request.body.getReader();
+      const chunks = [];
+      let size = 0;
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          size += value.byteLength;
+          if (size > MAX_BODY_BYTES) {
+            reader.cancel().catch(() => {});
+            return jsonError('payload_too_large', 413, request.method);
+          }
+          chunks.push(value);
+        }
+      } catch {
+        return jsonError('invalid_request', 400, request.method);
+      }
+      body = new Uint8Array(size);
+      let offset = 0;
+      for (const chunk of chunks) {
+        body.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+    }
+
     const headers = new Headers();
     for (const key of FORWARD_HEADERS) {
       const value = request.headers.get(key);
@@ -53,7 +96,7 @@ export default {
       const outbound = new Request(destination, {
         method: request.method,
         headers,
-        body: request.method === 'GET' || request.method === 'HEAD' ? undefined : request.body,
+        body,
         duplex: 'half',
         redirect: 'manual',
       });
