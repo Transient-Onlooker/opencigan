@@ -1,4 +1,5 @@
 import './admin.css';
+import './standalone-theme';
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const input = (id: string) => document.querySelector<HTMLInputElement>(`#${id}`)!;
