@@ -452,6 +452,8 @@
           chooseSchool(outcome.fallback.school, true);
           sharedClassState = message + ' 이전 학교와 학급을 유지했어요.';
         } else {
+          selectionState.update({ grade: pending.grade, classroom: pending.classroom });
+          classroomDraft = String(classroom);
           classError = true;
           schoolEditorOpen = true;
           sharedClassState = message + ' 시간표에서 확인할 수 있는 학급을 선택해 주세요.';
@@ -728,7 +730,7 @@
 
   function restoreSharedClass(shared: NonNullable<ReturnType<typeof readSharedClass>>, fallback: { school: School | null; grade: number; classroom: number }) {
     return sharedSelection.verifySchool(shared, fallback, () => school?.id, searchSchools, (verified) => {
-      selectionState.update({ grade: shared.grade, classroom: shared.classroom }); classError = false;
+      classError = false;
       chooseSchool(verified, true, true, false);
     }, () => { sharedClassState = '공유 링크의 학교를 확인하지 못해 이전 학교를 유지했어요.'; });
   }
