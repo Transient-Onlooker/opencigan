@@ -52,6 +52,7 @@
   let settingsContent: HTMLElement;
   let searchResults: { name: string; category: string; target: HTMLElement; panel: HTMLDetailsElement }[] = [];
   let ruleSchool = '';
+  let lessonDetailsOpen = false;
   let ruleStart = '', ruleDuration = '', ruleBreak = '', ruleLunchAfter = '', ruleLunch = '';
   $: if ((school?.id ?? '') !== ruleSchool) {
     ruleSchool = school?.id ?? '';
@@ -190,15 +191,20 @@
                {:else if ruleStart || ruleDuration || ruleBreak || ruleLunchAfter || ruleLunch}
                  <p class="state-inline" role="status">시작 시각과 수업·쉬는 시간을 입력하고, 선택한 점심시간과 하루 범위를 확인해 주세요.</p>
                {/if}
+               <details class="lesson-time-detail" bind:open={lessonDetailsOpen}>
+                 <summary>상세 시간 설정하기</summary>
+                 <p class="display-settings-hint">직접 수정한 시각이 저장됩니다. 계산 규칙은 현재 화면의 미리보기이며 저장되지 않아요. 교시별 계산값으로 되돌리거나 전체 계산값을 다시 적용할 수 있어요.</p>
                <div class="lesson-time-grid">
                  {#each lessonTimePeriods as period}
                    <div class="lesson-time-row">
                      <strong>{period}교시</strong>
                      <label>시작 <input type="time" aria-label={`${period}교시 시작`} value={lessonTimeDrafts[period]?.start ?? ''} oninput={(event) => editLessonTime(period, 'start', event.currentTarget.value)} /></label>
                      <label>종료 <input type="time" aria-label={`${period}교시 종료`} value={lessonTimeDrafts[period]?.end ?? ''} oninput={(event) => editLessonTime(period, 'end', event.currentTarget.value)} /></label>
+                     {#if rulePreview}<button class="text-button lesson-time-revert" type="button" aria-label={`${period}교시 계산값으로 되돌리기`} onclick={() => { if (rulePreview) { editLessonTime(period, 'start', rulePreview[period].start); editLessonTime(period, 'end', rulePreview[period].end); } }}>계산값 복귀</button>{/if}
                    </div>
                  {/each}
                </div>
+               </details>
                <div class="lesson-time-actions"><button class="secondary-button" type="button" onclick={(event) => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); event.currentTarget.focus(); saveLessonTimes(); }}><Icon name="save" /> 시각 저장</button><button class="secondary-button" type="button" onclick={clearLessonTimes}>시각 초기화</button></div>
                {#if lessonTimeState}<p class="state-inline" role="status">{lessonTimeState}</p>{/if}
              </details>
@@ -249,6 +255,7 @@
 .settings-backup .state-inline{margin-top:10px}
 .lesson-time-settings{margin:0 0 14px;padding:0 14px 14px;border:1px solid var(--line)}.lesson-time-settings summary{min-height:44px;align-content:center;cursor:pointer;font-size:14px;font-weight:650}.lesson-time-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.lesson-time-row{display:grid;grid-template-columns:50px repeat(2,minmax(0,1fr));gap:8px;align-items:center;min-width:0;font-size:13px}.lesson-time-row>strong{font-size:13px;white-space:nowrap}.lesson-time-row label{display:grid;gap:4px;min-width:0;color:var(--muted)}.lesson-time-row input{min-width:0;width:100%;min-height:44px;padding:7px 8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:16px}.lesson-time-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 0}.lesson-time-settings .state-inline{margin-top:10px}
 .lesson-rule-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px;margin:12px 0}.lesson-rule-grid label{display:grid;gap:4px;min-width:0;font-size:13px;color:var(--muted)}.lesson-rule-grid input,.lesson-rule-grid select{width:100%;min-width:0;min-height:44px;padding:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:16px}.lesson-preview{margin:12px 0;padding:12px;border:1px solid var(--line)}.lesson-preview p{color:var(--muted);font-size:13px}.lesson-preview ol{display:flex;flex-wrap:wrap;gap:6px 18px;list-style:none;padding:0;font-size:13px}
+.lesson-time-detail{margin-top:12px;border-top:1px solid var(--line)}.lesson-time-revert{grid-column:2 / -1;justify-self:start;min-height:44px}
 @media(max-width:700px){.lesson-time-grid{grid-template-columns:1fr}.lesson-time-row{grid-template-columns:50px repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.display-settings-grid input:not([type="checkbox"]),.display-settings-grid select{font-size:16px}}
 .allergy-settings{border-top:1px solid var(--line);margin:0 0 12px}
