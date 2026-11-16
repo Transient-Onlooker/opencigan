@@ -174,7 +174,7 @@ test('school settings backup restores display preferences and bell times', async
   await page.getByText('시간표 표시 설정', { exact: true }).click();
   await page.getByLabel('시간표에 교사 표시').uncheck();
   await page.getByText('학교 교시 시각 설정', { exact: true }).click();
-  await page.getByLabel('1교시 시작').fill('08:30');
+  await page.getByLabel('1교시 시작', { exact: true }).fill('08:30');
   await page.getByLabel('1교시 종료').fill('09:20');
   await page.getByRole('button', { name: '시각 저장' }).click();
   await page.getByText('설정 백업·복원', { exact: true }).click();
@@ -674,7 +674,7 @@ test('timed calendar includes bell times only after explicit consent and closes 
   await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByRole('searchbox', { name: '설정 검색' }).fill('교시');
-  await page.getByRole('list', { name: '설정 검색 결과' }).getByRole('button', { name: /1교시 시작/ }).click();
+  await page.getByRole('list', { name: '설정 검색 결과' }).getByRole('button', { name: '1교시 시작 학교 교시 시각 설정', exact: true }).click();
   await page.getByLabel('1교시 시작', { exact: true }).fill('09:00');
   await page.getByLabel('1교시 종료', { exact: true }).fill('09:50');
   await page.getByRole('button', { name: '시각 저장', exact: true }).click();
