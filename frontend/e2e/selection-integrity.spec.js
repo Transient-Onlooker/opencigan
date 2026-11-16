@@ -27,6 +27,7 @@ async function mockApi(page, delayedSearch, onSchoolSearch) {
 
 test('return action follows the timetable view and preserves the selected class', async ({ page }) => {
   await mockApi(page);
+  await page.addInitScript(() => Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }));
   await page.route('**/api/v1/timetable?*', (route) => {
     const requestedWeek = new URL(route.request().url()).searchParams.get('week');
     return route.fulfill({ json: {
@@ -68,6 +69,9 @@ test('return action follows the timetable view and preserves the selected class'
     await expect(panel.locator('.quick-class select').nth(1)).toHaveValue('2');
   }
   await tabs.getByRole('button', { name: '이번 주', exact: true }).click();
+  const download = page.waitForEvent('download');
+  await panel.getByRole('button', { name: '이미지 저장·공유' }).click();
+  expect((await download).suggestedFilename()).toMatch(/1학년2반_week_2026-11-09\.png$/);
   await page.getByRole('button', { name: '학급 링크 복사' }).click();
   const shared = new URL(await page.getByLabel('공유 링크', { exact: true }).inputValue());
   expect(new URLSearchParams(shared.hash.slice(1)).get('class')).toBe('2');
