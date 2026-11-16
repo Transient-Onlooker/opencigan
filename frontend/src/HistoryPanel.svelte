@@ -15,14 +15,16 @@
   export let changeTypeText: (value: string) => string;
 </script>
 
+{#if historyDisabled}
+  <p class="history-unavailable" role="status">변경 이력은 현재 제공되지 않아요.</p>
+{:else}
 <section class="history-section" aria-labelledby="history-title">
               <div class="history-heading">
                 <div><h3 id="history-title">시간표 변경 이력</h3><p>선택한 주에 실제로 수집된 변경 기록</p></div>
                 <button class="secondary-button" aria-expanded={historyOpen} aria-controls="history-list" onclick={toggleHistory}>{historyOpen ? '이력 닫기' : '이력 보기'}</button>
               </div>
               <div id="history-list" hidden={!historyOpen}>
-                {#if historyDisabled}<p class="state-inline">변경 이력 저장이 아직 활성화되지 않았어요.</p>
-                {:else if historyLoading && !historyChanges.length}<p class="state-inline" role="status">변경 이력을 불러오는 중…</p>
+                {#if historyLoading && !historyChanges.length}<p class="state-inline" role="status">변경 이력을 불러오는 중…</p>
                 {:else if historyError}<div class="notice" role="alert">{historyError} <button class="text-button" onclick={() => loadHistory()}>다시 시도</button></div>
                 {:else if historyChanges.length}
                   <div class="history-filters lesson-search-fields"><label>비교 범위<select bind:value={historyScope}><option value="class">현재 학급</option><option value="school">학교 전체</option></select></label></div>
@@ -43,10 +45,12 @@
                 {:else if !historyLoading}<p class="state-inline">이 주에 수집된 변경 기록이 없어요.</p>{/if}
               </div>
             </section>
+{/if}
 
 <style>
 .history-section{margin-top:24px;border:1px solid var(--line);padding:16px}.history-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}.history-heading h3{font-size:17px}.history-heading p{margin:4px 0 0;color:var(--muted);font-size:14px}.history-list{list-style:none;margin:14px 0 0;padding:0;border-top:1px solid var(--line)}.history-list li{padding:12px 0;border-bottom:1px solid var(--line)}.history-list li>div{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.history-list li>div span{font-size:12px;color:var(--muted)}.history-list li p{margin:6px 0 0;overflow-wrap:anywhere}.history-more{margin-top:12px}
 .history-filters label{flex:0 1 13rem}
+.history-unavailable{margin:16px 0 0;color:var(--muted);font-size:13px}
 .history-list li p{display:flex;flex-wrap:wrap;gap:4px 16px}
 .history-list li p>span{min-width:0}
 @media(max-width:700px){.history-section{padding:12px}.history-heading{align-items:flex-start}.history-heading .secondary-button{flex:none;padding-inline:9px}}
