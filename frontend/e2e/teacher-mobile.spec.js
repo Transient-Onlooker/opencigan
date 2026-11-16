@@ -78,7 +78,15 @@ for (const viewport of [{ width: 320, height: 700 }, { width: 375, height: 812 }
       const menu = await page.getByRole('navigation', { name: '캘린더 메뉴' }).boundingBox();
       if (viewport.width <= 700) expect(box.y + box.height).toBeLessThanOrEqual(menu.y + 1);
       if (viewport.width <= 700) {
-        await page.getByRole('button', { name: '학교 변경' }).click();
+        const editSchool = page.getByRole('button', { name: '학교/학년 변경' });
+        await expect(editSchool).toHaveAttribute('aria-expanded', 'false');
+        await editSchool.click();
+        await expect(page.getByRole('button', { name: '변경 닫기' })).toHaveAttribute('aria-expanded', 'true');
+        for (const control of ['#school', '#grade', '#classroom']) {
+          const element = page.locator('#school-settings').locator(control);
+          await expect(element).toBeVisible();
+          expect((await element.boundingBox()).height).toBeGreaterThanOrEqual(44);
+        }
         await page.getByRole('searchbox', { name: '학교 찾기' }).focus();
         await expect(page.getByRole('navigation', { name: '캘린더 메뉴', includeHidden: true })).toBeHidden();
       }

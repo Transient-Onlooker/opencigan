@@ -149,7 +149,7 @@ test('week navigation hides unverified actions and keeps the last row and search
   const menu = page.getByRole('navigation', { name: '캘린더 메뉴', includeHidden: true });
   const lastRow = panel.getByRole('table').locator('tbody tr').last();
   await expect(panel.getByText('이 반의 수업 찾기', { exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: '학교 변경', exact: true }).click();
+  await page.getByRole('button', { name: '학교/학년 변경', exact: true }).click();
   const input = page.getByRole('searchbox', { name: '학교 찾기' });
   for (const viewport of [{ width: 320, height: 600 }, { width: 667, height: 320 }]) {
     await page.setViewportSize(viewport);
@@ -189,7 +189,7 @@ test('a late response from a previous school cannot change the active class or l
   await firstRequest;
   const subscribe = page.getByRole('button', { name: '캘린더 구독 링크' });
   await expect(subscribe).toBeDisabled();
-  await page.getByRole('button', { name: '학교 변경', exact: true }).click();
+  await page.getByRole('button', { name: '학교/학년 변경', exact: true }).click();
   await page.getByRole('searchbox', { name: '학교 찾기' }).fill(second.name);
   await page.getByRole('button', { name: /둘째학교/ }).click();
   const table = page.locator('#timetable-panel').getByRole('table');

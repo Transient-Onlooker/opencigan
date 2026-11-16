@@ -241,7 +241,7 @@ test('manual class selection wins over a delayed shared school check in the same
   await expect(classes).toHaveValue('1');
   await classes.selectOption('2');
   release();
-  await page.getByRole('button', { name: '학교 변경', exact: true }).click();
+  await page.getByRole('button', { name: '학교/학년 변경', exact: true }).click();
   await expect(page.getByRole('spinbutton', { name: '반', exact: true })).toHaveValue('2');
   await expect(page.locator('#timetable-panel').getByRole('table')).toContainText('과목2');
   expect(await page.evaluate(() => localStorage.getItem('opensigan-class'))).toBe('2');
@@ -277,7 +277,7 @@ test('invalid manual class edits restore the applied selection on blur', async (
   await mockApi(page);
   await page.goto('/' + sharedHash(1));
   await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
-  await page.getByRole('button', { name: '학교 변경', exact: true }).click();
+  await page.getByRole('button', { name: '학교/학년 변경', exact: true }).click();
   const input = page.getByRole('spinbutton', { name: '반', exact: true });
   await input.fill('99');
   await expect(input).toHaveAttribute('aria-invalid', 'true');
@@ -304,7 +304,7 @@ test('grade changes reconcile the class and remain synchronized across both sele
   await grade.selectOption('2');
   await expect(classroom).toHaveValue('3');
   await expect(page.locator('#timetable-panel').getByRole('table')).toContainText('2학년 수학');
-  await page.getByRole('button', { name: '학교 변경', exact: true }).click();
+  await page.getByRole('button', { name: '학교/학년 변경', exact: true }).click();
   await expect(page.locator('#grade')).toHaveValue('2');
   expect(await page.evaluate(() => [localStorage.getItem('opensigan-grade'), localStorage.getItem('opensigan-class')])).toEqual(['2', '3']);
 });
