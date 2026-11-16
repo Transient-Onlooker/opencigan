@@ -82,8 +82,8 @@ for (const viewport of [{ width: 320, height: 700 }, { width: 375, height: 812 }
         await expect(editSchool).toHaveAttribute('aria-expanded', 'false');
         await editSchool.click();
         await expect(page.getByRole('button', { name: '변경 닫기' })).toHaveAttribute('aria-expanded', 'true');
-        for (const control of ['학교 찾기', '학년', '반']) {
-          const element = page.locator('#school-settings').getByLabel(control, { exact: true });
+        for (const control of ['#school', '#grade', '#classroom']) {
+          const element = page.locator('#school-settings').locator(control);
           await expect(element).toBeVisible();
           expect((await element.boundingBox()).height).toBeGreaterThanOrEqual(44);
         }
