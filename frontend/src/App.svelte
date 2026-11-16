@@ -733,8 +733,12 @@
       classError = false;
       if (fallback.school) {
         const requestedWeek = week;
-        let candidate: TimetableResponse | null = null;
-        try { candidate = await getTimetable(verified.id, requestedWeek, signal); } catch { /* The previous selection remains active. */ }
+        const cacheKey = verified.id + '\u0000' + requestedWeek;
+        const cached = timetableSession.cache.get(cacheKey, Date.now());
+        let candidate: TimetableResponse | null = cached?.data ?? null;
+        if (!candidate) {
+          try { candidate = await getTimetable(verified.id, requestedWeek, signal); } catch { /* The previous selection remains active. */ }
+        }
         if (signal.aborted) return;
         if (school?.id !== fallback.school.id || week !== requestedWeek) { sharedSelection.cancel(); return; }
         const valid = candidate?.schoolId === verified.id && candidate.weekStart === requestedWeek &&
@@ -744,8 +748,7 @@
           sharedClassState = '공유 링크의 학급을 확인하지 못해 이전 학교와 학급을 유지했어요.';
           return;
         }
-        const cacheKey = verified.id + '\u0000' + requestedWeek;
-        const expires = Date.now() + refreshInterval;
+        const expires = cached?.expires ?? Date.now() + refreshInterval;
         timetableSession.cache.put(cacheKey, candidate, expires);
         chooseSchool(verified, true, true, false);
         if (school?.id === verified.id && !pendingSharedClass && !classError) {

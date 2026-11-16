@@ -86,6 +86,18 @@ test('공유 학급은 시간표 검증이 끝나기 전까지 선택과 저장�
   cleanup();
 });
 
+test('같은 학교 공유 학급은 유효한 주간 캐시로 검증하고 재요청하지 않는다', async () => {
+  const { app, requests, search, store, cleanup } = setup({ shared: savedSchool });
+  requests[0].resolve(data(savedSchool, [{ grade: 1, class: 1 }, { grade: 1, class: 7 }]));
+  await flush();
+  search.resolve({ schools: [savedSchool], stale: false });
+  await flush();
+  assert.equal(requests.length, 1);
+  assert.equal(app.state().classroom, 7);
+  assert.equal(store.get('opensigan-class'), '7');
+  cleanup();
+});
+
 test('공유 학급 검증 중 같은 학교 즐겨찾기를 선택하면 공유 반을 적용하지 않는다', async () => {
   const { app, search, requests, store, cleanup } = setup({ fallback: null });
   search.resolve({ schools: [sharedSchool], stale: false });
