@@ -65,6 +65,23 @@ test('같은 학교의 반을 수동 변경하면 늦은 공유 학교 검색도
   cleanup();
 });
 
+test('공유 학급은 시간표 검증이 끝나기 전까지 선택과 저장에 확정되지 않는다', async () => {
+  const { app, requests, search, store, cleanup } = setup();
+  requests[0].resolve(data(savedSchool));
+  await flush();
+  search.resolve({ schools: [sharedSchool], stale: false });
+  await flush();
+  assert.equal(app.state().pendingSharedClass.classroom, 7);
+  assert.equal(app.state().classroom, 1);
+  assert.equal(store.get('opensigan-class'), '1');
+  requests[1].resolve(data(sharedSchool, [{ grade: 1, class: 7 }]));
+  await flush();
+  assert.equal(app.state().pendingSharedClass, null);
+  assert.equal(app.state().classroom, 7);
+  assert.equal(store.get('opensigan-class'), '7');
+  cleanup();
+});
+
 test('공유 학급 검증 중 같은 학교 즐겨찾기를 선택하면 공유 반을 적용하지 않는다', async () => {
   const { app, search, requests, store, cleanup } = setup({ fallback: null });
   search.resolve({ schools: [sharedSchool], stale: false });
