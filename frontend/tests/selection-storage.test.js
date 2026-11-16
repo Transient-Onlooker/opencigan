@@ -107,6 +107,21 @@ test('shared selection commits only verified classes and otherwise returns the o
   }
 });
 
+test('selection owner commits verified shared classes and restores the previous class on rollback', () => {
+  const school = { id: 'shared' };
+  const fallback = { school: { id: 'old' }, grade: 2, classroom: 3 };
+  const pending = { schoolId: school.id, grade: 1, classroom: 7, fallback };
+  let current;
+  const owner = exports.createSelectionState({ school, grade: 1, classroom: 7, week: '2026-11-09' }, (state) => { current = state; });
+  assert.equal(owner.resolveShared(pending, { stale: false, records: [{ grade: 1, class: 7 }] }, false, 3).status, 'committed');
+  assert.equal(current.classroom, 7);
+  assert.equal(owner.resolveShared(pending, { stale: false, records: [{ grade: 1, class: 1 }] }, false, 3).status, 'rolled-back');
+  assert.equal(current.grade, 2);
+  assert.equal(current.classroom, 3);
+  assert.equal(current.school, school);
+  assert.equal(current.week, '2026-11-09');
+});
+
 test('shared selection session cancels obsolete checks and publishes pending and cleared states', () => {
   let state;
   const session = exports.createSharedSelectionSession((next) => { state = next; });

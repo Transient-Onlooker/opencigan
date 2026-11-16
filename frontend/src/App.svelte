@@ -11,7 +11,7 @@
   import TimetablePanel from './TimetablePanel.svelte';
   import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference, readFavorites, writeFavorites, readTheme, writeTheme, readAnimations, writeAnimations, readMealSchool, writeMealSchool, type Favorite } from './preferences';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { saveSelection, readSelection, resolveSharedClass, gradesInTimetable, classesInGrade, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
+  import { saveSelection, readSelection, gradesInTimetable, classesInGrade, createSelectionState, createSharedSelectionSession, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -445,13 +445,12 @@
   function ensureAvailableClass() {
     if (pendingSharedClass && pendingSharedClass.schoolId === school?.id) {
       const pending = sharedSelection.consume()!;
-      const outcome = resolveSharedClass(pending, timetable, timetableFromDevice, school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6);
+      const outcome = selectionState.resolveShared(pending, timetable, timetableFromDevice, school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6);
       if (outcome.status === 'rolled-back') {
         const message = outcome.reason === 'missing'
           ? `공유 링크의 ${pending.grade}학년 ${pending.classroom}반이 선택한 주의 시간표 데이터에 없어 적용하지 않았어요.`
           : '시간표 데이터가 없어 공유 링크의 학년·반을 확인하지 못했어요.';
         if (outcome.fallback.school) {
-          selectionState.update({ grade: outcome.fallback.grade, classroom: outcome.fallback.classroom });
           classError = false;
           chooseSchool(outcome.fallback.school, true);
           sharedClassState = message + ' 이전 학교와 학급을 유지했어요.';
@@ -463,7 +462,6 @@
         return;
       }
       classError = false;
-      selectionState.update({ grade: outcome.grade, classroom: outcome.classroom });
       classroomDraft = String(classroom);
       sharedClassState = '';
       if (school) persistSelection({ school, grade, classroom });

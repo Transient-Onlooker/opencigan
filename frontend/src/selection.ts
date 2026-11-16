@@ -22,6 +22,12 @@ export function createSelectionState(initial: SelectionState, onChange: (state: 
       update(reconcileClassSelection(records, maxGrade, state.grade, state.classroom));
       return previousGrade !== Number(state.grade) || previousClassroom !== Number(state.classroom);
     },
+    resolveShared(pending: PendingSharedClass, timetable: TimetableResponse | null, fromDevice: boolean, maxGrade: number) {
+      const outcome = resolveSharedClass(pending, timetable, fromDevice, maxGrade);
+      if (outcome.status === 'committed') update({ grade: outcome.grade, classroom: outcome.classroom });
+      else if (outcome.fallback.school) update({ grade: outcome.fallback.grade, classroom: outcome.fallback.classroom });
+      return outcome;
+    },
   };
 }
 
