@@ -75,7 +75,7 @@
           <details class="display-settings" hidden={!settingsMatch('일반 테마 애니메이션', settingsQuery)} bind:open={settingsOpen.general}>
             <summary>일반 설정</summary>
             <div class="display-settings-grid">
-              <label>테마<select value={theme} onchange={(event) => setTheme(event.currentTarget.value)}><option value="light">라이트 모드</option><option value="dark">다크 모드</option><option value="system">시스템 설정 따르기</option></select></label>
+              <label>테마<select aria-label="테마" value={theme} onchange={(event) => setTheme(event.currentTarget.value)}><option value="light">라이트 모드</option><option value="dark">다크 모드</option><option value="system">시스템 설정 따르기</option></select></label>
               <label class="display-toggle"><input type="checkbox" checked={animationsEnabled} onchange={(event) => setAnimationsEnabled(event.currentTarget.checked)} /> 애니메이션 사용</label>
             </div>
           </details>
@@ -113,8 +113,8 @@
                <summary>과목·교사 상세 설정</summary>
                <p class="display-settings-hint">{useClassDisplay ? '현재 학급에만 적용돼요.' : '별도 설정이 없는 이 학교 학급에 적용돼요.'}</p>
                <div class="display-settings-grid">
-                 <label>과목 색상<select value={displaySettings.colorMode} onchange={(event) => setColorMode(event.currentTarget.value)}><option value="none">색상 없음 (기본)</option><option value="auto">자동 색상</option><option value="custom">직접 선택</option></select></label>
-                 <label>과목 선택<select bind:value={selectedSubject} disabled={!subjectNames.length}><option value="">과목을 선택하세요</option>{#each subjectNames as subject}<option value={subject}>{subject}</option>{/each}</select></label>
+                 <label>과목 색상<select aria-label="과목 색상" value={displaySettings.colorMode} onchange={(event) => setColorMode(event.currentTarget.value)}><option value="none">색상 없음 (기본)</option><option value="auto">자동 색상</option><option value="custom">직접 선택</option></select></label>
+                 <label>과목 선택<select aria-label="과목 선택" bind:value={selectedSubject} disabled={!subjectNames.length}><option value="">과목을 선택하세요</option>{#each subjectNames as subject}<option value={subject}>{subject}</option>{/each}</select></label>
                  <label>과목 표시 이름<input type="text" value={displaySettings.subjectAliases[selectedSubject] || ''} disabled={!selectedSubject} maxlength="60" placeholder="원본 이름 유지" oninput={(event) => saveAlias('subject', selectedSubject, event.currentTarget.value)} /></label>
                  {#if displaySettings.colorMode === 'custom'}
                    <label>선택한 과목 색상<input type="color" value={displaySettings.subjectColors[selectedSubject] || '#425a75'} disabled={!selectedSubject} onchange={(event) => saveSubjectColor(event.currentTarget.value)} /></label>
