@@ -192,7 +192,7 @@ test('school settings backup restores display preferences and bell times', async
   await page.getByLabel('Opencigan 설정 JSON 파일 불러오기').setInputFiles({ name: 'school.json', mimeType: 'application/json', buffer: contents });
   await expect(page.getByText('현재 학교의 설정을 복원했어요.')).toBeVisible();
   await expect(page.getByLabel('시간표에 교사 표시')).not.toBeChecked();
-  await expect(page.getByLabel('1교시 시작')).toHaveValue('08:30');
+  await expect(page.getByLabel('1교시 시작', { exact: true })).toHaveValue('08:30');
   await page.reload();
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByText('시간표 표시 설정', { exact: true }).click();
