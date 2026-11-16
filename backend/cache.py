@@ -1,7 +1,11 @@
 import json
+import logging
 import threading
 import time
 from collections import OrderedDict
+
+logger = logging.getLogger("opensigan.cache")
+RESOURCE_TYPES = frozenset(("timetable", "school_search", "neis_school_search", "meals"))
 
 
 class Cache:
@@ -64,10 +68,13 @@ class Cache:
                     raise RuntimeError("fetch returned a non-JSON value") from exc
             except ValueError:
                 raise
-            except Exception:
+            except Exception as exc:
                 now = time.monotonic()
                 with self.guard:
                     self._store(key, previous_value, previous_fetched_at, now + self.retry_delay)
+                resource = key[0] if isinstance(key, tuple) and key and key[0] in RESOURCE_TYPES else "other"
+                logger.warning("cache refresh failed resource=%s fallback=%s error_type=%s",
+                               resource, "stale" if previous_value is not None else "none", type(exc).__name__)
                 if previous_value is not None:
                     return output(self._stale(previous_value), "stale")
                 raise

@@ -37,6 +37,12 @@ journalctl --user -u opensigan-preview -n 30 --no-pager
 
 `/api/v1/status`는 프로세스가 응답하는지만 확인하며 컴시간 또는 NEIS 상태를 보장하지 않습니다. 자세한 외부 API 점검은 [API 가이드](api-guide.md) 참조. 실제 학교 검색/시간표·급식 호출은 원본 서버에 트래픽을 발생시키므로 캐시/제한을 고려해 필요한 경우만 하세요.
 
+캐시가 원본 갱신에 실패하면 API 로그에 `cache refresh failed`가 기록됩니다. `resource`는 시간표·학교 검색·급식 중 작업 종류이고, `fallback=stale`은 기존 데이터를 반환했음을, `fallback=none`은 대체 데이터가 없음을 뜻합니다. `error_type`은 예외 종류이며 원인이 반드시 원본 서버라는 뜻은 아닙니다. 이 진단 항목에는 검색어·학교 식별자·예외 메시지를 기록하지 않습니다. 재시도 대기 중 같은 캐시 키가 다시 조회될 때는 중복 로그를 남기지 않습니다.
+
+```bash
+journalctl --user -u opensigan -n 100 --no-pager
+```
+
 ## 상태 배지 및 GitHub Actions
 
 | 배지 | 대상 | 통과의 의미 | 통과해도 확인되지 않는 것 |
