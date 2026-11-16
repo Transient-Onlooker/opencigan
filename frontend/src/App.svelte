@@ -521,6 +521,7 @@
     const validWeek = clampWeek(week, current);
     if (selectedDay === previousToday) selectedDay = today;
     if (validWeek !== week) {
+      cancelSharedSelection();
       selectionState.update({ week: validWeek });
       selectedDay = selectedDay < week ? week : selectedDay > addDays(week, 6) ? addDays(week, 6) : selectedDay;
       historySession.reset();
@@ -539,9 +540,10 @@
   function changeWeek(delta: number) {
     refreshCalendar(false); const next = addDays(week, delta * 7);
     if (next < current || next > addDays(current, 7)) return;
+    if (next !== week) cancelSharedSelection();
     tableRefreshState = ''; exportState = ''; teacherQuery = ''; selectionState.update({ week: next }); selectedDay = week === current ? today : week; historySession.reset(); historyOpen = false; loadTimetable(false, true);
   }
-  function currentWeek() { refreshCalendar(false); const preserve = week === current; const reopenHistory = historyOpen; tableRefreshState = ''; if (!preserve) teacherQuery = ''; selectionState.update({ week: current }); selectedDay = today; historySession.reset(); loadTimetable(preserve); if (reopenHistory) void loadHistory(); }
+  function currentWeek() { refreshCalendar(false); const preserve = week === current; const reopenHistory = historyOpen; tableRefreshState = ''; if (!preserve) { cancelSharedSelection(); teacherQuery = ''; } selectionState.update({ week: current }); selectedDay = today; historySession.reset(); loadTimetable(preserve); if (reopenHistory) void loadHistory(); }
   function changeMealDate(delta: number) {
     const next = addDays(mealDate, delta);
     if (!validMealDate(next)) { dateError = '1900년 이후의 올바른 날짜를 선택해 주세요.'; return; }
@@ -562,6 +564,7 @@
     const targetWeek = monday(value);
     if (targetWeek < current || targetWeek > addDays(current, 7)) return;
     const needsTimetable = targetWeek !== week || timetable?.weekStart !== targetWeek;
+    if (targetWeek !== week) cancelSharedSelection();
     view = 'timetable'; timetableView = 'today'; selectionState.update({ week: targetWeek }); selectedDay = value;
     mealDate = value; mealDateDraft = value; dateError = '';
     if (needsTimetable) {
