@@ -11,7 +11,7 @@
   import TimetablePanel from './TimetablePanel.svelte';
   import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference, readFavorites, writeFavorites, readTheme, writeTheme, readAnimations, writeAnimations, readMealSchool, writeMealSchool, type Favorite } from './preferences';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { saveSelection, readSelection, gradesInTimetable, classesInGrade, createSelectionState, createSharedSelectionSession, validateSharedClass, type PendingSharedClass } from './selection';
+  import { saveSelection, readSelection, gradesInTimetable, classesInGrade, createSelectionState, createSharedSelectionSession, validateSharedCandidate, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -748,8 +748,7 @@
         }
         if (signal.aborted) return;
         if (school?.id !== fallback.school.id || week !== requestedWeek) { sharedSelection.cancel(); return; }
-        const valid = candidate?.schoolId === verified.id && candidate.weekStart === requestedWeek &&
-          validateSharedClass(candidate, false, /(?:중학교|고등학교)/.test(verified.name) ? 3 : 6, shared.grade, shared.classroom) === 'valid';
+        const valid = validateSharedCandidate(candidate, verified, requestedWeek, shared.grade, shared.classroom);
         if (!valid || !candidate) {
           sharedSelection.consume();
           sharedClassState = '공유 링크의 학급을 확인하지 못해 이전 학교와 학급을 유지했어요.';
