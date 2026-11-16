@@ -186,3 +186,36 @@ test('failed refresh marks the retained timetable as stale', async () => {
   assert.equal(state.error, 'failed');
   assert.equal(data.stale, false);
 });
+
+for (const outcome of ['failure', 'stale response']) {
+  test(`${outcome} invalidates the previously fresh week before reuse`, async () => {
+    let state;
+    let calls = 0;
+    const session = exports.createTimetableSession((value) => { state = value; });
+    const fresh = { schoolId: 'a', weekStart: '2026-11-09', records: [], stale: false };
+    const storage = () => ({ getItem: () => null, setItem() {} });
+    const options = {
+      schoolId: 'a', week: fresh.weekStart, preserve: false, reuseCachedWeek: true, validateClass: false,
+      refreshInterval: 100, now: () => 10, storage,
+      current: () => ({ schoolId: 'a', week: fresh.weekStart }),
+      fetch: async () => {
+        calls++;
+        if (calls === 2 && outcome === 'failure') throw new Error('server failed');
+        if (calls === 2) return { ...fresh, stale: true };
+        return fresh;
+      },
+      validate() {}, classError: () => false, errorText: (error) => error.message, onSuccess() {}, onFailure() {},
+    };
+    const flush = () => new Promise(setImmediate);
+    session.load(options);
+    await flush();
+    session.load({ ...options, preserve: true, reuseCachedWeek: false });
+    await flush();
+    assert.equal(state.data.stale, true);
+    session.load(options);
+    await flush();
+    assert.equal(calls, 3);
+    assert.equal(state.data.stale, false);
+    assert.equal(state.error, '');
+  });
+}
