@@ -386,7 +386,7 @@ test('refresh keeps the visible timetable while announcing progress and failure'
     calls += 1;
     if (calls === 1) return route.fulfill({ json: timetable });
     await pending;
-    return route.fulfill({ status: 503, json: { code: 'upstream_unavailable' } });
+    return route.fulfill({ status: 503, headers: { 'Retry-After': '12' }, json: { code: 'upstream_unavailable' } });
   });
   await page.goto('/' + sharedHash(1));
   const panel = page.locator('#timetable-panel');
@@ -398,6 +398,7 @@ test('refresh keeps the visible timetable while announcing progress and failure'
   await expect(panel.getByRole('alert')).toContainText('이전 시간표를 표시하고 있어요');
   await expect(panel.getByRole('alert')).toHaveCount(1);
   await expect(panel.getByRole('alert')).toContainText('새로고침 실패');
+  await expect(panel.getByRole('alert')).toContainText('12초 후 다시 시도');
   await expect(panel.locator('.refresh-feedback')).toHaveCount(0);
   await expect(panel.getByRole('table')).toContainText('과목1');
   await expect(panel.getByText('저장된 시간표 · 최신 정보가 아닐 수 있어요')).toBeVisible();
