@@ -25,6 +25,59 @@ async function mockApi(page, delayedSearch, onSchoolSearch) {
   });
 }
 
+test('return action follows the timetable view and preserves the selected class', async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript(() => Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }));
+  await page.route('**/api/v1/timetable?*', (route) => {
+    const requestedWeek = new URL(route.request().url()).searchParams.get('week');
+    return route.fulfill({ json: {
+      ...timetable, weekStart: requestedWeek,
+      records: timetable.records.map((record) => ({ ...record, date: requestedWeek, teacher: '김교사' })),
+    } });
+  });
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto('/' + sharedHash(2));
+  const panel = page.locator('#timetable-panel');
+  const tabs = panel.getByRole('group', { name: '시간표 보기' });
+  const backToToday = panel.getByRole('button', { name: '오늘로', exact: true });
+  const backToWeek = panel.getByRole('button', { name: '이번 주로', exact: true });
+  await expect(panel.locator('.quick-class select').nth(1)).toHaveValue('2');
+  await expect(backToToday).toHaveCount(0);
+  await expect(backToWeek).toHaveCount(0);
+  await tabs.getByRole('button', { name: '오늘', exact: true }).click();
+  await expect(backToToday).toHaveCount(0);
+  await panel.getByLabel('날짜', { exact: true }).fill('2026-11-10');
+  await panel.getByLabel('날짜', { exact: true }).blur();
+  await expect(backToToday).toBeVisible();
+  await backToToday.click();
+  await expect(panel.getByLabel('날짜', { exact: true })).toHaveValue('2026-11-09');
+  await expect(backToToday).toHaveCount(0);
+  await panel.getByRole('button', { name: '다음 주', exact: true }).click();
+  await expect(backToToday).toBeVisible();
+  await expect(backToWeek).toHaveCount(0);
+  await backToToday.click();
+  await expect(panel.getByLabel('날짜', { exact: true })).toHaveValue('2026-11-09');
+  await tabs.getByRole('button', { name: '이번 주', exact: true }).click();
+  for (const tab of ['이번 주', '1학년', '교사']) {
+    await tabs.getByRole('button', { name: tab, exact: true }).click();
+    await expect(backToWeek).toHaveCount(0);
+    await panel.getByRole('button', { name: '다음 주', exact: true }).click();
+    await expect(backToWeek).toBeVisible();
+    await expect(backToToday).toHaveCount(0);
+    await backToWeek.click();
+    await expect(backToWeek).toHaveCount(0);
+    await expect(panel.locator('.quick-class select').nth(1)).toHaveValue('2');
+  }
+  await tabs.getByRole('button', { name: '이번 주', exact: true }).click();
+  const download = page.waitForEvent('download');
+  await panel.getByRole('button', { name: '이미지 저장·공유' }).click();
+  expect((await download).suggestedFilename()).toMatch(/1학년2반_week_2026-11-09\.png$/);
+  await page.getByRole('button', { name: '학급 링크 복사' }).click();
+  const shared = new URL(await page.getByLabel('공유 링크', { exact: true }).inputValue());
+  expect(new URLSearchParams(shared.hash.slice(1)).get('class')).toBe('2');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+});
+
 test('settings icon remains visible and aligned in both themes on desktop and mobile', async ({ page }) => {
   await mockApi(page);
   await page.addInitScript(() => localStorage.setItem('opensigan-theme', 'light'));
