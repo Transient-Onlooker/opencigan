@@ -6,6 +6,36 @@ from backend.app import dispatch_request
 
 
 class IcalApiTimesTests(unittest.TestCase):
+    def test_weekday_overrides_use_local_day_and_keep_default_for_other_days(self):
+        data = {'schoolId': '1:Example', 'records': [
+            {'grade': 1, 'class': 2, 'date': day, 'period': 1, 'subject': 'Math', 'teacher': None}
+            for day in ('2026-11-09', '2026-11-10')
+        ], 'fetchedAt': '2026-11-09T00:00:00Z'}
+        query = urlencode({'school': '1:Example', 'grade': 1, 'class': 2, 'mode': 'timed',
+                           'times': '1:0900-0950', 'weekday_times': '2.1:1000-1050'})
+        with patch('backend.app._cached_timetable', return_value=(data, 'hit')):
+            status, headers, body = dispatch_request('GET', '/api/v1/timetable.ics', query)
+            self.assertEqual(status, 200)
+            self.assertIn(b'DTSTART:20261109T000000Z', body)
+            self.assertIn(b'DTSTART:20261110T010000Z', body)
+            status, _, empty = dispatch_request('GET', '/api/v1/timetable.ics', query,
+                                               request_headers={'If-None-Match': headers['ETag']})
+            self.assertEqual((status, empty), (304, b''))
+
+    def test_bad_weekday_overrides_are_rejected_before_upstream(self):
+        for overrides in ('0.1:0900-0950', '8.1:0900-0950', '2.1:2400-2500',
+                          '2.1:1000-1050,2.1:1100-1150', '2.2:0940-1030', 'x' * 2401):
+            with self.subTest(overrides=overrides), patch('backend.app._cached_timetable') as cached:
+                query = urlencode({'school': '1:Example', 'grade': 1, 'class': 2, 'mode': 'timed',
+                                   'times': '1:0900-0950,2:1000-1050', 'weekday_times': overrides})
+                status, _, _ = dispatch_request('GET', '/api/v1/timetable.ics', query)
+                self.assertEqual(status, 400)
+                cached.assert_not_called()
+        query = urlencode({'school': '1:Example', 'grade': 1, 'class': 2, 'mode': 'periods', 'weekday_times': '1.1:0900-0950'})
+        with patch('backend.app._cached_timetable') as cached:
+            self.assertEqual(dispatch_request('GET', '/api/v1/timetable.ics', query)[0], 400)
+            cached.assert_not_called()
+
     def test_timed_feed_reuses_cache_and_revalidates_by_body(self):
         data = {'schoolId': '1:Example', 'records': [
             {'grade': 1, 'class': 2, 'date': '2026-11-09', 'period': 1, 'subject': 'Math', 'teacher': None},

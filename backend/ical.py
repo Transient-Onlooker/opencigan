@@ -63,7 +63,7 @@ def _normalize_lesson_times(lesson_times):
     return normalized
 
 
-def render_timetable_ics(school, grade, classroom, timetables, mode="periods", lesson_times=None):
+def render_timetable_ics(school, grade, classroom, timetables, mode="periods", lesson_times=None, weekday_times=None):
     name = school.split(":", 1)[1] if ":" in school else school
     lines = [
         "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Opencigan//Timetable//KO",
@@ -72,6 +72,14 @@ def render_timetable_ics(school, grade, classroom, timetables, mode="periods", l
         "REFRESH-INTERVAL;VALUE=DURATION:PT30M",
     ]
     normalized_times = _normalize_lesson_times(lesson_times) if mode == "timed" else {}
+    normalized_weekdays = {}
+    if mode == "timed" and weekday_times is not None:
+        if not isinstance(weekday_times, dict):
+            raise ValueError("요일별 시각 형식이 올바르지 않습니다")
+        for weekday, entries in weekday_times.items():
+            if not isinstance(weekday, int) or isinstance(weekday, bool) or not 1 <= weekday <= 7:
+                raise ValueError("요일은 1에서 7 사이의 정수여야 합니다")
+            normalized_weekdays[weekday] = _normalize_lesson_times(entries)
 
     for timetable in timetables:
         timestamp = _stamp(timetable.get("sourceUpdatedAt") or timetable.get("fetchedAt"))
@@ -144,8 +152,10 @@ def render_timetable_ics(school, grade, classroom, timetables, mode="periods", l
                 has_time = False
                 dtstart_line = None
                 dtend_line = None
-                if mode == "timed" and period in normalized_times:
-                    (sh, sm), (eh, em) = normalized_times[period]
+                times_for_day = normalized_weekdays.get(day.isoweekday(), {})
+                selected_time = times_for_day.get(period, normalized_times.get(period))
+                if mode == "timed" and selected_time:
+                    (sh, sm), (eh, em) = selected_time
                     start_dt = datetime(day.year, day.month, day.day, sh, sm, tzinfo=KST).astimezone(timezone.utc)
                     end_dt = datetime(day.year, day.month, day.day, eh, em, tzinfo=KST).astimezone(timezone.utc)
                     dtstart_line = "DTSTART:" + start_dt.strftime("%Y%m%dT%H%M%SZ")

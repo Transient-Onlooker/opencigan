@@ -15,6 +15,7 @@ def timetable_calendar(query, current_cache, request_headers, headers, query_par
     if mode not in ("periods", "summary", "timed"):
         raise ValueError("mode는 periods, summary 또는 timed여야 합니다")
     lesson_times = {}
+    weekday_times = {}
     if "times" in query:
         if mode != "timed":
             raise ValueError("교시 시각은 timed 모드에서만 사용할 수 있습니다")
@@ -32,6 +33,26 @@ def timetable_calendar(query, current_cache, request_headers, headers, query_par
         ordered = [value for _, value in sorted(lesson_times.items())]
         if any(value["start"] < ordered[index - 1]["end"] for index, value in enumerate(ordered) if index):
             raise ValueError("교시 시각이 겹칩니다")
+    if "weekday_times" in query:
+        if mode != "timed":
+            raise ValueError("요일별 시각은 timed 모드에서만 사용할 수 있습니다")
+        raw_overrides = query_param(query, "weekday_times", 2400)
+        for item in raw_overrides.split(","):
+            match = re.fullmatch(r"([1-7])\.([1-9]|1[0-9]|20):([0-2][0-9][0-5][0-9])-([0-2][0-9][0-5][0-9])", item)
+            if not match:
+                raise ValueError("요일별 시각 형식은 1.1:0900-0950입니다")
+            weekday, period = int(match[1]), int(match[2])
+            start = match[3][:2] + ":" + match[3][2:]
+            end = match[4][:2] + ":" + match[4][2:]
+            entries = weekday_times.setdefault(weekday, {})
+            if period in entries or start >= end or end > "23:59":
+                raise ValueError("요일별 시각의 중복·범위·순서를 확인하세요")
+            entries[period] = {"start": start, "end": end}
+        for entries in weekday_times.values():
+            merged = {**lesson_times, **entries}
+            ordered = [value for _, value in sorted(merged.items())]
+            if any(value["start"] < ordered[index - 1]["end"] for index, value in enumerate(ordered) if index):
+                raise ValueError("요일별 교시 시각이 겹칩니다")
     now = datetime.now(timezone(timedelta(hours=9))).date()
     monday = now - timedelta(days=now.weekday())
     timetables = []
@@ -42,7 +63,10 @@ def timetable_calendar(query, current_cache, request_headers, headers, query_par
             timetable = {**timetable, "records": [r for r in timetable["records"]
                          if teacher_filter in (r.get("teacher") or "").casefold()]}
         timetables.append(timetable)
-    body = render_ics(school, grade_filter, class_filter, timetables, mode=mode, lesson_times=lesson_times)
+    if weekday_times:
+        body = render_ics(school, grade_filter, class_filter, timetables, mode=mode, lesson_times=lesson_times, weekday_times=weekday_times)
+    else:
+        body = render_ics(school, grade_filter, class_filter, timetables, mode=mode, lesson_times=lesson_times)
     etag = '"' + hashlib.sha256(body).hexdigest() + '"'
     headers["ETag"] = etag
     headers["Cache-Control"] = "private, max-age=0, must-revalidate"
