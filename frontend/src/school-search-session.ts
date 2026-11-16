@@ -3,6 +3,7 @@ import type { School } from './api';
 export function createSchoolSearchSession(onChange: (results: School[], message: string) => void) {
   let timer: ReturnType<typeof setTimeout>;
   let request: AbortController | undefined;
+  const cache = new Map<string, { schools: School[]; savedAt: number }>();
   const session = {
     cancel() { clearTimeout(timer); request?.abort(); },
     clear() { session.cancel(); onChange([], ''); },
@@ -15,9 +16,23 @@ export function createSchoolSearchSession(onChange: (results: School[], message:
       timer = setTimeout(async () => {
         const controller = new AbortController(); request = controller;
         try {
-          const result = await search(query().trim(), controller.signal);
-          if (!controller.signal.aborted) onChange(result.schools, result.stale ? '저장된 검색 결과예요. 최신 정보가 아닐 수 있습니다.' : result.schools.length ? '' : '검색 결과가 없어요. 컴시간에서 시간표를 제공하지 않는 학교는 검색되지 않을 수 있습니다.');
-        } catch (error) { if (!controller.signal.aborted) onChange([], errorText(error)); }
+          const result = await search(text, controller.signal);
+          if (controller.signal.aborted || query().trim() !== text) return;
+          if (!result.stale && result.schools.length) {
+            cache.delete(text);
+            cache.set(text, { schools: result.schools.slice(), savedAt: Date.now() });
+            if (cache.size > 10) cache.delete(cache.keys().next().value!);
+          }
+          onChange(result.schools, result.stale ? '저장된 검색 결과예요. 최신 정보가 아닐 수 있습니다.' : result.schools.length ? '' : '검색 결과가 없어요. 컴시간에서 시간표를 제공하지 않는 학교는 검색되지 않을 수 있습니다.');
+        } catch (error) {
+          if (controller.signal.aborted || query().trim() !== text) return;
+          const saved = cache.get(text);
+          const notice = errorText(error);
+          if (saved) {
+            const time = new Date(saved.savedAt).toLocaleString('ko-KR');
+            onChange(saved.schools.slice(), `${notice} 이 화면에 저장된 검색 결과(${time})예요. 최신 정보가 아닐 수 있습니다.`);
+          } else onChange([], `${notice} 이 검색어의 저장된 결과가 없어요.`);
+        }
       }, 250);
     },
   };
