@@ -1,6 +1,6 @@
 # Cloudflare Pages + Workers VPC + Tunnel — P0 실행 로드맵
 
-> 2026-11-16 수정: **MCVKR은 타사 서브도메인 제공자**이며, `mcv.kr`의 네임서버와 Cloudflare zone을 사용자가 소유하거나 변경할 수 없다. **DNS zone 이전 없이 가능한 방식**으로 변경한다. 아직 Cloudflare 배포·관리 권한·Pi cloudflared 설치는 확인되지 않았다. [P0 로드맵](roadmap/core-quality.md) · [운영 가이드](operations.md) · [프록시 IP 신뢰 정책](proxy-client-ip.md) · [QA](qa-2026-11-16.md).
+> **MCVKR은 타사 서브도메인 제공자**이며, `mcv.kr`의 네임서버와 Cloudflare zone을 사용자가 소유하거나 변경할 수 없다. DNS zone 이전 없이 진행한다. 2026-11-17 기준 Pages와 Pi 터널을 연결했으며, 실제 클라이언트 IP 등 운영 전환 검증은 남아 있다. [P0 로드맵](roadmap/core-quality.md) · [운영 가이드](operations.md) · [프록시 IP 신뢰 정책](proxy-client-ip.md) · [QA](qa-2026-11-16.md).
 
 ## 목표 아키텍처 — 사용자 제안 방식
 
@@ -40,11 +40,13 @@ flowchart TD
 
 ## Phase 2 — Pi Tunnel과 Workers VPC Service 연결
 
-- [ ] Pi에서 `systemctl --user status opensigan`, `systemctl --user cat opensigan`, `curl http://127.0.0.1:8000/api/v1/status`로 원본 상태 확인. WARP 출구는 그대로 둔다.
-- [ ] **Workers VPC → Tunnels**에서 전용 Tunnel 생성. 공식 ARM64용 `cloudflared`를 Pi에 설치하고, 토큰은 비밀로 유지. Workers VPC용 tunnel은 QUIC 연결이 필요하고 UDP 7844 접근 및 cloudflared 2025.7.0 이상을 확인.
-- [ ] **Workers VPC → VPC Services**에 Pi의 비공개 HTTP 원본 `127.0.0.1:8000`을 등록(호스트·IPv4 및 HTTP 포트 8000 지정). Service ID를 기록하되 비밀 토큰과 혼동하지 않는다.
-- [ ] API Worker에서 해당 VPC Service를 `vpc_services` binding으로 연결하고 `env.PRIVATE_API.fetch(...)`로 보낸다. 원본 대상은 공개 MCVKR 주소가 아니라 터널 뒤의 Pi 로컬 HTTP 주소.
-- [ ] 먼저 Worker 로컬/배포 스모크 테스트로 `/api/v1/status` 200, JSON 오류 400, HEAD/OPTIONS를 검증. Pages Functions → Worker Service Binding으로 같은 경로가 정상 작동하는지 확인.
+- [x] Pi에서 서비스 설정과 로컬 상태 API를 확인했다. 기존 컴시간 전용 WARP 설정은 유지했다.
+- [x] 전용 터널과 Pi 사용자 서비스를 생성했다. `cloudflared` 2026.11.0, QUIC·UDP 연결 및 Cloudflare 터널 healthy 상태를 확인했다.
+- [x] 비공개 HTTP 원본 `127.0.0.1:8000`을 VPC Service `opencigan-pi`로 등록했다. Service ID: `01a1e508-9473-7c43-b9ab-1b76b0600696`.
+- [x] API Worker `opensigan-private-api`에 VPC Service를 `PRIVATE_API`로 연결했다. 공개 `workers.dev` 경로는 사용하지 않는다.
+- [x] Pages Functions → Worker → VPC → Pi 경로에서 상태 API 200, 입력 오류 JSON 400, HEAD 200, OPTIONS 204를 확인했다. Pages 미리보기와 운영 환경에 서비스 바인딩을 설정했으며 `opencigan.pages.dev` 상태 API도 200을 반환했다.
+
+2026-11-17 연결 기록: Pi의 사용자 서비스는 `opencigan-cloudflared.service`이며 터널 토큰은 Pi에 별도로 보관한다. 기존 Funnel과 WARP는 유지했다. `opencigan.mcv.kr`의 CNAME은 변경하지 않았다. 상태 API 응답은 프로세스 생존만 나타내며, 실제 사용자 IP 분리·인증·ICS·원본 데이터와 운영 전환 검증은 아래 단계에서 계속한다.
 
 ```bash
 systemctl --user status opensigan --no-pager
