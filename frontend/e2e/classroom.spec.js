@@ -236,7 +236,7 @@ test('the installed shell reloads offline and only restores the matching week', 
   const navigation = await page.goto('/?offline=1');
   expect(navigation.fromServiceWorker()).toBe(true);
   await expect(page.getByRole('heading', { name: school.name })).toBeVisible();
-  await expect(page.getByText('오프라인 · 이 기기에 저장된 시간표')).toBeVisible();
+  await expect(page.getByText('이 기기에 저장된 시간표 · 최신 정보가 아닐 수 있어요')).toBeVisible();
   await expect(page.getByRole('table').getByText('오프라인 수학')).toBeVisible();
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'PNG 저장' }).click();
@@ -246,5 +246,5 @@ test('the installed shell reloads offline and only restores the matching week', 
   expect(Buffer.concat(chunks).subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   await page.getByRole('button', { name: '다음 주' }).click();
   await expect(page.getByRole('table')).toHaveCount(0);
-  await expect(page.getByText('오프라인 · 이 기기에 저장된 시간표')).toHaveCount(0);
+  await expect(page.getByText('이 기기에 저장된 시간표 · 최신 정보가 아닐 수 있어요')).toHaveCount(0);
 });

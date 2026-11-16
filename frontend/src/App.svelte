@@ -484,7 +484,7 @@
     }
     timetableSession.load({
       schoolId: school?.id, week, preserve, reuseCachedWeek, validateClass, refreshInterval,
-      now: () => Date.now(), storage: () => localStorage, online: () => navigator.onLine !== false,
+      now: () => Date.now(), storage: () => localStorage,
       current: () => ({ schoolId: school?.id, week }), fetch: getTimetable,
       validate: ensureAvailableClass, classError: () => classError, errorText,
       onSuccess: (data) => {

@@ -400,6 +400,33 @@ test('refresh keeps the visible timetable while announcing progress and failure'
   await expect(panel.getByRole('alert')).toContainText('새로고침 실패');
   await expect(panel.locator('.refresh-feedback')).toHaveCount(0);
   await expect(panel.getByRole('table')).toContainText('과목1');
+  await expect(panel.getByText('저장된 시간표 · 최신 정보가 아닐 수 있어요')).toBeVisible();
+});
+
+test('online server failure restores the matching saved timetable and retry recovers', async ({ page }) => {
+  await page.addInitScript(({ school, timetable }) => {
+    localStorage.setItem('opensigan-school', JSON.stringify(school));
+    localStorage.setItem('opensigan-grade', '1');
+    localStorage.setItem('opensigan-class', '1');
+    localStorage.setItem('opensigan-offline-timetable', JSON.stringify(timetable));
+  }, { school, timetable });
+  await mockApi(page);
+  let calls = 0;
+  await page.route('**/api/v1/timetable?*', (route) => {
+    calls += 1;
+    return calls === 1
+      ? route.fulfill({ status: 503, json: { code: 'upstream_unavailable' } })
+      : route.fulfill({ json: { ...timetable, records: timetable.records.map((record) => ({ ...record, subject: '복구된 수업' })) } });
+  });
+  await page.goto('/');
+  const panel = page.locator('#timetable-panel');
+  await expect(panel.getByRole('alert')).toContainText('원본에서 데이터를 가져오지');
+  await expect(panel.getByText('이 기기에 저장된 시간표 · 최신 정보가 아닐 수 있어요')).toBeVisible();
+  await expect(panel.getByRole('table')).toContainText('과목1');
+  await panel.getByRole('button', { name: '다시 시도' }).click();
+  await expect(panel.getByRole('table')).toContainText('복구된 수업');
+  await expect(panel.getByRole('alert')).toHaveCount(0);
+  await expect(panel.getByText('이 기기에 저장된 시간표 · 최신 정보가 아닐 수 있어요')).toHaveCount(0);
 });
 
 test('meal menu search, allergy filters, NEIS details and timetable date link work together', async ({ page }) => {
