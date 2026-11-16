@@ -20,6 +20,7 @@
   import { createTimetableSession } from './timetable-cache';
   import { createHistorySession } from './history-session';
   import { createMealSession } from './meal-session';
+  import { createSchoolSearchSession } from './school-search-session';
   import { classLessons, teacherLessons, teacherNamesInTimetable, gradeLessons, comparisonClasses, missingWeekdayDates, observedClassCount as countObservedClasses, subjectNamesInTimetable } from './timetable-view';
   import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, type LessonTimes } from './lesson-times';
   import { createClassDisplayPreferences, defaultDisplaySettings, parseDisplaySettings, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
@@ -116,8 +117,7 @@
   });
   let timetableRefreshAt = 0;
   let mealsRefreshAt = 0;
-  let schoolTimer: ReturnType<typeof setTimeout>;
-  let schoolRequest: AbortController | undefined;
+  const schoolSearchSession = createSchoolSearchSession((results, message) => { schoolResults = results; schoolSearchState = message; });
   const mealSession = createMealSession((state) => {
     neis = state.neis; neisResults = state.candidates; neisSearchState = state.searchState; neisLoading = state.neisLoading;
     meals = state.meals; hasMeals = state.hasMeals; mealsStale = state.stale; mealState = state.error;
@@ -385,20 +385,7 @@
   }
 
   function findSchool() {
-    clearTimeout(schoolTimer); schoolRequest?.abort(); schoolResults = []; schoolSearchState = '';
-    if (schoolQuery.trim().length < 2) { schoolSearchState = schoolQuery.length ? '학교 이름을 두 글자 이상 입력해 주세요.' : ''; return; }
-    if (schoolQuery.trim().length > 50) { schoolSearchState = '학교 이름은 최대 50자까지 검색할 수 있어요.'; return; }
-    schoolSearchState = '검색 중…';
-    schoolTimer = setTimeout(async () => {
-      const controller = new AbortController(); schoolRequest = controller;
-      try {
-        const result = await searchSchools(schoolQuery.trim(), controller.signal);
-        if (!controller.signal.aborted) {
-          schoolResults = result.schools;
-          schoolSearchState = result.stale ? '저장된 검색 결과예요. 최신 정보가 아닐 수 있습니다.' : schoolResults.length ? '' : '검색 결과가 없어요. 컴시간에서 시간표를 제공하지 않는 학교는 검색되지 않을 수 있습니다.';
-        }
-      } catch (error) { if (!controller.signal.aborted) schoolSearchState = errorText(error); }
-    }, 250);
+    schoolSearchSession.find(() => schoolQuery, searchSchools, errorText);
   }
   function cancelSharedSelection() {
     sharedSelection.cancel();
@@ -420,7 +407,7 @@
     if (selectionState.prepareSchool(value, keepClass)) classError = false;
     classroomDraft = String(classroom);
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
-    schoolRequest?.abort(); clearTimeout(schoolTimer); mealSession.cancel(); historySession.cancel();
+    schoolSearchSession.cancel(); mealSession.cancel(); historySession.cancel();
     selectionState.update({ school: value }); schoolQuery = value.name; schoolResults = []; schoolSearchState = ''; schoolEditorOpen = false;
     selectedSubject = ''; selectedTeacher = ''; teacherQuery = '';
     try { schoolDisplaySettings = readSchoolPreference(localStorage, 'opensigan-display:', value.id, parseDisplaySettings, defaultDisplaySettings); }
@@ -799,7 +786,7 @@
       stopNavigation();
       sharedSelection.cancel();
       clearInterval(calendarTimer); document.removeEventListener('visibilitychange', onVisibilityChange); document.removeEventListener('focusin', onFocusIn); document.removeEventListener('focusout', onFocusOut); window.removeEventListener('focus', onFocus); themeMedia?.removeEventListener?.('change', onThemeMedia); historySession.cancel();
-      clearTimeout(schoolTimer); schoolRequest?.abort(); mealSession.cancel(); timetableSession.cancel();
+      schoolSearchSession.cancel(); mealSession.cancel(); timetableSession.cancel();
     };
   });
 </script>
@@ -819,7 +806,7 @@
     {#if apiNotConfigured}<p class="notice" role="alert">학교 정보를 불러올 API 주소가 설정되지 않았어요.</p>{/if}
     {#if sharedClassState && !classError}<p class="notice" role="status">{sharedClassState}</p>{/if}
     {#if schoolEditorOpen || !school}
-      <SchoolSelector bind:schoolQuery {schoolResults} {schoolSearchState} {grade} {classroom} {classroomDraft} {gradeOptions} {classError} {sharedClassState} {findSchool} cancelSearch={() => { clearTimeout(schoolTimer); schoolRequest?.abort(); schoolResults = []; schoolSearchState = ''; }} {chooseSchool} {selectGrade} {updateClass} {saveClass} />
+      <SchoolSelector bind:schoolQuery {schoolResults} {schoolSearchState} {grade} {classroom} {classroomDraft} {gradeOptions} {classError} {sharedClassState} {findSchool} cancelSearch={schoolSearchSession.clear} {chooseSchool} {selectGrade} {updateClass} {saveClass} />
     {/if}
     <FavoritesBar {school} {grade} {classroom} {favorites} {currentFavorite} disabled={classError || !!pendingSharedClass} {addFavorite} {removeFavorite} {switchToFavorite} />
     <CalendarNav {view} {inputFocused} selectView={(value) => view = value} />
