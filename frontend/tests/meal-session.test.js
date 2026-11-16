@@ -43,6 +43,26 @@ test('meal school connection ignores a late response after switching schools', a
   assert.equal(state.neisLoading, false);
 });
 
+test('a cancelled meal request cannot replace the new request state when it fails late', async () => {
+  let state;
+  const requests = [];
+  const session = personalizationVm.createMealSession((next) => { state = next; });
+  const fetch = (school, from, to, signal) => new Promise((resolve, reject) => requests.push({ signal, resolve, reject }));
+  const load = (school) => session.load(school, 'week', 'week', false, () => 1000, 100, fetch, String);
+  load('old');
+  load('new');
+  assert.equal(requests[0].signal.aborted, true);
+  requests[0].reject(new Error('old request failed'));
+  await new Promise(setImmediate);
+  assert.equal(state.loading, true);
+  assert.equal(state.error, '');
+  requests[1].resolve({ meals: [{ date: 'new' }], stale: false });
+  await new Promise(setImmediate);
+  assert.equal(state.loading, false);
+  assert.equal(state.error, '');
+  assert.equal(state.meals[0].date, 'new');
+});
+
 test('choosing a meal school cancels search and loads meals even when storage is blocked', async () => {
   let state;
   let resolve;
