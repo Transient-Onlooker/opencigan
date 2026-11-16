@@ -22,3 +22,5 @@
 .class-cell .change-label{font-size:11px;padding:1px 5px;background:var(--ink);color:var(--surface);font-weight:750}
 .timetable .class-cell+.class-cell{border-top:1px solid var(--line);padding-top:8px;margin-top:8px}
 .empty-cell{color:var(--muted)}
+
+.table-scroll{border-radius:12px}

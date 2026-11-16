@@ -62,3 +62,15 @@ label{font-size:14px;font-weight:650}
 .calendar-date>span{display:block;font-size:13px;color:var(--muted);margin-top:2px}
 .date-picker{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;margin-top:8px;font-size:13px;color:var(--muted)}
 .date-picker input{min-width:0;max-width:100%;min-height:44px;border:1px solid var(--line);padding:6px 10px;color:var(--ink);background:var(--surface);font-size:16px}
+
+/* Navigation and surface hierarchy, shared between light and dark themes. */
+.app-shell{--line:#dedee1;--soft:#f6f7f8}
+.app-shell.dark{--line:#3c3e42;--soft:#1c1e21}
+.theme-toggle,.secondary-button,.arrow-button{border-radius:10px}
+.theme-toggle:hover,.secondary-button:hover,.arrow-button:hover{background:var(--soft)}
+.view-switch{gap:4px;border-radius:12px;background:var(--soft);padding:4px}
+.view-switch button{border:0;border-radius:8px;min-height:44px;background:transparent}
+.view-switch button:hover:not([aria-pressed=true]){background:var(--surface)}
+.view-switch button[aria-pressed=true]{background:var(--ink);color:var(--surface)}
+.date-picker input,.day-picker input,.lesson-search-fields input,.lesson-search-fields select{border-radius:9px}
+@media(max-width:700px){.view-switch button{min-width:calc(50% - 2px)}.timetable-switch button{min-width:0}}

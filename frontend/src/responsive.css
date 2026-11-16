@@ -26,3 +26,7 @@
 }
 @media(max-width:390px){main{width:calc(100% - 24px)}.topbar{padding-inline:12px}.calendar-date strong{font-size:17px}.date-picker{gap:4px}.section-heading{gap:8px}.section-heading .secondary-button{padding-inline:8px}.school-heading h1{font-size:20px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition:none!important}}
+
+@media(max-width:700px){
+  .view-switch button,.view-switch button:nth-child(2),.view-switch button:nth-child(n+3),.timetable-switch button,.timetable-switch button:nth-child(2){border:0}
+}
