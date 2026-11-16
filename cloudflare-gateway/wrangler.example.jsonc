@@ -21,6 +21,16 @@
       "name": "GENERAL_RATE",
       "namespace_id": "961302",
       "simple": { "limit": 60, "period": 60 }
+    },
+    {
+      "name": "TIMETABLE_RATE",
+      "namespace_id": "961303",
+      "simple": { "limit": 40, "period": 60 }
+    },
+    {
+      "name": "CALENDAR_RATE",
+      "namespace_id": "961304",
+      "simple": { "limit": 20, "period": 60 }
     }
   ]
 }

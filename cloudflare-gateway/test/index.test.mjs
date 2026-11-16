@@ -3,18 +3,21 @@ import assert from 'node:assert/strict';
 import worker from '../src/index.mjs';
 
 const req = (path, init = {}) => new Request('https://opencigan.pages.dev' + path, init);
-function setup({search = true, general = true, failFetch = false} = {}) {
+function setup({search = true, general = true, failFetch = false, blockedKey = ''} = {}) {
   const calls = [];
+  const limits = [];
   const env = {
     PRIVATE_API: { fetch: async (request) => {
       calls.push(request);
       if (failFetch) throw new Error('private origin unreachable: do not disclose');
       return new Response('calendar data', { status: 200, headers: { ETag: '"abc"' } });
     } },
-    SEARCH_RATE: { limit: async () => ({ success: search }) },
-    GENERAL_RATE: { limit: async () => ({ success: general }) },
+    SEARCH_RATE: { limit: async ({key}) => { limits.push(['search', key]); return { success: search }; } },
+    GENERAL_RATE: { limit: async ({key}) => { limits.push(['general', key]); return { success: general }; } },
+    TIMETABLE_RATE: { limit: async ({key}) => { limits.push(['timetable', key]); return { success: blockedKey !== `timetable:${key}` }; } },
+    CALENDAR_RATE: { limit: async ({key}) => { limits.push(['calendar', key]); return { success: blockedKey !== `calendar:${key}` }; } },
   };
-  return { env, calls };
+  return { env, calls, limits };
 }
 
 test('only /api/v1/ routes are forwarded; no open proxy', async () => {
@@ -59,7 +62,24 @@ test('school search is separately rate limited', async () => {
   const response = await worker.fetch(req('/api/v1/schools?q=test'), env);
   assert.equal(response.status, 429);
   assert.equal((await response.json()).code, 'edge_rate_limited');
+  assert.equal(response.headers.get('retry-after'), '60');
   assert.equal(calls.length, 0);
+});
+
+test('timetable and calendar use separate category budgets alongside the general cap', async () => {
+  const ip = '203.0.113.9';
+  const { env, calls, limits } = setup({blockedKey: `calendar:${ip}`});
+  const headers = {'CF-Connecting-IP': ip, 'X-Forwarded-For': '198.51.100.1'};
+  const calendar = await worker.fetch(req('/api/v1/timetable.ics', {headers}), env);
+  assert.equal(calendar.status, 429);
+  assert.equal(calendar.headers.get('retry-after'), '60');
+  assert.equal(calls.length, 0);
+  const timetable = await worker.fetch(req('/api/v1/timetable', {headers}), env);
+  assert.equal(timetable.status, 200);
+  assert.deepEqual(limits, [
+    ['general', ip], ['calendar', ip],
+    ['general', ip], ['timetable', ip],
+  ]);
 });
 
 test('OPTIONS bypasses rate limits for CORS preflight and still reaches Pi', async () => {

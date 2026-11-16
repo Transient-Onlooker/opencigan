@@ -13,10 +13,10 @@ const FORWARD_HEADERS = [
 ];
 const ORIGIN = 'http://127.0.0.1:8000';
 
-function jsonError(code, status, method) {
+function jsonError(code, status, method, extraHeaders = {}) {
   return new Response(
     method === 'HEAD' ? null : JSON.stringify({ code, message: 'API 연결을 처리하지 못했어요.' }),
-    { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } },
+    { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...extraHeaders } },
   );
 }
 
@@ -37,7 +37,7 @@ export default {
     }
 
     if (!env?.PRIVATE_API || typeof env.PRIVATE_API.fetch !== 'function' ||
-        !env.SEARCH_RATE || !env.GENERAL_RATE) {
+        !env.SEARCH_RATE || !env.GENERAL_RATE || !env.TIMETABLE_RATE || !env.CALENDAR_RATE) {
       return jsonError('gateway_unconfigured', 503, request.method);
     }
 
@@ -47,10 +47,17 @@ export default {
     const ip = request.headers.get('CF-Connecting-IP') ?? '';
     const clientKey = ip.length <= 45 && /^[0-9a-f.:]+$/i.test(ip) ? ip : 'unidentified';
     if (request.method !== 'OPTIONS') {
-      const search = url.pathname === '/api/v1/schools' || url.pathname === '/api/v1/neis/schools';
+      const search = path === '/api/v1/schools' || path === '/api/v1/neis/schools';
+      const category = path === '/api/v1/timetable.ics' || path === '/api/v1/timetable/history.rss'
+        ? 'calendar' : path === '/api/v1/timetable' ? 'timetable' : null;
       try {
         const { success } = await (search ? env.SEARCH_RATE : env.GENERAL_RATE).limit({ key: clientKey });
-        if (!success) return jsonError('edge_rate_limited', 429, request.method);
+        const categoryLimiter = category === 'calendar' ? env.CALENDAR_RATE : env.TIMETABLE_RATE;
+        const categoryAllowed = success && category
+          ? (await categoryLimiter.limit({ key: clientKey })).success : true;
+        if (!success || !categoryAllowed) {
+          return jsonError('edge_rate_limited', 429, request.method, { 'Retry-After': '60' });
+        }
       } catch {
         return jsonError('gateway_unavailable', 503, request.method);
       }
