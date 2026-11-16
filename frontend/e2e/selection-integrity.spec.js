@@ -153,7 +153,7 @@ test('settings groups keep advanced controls separate and restore expanded state
   const search = page.getByRole('searchbox', { name: '설정 검색' });
   await search.fill('과목');
   const results = page.getByRole('list', { name: '설정 검색 결과' });
-  await expect(results.getByRole('button', { name: /과목 색상/ })).toBeVisible();
+  await expect(results.getByRole('button', { name: '과목 색상 과목·교사 상세 설정', exact: true })).toBeVisible();
   await expect(results.getByRole('button', { name: /교사 표시 이름/ })).toHaveCount(0);
   await expect(page.getByLabel('시간표에 교사 표시')).toBeHidden();
   await expect(page.getByText('학교 교시 시각 설정', { exact: true })).toBeHidden();
@@ -162,7 +162,7 @@ test('settings groups keep advanced controls separate and restore expanded state
   await expect(page.getByLabel('시간표에 교사 표시')).toBeVisible();
   await expect(page.getByLabel('과목 색상', { exact: true })).toBeHidden();
   await search.fill('과목 색상');
-  await results.getByRole('button', { name: /과목 색상/ }).first().focus();
+  await results.getByRole('button', { name: '과목 색상 과목·교사 상세 설정', exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByLabel('과목 색상', { exact: true })).toBeFocused();
   await page.getByLabel('과목 색상', { exact: true }).selectOption('auto');
