@@ -45,7 +45,8 @@ test('settings icon remains visible and aligned in both themes on desktop and mo
       expect(box.x + box.width).toBeLessThanOrEqual(button.x + button.width);
       expect(box.y).toBeGreaterThanOrEqual(button.y);
       expect(box.y + box.height).toBeLessThanOrEqual(button.y + button.height);
-      expect(await icon.evaluate((node) => getComputedStyle(node).stroke)).toBe(await settings.evaluate((node) => getComputedStyle(node).color));
+      const colors = await settings.evaluate((node) => ({ icon: getComputedStyle(node.querySelector('svg')).stroke, text: getComputedStyle(node).color }));
+      expect(colors.icon).toBe(colors.text);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       if (theme === 'dark') await page.getByRole('button', { name: '라이트 모드로 전환' }).click();
     }
