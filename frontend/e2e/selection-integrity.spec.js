@@ -167,6 +167,19 @@ test('class settings backup restores the selected class without changing another
   expect(await page.evaluate((key) => localStorage.getItem(key), otherKey)).toBeNull();
 });
 
+test('invalid shared classroom explains why the saved class is retained', async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript((saved) => {
+    localStorage.setItem('opensigan-school', JSON.stringify(saved));
+    localStorage.setItem('opensigan-grade', '1');
+    localStorage.setItem('opensigan-class', '2');
+  }, school);
+  await page.goto('/' + sharedHash(99));
+  await expect(page.getByRole('status').filter({ hasText: '공유 링크의 1학년 99반' })).toContainText('기존 봄빛고등학교 1학년 2반을 유지');
+  await expect(page.getByRole('status').filter({ hasText: '공유 링크의 1학년 99반' })).toContainText('시간표에 없어요');
+  expect(await page.evaluate(() => localStorage.getItem('opensigan-class'))).toBe('2');
+});
+
 test('invalid shared classroom exposes an error and can be corrected without saving the forged class', async ({ page }) => {
   await mockApi(page);
   await page.goto('/' + sharedHash());

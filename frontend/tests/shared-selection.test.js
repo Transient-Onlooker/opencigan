@@ -183,6 +183,9 @@ for (const outcome of ['network', 'stale', 'empty', 'missing']) {
     assert.equal(app.state().classroom, 1);
     assert.equal(app.state().pendingSharedClass, null);
     assert.equal(app.state().tableLoading, false);
+    assert.match(app.state().sharedClassState, /공유 링크의 1학년 7반/);
+    assert.match(app.state().sharedClassState, /기존 기존고등학교 1학년 1반을 유지/);
+    assert.match(app.state().sharedClassState, outcome === 'missing' ? /시간표에 없어요/ : /시간표 데이터를 확인할 수 없어요/);
     assert.equal(JSON.parse(store.get('opensigan-school')).id, savedSchool.id);
     assert.equal(JSON.parse(store.get('opensigan-offline-timetable')).schoolId, savedSchool.id);
     cleanup();

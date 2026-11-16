@@ -452,7 +452,7 @@
         if (outcome.fallback.school) {
           classError = false;
           chooseSchool(outcome.fallback.school, true);
-          sharedClassState = message + ' 이전 학교와 학급을 유지했어요.';
+          sharedClassState = message + ` 기존 ${outcome.fallback.school.name} ${outcome.fallback.grade}학년 ${outcome.fallback.classroom}반을 유지했어요.`;
         } else {
           selectionState.update({ grade: pending.grade, classroom: pending.classroom });
           classroomDraft = String(classroom);
@@ -754,7 +754,9 @@
         const valid = validateSharedCandidate(candidate, verified, requestedWeek, shared.grade, shared.classroom);
         if (!valid || !candidate) {
           sharedSelection.consume();
-          sharedClassState = '공유 링크의 학급을 확인하지 못해 이전 학교와 학급을 유지했어요.';
+          const available = candidate?.schoolId === verified.id && candidate.weekStart === requestedWeek && !candidate.stale && candidate.records.length > 0;
+          const reason = available ? '선택한 주의 시간표에 없어요.' : '시간표 데이터를 확인할 수 없어요.';
+          sharedClassState = `공유 링크의 ${shared.grade}학년 ${shared.classroom}반은 ${reason} 기존 ${fallback.school.name} ${fallback.grade}학년 ${fallback.classroom}반을 유지했어요.`;
           return;
         }
         const expires = cached?.expires ?? Date.now() + refreshInterval;
