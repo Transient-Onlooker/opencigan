@@ -79,7 +79,7 @@
                  </label>
                  {#if displaySettings.colorMode === 'custom'}
                    <label>선택한 과목 색상
-                     <input type="color" value={displaySettings.subjectColors[selectedSubject] || '#dcebfD'} disabled={!selectedSubject} onchange={(event) => saveSubjectColor(event.currentTarget.value)} />
+                     <input type="color" value={displaySettings.subjectColors[selectedSubject] || '#425a75'} disabled={!selectedSubject} onchange={(event) => saveSubjectColor(event.currentTarget.value)} />
                    </label>
                    <button type="button" class="secondary-button display-reset" onclick={clearSubjectColors}>과목 색상 초기화</button>
                  {/if}

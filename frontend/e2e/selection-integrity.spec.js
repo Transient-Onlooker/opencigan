@@ -396,6 +396,9 @@ test('refresh keeps the visible timetable while announcing progress and failure'
   await expect(panel.getByRole('table')).toContainText('과목1');
   release();
   await expect(panel.getByRole('alert')).toContainText('이전 시간표를 표시하고 있어요');
+  await expect(panel.getByRole('alert')).toHaveCount(1);
+  await expect(panel.getByRole('alert')).toContainText('새로고침 실패');
+  await expect(panel.locator('.refresh-feedback')).toHaveCount(0);
   await expect(panel.getByRole('table')).toContainText('과목1');
 });
 
@@ -461,6 +464,9 @@ test('favorites collapse, settings search and keyboard help remain usable at nar
   await expect(help.locator('..').getByText(/원본 서비스가 제공하는/)).toBeVisible();
   await help.press('Enter');
   await expect(help).toHaveAttribute('aria-expanded', 'true');
+  const emptyPeriodHelp = page.getByLabel('빈 교시 도움말');
+  await emptyPeriodHelp.focus();
+  await expect(emptyPeriodHelp.locator('..').getByText(/수집된 수업 기록이 없는 칸/)).toBeVisible();
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByLabel('설정 검색').fill('알레르기');
   await expect(page.getByText('급식 알레르기 설정', { exact: true })).toBeVisible();
