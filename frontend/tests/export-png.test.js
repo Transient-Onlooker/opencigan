@@ -128,13 +128,13 @@ test('cancelled image share does not download a file', async () => {
 });
 
 test('unsupported share and share failures fall back to PNG download', async () => {
-  for (const harness of [
-    shareHarness(null, null),
-    shareHarness(async () => {}, () => false),
-    shareHarness(async () => { throw new Error('NotAllowedError'); }, () => true),
-    shareHarness(async () => {}, () => true, false),
+  for (const [harness, result] of [
+    [shareHarness(null, null), 'unsupported'],
+    [shareHarness(async () => {}, () => false), 'unsupported'],
+    [shareHarness(async () => { throw new Error('NotAllowedError'); }, () => true), 'failed'],
+    [shareHarness(async () => {}, () => true, false), 'unsupported'],
   ]) {
-    assert.equal(await harness.share(), 'downloaded');
+    assert.equal(await harness.share(), result);
     assert.equal(harness.getDownloads(), 1);
   }
 });

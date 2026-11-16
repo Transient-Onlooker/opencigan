@@ -54,6 +54,7 @@
   let tableRefreshState = '';
   let timetableCheckedAt = '';
   let exportState = '';
+  let imageShareCancelled = false;
   let exportBusy = false;
   let shareUrl = '';
   let shareState = '';
@@ -625,6 +626,7 @@
     const options = pngOptions();
     if (!options || exportBusy) return;
     exportBusy = true;
+    imageShareCancelled = false;
     exportState = format + ' 파일을 만드는 중…';
     try {
       await (format === 'PDF' ? saveTimetablePdf(options) : saveTimetablePng(options));
@@ -636,10 +638,12 @@
     const options = pngOptions();
     if (!options || exportBusy) return;
     exportBusy = true;
-    exportState = '공유할 이미지를 만드는 중…';
+    imageShareCancelled = false;
+    exportState = '시간표 이미지를 만드는 중…';
     try {
       const result = await shareTimetablePng(options);
-      exportState = result === 'shared' ? '시간표 이미지를 공유했어요.' : result === 'cancelled' ? '' : '이 브라우저에서는 이미지 공유가 어려워 PNG로 저장했어요.';
+      imageShareCancelled = result === 'cancelled';
+      exportState = result === 'shared' ? '시간표 이미지를 공유했어요.' : result === 'cancelled' ? '공유를 취소했어요.' : result === 'failed' ? '공유하지 못해 PNG 다운로드를 시작했어요.' : '이 브라우저는 이미지 공유를 지원하지 않아 PNG 다운로드를 시작했어요.';
     } catch (error) { exportState = errorText(error); }
     finally { exportBusy = false; }
   }
@@ -842,7 +846,7 @@
     {/if}
     <CalendarNav {view} {inputFocused} selectView={(value) => view = value} />
     <div id="calendar" class="calendar-content" tabindex="-1">
-        <TimetablePanel {view} {timetableView} {school} {timetable} {week} {current} {today} {selectedDay} {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {tableState} {tableRefreshState} {timetableCheckedAt} {timetableFromDevice} {exportState} {exportBusy} {canExport} {weekendClasses} {classError} {sharedClassState} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} lessonTimes={selectedDayTimes} {comparableClasses} {gradeRecords} bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {dates} {periods} {filtered} {missingWeekdays} {observedClassCount} {teacherNames} {historyOpen} {historyDisabled} {historyLoading} {historyError} {historyChanges} {visibleHistory} {historyCursor} bind:historyScope {exportTimetable} {sharePng} {refreshTimetable} {currentWeek} {selectTimetableView} {selectGrade} {selectClass} {changeWeek} {loadTimetable} {selectTimetableDate} {toggleHistory} {loadHistory} {dateText} {shortDate} {timeText} {changeTypeText} {subjectStyle} />
+        <TimetablePanel {view} {timetableView} {school} {timetable} {week} {current} {today} {selectedDay} {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {tableState} {tableRefreshState} {timetableCheckedAt} {timetableFromDevice} {exportState} {exportBusy} {imageShareCancelled} {canExport} {weekendClasses} {classError} {sharedClassState} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} lessonTimes={selectedDayTimes} {comparableClasses} {gradeRecords} bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {dates} {periods} {filtered} {missingWeekdays} {observedClassCount} {teacherNames} {historyOpen} {historyDisabled} {historyLoading} {historyError} {historyChanges} {visibleHistory} {historyCursor} bind:historyScope {exportTimetable} {sharePng} {refreshTimetable} {currentWeek} {selectTimetableView} {selectGrade} {selectClass} {changeWeek} {loadTimetable} {selectTimetableDate} {toggleHistory} {loadHistory} {dateText} {shortDate} {timeText} {changeTypeText} {subjectStyle} />
         <MealsPanel {view} {mealDate} {today} {mealView} {mealDates} {mealDateDraft} {dateError} {neis} {school} {neisSearchState} {neisLoading} {neisResults} {mealState} {hasMeals} {mealLoading} {meals} {visibleMealTypes} {allergySelection} {showAllergenNumbers} {current} {mealsStale} {todayMeals} {setMealView} {changeMealDate} {dateText} {updateMealDateDraft} {selectMealDate} {chooseNeis} {connectMeals} {loadMeals} {selectMealTimetableDate} />
         <SettingsPanel {view} {school} {week} dark={isDark} {useClassDisplay} {classError} {grade} {classroom} {theme} {animationsEnabled} {displaySettings} bind:selectedSubject {subjectNames} {teacherNames} {lessonTimePeriods} {lessonTimeDrafts} {weekdayTimeDrafts} {lessonTimeState} {settingsBackupState} {mealTypes} {enabledMealTypes} {showAllergenNumbers} {allergySelection} {setClassDisplay} {setTheme} {setAnimationsEnabled} {setColorMode} {saveAlias} {saveSubjectColor} {clearSubjectColors} {saveDisplaySettings} {editLessonTime} {editWeekdayTime} {clearWeekdayTime} {applyLessonTimeRules} {saveLessonTimes} {clearLessonTimes} {downloadSettingsBackup} {importSettingsFile} {resetDisplaySettings} {toggleMealType} {setAllergenNumbersVisible} {toggleAllergy} />
     </div>
