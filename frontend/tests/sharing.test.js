@@ -166,7 +166,8 @@ test('공유 링크의 학급이 실제 시간표에 없으면 이전 학교와 
   assert.equal(app.state().grade, 3);
   assert.equal(app.state().classroom, 4);
   assert.equal(app.state().classError, false);
-  assert.match(app.state().sharedClassState, /이전 학교와 학급을 유지/);
+  assert.match(app.state().sharedClassState, /공유 링크의 2학년 7반/);
+  assert.match(app.state().sharedClassState, /기존 기존고등학교 3학년 4반을 유지/);
   assert.equal(JSON.parse(values.get('opensigan-school')).id, savedSchool.id);
   cleanup();
 });
