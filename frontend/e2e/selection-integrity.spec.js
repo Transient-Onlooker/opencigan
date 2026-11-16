@@ -25,6 +25,35 @@ async function mockApi(page, delayedSearch, onSchoolSearch) {
   });
 }
 
+test('settings icon remains visible and aligned in both themes on desktop and mobile', async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript(() => localStorage.setItem('opensigan-theme', 'light'));
+  await page.goto('/');
+  const settings = page.getByRole('navigation', { name: '캘린더 메뉴' }).getByRole('button', { name: '설정', exact: true });
+  const icon = settings.locator('svg');
+  await expect(icon).toHaveAttribute('aria-hidden', 'true');
+  for (const width of [320, 1366]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const theme of ['light', 'dark']) {
+      if (theme === 'dark') await page.getByRole('button', { name: '다크 모드로 전환' }).click();
+      await expect(icon).toBeVisible();
+      const box = await icon.boundingBox();
+      const button = await settings.boundingBox();
+      expect(box.width).toBeGreaterThanOrEqual(18);
+      expect(box.height).toBeGreaterThanOrEqual(18);
+      expect(box.x).toBeGreaterThanOrEqual(button.x);
+      expect(box.x + box.width).toBeLessThanOrEqual(button.x + button.width);
+      expect(box.y).toBeGreaterThanOrEqual(button.y);
+      expect(box.y + box.height).toBeLessThanOrEqual(button.y + button.height);
+      expect(await icon.evaluate((node) => getComputedStyle(node).stroke)).toBe(await settings.evaluate((node) => getComputedStyle(node).color));
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      if (theme === 'dark') await page.getByRole('button', { name: '라이트 모드로 전환' }).click();
+    }
+  }
+  await settings.click();
+  await expect(page.getByRole('heading', { name: '설정', exact: true })).toBeVisible();
+});
+
 test('shared school and class stay pending until the matching timetable is verified', async ({ page }) => {
   const previous = { id: '1:봄빛초등학교', name: '봄빛초등학교', region: '서울' };
   let release;
