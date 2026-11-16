@@ -15,7 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 from backend.cache import Cache
-from backend.http_core import json_response, make_response_headers, preflight_response
+from backend.http_core import json_response, make_response_headers, preflight_response, query_param as _query_param, timetable_filters
 from backend.analytics import ApiRecorder
 from backend.access_logs import AccessLogRecorder, AccessLogStore, classify_origin
 from backend.ical import render_timetable_ics
@@ -227,30 +227,8 @@ def _webhook_api(method, path, body, request_headers, client, headers):
     return webhook_api(method, path, body, request_headers, client, headers, _rate_allowed, _webhook_store)
 
 
-def _query_param(params, key, limit):
-    values = params.get(key, [])
-    if len(values) != 1 or not values[0].strip() or len(values[0]) > limit:
-        raise ValueError(f"{key} 값이 올바르지 않습니다")
-    return values[0].strip()
-
-
 def _timetable_filters(query, require_class=False):
-    grade_filter = None
-    class_filter = None
-    teacher_filter = None
-    if require_class or "grade" in query:
-        raw_grade = _query_param(query, "grade", 1)
-        if not re.fullmatch(r"[1-6]", raw_grade):
-            raise ValueError("grade는 1부터 6까지의 정수여야 합니다")
-        grade_filter = int(raw_grade)
-    if require_class or "class" in query:
-        raw_class = _query_param(query, "class", 2)
-        if not re.fullmatch(r"[1-9][0-9]?", raw_class):
-            raise ValueError("class는 1부터 99까지의 정수여야 합니다")
-        class_filter = int(raw_class)
-    if "teacher" in query:
-        teacher_filter = _query_param(query, "teacher", 50).casefold()
-    return grade_filter, class_filter, teacher_filter
+    return timetable_filters(query, require_class, _query_param)
 
 
 def _cached_timetable(school, week, current_cache):
