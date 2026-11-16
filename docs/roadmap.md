@@ -63,6 +63,10 @@ flowchart LR
 
 [상세 배치와 검증 조건](roadmap/refactoring-and-release.md#배치-7-착수-조건과-리팩터링-순서) · [코드 수준 실행 설계](refactoring-plan.md) · [리팩터링 전 QA 기준선](refactoring-baseline-2026-11-15.md)
 
+### 오늘의 P0 Cloudflare Tunnel 작업
+
+**[Cloudflare Tunnel·WAF 단계별 구축 체크리스트](cloudflare-tunnel-rollout.md)**를 따릅니다. DNS·TLS 권한 확인 → Pi 백업 → 병렬 Tunnel → 외부 기능/IP 검증 → WAF → Pages·ICS 변경 → 롤백 검증 순서입니다. 기존 WARP 프록시와 GitHub Pages DNS는 유지합니다.
+
 ### 공개 서비스 전 주요 검증 게이트
 
 - **실기기:** iOS Safari·Android Chrome, PWA, 모바일 캘린더 앱의 실제 동작

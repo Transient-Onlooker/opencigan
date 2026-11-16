@@ -84,7 +84,9 @@ PY
 
 ## Cloudflare Tunnel 전환 계획 (P0, 미적용)
 
-**2026-11-16부터 공개 API/ICS 제공과 Cloudflare WAF 봇 방어를 P0 우선 작업으로 결정했습니다. 아직 Tunnel·WAF 운영 전환을 완료한 것은 아닙니다.** `cloudflared`가 Raspberry Pi에서 Cloudflare로 아웃바운드 연결을 만들고 로컬 API(`127.0.0.1:8000`)에 전달하는 구성을 우선 검토·구현합니다. 현재 정적 웹의 GitHub Pages 호스트와 분리되는 공개 API 호스트(예: `api.opencigan.mcv.kr`, 제안)를 사용하면 Pages 경로의 `/api/v1/...` 404 문제를 해소할 수 있습니다. DNS/TLS, CORS, 프런트·OpenAPI·ICS URL은 전환 검증 후 일치시켜야 합니다.
+[**오늘 진행용 세부 실행 체크리스트**](cloudflare-tunnel-rollout.md)는 호스트/인증서 선택, cloudflared 설치, WAF 오탐, 프런트·ICS 전환과 개별 롤백을 포함합니다.
+
+**2026-11-16부터 공개 API/ICS 제공과 Cloudflare WAF 봇 방어를 P0 우선 작업으로 결정했습니다. 아직 Tunnel·WAF 운영 전환을 완료한 것은 아닙니다.** `cloudflared`가 Raspberry Pi에서 Cloudflare로 아웃바운드 연결을 만들고 로컬 API(`127.0.0.1:8000`)에 전달하는 구성을 우선 검토·구현합니다. 현재 정적 웹의 GitHub Pages 호스트와 분리되는 공개 API 호스트(우선 후보 `opencigan-api.mcv.kr`; Cloudflare zone/TLS 확인 전 미확정)를 사용하면 Pages 경로의 `/api/v1/...` 404 문제를 해소할 수 있습니다. DNS/TLS, CORS, 프런트·OpenAPI·ICS URL은 전환 검증 후 일치시켜야 합니다.
 
 - **WAF/봇 방어:** API 호스트의 요청률·학교 검색 남용·반복 오류는 Cloudflare WAF 사용자 정의 규칙과 Rate Limiting으로 방어하는 것을 우선합니다. 학교 검색·시간표·ICS·상태·Webhook·관리자 API는 서로 다른 요청 특성이 있으므로 경로별 정책을 만들고 보안 이벤트와 오탐율을 확인합니다. 사용 가능한 Bot Score/관리 기능은 Cloudflare 계정 플랜을 확인한 후 선택합니다. API/ICS에 브라우저 JS Challenge를 일괄 적용하면 캘린더·기계 클라이언트가 차단될 수 있으므로 금지합니다. Bot Fight Mode의 예외 처리 제약도 검토해야 합니다.
 - **외부 진입과 원본 연결은 별개:** Cloudflare Tunnel/WAF는 방문자→API **수신** 경로입니다. 위의 `OPENCIGAN_COMCIGAN_PROXY`와 WARP는 Pi→컴시간 **송신** 경로이며 서로 대체하지 않습니다.
