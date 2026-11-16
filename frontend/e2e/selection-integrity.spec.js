@@ -183,6 +183,21 @@ test('class settings backup restores the selected class without changing another
   expect(await page.evaluate((key) => localStorage.getItem(key), otherKey)).toBeNull();
 });
 
+test('disabled history is compact without hiding source change badges', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/v1/timetable?*', (route) => route.fulfill({ json: {
+    ...timetable, records: timetable.records.map((record) => ({ ...record, isChanged: true })),
+  } }));
+  await page.route('**/api/v1/timetable/history?*', (route) => route.fulfill({ status: 503, json: { code: 'history_disabled' } }));
+  await page.goto('/' + sharedHash(1));
+  const panel = page.locator('#timetable-panel');
+  await expect(panel.locator('.change-label').first()).toBeVisible();
+  await panel.getByRole('button', { name: '이력 보기' }).click();
+  await expect(panel.getByRole('status').filter({ hasText: '변경 이력은 현재 제공되지 않아요.' })).toBeVisible();
+  await expect(panel.locator('.history-section')).toHaveCount(0);
+  await expect(panel.locator('.change-label').first()).toBeVisible();
+});
+
 test('invalid shared classroom explains why the saved class is retained', async ({ page }) => {
   await mockApi(page);
   await page.addInitScript((saved) => {
