@@ -45,53 +45,51 @@
   export let setAllergenNumbersVisible: (value: boolean) => void;
   export let toggleAllergy: (id: number, checked: boolean) => void;
   let settingsQuery = '';
-  let settingsOpen = { display: false, times: false, backup: false, meals: false, allergies: false };
+  let settingsOpen = { general: false, display: false, advanced: false, times: false, backup: false, meals: false, allergies: false, personal: false };
+  let beforeSearch = { ...settingsOpen };
   function settingsMatch(labels: string, query: string) {
     return !query.trim() || labels.toLocaleLowerCase('ko-KR').includes(query.trim().toLocaleLowerCase('ko-KR'));
+  }
+  function updateSettingsSearch(query: string) {
+    if (!settingsQuery.trim() && query.trim()) beforeSearch = { ...settingsOpen };
+    settingsQuery = query;
+    if (!query.trim()) { settingsOpen = { ...beforeSearch }; return; }
+    settingsOpen = {
+      general: settingsMatch('일반 테마 애니메이션', query),
+      display: settingsMatch('시간표 표시 교사 날짜 변경 변동 배지 테두리 밀도 종료 요일 학급', query),
+      advanced: settingsMatch('데이터 고급 과목 색상 별칭 교사 이름 상세', query),
+      times: settingsMatch('학교 교시 시각 시간 시작 종료', query),
+      backup: settingsMatch('설정 백업 복원 파일 저장 가져오기 내보내기 초기화', query),
+      meals: settingsMatch('급식 보기 식사 조식 중식 석식 알레르기 번호', query),
+      allergies: settingsMatch('급식 알레르기 주의', query),
+      personal: false,
+    };
   }
 </script>
 
 <section id="settings-panel" hidden={view !== 'settings'} aria-labelledby="settings-title">
           <h2 id="settings-title">설정</h2>
           <p><a href="./webhooks.html">시간표 변경 알림 관리</a></p>
-          <label class="settings-search">설정 검색<input type="search" bind:value={settingsQuery} oninput={() => { if (settingsQuery.trim()) settingsOpen = { display: true, times: true, backup: true, meals: true, allergies: true }; }} maxlength="60" placeholder="예: 교시, 알레르기, 백업" /></label>
-          {#if settingsQuery.trim() && !settingsMatch('시간표 표시 테마 애니메이션 과목 색상 별칭 교사 이름 날짜 변경 변동 배지 테두리 밀도 종료 요일 학교 교시 시각 시간 시작 백업 복원 파일 저장 가져오기 내보내기 초기화 급식 보기 식사 조식 중식 석식 알레르기 번호 주의 개인 일정 시험', settingsQuery)}<p role="status">일치하는 설정이 없어요.</p>{/if}
+          <label class="settings-search">설정 검색<input type="search" value={settingsQuery} oninput={(event) => updateSettingsSearch(event.currentTarget.value)} maxlength="60" placeholder="예: 교시, 알레르기, 백업" /></label>
+          {#if settingsQuery.trim() && !settingsMatch('일반 시간표 표시 테마 애니메이션 데이터 고급 상세 학급 과목 색상 별칭 교사 이름 날짜 변경 변동 배지 테두리 밀도 종료 요일 학교 교시 시각 시간 시작 백업 복원 파일 저장 가져오기 내보내기 초기화 급식 보기 식사 조식 중식 석식 알레르기 번호 주의 개인 일정 시험', settingsQuery)}<p role="status">일치하는 설정이 없어요.</p>{/if}
+          <details class="display-settings" hidden={!settingsMatch('일반 테마 애니메이션', settingsQuery)} bind:open={settingsOpen.general}>
+            <summary>일반 설정</summary>
+            <div class="display-settings-grid">
+              <label>테마<select value={theme} onchange={(event) => setTheme(event.currentTarget.value)}><option value="light">라이트 모드</option><option value="dark">다크 모드</option><option value="system">시스템 설정 따르기</option></select></label>
+              <label class="display-toggle"><input type="checkbox" checked={animationsEnabled} onchange={(event) => setAnimationsEnabled(event.currentTarget.checked)} /> 애니메이션 사용</label>
+            </div>
+          </details>
            {#if school}
-             <details class="personal-timetable-panel" hidden={!settingsMatch('개인 시간표 일정 시험', settingsQuery)}>
+             <details class="personal-timetable-panel" hidden={!settingsMatch('개인 시간표 일정 시험', settingsQuery)} bind:open={settingsOpen.personal}>
                <summary>개인 시간표·일정</summary>
                {#if view === 'settings'}
                  {#key `${school.id}:${grade}:${classroom}`}<PersonalTimetable schoolId={school.id} schoolName={school.name} {grade} {classroom} {week} {dark} {displaySettings} />{/key}
                {/if}
              </details>
-             <details class="display-settings" hidden={!settingsMatch('시간표 표시 테마 애니메이션 과목 색상 별칭 교사 이름 날짜 변경 변동 배지 테두리 밀도 종료 요일', settingsQuery)} bind:open={settingsOpen.display}>
+             <details class="display-settings" hidden={!settingsMatch('시간표 표시 교사 날짜 변경 변동 배지 테두리 밀도 종료 요일 학급', settingsQuery)} bind:open={settingsOpen.display}>
                <summary>시간표 표시 설정</summary>
                <label class="display-toggle"><input type="checkbox" checked={useClassDisplay} disabled={classError} onchange={(event) => setClassDisplay(event.currentTarget.checked)} /> {grade}학년 {classroom}반만 따로 설정</label>
                <div class="display-settings-grid">
-                <label>테마
-                  <select value={theme} onchange={(event) => setTheme(event.currentTarget.value)}>
-                    <option value="light">라이트 모드</option><option value="dark">다크 모드</option><option value="system">시스템 설정 따르기</option>
-                  </select>
-                </label>
-                 <label class="display-toggle"><input type="checkbox" checked={animationsEnabled} onchange={(event) => setAnimationsEnabled(event.currentTarget.checked)} /> 애니메이션 사용</label>
-                 <label>과목 색상
-                   <select value={displaySettings.colorMode} onchange={(event) => setColorMode(event.currentTarget.value)}>
-                     <option value="none">색상 없음 (기본)</option><option value="auto">자동 색상</option><option value="custom">직접 선택</option>
-                   </select>
-                 </label>
-                 <label>과목 선택
-                   <select bind:value={selectedSubject} disabled={!subjectNames.length}>
-                     <option value="">과목을 선택하세요</option>{#each subjectNames as subject}<option value={subject}>{subject}</option>{/each}
-                   </select>
-                 </label>
-                 <label>과목 표시 이름
-                   <input type="text" value={displaySettings.subjectAliases[selectedSubject] || ''} disabled={!selectedSubject} maxlength="60" placeholder="원본 이름 유지" oninput={(event) => saveAlias('subject', selectedSubject, event.currentTarget.value)} />
-                 </label>
-                 {#if displaySettings.colorMode === 'custom'}
-                   <label>선택한 과목 색상
-                     <input type="color" value={displaySettings.subjectColors[selectedSubject] || '#425a75'} disabled={!selectedSubject} onchange={(event) => saveSubjectColor(event.currentTarget.value)} />
-                   </label>
-                   <button type="button" class="secondary-button display-reset" onclick={clearSubjectColors}>과목 색상 초기화</button>
-                 {/if}
                  <label class="display-toggle"><input type="checkbox" checked={displaySettings.showTeachers} onchange={(event) => saveDisplaySettings({ ...displaySettings, showTeachers: event.currentTarget.checked })} /> 시간표에 교사 표시</label>
                   <label class="display-toggle"><input type="checkbox" checked={displaySettings.showDates} onchange={(event) => saveDisplaySettings({ ...displaySettings, showDates: event.currentTarget.checked })} /> 주간 시간표 머리글에 날짜 표시</label>
                   <label class="display-toggle"><input type="checkbox" checked={displaySettings.showChangeHighlights} onchange={(event) => saveDisplaySettings({ ...displaySettings, showChangeHighlights: event.currentTarget.checked })} /> 변경된 수업 강조</label>
@@ -108,6 +106,20 @@
                    </select>
                  </label>
                  <label class="display-toggle"><input type="checkbox" checked={displaySettings.dimOtherDays} onchange={(event) => saveDisplaySettings({ ...displaySettings, dimOtherDays: event.currentTarget.checked })} /> 이번 주 오늘 외 요일 흐리게 표시</label>
+               </div>
+               <p class="display-settings-hint">{useClassDisplay ? '현재 학급에만 적용돼요.' : '별도 설정이 없는 이 학교 학급에 적용돼요.'}</p>
+             </details>
+             <details class="display-settings" hidden={!settingsMatch('데이터 고급 과목 색상 별칭 교사 이름 상세', settingsQuery)} bind:open={settingsOpen.advanced}>
+               <summary>과목·교사 상세 설정</summary>
+               <p class="display-settings-hint">{useClassDisplay ? '현재 학급에만 적용돼요.' : '별도 설정이 없는 이 학교 학급에 적용돼요.'}</p>
+               <div class="display-settings-grid">
+                 <label>과목 색상<select value={displaySettings.colorMode} onchange={(event) => setColorMode(event.currentTarget.value)}><option value="none">색상 없음 (기본)</option><option value="auto">자동 색상</option><option value="custom">직접 선택</option></select></label>
+                 <label>과목 선택<select bind:value={selectedSubject} disabled={!subjectNames.length}><option value="">과목을 선택하세요</option>{#each subjectNames as subject}<option value={subject}>{subject}</option>{/each}</select></label>
+                 <label>과목 표시 이름<input type="text" value={displaySettings.subjectAliases[selectedSubject] || ''} disabled={!selectedSubject} maxlength="60" placeholder="원본 이름 유지" oninput={(event) => saveAlias('subject', selectedSubject, event.currentTarget.value)} /></label>
+                 {#if displaySettings.colorMode === 'custom'}
+                   <label>선택한 과목 색상<input type="color" value={displaySettings.subjectColors[selectedSubject] || '#425a75'} disabled={!selectedSubject} onchange={(event) => saveSubjectColor(event.currentTarget.value)} /></label>
+                   <button type="button" class="secondary-button display-reset" onclick={clearSubjectColors}>과목 색상 초기화</button>
+                 {/if}
                  <label>교사 선택
                    <select bind:value={selectedTeacher} disabled={!teacherNames.length}>
                      <option value="">교사를 선택하세요</option>{#each teacherNames as teacher}<option value={teacher}>{teacher}</option>{/each}
@@ -123,7 +135,6 @@
                    <input type="text" value={displaySettings.teacherSuffix} maxlength="30" placeholder="예: T" oninput={(event) => saveDisplaySettings({ ...displaySettings, teacherSuffix: event.currentTarget.value })} />
                  </label>
                </div>
-               <p class="display-settings-hint">{useClassDisplay ? '현재 학급에만 적용돼요.' : '별도 설정이 없는 이 학교 학급에 적용돼요.'}</p>
              </details>
              <details class="lesson-time-settings" hidden={!settingsMatch('학교 교시 시각 시간 시작 종료', settingsQuery)} bind:open={settingsOpen.times}>
                <summary>학교 교시 시각 설정</summary>
