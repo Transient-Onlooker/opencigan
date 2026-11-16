@@ -27,9 +27,9 @@ test('정규 API 경로, 매개변수와 오류를 처리한다', async (t) => {
       '/api/v1/timetable/history?school=comci%3A%ED%95%99%EA%B5%90&week=2026-11-09&cursor=cursor%20%2F%201',
       '/api/v1/meals?school=neis%2F2&from=2026-11-09&to=2026-11-15',
     ]);
-    globalThis.fetch = async () => ({ ok: false, status: 503 });
-    await assert.rejects(api.getMeals('neis/2', '2026-11-09', '2026-11-15'), /503/);
-    globalThis.fetch = async () => ({ ok: false, status: 503, clone: () => ({ json: async () => ({ code: 'history_disabled' }) }) });
+    globalThis.fetch = async () => new Response('', { status: 503 });
+    await assert.rejects(api.getMeals('neis/2', '2026-11-09', '2026-11-15'), /일시적으로 이용할 수 없어요/);
+    globalThis.fetch = async () => Response.json({ code: 'history_disabled' }, { status: 503 });
     await assert.rejects(api.getTimetableHistory('school', '2026-11-09'), (error) => error.code === 'history_disabled');
     globalThis.fetch = async () => { throw new TypeError('Failed to fetch'); };
     await assert.rejects(api.searchSchools('서울'), /서버에 연결할 수 없어요/);

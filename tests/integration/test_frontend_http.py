@@ -45,7 +45,7 @@ const assert = require('node:assert/strict');
       meals: [{ date: '2026-11-10', type: '중식', dishes: ['밥(1)', '국(2)'], calories: null, nutrition: null, origin: null }], stale: false,
     });
     await assert.rejects(api.getMeals('invalid', '2026-11-09', '2026-11-15'), /400/);
-    await assert.rejects(api.searchSchools('failure'), /503/);
+    await assert.rejects(api.searchSchools('failure'), error => error.code === 'upstream_unavailable' && /원본에서 데이터를 가져오지/.test(error.message));
   } finally {
     await vite.close();
   }

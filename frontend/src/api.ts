@@ -1,3 +1,5 @@
+import { apiError } from './api-error';
+
 export interface School { id: string; name: string; region: string }
 export interface NeisSchool extends School { address: string }
 export interface TimetableRecord { grade: number; class: number | string; date: string; period: number; subject: string; teacher: string | null; isChanged: boolean }
@@ -19,13 +21,7 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
       headers: { Accept: 'application/json' },
     });
     if (!response.ok) {
-      if (response.status === 503) {
-        const body = typeof response.clone === 'function'
-          ? await response.clone().json().catch(() => null) as { code?: string } | null
-          : null;
-        if (body?.code === 'history_disabled') throw Object.assign(new Error('이 학교는 변경 이력을 제공하지 않습니다.'), { code: body.code });
-      }
-      throw new Error(`요청을 완료하지 못했어요. (${response.status})`);
+      throw await apiError(response);
     }
     return await response.json() as T;
   } catch (error) {
