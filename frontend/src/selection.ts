@@ -10,6 +10,10 @@ export function createSelectionState(initial: SelectionState, onChange: (state: 
   };
   return {
     update,
+    validClass(value: number, available: number[]) {
+      return Number.isInteger(value) && value >= 1 && value <= 99 && (!available.length || available.includes(value));
+    },
+    commitClass(value: number) { update({ classroom: value }); },
     prepareSchool(school: School, keepClass: boolean) {
       const reset = state.school?.id !== school.id && !keepClass;
       if (reset) update({ grade: 1, classroom: 1 });

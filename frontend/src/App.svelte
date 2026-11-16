@@ -649,12 +649,12 @@
     const input = event.currentTarget as HTMLInputElement;
     const value = input.valueAsNumber;
     classroomDraft = input.value;
-    classError = !Number.isInteger(value) || value < 1 || value > 99 || (availableClasses.length > 0 && !availableClasses.includes(value));
+    classError = !selectionState.validClass(value, availableClasses);
   }
   function saveClass(event: Event) {
     updateClass(event);
     const input = event.currentTarget as HTMLInputElement;
-    if (!classError) selectionState.update({ classroom: input.valueAsNumber });
+    if (!classError) selectionState.commitClass(input.valueAsNumber);
     classroomDraft = String(classroom);
     input.value = classroomDraft;
     if (!classError) persistSelection({ classroom });

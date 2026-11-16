@@ -43,6 +43,19 @@ test('school preparation and timetable reconciliation use the same selection own
   assert.equal(current.classroom, 1);
 });
 
+test('class draft validation and commit preserve the selected class until a valid value is committed', () => {
+  let current;
+  const owner = exports.createSelectionState({ school: null, grade: 1, classroom: 2, week: '2026-11-09' }, (state) => { current = state; });
+  for (const value of [NaN, 0, 1.5, 100, 7]) assert.equal(owner.validClass(value, [2, 3]), false);
+  assert.equal(current, undefined);
+  assert.equal(owner.validClass(7, []), true);
+  assert.equal(owner.validClass(3, [2, 3]), true);
+  owner.commitClass(3);
+  assert.equal(current.classroom, 3);
+  assert.equal(current.grade, 1);
+  assert.equal(current.week, '2026-11-09');
+});
+
 test('selection persistence preserves keys, values and write order', () => {
   const writes = [];
   const storage = { setItem: (key, value) => writes.push([key, value]) };
