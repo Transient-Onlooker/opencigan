@@ -9,11 +9,12 @@ const timetable = {
   records: [1, 2].map((room) => ({ grade: 1, class: room, date: week, period: 1, subject: `과목${room}`, teacher: null, isChanged: false })),
 };
 
-async function mockApi(page, delayedSearch) {
+async function mockApi(page, delayedSearch, onSchoolSearch) {
   await page.clock.setFixedTime(new Date('2026-11-09T02:00:00Z'));
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname === '/api/v1/schools') {
+      onSchoolSearch?.();
       if (delayedSearch) await delayedSearch;
       return route.fulfill({ json: { schools: [school], stale: false } });
     }
@@ -121,6 +122,32 @@ test('manual class selection wins over a delayed shared school check in the same
   await expect(page.getByRole('spinbutton', { name: '반', exact: true })).toHaveValue('2');
   await expect(page.locator('#timetable-panel').getByRole('table')).toContainText('과목2');
   expect(await page.evaluate(() => localStorage.getItem('opensigan-class'))).toBe('2');
+});
+
+test('history navigation cancels an outstanding shared school verification', async ({ page }) => {
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  let markStarted;
+  const started = new Promise((resolve) => { markStarted = resolve; });
+  await mockApi(page, pending, markStarted);
+  await page.addInitScript((value) => {
+    localStorage.setItem('opensigan-school', JSON.stringify(value));
+    localStorage.setItem('opensigan-grade', '1');
+    localStorage.setItem('opensigan-class', '1');
+  }, school);
+  await page.goto('/' + sharedHash(2));
+  await started;
+  const classes = page.locator('.quick-class select').nth(1);
+  await expect(classes).toHaveValue('1');
+  await page.evaluate(({ school, week }) => {
+    const state = { version: 1, view: 'timetable', timetableView: 'week', school, grade: 1, classroom: 1, week, selectedDay: week, mealDate: week };
+    window.dispatchEvent(new PopStateEvent('popstate', { state: { opensigan: state } }));
+  }, { school, week });
+  release();
+  await page.waitForTimeout(350);
+  await expect(classes).toHaveValue('1');
+  await expect(page.locator('#timetable-panel').getByRole('table')).toContainText('과목1');
+  expect(await page.evaluate(() => localStorage.getItem('opensigan-class'))).toBe('1');
 });
 
 test('invalid manual class edits restore the applied selection on blur', async ({ page }) => {
