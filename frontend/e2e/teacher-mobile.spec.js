@@ -41,7 +41,7 @@ test('teacher and grade views keep class labels legible on narrow screens', asyn
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
 
-for (const viewport of [{ width: 320, height: 700 }, { width: 667, height: 375 }, { width: 1280, height: 800 }]) {
+for (const viewport of [{ width: 320, height: 700 }, { width: 375, height: 812 }, { width: 390, height: 844 }, { width: 667, height: 375 }, { width: 768, height: 1024 }, { width: 1280, height: 800 }]) {
   for (const theme of ['light', 'dark']) {
     test(`weekly timetable stays usable at ${viewport.width}px in ${theme} mode`, async ({ page }) => {
       await page.setViewportSize(viewport);
