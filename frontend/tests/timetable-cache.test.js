@@ -135,3 +135,54 @@ test('week reuse avoids a request until expiry while manual refresh requests fre
   await flush();
   assert.equal(calls, 3);
 });
+
+test('server failure restores only the matching saved timetable and recovery replaces it', async () => {
+  let state;
+  let selected = { schoolId: 'a', week: '2026-11-09' };
+  const session = exports.createTimetableSession((value) => { state = value; });
+  const saved = { schoolId: 'a', weekStart: selected.week, records: [{ subject: 'saved' }], fetchedAt: '2026-11-09T01:00:00Z', stale: false };
+  const fresh = { ...saved, records: [{ subject: 'fresh' }] };
+  const storage = () => ({ getItem: () => JSON.stringify(saved), setItem() {} });
+  let fail = true;
+  const options = {
+    schoolId: 'a', week: selected.week, preserve: false, reuseCachedWeek: false, validateClass: false,
+    refreshInterval: 100, now: () => 10, storage, online: () => true, current: () => selected,
+    fetch: async () => { if (fail) throw new Error('server unavailable'); return fresh; },
+    validate() {}, classError: () => false, errorText: (error) => error.message, onSuccess() {}, onFailure() {},
+  };
+  const flush = () => new Promise(setImmediate);
+  session.load(options);
+  await flush();
+  assert.equal(state.data.records[0].subject, 'saved');
+  assert.equal(state.fromDevice, true);
+  assert.equal(state.error, 'server unavailable');
+  fail = false;
+  session.load({ ...options, preserve: true });
+  await flush();
+  assert.equal(state.data.records[0].subject, 'fresh');
+  assert.equal(state.fromDevice, false);
+  assert.equal(state.error, '');
+  fail = true;
+  selected = { schoolId: 'a', week: '2026-11-16' };
+  session.load({ ...options, week: selected.week, preserve: true });
+  await flush();
+  assert.equal(state.data, null);
+  assert.equal(state.error, 'server unavailable');
+});
+
+test('failed refresh marks the retained timetable as stale', async () => {
+  let state;
+  const session = exports.createTimetableSession((value) => { state = value; });
+  const data = { schoolId: 'a', weekStart: '2026-11-09', records: [], stale: false };
+  session.update({ data });
+  session.load({
+    schoolId: 'a', week: data.weekStart, preserve: true, reuseCachedWeek: false, validateClass: false,
+    refreshInterval: 100, now: () => 10, storage: () => ({ getItem: () => null }), online: () => true,
+    current: () => ({ schoolId: 'a', week: data.weekStart }), fetch: async () => { throw new Error('failed'); },
+    validate() {}, classError: () => false, errorText: (error) => error.message, onSuccess() {}, onFailure() {},
+  });
+  await new Promise(setImmediate);
+  assert.equal(state.data.stale, true);
+  assert.equal(state.error, 'failed');
+  assert.equal(data.stale, false);
+});

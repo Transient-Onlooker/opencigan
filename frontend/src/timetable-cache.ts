@@ -20,7 +20,7 @@ export function createTimetableCache(limit = 4) {
 export type TimetableSessionState = { data: TimetableResponse | null; fromDevice: boolean; loading: boolean; error: string; refreshAt: number };
 type TimetableLoad = {
   schoolId: string | undefined; week: string; preserve: boolean; reuseCachedWeek: boolean; validateClass: boolean;
-  refreshInterval: number; now: () => number; storage: () => Storage; online: () => boolean;
+  refreshInterval: number; now: () => number; storage: () => Storage;
   current: () => { schoolId: string | undefined; week: string };
   fetch: (schoolId: string, week: string, signal: AbortSignal) => Promise<TimetableResponse>;
   validate: () => void; classError: () => boolean; errorText: (error: unknown) => string;
@@ -90,14 +90,16 @@ export function createTimetableSession(onChange: (state: TimetableSessionState) 
       session.update({ loading: true });
       void result.catch((error) => {
         if (controller.signal.aborted) return;
-        if (!state.data && !options.online()) {
-          const selected = options.current();
+        const selected = options.current();
+        if (state.data && state.data.schoolId === selected.schoolId && state.data.weekStart === selected.week) {
+          session.update({ data: { ...state.data, stale: true } });
+        } else {
           const saved = selected.schoolId && session.restoreOffline(selected.schoolId, selected.week, options.storage);
-          if (saved) session.update({ data: saved, fromDevice: true });
+          session.update({ data: saved || null, fromDevice: !!saved });
         }
         if (options.validateClass) options.validate();
         if (controller.signal.aborted) return;
-        if (!state.fromDevice || options.online()) session.update({ error: options.errorText(error) });
+        session.update({ error: options.errorText(error) });
         options.onFailure();
       }).finally(() => { if (!controller.signal.aborted) session.update({ loading: false }); });
     },
