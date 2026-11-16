@@ -4,7 +4,7 @@
 
 ## 이슈를 열기 전에
 
-1. [기존 이슈](https://github.com/Transient-Onlooker/opensigan/issues), [알려진 문제](docs/known-issues.md), [로드맵](docs/roadmap.md)을 확인합니다.
+1. [기존 이슈](https://github.com/Transient-Onlooker/opencigan/issues), [알려진 문제](docs/known-issues.md), [로드맵](docs/roadmap.md)을 확인합니다.
 2. 재현 순서와 기대한 결과, 실제 결과를 적어 주세요. 브라우저·OS와 모바일 기기나 화면 크기를 알면 함께 적어 주세요. 로컬에서 재현했다면 커밋도 도움이 됩니다.
 3. 화면 캡처나 로그에는 개인정보, 비공개 주소, 인증 정보, 원본 데이터 덤프를 포함하지 마세요. 데이터 처리 문제는 실제 학교 자료 대신 최소한의 합성 데이터로 재현해 주세요.
 
