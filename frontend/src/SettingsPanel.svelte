@@ -134,6 +134,7 @@
              <details class="settings-backup" hidden={!settingsMatch('설정 백업 복원 파일 저장 가져오기 내보내기 초기화', settingsQuery)} bind:open={settingsOpen.backup}>
                <summary>설정 백업·복원</summary>
                <p class="display-settings-hint">학교 파일에는 기본 표시 설정과 교시 시각을, 학급 파일에는 해당 학급의 표시 설정을 저장해요. 두 파일 모두 급식 알레르기 설정은 포함하지 않아요.</p>
+               {#if !useClassDisplay}<p class="display-settings-hint">학급 설정 파일을 저장하려면 시간표 표시 설정에서 ‘{grade}학년 {classroom}반만 따로 설정’을 켜 주세요.</p>{/if}
                <div class="lesson-time-actions">
                  <button class="secondary-button" type="button" onclick={() => downloadSettingsBackup()}><Icon name="save" /> 학교 설정 파일 저장</button>
                  {#if useClassDisplay}<button class="secondary-button" type="button" disabled={classError} onclick={() => downloadSettingsBackup(true)}><Icon name="save" /> 학급 설정 파일 저장</button>{/if}

@@ -139,15 +139,31 @@ test('school settings backup restores display preferences and bell times', async
   await expect(page.getByLabel('1교시 종료')).toHaveValue('09:20');
 });
 
+test('older version 1 school settings files can still be imported', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('시간표 표시 설정', { exact: true }).click();
+  await page.getByText('설정 백업·복원', { exact: true }).click();
+  const legacy = { format: 'opencigan-settings', version: 1, schoolId: school.id, displaySettings: { colorMode: 'none', showTeachers: false }, lessonTimes: {} };
+  await page.getByLabel('Opencigan 설정 JSON 파일 불러오기').setInputFiles({ name: 'legacy.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(legacy)) });
+  await expect(page.getByText('현재 학교의 설정을 복원했어요.')).toBeVisible();
+  await expect(page.getByLabel('시간표에 교사 표시')).not.toBeChecked();
+});
+
 test('class settings backup restores the selected class without changing another class', async ({ page }) => {
   await mockApi(page);
   await page.goto('/' + sharedHash(1));
   await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByText('시간표 표시 설정', { exact: true }).click();
+  await page.getByText('설정 백업·복원', { exact: true }).click();
+  await expect(page.getByRole('button', { name: '학급 설정 파일 저장' })).toHaveCount(0);
+  await expect(page.getByText('학급 설정 파일을 저장하려면', { exact: false })).toBeVisible();
   await page.getByLabel('1학년 1반만 따로 설정').check();
   await page.getByLabel('시간표에 교사 표시').uncheck();
-  await page.getByText('설정 백업·복원', { exact: true }).click();
+  await expect(page.getByText('학급 설정 파일을 저장하려면', { exact: false })).toHaveCount(0);
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '학급 설정 파일 저장' }).click();
   const download = await downloadPromise;
