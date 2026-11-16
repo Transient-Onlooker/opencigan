@@ -437,10 +437,7 @@
       (selected, candidates) => mealSchoolCandidates(selected, candidates), chooseNeis, errorText);
   }
   function chooseNeis(value: NeisSchool) {
-    mealSession.cancelNeis();
-    mealSession.update({ neis: value, candidates: [], neisLoading: false, searchState: '급식도 ' + value.name + '로 연결했어요.' });
-    if (school) { try { writeMealSchool(localStorage, school.id, value); } catch { /* 현재 연결은 저장 없이 유지합니다. */ } }
-    loadMeals();
+    mealSession.choose(value, (selected) => { if (school) writeMealSchool(localStorage, school.id, selected); }, loadMeals);
   }
   function ensureAvailableClass() {
     if (pendingSharedClass && pendingSharedClass.schoolId === school?.id) {

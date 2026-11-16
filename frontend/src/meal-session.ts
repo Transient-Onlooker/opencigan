@@ -22,6 +22,12 @@ export function createMealSession(onChange: (state: MealState) => void) {
       session.cancel();
       session.update({ neis: null, candidates: [], searchState: '', neisLoading: false, meals: [], hasMeals: false, stale: false, error: '', loading: false, dataKey: '', requestKey: '' });
     },
+    choose(school: NeisSchool, save: (school: NeisSchool) => void, load: () => void) {
+      session.cancelNeis();
+      session.update({ neis: school, candidates: [], neisLoading: false, searchState: '급식도 ' + school.name + '로 연결했어요.' });
+      try { save(school); } catch { /* The current connection still works without storage. */ }
+      load();
+    },
     async connect(
       school: School, currentSchoolId: () => string | undefined,
       search: (name: string, signal: AbortSignal) => Promise<{ schools: NeisSchool[]; stale: boolean }>,
