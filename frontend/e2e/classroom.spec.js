@@ -148,22 +148,19 @@ test('week navigation hides unverified actions and keeps the last row and search
 
   const menu = page.getByRole('navigation', { name: '캘린더 메뉴', includeHidden: true });
   const lastRow = panel.getByRole('table').locator('tbody tr').last();
-  await panel.getByText('이 반의 수업 찾기', { exact: true }).click();
-  const input = panel.getByRole('searchbox', { name: '과목명 또는 교사명' });
-  await input.fill('마지막');
-  const result = panel.locator('.lesson-search article').last();
+  await expect(panel.getByText('이 반의 수업 찾기', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '학교 변경', exact: true }).click();
+  const input = page.getByRole('searchbox', { name: '학교 찾기' });
   for (const viewport of [{ width: 320, height: 600 }, { width: 667, height: 320 }]) {
     await page.setViewportSize(viewport);
     await input.focus();
     await expect(menu).toBeHidden();
     await input.press('Tab');
     await expect(menu).toBeVisible();
-    for (const target of [result, lastRow]) {
-      await target.evaluate((element) => element.scrollIntoView({ block: 'end', behavior: 'instant' }));
-      const box = await target.boundingBox();
-      const nav = await menu.boundingBox();
-      expect(box.y + box.height).toBeLessThanOrEqual(nav.y);
-    }
+    await lastRow.evaluate((element) => element.scrollIntoView({ block: 'end', behavior: 'instant' }));
+    const box = await lastRow.boundingBox();
+    const nav = await menu.boundingBox();
+    expect(box.y + box.height).toBeLessThanOrEqual(nav.y);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
   }
 });

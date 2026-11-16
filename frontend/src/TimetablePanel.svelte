@@ -8,7 +8,7 @@
   import TodayLessons from './TodayLessons.svelte';
   import WeekGrid from './WeekGrid.svelte';
   import { addDays } from './date';
-  import { displaySubject, displayTeacher, type DisplaySettings } from './personalization';
+  import type { DisplaySettings } from './personalization';
   import type { School, TimetableRecord, TimetableResponse, TimetableChange } from './api';
   import type { LessonTimes, dailyLessonOverview } from './lesson-times';
   export let view: 'timetable' | 'meals' | 'settings';
@@ -34,9 +34,6 @@
   export let weekendClasses: boolean;
   export let classError: boolean;
   export let sharedClassState: string;
-  export let lessonQuery: string;
-  export let lessonWeekday: string;
-  export let matchingLessons: TimetableRecord[];
   export let selectedClassLessons: TimetableRecord[];
   export let shownClassLessons: TimetableRecord[];
   export let dayOverview: ReturnType<typeof dailyLessonOverview>;
@@ -91,7 +88,6 @@
            {#if school}<QuickClass {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {selectGrade} {selectClass} />{/if}
            <div class="calendar-toolbar"><button class="arrow-button" onclick={() => changeWeek(-1)} disabled={week <= current} aria-label="이전 주">←</button><div class="calendar-date" aria-live="polite"><strong>{shortDate(week)} ~ {shortDate(addDays(week, weekendClasses ? 6 : 4))}</strong></div><button class="arrow-button" onclick={() => changeWeek(1)} disabled={week >= addDays(current, 7)} aria-label="다음 주">→</button></div>
            <div class="quick-class-hint">이번 주·다음 주만 조회할 수 있어요. <Help label="시간표 조회 범위" text="원본 서비스가 제공하는 현재 주와 다음 주를 조회합니다. 과거 또는 더 먼 미래의 시간표는 제공하지 않아요." /></div>
-          {#if timetable && !classError && timetableView === 'week'}<details class="lesson-search"><summary>이 반의 수업 찾기</summary><div class="lesson-search-fields"><label>과목명 또는 교사명<input type="search" bind:value={lessonQuery} placeholder="이번 주 수업 검색" maxlength="100" /></label><label>요일<select bind:value={lessonWeekday}><option value="">모든 요일</option>{#each ['일', '월', '화', '수', '목', '금', '토'] as day, index}<option value={String(index)}>{day}요일</option>{/each}</select></label></div>{#if lessonQuery.trim() || lessonWeekday}<p role="status">검색 결과 {matchingLessons.length}개</p>{#if matchingLessons.length}<div class="lesson-list">{#each matchingLessons as lesson}<article><span class="lesson-period">{dateText(lesson.date, { weekday: 'short' })} · {lesson.period}교시</span><strong style={subjectStyle(lesson.subject)}>{displaySubject(lesson.subject, displaySettings)}</strong>{#if displaySettings.showTeachers && lesson.teacher}<span>{displayTeacher(lesson.teacher, displaySettings)}</span>{/if}</article>{/each}</div>{:else}<p>이 반의 이번 주 수업 중 일치하는 결과가 없어요.</p>{/if}{/if}</details>{/if}
           {#if tableState}<div class="notice" role="alert">{tableRefreshState === '새로고침 실패' ? '새로고침 실패. ' : ''}{timetable ? '이전 시간표를 표시하고 있어요. ' : '이 학교와 주에 저장된 시간표가 없어요. '}{tableState}{tableRefreshState === '새로고침 실패' && timetableCheckedAt ? ' · 마지막 확인 ' + timeText(timetableCheckedAt, true) : ''} <button class="text-button" onclick={() => loadTimetable(!!timetable)}>다시 시도</button></div>{/if}
           {#if tableLoading && timetable}<p class="state-inline" role="status">새 시간표를 확인하는 동안 이전 시간표를 표시하고 있어요.</p>{/if}
           {#if !school}<div class="state-message"><strong>학교를 먼저 선택해 주세요</strong><p>학교와 학급을 선택하면 시간표가 표시돼요.</p></div>
@@ -114,9 +110,6 @@
         </section>
 
 <style>
-.lesson-search{border:1px solid var(--line);padding:12px 16px;margin:0 0 20px}
-.lesson-search summary{cursor:pointer;min-height:44px;display:list-item;align-content:center;font-weight:650}
-.lesson-search p{font-size:14px;color:var(--muted)}
 .last-fetched{font-size:12px;color:var(--muted);white-space:nowrap}
 .dataset-details{margin:8px 0 0;font-size:12px;color:var(--muted)}
 .dataset-details summary{display:list-item;width:fit-content;min-height:36px;align-content:center;cursor:pointer}

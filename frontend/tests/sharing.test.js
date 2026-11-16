@@ -12,7 +12,7 @@ import { lessonTimesVm } from './helpers/lesson-times-vm.js';
 const source = await readFile(new URL('../src/sharing.ts', import.meta.url), 'utf8');
 const context = { exports: {}, URL, URLSearchParams };
 runInNewContext(ts.transpile(source, { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }), context);
-const { shareClassUrl, readSharedClass, findLessons } = context.exports;
+const { shareClassUrl, readSharedClass } = context.exports;
 
 test('shared class restores Korean names and keeps identifiers in the URL fragment', () => {
   const school = { id: '123:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
@@ -26,19 +26,6 @@ test('malformed, duplicated and out-of-range shared class values are ignored', (
   for (const hash of ['', good + '&grade=3', good.replace('class=7', 'class=0'), good.replace('grade=2', 'grade=7'), good.replace('123%3ASchool', 'invalid'), 'x'.repeat(4097)]) {
     assert.equal(readSharedClass(hash), null);
   }
-});
-
-test('lesson search matches subject or teacher, combines weekday and preserves source order', () => {
-  const records = [
-    { date: '2026-11-10', period: 2, subject: 'Math', teacher: 'Kim' },
-    { date: '2026-11-09', period: 3, subject: '국어', teacher: '박선생' },
-    { date: '2026-11-09', period: 1, subject: '수학', teacher: null },
-  ];
-  assert.equal(findLessons(records, 'math', '').length, 1);
-  assert.equal(findLessons(records, '선생', '1')[0].subject, '국어');
-  assert.equal(findLessons(records, 'Kim', '1').length, 0);
-  assert.equal(findLessons(records, '', '1')[0].period, 1);
-  assert.equal(records[0].date, '2026-11-10');
 });
 
 test('shared class takes precedence at startup even when browser storage is blocked', async () => {
