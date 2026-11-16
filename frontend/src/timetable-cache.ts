@@ -14,6 +14,7 @@ export function createTimetableCache(limit = 4) {
       weeks.set(key, { data, expires });
       if (weeks.size > limit) weeks.delete(weeks.keys().next().value!);
     },
+    invalidate(key: string) { weeks.delete(key); },
   };
 }
 
@@ -81,6 +82,7 @@ export function createTimetableSession(onChange: (state: TimetableSessionState) 
       }
       session.update({ refreshAt: options.now() + options.refreshInterval });
       const { controller, result } = session.fetch(options.schoolId, options.week, options.current, options.fetch, (data) => {
+        if (data.stale) cache.invalidate(key);
         session.update({ data, fromDevice: false });
         if (options.validateClass) options.validate();
         if (controller.signal.aborted || options.classError()) return;
@@ -90,6 +92,7 @@ export function createTimetableSession(onChange: (state: TimetableSessionState) 
       session.update({ loading: true });
       void result.catch((error) => {
         if (controller.signal.aborted) return;
+        cache.invalidate(key);
         const selected = options.current();
         if (state.data && state.data.schoolId === selected.schoolId && state.data.weekStart === selected.week) {
           session.update({ data: { ...state.data, stale: true } });

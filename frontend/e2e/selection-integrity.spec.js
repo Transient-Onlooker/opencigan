@@ -430,6 +430,30 @@ test('online server failure restores the matching saved timetable and retry reco
   await expect(panel.getByText('이 기기에 저장된 시간표 · 최신 정보가 아닐 수 있어요')).toHaveCount(0);
 });
 
+test('returning to a week after a failed refresh fetches it again', async ({ page }) => {
+  await mockApi(page);
+  let currentWeekRequests = 0;
+  await page.route('**/api/v1/timetable?*', (route) => {
+    const requestedWeek = new URL(route.request().url()).searchParams.get('week');
+    if (requestedWeek !== week) {
+      return route.fulfill({ json: { ...timetable, weekStart: requestedWeek, records: timetable.records.map((record) => ({ ...record, date: requestedWeek })) } });
+    }
+    currentWeekRequests += 1;
+    if (currentWeekRequests === 2) return route.fulfill({ status: 503, json: { code: 'upstream_unavailable' } });
+    return route.fulfill({ json: currentWeekRequests === 1 ? timetable : { ...timetable, records: timetable.records.map((record) => ({ ...record, subject: '재조회한 수업' })) } });
+  });
+  await page.goto('/' + sharedHash(1));
+  const panel = page.locator('#timetable-panel');
+  await expect(panel.getByRole('table')).toContainText('과목1');
+  await panel.getByRole('button', { name: /시간표 새로고침/ }).click();
+  await expect(panel.getByRole('alert')).toContainText('새로고침 실패');
+  await panel.getByRole('button', { name: '다음 주' }).click();
+  await expect(panel.getByRole('alert')).toHaveCount(0);
+  await panel.getByRole('button', { name: '이전 주' }).click();
+  await expect(panel.getByRole('table')).toContainText('재조회한 수업');
+  expect(currentWeekRequests).toBe(3);
+});
+
 test('timetable outage without a saved copy leaves meals available and retry recovers', async ({ page }) => {
   await page.addInitScript((savedSchool) => {
     localStorage.setItem('opensigan-school', JSON.stringify(savedSchool));
