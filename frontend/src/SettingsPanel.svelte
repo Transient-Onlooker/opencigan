@@ -3,7 +3,7 @@
   import Icon from './Icon.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import { allergens } from './allergens';
-  import { calculateLessonTimes, type LessonTimes } from './lesson-times';
+  import { calculateLessonTimes, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
   import type { School } from './api';
   import type { DisplaySettings } from './personalization';
   export let view: 'timetable' | 'meals' | 'settings';
@@ -23,6 +23,7 @@
   export let teacherNames: string[];
   export let lessonTimePeriods: number[];
   export let lessonTimeDrafts: Record<number, { start: string; end: string }>;
+  export let weekdayTimeDrafts: WeekdayLessonTimes;
   export let lessonTimeState: string;
   export let settingsBackupState: string;
   export let mealTypes: string[];
@@ -38,6 +39,8 @@
   export let clearSubjectColors: () => void;
   export let saveDisplaySettings: (value: DisplaySettings) => void;
   export let editLessonTime: (period: number, part: 'start' | 'end', value: string) => void;
+  export let editWeekdayTime: (day: number, period: number, part: 'start' | 'end', value: string) => void;
+  export let clearWeekdayTime: (day: number, period: number) => void;
   export let applyLessonTimeRules: (value: LessonTimes) => void;
   export let saveLessonTimes: () => void;
   export let clearLessonTimes: () => void;
@@ -53,6 +56,7 @@
   let searchResults: { name: string; category: string; target: HTMLElement; panel: HTMLDetailsElement }[] = [];
   let ruleSchool = '';
   let lessonDetailsOpen = false;
+  let weekdaySelection = 1;
   let ruleStart = '', ruleDuration = '', ruleBreak = '', ruleLunchAfter = '', ruleLunch = '';
   $: if ((school?.id ?? '') !== ruleSchool) {
     ruleSchool = school?.id ?? '';
@@ -204,6 +208,19 @@
                    </div>
                  {/each}
                </div>
+               </details>
+               <details class="lesson-time-detail">
+                 <summary>요일별 예외 시각</summary>
+                 <p class="display-settings-hint">요일별로 입력한 교시만 공통 시각보다 우선합니다. 시작·종료를 모두 입력하거나 공통 시각으로 되돌리세요.</p>
+                 <label>요일 선택 <select bind:value={weekdaySelection}><option value={1}>월요일</option><option value={2}>화요일</option><option value={3}>수요일</option><option value={4}>목요일</option><option value={5}>금요일</option><option value={6}>토요일</option><option value={7}>일요일</option></select></label>
+                 <div class="lesson-time-grid">{#each lessonTimePeriods as period}
+                   <div class="lesson-time-row">
+                     <strong>{period}교시</strong>
+                     <label>시작 <input type="time" aria-label={`요일별 ${period}교시 시작`} value={weekdayTimeDrafts[weekdaySelection]?.[period]?.start ?? ''} oninput={(event) => editWeekdayTime(weekdaySelection, period, 'start', event.currentTarget.value)} /></label>
+                     <label>종료 <input type="time" aria-label={`요일별 ${period}교시 종료`} value={weekdayTimeDrafts[weekdaySelection]?.[period]?.end ?? ''} oninput={(event) => editWeekdayTime(weekdaySelection, period, 'end', event.currentTarget.value)} /></label>
+                     {#if weekdayTimeDrafts[weekdaySelection]?.[period]}<button class="text-button lesson-time-revert" type="button" aria-label={`요일별 ${period}교시 공통 시각으로 되돌리기`} onclick={() => clearWeekdayTime(weekdaySelection, period)}>공통 시각 사용</button>{/if}
+                   </div>
+                 {/each}</div>
                </details>
                <div class="lesson-time-actions"><button class="secondary-button" type="button" onclick={(event) => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); event.currentTarget.focus(); saveLessonTimes(); }}><Icon name="save" /> 시각 저장</button><button class="secondary-button" type="button" onclick={clearLessonTimes}>시각 초기화</button></div>
                {#if lessonTimeState}<p class="state-inline" role="status">{lessonTimeState}</p>{/if}

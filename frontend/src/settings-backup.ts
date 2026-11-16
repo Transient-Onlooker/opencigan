@@ -3,19 +3,35 @@ import { parseLessonTimes, parseWeekdayLessonTimes, type LessonTimes, type Weekd
 
 export const MAX_SETTINGS_BACKUP_BYTES = 64 * 1024;
 
-export function saveSchoolSettingsBackup(storage: Storage, schoolId: string, displaySettings: DisplaySettings, lessonTimes: LessonTimes) {
+export function saveLessonTimePreferences(storage: Storage, schoolId: string, lessonTimes: LessonTimes, weekdayLessonTimes: WeekdayLessonTimes) {
+  const key = 'opensigan-lesson-times:' + schoolId;
+  const weekdayKey = 'opensigan-weekday-lesson-times:' + schoolId;
+  const previous = storage.getItem(key), previousWeekdays = storage.getItem(weekdayKey);
+  try {
+    storage.setItem(key, JSON.stringify(lessonTimes));
+    storage.setItem(weekdayKey, JSON.stringify(weekdayLessonTimes));
+  } catch {
+    try { if (previous === null) storage.removeItem(key); else storage.setItem(key, previous); } catch { /* 저장소가 계속 차단될 수 있습니다. */ }
+    try { if (previousWeekdays === null) storage.removeItem(weekdayKey); else storage.setItem(weekdayKey, previousWeekdays); } catch { /* 저장소가 계속 차단될 수 있습니다. */ }
+    throw new Error('브라우저 저장소에 설정을 저장하지 못했어요.');
+  }
+}
+
+export function saveSchoolSettingsBackup(storage: Storage, schoolId: string, displaySettings: DisplaySettings, lessonTimes: LessonTimes, weekdayLessonTimes?: WeekdayLessonTimes) {
   const displayKey = 'opensigan-display:' + schoolId;
   const timesKey = 'opensigan-lesson-times:' + schoolId;
   const previousDisplay = storage.getItem(displayKey);
   const previousTimes = storage.getItem(timesKey);
+  const weekdayKey = 'opensigan-weekday-lesson-times:' + schoolId;
+  const previousWeekdays = weekdayLessonTimes === undefined ? null : storage.getItem(weekdayKey);
   try {
     storage.setItem(displayKey, JSON.stringify(displaySettings));
     storage.setItem(timesKey, JSON.stringify(lessonTimes));
+    if (weekdayLessonTimes !== undefined) storage.setItem(weekdayKey, JSON.stringify(weekdayLessonTimes));
   } catch {
-    try {
-      if (previousDisplay === null) storage.removeItem(displayKey); else storage.setItem(displayKey, previousDisplay);
-      if (previousTimes === null) storage.removeItem(timesKey); else storage.setItem(timesKey, previousTimes);
-    } catch { /* Storage access may remain blocked during rollback. */ }
+    try { if (previousDisplay === null) storage.removeItem(displayKey); else storage.setItem(displayKey, previousDisplay); } catch { /* 저장소가 계속 차단될 수 있습니다. */ }
+    try { if (previousTimes === null) storage.removeItem(timesKey); else storage.setItem(timesKey, previousTimes); } catch { /* 저장소가 계속 차단될 수 있습니다. */ }
+    if (weekdayLessonTimes !== undefined) { try { if (previousWeekdays === null) storage.removeItem(weekdayKey); else storage.setItem(weekdayKey, previousWeekdays); } catch { /* 저장소가 계속 차단될 수 있습니다. */ } }
     throw new Error('브라우저 저장소에 설정을 저장하지 못했어요.');
   }
 }

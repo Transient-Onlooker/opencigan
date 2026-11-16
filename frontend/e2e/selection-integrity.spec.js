@@ -176,7 +176,7 @@ test('school settings backup restores display preferences and bell times', async
   await page.getByText('학교 교시 시각 설정', { exact: true }).click();
   await page.getByText('상세 시간 설정하기', { exact: true }).click();
   await page.getByLabel('1교시 시작', { exact: true }).fill('08:30');
-  await page.getByLabel('1교시 종료').fill('09:20');
+  await page.getByLabel('1교시 종료', { exact: true }).fill('09:20');
   await page.getByRole('button', { name: '시각 저장' }).click();
   await page.getByText('설정 백업·복원', { exact: true }).click();
   const downloadPromise = page.waitForEvent('download');
@@ -200,7 +200,7 @@ test('school settings backup restores display preferences and bell times', async
   await page.getByText('학교 교시 시각 설정', { exact: true }).click();
   await page.getByText('상세 시간 설정하기', { exact: true }).click();
   await expect(page.getByLabel('시간표에 교사 표시')).not.toBeChecked();
-  await expect(page.getByLabel('1교시 종료')).toHaveValue('09:20');
+  await expect(page.getByLabel('1교시 종료', { exact: true })).toHaveValue('09:20');
 });
 
 test('older version 1 school settings files can still be imported', async ({ page }) => {
@@ -721,6 +721,43 @@ test('lesson time rules preview lunch and require explicit application and savin
   await page.getByRole('button', { name: '시각 저장', exact: true }).click();
   await expect(page.getByText('이 학교의 교시 시각을 저장했어요.')).toBeVisible();
   expect(JSON.parse(await page.evaluate((id) => localStorage.getItem('opensigan-lesson-times:' + id), school.id))[5].start).toBe('13:10');
+});
+
+test('weekday bell times save independently and are included in school backup', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('학교 교시 시각 설정', { exact: true }).click();
+  await page.getByText('상세 시간 설정하기', { exact: true }).click();
+  await page.getByLabel('1교시 시작', { exact: true }).fill('09:00');
+  await page.getByLabel('1교시 종료', { exact: true }).fill('09:50');
+  await page.getByText('요일별 예외 시각', { exact: true }).click();
+  await page.getByLabel('요일 선택').selectOption('2');
+  await page.getByLabel('요일별 1교시 시작').fill('10:00');
+  await page.getByLabel('요일별 1교시 종료').fill('10:50');
+  await page.getByRole('button', { name: '시각 저장', exact: true }).click();
+  await expect(page.getByText('이 학교의 교시 시각을 저장했어요.')).toBeVisible();
+  await page.getByText('설정 백업·복원', { exact: true }).click();
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: '학교 설정 파일 저장' }).click();
+  const chunks = [];
+  for await (const chunk of await (await download).createReadStream()) chunks.push(chunk);
+  const backupFile = Buffer.concat(chunks);
+  const backup = JSON.parse(backupFile.toString());
+  expect(backup.version).toBe(2);
+  expect(backup.weekdayLessonTimes['2']['1'].start).toBe('10:00');
+  await page.reload();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('학교 교시 시각 설정', { exact: true }).click();
+  await page.getByText('요일별 예외 시각', { exact: true }).click();
+  await page.getByLabel('요일 선택').selectOption('2');
+  await expect(page.getByLabel('요일별 1교시 시작')).toHaveValue('10:00');
+  await page.getByRole('button', { name: '시각 초기화' }).click();
+  await page.getByText('설정 백업·복원', { exact: true }).click();
+  await page.getByLabel('Opencigan 설정 JSON 파일 불러오기').setInputFiles({ name: 'school.json', mimeType: 'application/json', buffer: backupFile });
+  await expect(page.getByText('현재 학교의 설정을 복원했어요.')).toBeVisible();
+  await expect(page.getByLabel('요일별 1교시 시작')).toHaveValue('10:00');
 });
 
 test('personal schedule preserves entered dates when saving lessons and events', async ({ page, browserName, context }) => {
