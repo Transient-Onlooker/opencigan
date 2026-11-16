@@ -19,7 +19,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.table-scroll:focu
 .theme-toggle:hover,.secondary-button:hover,.arrow-button:hover,.school-option:hover{background:var(--soft);border-color:var(--ink)}
 .theme-toggle:active,.secondary-button:active,.arrow-button:active{background:var(--ink);color:var(--surface)}
 main{width:min(960px,calc(100% - 40px));margin:0 auto}
-.personal-timetable-panel{margin-top:20px;border:1px solid var(--line);padding:12px;min-width:0}
+.personal-timetable-panel{margin:0 0 14px;border:1px solid var(--line);padding:0 14px;min-width:0}
 .personal-timetable-panel>summary{min-height:44px;align-content:center;cursor:pointer;font-weight:650}
 .secondary-button>.icon{width:17px;height:17px;margin-right:4px}
 .context-help{position:relative;display:inline-block;vertical-align:middle;font-size:13px;font-weight:400}
