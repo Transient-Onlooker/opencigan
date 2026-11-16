@@ -265,6 +265,21 @@ test('grade changes reconcile the class and remain synchronized across both sele
   expect(await page.evaluate(() => [localStorage.getItem('opensigan-grade'), localStorage.getItem('opensigan-class')])).toEqual(['2', '3']);
 });
 
+test('grade comparison accepts a pasted date in the selected week', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await page.getByRole('group', { name: '시간표 보기' }).getByRole('button', { name: '1학년' }).click();
+  const input = page.getByLabel('비교 날짜');
+  await expect(page.getByText('비교할 시간표가 없어요')).toHaveCount(0);
+  await input.evaluate((element) => {
+    const clipboard = new DataTransfer();
+    clipboard.setData('text/plain', '2026-11-10');
+    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: clipboard, bubbles: true, cancelable: true }));
+  });
+  await expect(input).toHaveValue('2026-11-10');
+  await expect(page.getByText('비교할 시간표가 없어요')).toBeVisible();
+});
+
 test('meal date accepts continuous keyboard entry', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'Native date keyboard entry varies by browser and locale.');
   await mockApi(page);
