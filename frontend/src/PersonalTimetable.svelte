@@ -13,7 +13,7 @@
     MAX_STORE_ENTRIES,
   } from './personal-timetable';
   import { saveTimetablePng } from './export-png';
-  import { addDays } from './date';
+  import { addDays, pasteDate } from './date';
 
   let {
     schoolId = '',
@@ -328,7 +328,7 @@
         </label>
         <label>
           특정 일자 (선택)
-          <input type="date" bind:value={newSpecificDate} />
+          <input type="date" bind:value={newSpecificDate} onpaste={pasteDate} />
         </label>
         <button type="submit" class="pt-submit-btn">저장</button>
       </div>
@@ -372,7 +372,7 @@
           </label>
           <label>
             날짜
-            <input type="date" bind:value={newEventDate} required />
+            <input type="date" bind:value={newEventDate} onpaste={pasteDate} required />
           </label>
           <label>
             시각 (선택)

@@ -265,6 +265,35 @@ test('grade changes reconcile the class and remain synchronized across both sele
   expect(await page.evaluate(() => [localStorage.getItem('opensigan-grade'), localStorage.getItem('opensigan-class')])).toEqual(['2', '3']);
 });
 
+test('meal date accepts continuous keyboard entry', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Native date keyboard entry varies by browser and locale.');
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  const input = page.getByLabel('날짜 선택');
+  await input.fill('');
+  await input.focus();
+  await input.pressSequentially('12252026');
+  await input.blur();
+  await expect(input).toHaveValue('2026-12-25');
+  await expect(input).toHaveAttribute('aria-invalid', 'false');
+});
+
+test('meal date accepts pasted ISO date', async ({ page, browserName, context }) => {
+  test.skip(browserName !== 'chromium', 'Clipboard permissions differ by browser.');
+  await mockApi(page);
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/' + sharedHash(1));
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  const input = page.getByLabel('날짜 선택');
+  await input.fill('');
+  await input.focus();
+  await page.evaluate(() => navigator.clipboard.writeText('2026-12-25'));
+  await input.press('Control+V');
+  await input.blur();
+  await expect(input).toHaveValue('2026-12-25');
+});
+
 test('meal date errors preserve the applied date and valid input fetches the matching week', async ({ page }) => {
   await mockApi(page);
   await page.goto('/' + sharedHash(1));
@@ -407,13 +436,22 @@ test('timed calendar includes bell times only after explicit consent and closes 
   await expect(page.getByLabel('일정 표시 방식')).toHaveCount(0);
 });
 
-test('personal schedule preserves entered dates when saving lessons and events', async ({ page }) => {
+test('personal schedule preserves entered dates when saving lessons and events', async ({ page, browserName, context }) => {
   await mockApi(page);
+  if (browserName === 'chromium') await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/' + sharedHash(1));
   await page.getByText('개인 시간표·일정', { exact: true }).click();
   const personal = page.getByRole('region', { name: '개인 시간표', exact: true });
   await personal.getByLabel('과목명', { exact: true }).fill('개인 수업');
-  await personal.getByLabel('특정 일자 (선택)').fill(week);
+  const specificDate = personal.getByLabel('특정 일자 (선택)');
+  if (browserName === 'chromium') {
+    await page.evaluate(() => navigator.clipboard.writeText('20261109'));
+    await specificDate.focus();
+    await specificDate.press('Control+V');
+    await expect(specificDate).toHaveValue(week);
+  } else {
+    await specificDate.fill(week);
+  }
   await personal.getByRole('button', { name: '저장', exact: true }).click();
   await expect(personal.getByRole('table')).toContainText('개인 수업');
   await personal.getByRole('button', { name: /일정 \/ 시험 오버레이/ }).click();

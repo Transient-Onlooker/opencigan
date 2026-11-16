@@ -1,6 +1,6 @@
 <script lang="ts">
   import MealMenu from './MealMenu.svelte';
-  import { addDays } from './date';
+  import { addDays, pasteDate } from './date';
   import type { Meal, NeisSchool, School } from './api';
   export let view: 'timetable' | 'meals' | 'settings';
   export let mealDate: string;
@@ -38,7 +38,7 @@
 <section id="meals-panel" hidden={view !== 'meals'} aria-labelledby="meals-title">
           <div class="section-heading"><div><p class="eyebrow">{mealDate === today ? '오늘의 식단' : '하루 식단'}</p><h2 id="meals-title">학교 급식</h2></div><button class="secondary-button" onclick={todayMeals}>오늘로</button></div>
           <div class="view-switch" role="group" aria-label="급식 보기"><button aria-pressed={mealView === 'day'} onclick={() => setMealView('day')}>하루 식단</button><button aria-pressed={mealView === 'week'} onclick={() => setMealView('week')}>주간 식단</button></div>
-          <div class="calendar-toolbar"><button class="arrow-button" onclick={() => changeMealDate(mealView === 'week' ? -7 : -1)} aria-label={mealView === 'week' ? '이전 급식 주' : '이전 날짜'}>←</button><div class="calendar-date"><strong aria-live="polite">{mealView === 'week' ? dateText(mealDates[0]) + ' — ' + dateText(mealDates[6]) : dateText(mealDate, { month: 'long', day: 'numeric', weekday: 'long' })}</strong><label class="date-picker">날짜 선택 <input type="date" min="1900-01-01" max="9999-12-31" value={mealDateDraft} oninput={updateMealDateDraft} onchange={(event) => selectMealDate(event, true)} onblur={selectMealDate} onkeydown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} aria-invalid={!!dateError} aria-describedby={dateError ? 'meal-date-error' : undefined} /></label></div><button class="arrow-button" onclick={() => changeMealDate(mealView === 'week' ? 7 : 1)} aria-label={mealView === 'week' ? '다음 급식 주' : '다음 날짜'}>→</button></div>
+          <div class="calendar-toolbar"><button class="arrow-button" onclick={() => changeMealDate(mealView === 'week' ? -7 : -1)} aria-label={mealView === 'week' ? '이전 급식 주' : '이전 날짜'}>←</button><div class="calendar-date"><strong aria-live="polite">{mealView === 'week' ? dateText(mealDates[0]) + ' — ' + dateText(mealDates[6]) : dateText(mealDate, { month: 'long', day: 'numeric', weekday: 'long' })}</strong><label class="date-picker">날짜 선택 <input type="date" min="1900-01-01" max="9999-12-31" value={mealDateDraft} oninput={updateMealDateDraft} onpaste={pasteDate} onchange={(event) => selectMealDate(event, true)} onblur={selectMealDate} onkeydown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} aria-invalid={!!dateError} aria-describedby={dateError ? 'meal-date-error' : undefined} /></label></div><button class="arrow-button" onclick={() => changeMealDate(mealView === 'week' ? 7 : 1)} aria-label={mealView === 'week' ? '다음 급식 주' : '다음 날짜'}>→</button></div>
           {#if dateError}<p id="meal-date-error" class="notice" role="alert">{dateError}</p>{/if}
            <div class="meal-connection" aria-live="polite">{!neis && school ? neisSearchState : ''}</div>
           {#if !school}<div class="state-message"><strong>학교를 먼저 선택해 주세요</strong><p>시간표 학교를 선택하면 급식도 함께 연결돼요.</p></div>
