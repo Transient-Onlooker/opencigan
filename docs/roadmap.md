@@ -12,7 +12,7 @@ timeline
     QA 기준선 : 리팩터링 전 자동 회귀와 배포 상태 기록
     리팩터링 : 선택과 데이터 세션 분리 PR 병합 : UI와 백엔드 정리 남음
     UX 개선 : 설정 화면과 기본 사용 흐름 개편 대기
-    운영 검증 : 공개 도메인, 실제 기기, 원본 IP와 정책 확인
+    운영 검증 : Cloudflare Tunnel과 WAF 전환 P0 : 공개 도메인과 실제 IP, 실기기 확인
     후속 기능 : 알림 안정화와 장기 확장
 ```
 
@@ -49,7 +49,7 @@ flowchart LR
 
 | 영역 | 현재 판단 | 세부 작업 |
 | --- | --- | --- |
-| **P0 · 핵심 기능과 품질** | 기능 다수 구현, 공개 전 검증 잔여 | [핵심 기능·QA 게이트](roadmap/core-quality.md) |
+| **P0 · 핵심 기능·보안·공개 인프라** | **Cloudflare Tunnel 전환 및 WAF 봇 방어 우선**, 공개 API/ICS·가용성 검증 잔여 | [P0 공개 전 필수 작업](roadmap/core-quality.md) |
 | **P1 · 사용자 경험** | 기존 기능 구현, UI/UX 개선 다수 대기 | [학교·시간표·설정·급식 UX](roadmap/user-experience.md) |
 | **P2 · 외부 개발자 연동** | API·ICS·관리 도구 일부 구현, 외부 운영 검증 대기 | [API·캘린더·터널·로그](roadmap/api-operations.md) |
 | **P3–P4 · 자동화와 확장** | 부분 구현 또는 아이디어·운영 검증 대기 | [알림·장기 확장·아이디어](roadmap/automation-and-future.md) |
@@ -66,7 +66,7 @@ flowchart LR
 ### 공개 서비스 전 주요 검증 게이트
 
 - **실기기:** iOS Safari·Android Chrome, PWA, 모바일 캘린더 앱의 실제 동작
-- **네트워크:** 공개 도메인의 API·ICS 접근, 프록시 뒤 실제 IP·요청 제한과 접속 로그
+- **네트워크·봇 방어(P0):** Cloudflare Tunnel 공개 API/ICS 연결, Cloudflare WAF·Rate Limiting의 엔드포인트별 설정, 비브라우저 API/캘린더 구독 보호, 신뢰 프록시 뒤 실제 IP·요청 제한과 접속 로그 검증
 - **데이터·정책:** 실측된 교시 시각과 캘린더 동기화, 원본 데이터 재제공·관측 이력 운영 정책
 - **회귀·운영:** 변경 영역별 테스트, Chromium/WebKit, RPi 배포 SHA/롤백 경로와 UI UX 검사
 

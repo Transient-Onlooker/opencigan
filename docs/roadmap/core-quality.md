@@ -16,6 +16,20 @@
 
 **공개 전 필요**
 
+**P0 — Cloudflare Tunnel 공개 API 전환·엣지 봇 방어 (2026-11-16 우선순위 상향)**
+
+> 현재 Tailscale Funnel을 대체할 **우선 구현 경로**로 Cloudflare Tunnel을 채택합니다. 아직 운영 전환 또는 검증 완료를 뜻하지 않습니다. 아래는 기존 P2의 Tunnel 검토·비교 항목을 P0으로 이동한 것입니다. [운영 절차와 위험](../operations.md#cloudflare-tunnel-전환-계획-p0-미적용).
+
+- [ ] **P0 · Cloudflare Tunnel로 공개 API/ICS 제공**: Raspberry Pi `cloudflared` → `127.0.0.1:8000` 연결, Cloudflare DNS/TLS와 공개 API 호스트를 구성. 정적 GitHub Pages의 `opencigan.mcv.kr`와 백엔드 호스트는 분리 검토(예: **`api.opencigan.mcv.kr`은 제안 주소이며 아직 확정·생성되지 않음**). API 문서·프런트 설정·생성되는 ICS URL·CORS Origin을 동일한 공개 호스트에 맞추고 외부망에서 실제 접근 확인.
+- [ ] **P0 · Cloudflare WAF 기반 봇/남용 요청 방어**: 공개 API 호스트에 대해 Cloudflare WAF 사용자 정의 규칙과 엔드포인트별 Rate Limiting을 설계(학교 검색·시간표·ICS·상태·관리자·Webhook의 요청 패턴 분리). 과도한 학교 순회, 반복 오류, 비정상적 요청률 등은 관측 후 단계적 차단·제한하고, 유효한 학생 조회·캘린더 앱·외부 API 클라이언트의 오탐과 정상 요청 차단 여부를 점검. 봇 점수/고급 기능은 **실제 Cloudflare 플랜에서 사용 가능할 때만** 적용. 경로별 규칙과 정상 요청량 기준을 정한 뒤 활성화.
+- [ ] **P0 · 비브라우저 클라이언트 보호**: JS/Managed Challenge를 API JSON·ICS 구독 경로에 일괄 적용하지 않기(캘린더·프로그래밍 클라이언트는 브라우저 챌린지를 풀 수 없음). 사람 대상 웹 화면과 기계 클라이언트의 정책을 분리하고 WAF/Rate Limiting 실제 차단 응답(403/429 등)·재시도 동작을 검증. Cloudflare Bot Fight Mode처럼 예외를 세밀하게 설정하기 어려운 기능은 전역 활성화 전에 반드시 검토.
+- [ ] **P0 · 원본 클라이언트 IP·보안 경계**: 터널 뒤 `REMOTE_ADDR`만으로 실제 방문자 판단하지 말 것. `CF-Connecting-IP` 등 신뢰된 터널에서만 전달되는 IP를 서버 요청 제한·접속 로그에 반영하고 직접 접근/헤더 위조를 방지. Cloudflare 엣지 제한과 기존 Python 60회/60초 제한·셔터 동작이 충돌하거나 모든 사용자를 동일 IP로 집계하지 않는지 외부 클라이언트 두 곳 이상에서 검증.
+- [ ] **P0 · Tailscale Funnel 대비 성능·제약 및 롤백**: 동일 API(`/api/v1/status`, 캐시된 시간표)의 TTFB·전체 응답을 동일 조건에서 비교하고 한국 접속 기준 중앙값·p95·측정 방법 기록. Cloudflare 플랜별 WAF/Rate Limiting 한도, 터널 안정성, 대역폭·정책, 비용 및 배포/롤백 절차 점검. 기존 공개 구독이 있을 경우 마이그레이션 전후의 동기화 실패를 방지.
+- [ ] **NEW-02 · 공개 API/ICS 주소 정리(릴리스 필수)**: QA에서 ICS·API 기본 원점이 `rpi.tail9802be.ts.net`이고 `opencigan.mcv.kr/api/v1/timetable.ics`는 Pages 404인 것을 확인. 새 공개 API 호스트의 DNS/TLS·CORS·ICS ETag/304·외부 캘린더 갱신을 검증하고, 생성 링크·문서·페이지를 갱신하여 운영/Tailscale 주소를 사용자 기본값으로 노출하지 않기. [QA 기록](../qa-2026-11-16.md).
+
+**구분:** 이 작업의 Cloudflare Tunnel/WAF는 **외부 사용자 → OpenCigan API로 들어오는 트래픽**을 보호합니다. 컴시간 원본에 접근하기 위해 사용한 **Pi → 컴시간 전용 WARP 출구 프록시**(`OPENCIGAN_COMCIGAN_PROXY`)와 별개입니다.
+
+
 
 **2026-11-16 QA 후속 ([결함 NEW-01~09](../qa-2026-11-16.md))**
 

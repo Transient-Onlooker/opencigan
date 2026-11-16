@@ -82,10 +82,13 @@ PY
 
 복구 시에는 서비스와 DB에 쓰는 다른 프로세스를 모두 중지하고, 복구 전 현재 DB도 별도 백업으로 보존합니다. 검증된 배포 전 백업을 **새 경로**에 복사한 뒤 구버전의 `OPENCIGAN_HISTORY_DB`가 그 복사본을 가리키도록 설정하고 재시작합니다. 구버전 실행 중에는 새 DB의 스키마나 WAL 파일을 직접 교체하지 않습니다. 백업 이후 관측한 이력은 복구본에 포함되지 않으므로 보존한 새 DB와 혼동하지 마세요. 적용 전후에는 `PRAGMA integrity_check`와 테스트 학교의 이력 조회를 확인합니다. 이 절차는 운영 DB에서 실행한 검증 결과가 아닙니다.
 
-## Cloudflare Tunnel 전환 검토 (미적용)
+## Cloudflare Tunnel 전환 계획 (P0, 미적용)
 
-현재 Tailscale Funnel의 대안으로 **Cloudflare Tunnel**을 검토합니다. `cloudflared`가 Raspberry Pi에서 Cloudflare로 아웃바운드 연결을 만들고, 공개 도메인 요청을 로컬 API(`127.0.0.1:8000`)에 전달하는 구성입니다. 외부 포트포워딩 없이 원본 서버 IP 노출을 줄일 수 있고, Cloudflare의 WAF·DDoS 방어·요청 제한 기능과 함께 운영하는 방안을 고려합니다.
+**2026-11-16부터 공개 API/ICS 제공과 Cloudflare WAF 봇 방어를 P0 우선 작업으로 결정했습니다. 아직 Tunnel·WAF 운영 전환을 완료한 것은 아닙니다.** `cloudflared`가 Raspberry Pi에서 Cloudflare로 아웃바운드 연결을 만들고 로컬 API(`127.0.0.1:8000`)에 전달하는 구성을 우선 검토·구현합니다. 현재 정적 웹의 GitHub Pages 호스트와 분리되는 공개 API 호스트(예: `api.opencigan.mcv.kr`, 제안)를 사용하면 Pages 경로의 `/api/v1/...` 404 문제를 해소할 수 있습니다. DNS/TLS, CORS, 프런트·OpenAPI·ICS URL은 전환 검증 후 일치시켜야 합니다.
 
+- **WAF/봇 방어:** API 호스트의 요청률·학교 검색 남용·반복 오류는 Cloudflare WAF 사용자 정의 규칙과 Rate Limiting으로 방어하는 것을 우선합니다. 학교 검색·시간표·ICS·상태·Webhook·관리자 API는 서로 다른 요청 특성이 있으므로 경로별 정책을 만들고 보안 이벤트와 오탐율을 확인합니다. 사용 가능한 Bot Score/관리 기능은 Cloudflare 계정 플랜을 확인한 후 선택합니다. API/ICS에 브라우저 JS Challenge를 일괄 적용하면 캘린더·기계 클라이언트가 차단될 수 있으므로 금지합니다. Bot Fight Mode의 예외 처리 제약도 검토해야 합니다.
+- **외부 진입과 원본 연결은 별개:** Cloudflare Tunnel/WAF는 방문자→API **수신** 경로입니다. 위의 `OPENCIGAN_COMCIGAN_PROXY`와 WARP는 Pi→컴시간 **송신** 경로이며 서로 대체하지 않습니다.
+- **변경 검증/되돌리기:** DNS/TLS/라우팅, ETag·304·ICS 구독, CORS, JSON API의 정상 및 차단 응답, Rate Limiting·Python 자체 제한 일치, 인증된 관리 페이지, Tailscale Funnel 대비 지연·정책·비용·롤백을 확인합니다. 실제 적용 전에는 기존 구독 URL의 연속성을 고려하세요.
 - **접속자 IP와 로그:** 터널 뒤에서 서버의 `REMOTE_ADDR`는 보통 `cloudflared`의 연결 주소입니다. HTTP 원본 접속 IP는 Cloudflare의 `CF-Connecting-IP` 헤더로 전달되므로, 현재의 [신뢰 프록시 IP 처리](proxy-client-ip.md)와 [접속 로그](access-logs.md)에 **신뢰된 터널에서만** 올바르게 반영되는지 시험합니다. 외부에서 임의로 보낸 헤더를 신뢰하는 구성은 피합니다.
 - **속도·용량:** Tailscale Funnel은 변경 불가능한 대역폭 제한이 있습니다. Cloudflare Tunnel에는 동일한 공개 월간 GB 한도가 명시되지 않았더라도, 플랜·요청 크기·서비스별 사용 정책·운영 서버의 업로드 대역폭과 처리 성능 등 제약이 남습니다. *무제한 트래픽이나 무조건 빠른 응답은 가정하지 않습니다.* 기존 로드맵의 TTFB/p95 벤치마크로 비교합니다.
 - **전환 시 확인:** `opencigan.mcv.kr` DNS/TLS, API CORS, `.ics` 구독, 304/ETag, 관리자 인증, IP별 429 제한과 503 과부하 보호, 터널 재연결, 서비스 중단 시 복귀 방법을 확인합니다. 현재 운영 중인 Funnel·DNS·systemd 설정은 이 검토만으로 변경하지 않습니다.
