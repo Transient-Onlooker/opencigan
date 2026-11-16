@@ -1,5 +1,5 @@
 import { parseDisplaySettings, type DisplaySettings } from './personalization';
-import { parseLessonTimes, type LessonTimes } from './lesson-times';
+import { parseLessonTimes, parseWeekdayLessonTimes, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
 
 export const MAX_SETTINGS_BACKUP_BYTES = 64 * 1024;
 
@@ -22,23 +22,27 @@ export function saveSchoolSettingsBackup(storage: Storage, schoolId: string, dis
 
 type ClassroomScope = { grade: number; classroom: number };
 
-export function createSettingsBackup(schoolId: string, displaySettings: DisplaySettings, lessonTimes: LessonTimes, scope?: ClassroomScope): string {
+export function createSettingsBackup(schoolId: string, displaySettings: DisplaySettings, lessonTimes: LessonTimes, scope?: ClassroomScope, weekdayTimes?: WeekdayLessonTimes): string {
+  const overrides = weekdayTimes === undefined ? undefined : parseWeekdayLessonTimes(weekdayTimes, lessonTimes);
+  if (overrides === null) throw new Error('요일별 교시 시각이 잘못되었거나 서로 겹쳐요.');
   return JSON.stringify({
     format: 'opencigan-settings',
-    version: 1,
+    version: !scope && overrides && Object.keys(overrides).length ? 2 : 1,
     schoolId,
     displaySettings: parseDisplaySettings(displaySettings),
     ...(scope ? { scope } : { lessonTimes: parseLessonTimes(lessonTimes) }),
+    ...(!scope && overrides && Object.keys(overrides).length ? { weekdayLessonTimes: overrides } : {}),
   }, null, 2);
 }
 
-export function parseSettingsBackup(text: string, schoolId: string, scope?: ClassroomScope): { displaySettings: DisplaySettings; lessonTimes: LessonTimes; scoped?: true } {
+export function parseSettingsBackup(text: string, schoolId: string, scope?: ClassroomScope): { displaySettings: DisplaySettings; lessonTimes: LessonTimes; weekdayLessonTimes?: WeekdayLessonTimes; scoped?: true } {
   if (new TextEncoder().encode(text).length > MAX_SETTINGS_BACKUP_BYTES) throw new Error('설정 파일은 64KB 이하여야 해요.');
   let raw: unknown;
   try { raw = JSON.parse(text); } catch { throw new Error('올바른 JSON 설정 파일이 아니에요.'); }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Opencigan 설정 파일이 아니에요.');
   const backup = raw as Record<string, unknown>;
-  if (backup.format !== 'opencigan-settings' || backup.version !== 1) throw new Error('지원하지 않는 설정 파일 형식이에요.');
+  if (backup.format !== 'opencigan-settings' || (backup.version !== 1 && backup.version !== 2)) throw new Error('지원하지 않는 설정 파일 형식이에요.');
+  if (backup.version === 2 && backup.scope !== undefined) throw new Error('지원하지 않는 설정 파일 형식이에요.');
   if (backup.schoolId !== schoolId) throw new Error('현재 선택한 학교의 설정 파일만 불러올 수 있어요.');
   if (backup.scope !== undefined) {
     const target = backup.scope as Partial<ClassroomScope> | null;
@@ -56,6 +60,11 @@ export function parseSettingsBackup(text: string, schoolId: string, scope?: Clas
   const lessonTimes = parseLessonTimes(backup.lessonTimes);
   if (Object.keys(lessonTimes).length !== Object.keys(backup.lessonTimes as object).length) {
     throw new Error('교시 시각이 잘못되었거나 서로 겹쳐요.');
+  }
+  if (backup.version === 2) {
+    const weekdayLessonTimes = parseWeekdayLessonTimes(backup.weekdayLessonTimes, lessonTimes);
+    if (!weekdayLessonTimes) throw new Error('요일별 교시 시각이 잘못되었거나 서로 겹쳐요.');
+    return { displaySettings: parseDisplaySettings(display), lessonTimes, weekdayLessonTimes };
   }
   return { displaySettings: parseDisplaySettings(display), lessonTimes };
 }

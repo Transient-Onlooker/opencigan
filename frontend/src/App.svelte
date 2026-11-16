@@ -292,6 +292,7 @@
       if (file.size > MAX_SETTINGS_BACKUP_BYTES) throw new Error('설정 파일은 64KB 이하여야 해요.');
       const backup = parseSettingsBackup(await file.text(), schoolId, scope);
       if (school?.id !== schoolId) throw new Error('학교가 변경되어 설정을 적용하지 않았어요.');
+      if (backup.weekdayLessonTimes !== undefined) throw new Error('요일별 교시 시각이 포함된 설정은 아직 불러올 수 없어요. 기존 설정은 유지됩니다.');
       if (backup.scoped) {
         if (targetClass !== classDisplayKey || classError) throw new Error('학급이 변경되어 설정을 적용하지 않았어요.');
         try { classDisplayPreferences.restore(targetClass, backup.displaySettings); }
