@@ -1,10 +1,13 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
+  import PersonalTimetable from './PersonalTimetable.svelte';
   import { allergens } from './allergens';
   import type { School } from './api';
   import type { DisplaySettings } from './personalization';
   export let view: 'timetable' | 'meals' | 'settings';
   export let school: School | null;
+  export let week: string;
+  export let dark: boolean;
   export let useClassDisplay: boolean;
   export let classError: boolean;
   export let grade: number;
@@ -52,8 +55,14 @@
           <h2 id="settings-title">설정</h2>
           <p><a href="./webhooks.html">시간표 변경 알림 관리</a></p>
           <label class="settings-search">설정 검색<input type="search" bind:value={settingsQuery} oninput={() => { if (settingsQuery.trim()) settingsOpen = { display: true, times: true, backup: true, meals: true, allergies: true }; }} maxlength="60" placeholder="예: 교시, 알레르기, 백업" /></label>
-          {#if settingsQuery.trim() && !settingsMatch('시간표 표시 테마 애니메이션 과목 색상 별칭 교사 이름 날짜 변경 변동 배지 테두리 밀도 종료 요일 학교 교시 시각 시간 시작 백업 복원 파일 저장 가져오기 내보내기 초기화 급식 보기 식사 조식 중식 석식 알레르기 번호 주의', settingsQuery)}<p role="status">일치하는 설정이 없어요.</p>{/if}
+          {#if settingsQuery.trim() && !settingsMatch('시간표 표시 테마 애니메이션 과목 색상 별칭 교사 이름 날짜 변경 변동 배지 테두리 밀도 종료 요일 학교 교시 시각 시간 시작 백업 복원 파일 저장 가져오기 내보내기 초기화 급식 보기 식사 조식 중식 석식 알레르기 번호 주의 개인 일정 시험', settingsQuery)}<p role="status">일치하는 설정이 없어요.</p>{/if}
            {#if school}
+             <details class="personal-timetable-panel" hidden={!settingsMatch('개인 시간표 일정 시험', settingsQuery)}>
+               <summary>개인 시간표·일정</summary>
+               {#if view === 'settings'}
+                 {#key `${school.id}:${grade}:${classroom}`}<PersonalTimetable schoolId={school.id} schoolName={school.name} {grade} {classroom} {week} {dark} {displaySettings} />{/key}
+               {/if}
+             </details>
              <details class="display-settings" hidden={!settingsMatch('시간표 표시 테마 애니메이션 과목 색상 별칭 교사 이름 날짜 변경 변동 배지 테두리 밀도 종료 요일', settingsQuery)} bind:open={settingsOpen.display}>
                <summary>시간표 표시 설정</summary>
                <label class="display-toggle"><input type="checkbox" checked={useClassDisplay} disabled={classError} onchange={(event) => setClassDisplay(event.currentTarget.checked)} /> {grade}학년 {classroom}반만 따로 설정</label>

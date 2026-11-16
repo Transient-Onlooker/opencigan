@@ -605,6 +605,7 @@ test('personal schedule preserves entered dates when saving lessons and events',
   await mockApi(page);
   if (browserName === 'chromium') await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/' + sharedHash(1));
+  await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByText('개인 시간표·일정', { exact: true }).click();
   const personal = page.getByRole('region', { name: '개인 시간표', exact: true });
   await personal.getByLabel('과목명', { exact: true }).fill('개인 수업');
@@ -631,6 +632,8 @@ test('personal timetable saves, replaces and deletes local lessons without chang
   await mockApi(page);
   await page.goto('/' + sharedHash(1));
   await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
+  await expect(page.getByText('개인 시간표·일정', { exact: true })).toBeHidden();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByText('개인 시간표·일정', { exact: true }).click();
   const personal = page.getByRole('region', { name: '개인 시간표', exact: true });
   await personal.getByLabel('과목명', { exact: true }).fill('개인 수학');
@@ -643,10 +646,18 @@ test('personal timetable saves, replaces and deletes local lessons without chang
   const download = page.waitForEvent('download');
   await personal.getByRole('button', { name: '시간표 PNG 저장' }).click();
   expect((await download).suggestedFilename()).toMatch(/개인_시간표.*\.png$/);
+  await page.getByRole('button', { name: '시간표', exact: true }).click();
   await expect(page.locator('#timetable-panel').getByRole('table')).toContainText('과목1');
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await expect(personal.getByRole('table')).toContainText('수정한 수학');
+  await page.reload();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('개인 시간표·일정', { exact: true }).click();
+  await expect(personal.getByRole('table')).toContainText('수정한 수학');
   await personal.getByRole('button', { name: /수정한 수학 삭제/ }).click();
   await expect(personal.getByRole('table')).not.toContainText('수정한 수학');
   await page.reload();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByText('개인 시간표·일정', { exact: true }).click();
   await expect(personal.getByRole('table')).not.toContainText('수정한 수학');
 });
