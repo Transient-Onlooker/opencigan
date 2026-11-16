@@ -14,7 +14,7 @@ from datetime import date, datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
-from backend.cache import Cache
+from backend.cache import Cache, CacheBackoffError
 from backend.http_core import json_response, make_response_headers, preflight_response, query_param as _query_param, timetable_filters
 from backend.analytics import ApiRecorder
 from backend.access_logs import AccessLogRecorder, AccessLogStore, classify_origin
@@ -317,6 +317,9 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
             return json_response(404, headers, {"error": "요청한 경로가 없습니다", "code": "not_found"})
 
         return json_response(200, headers, result)
+    except CacheBackoffError as exc:
+        headers["Retry-After"] = str(exc.retry_after)
+        return json_response(503, headers, {"error": "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", "code": "upstream_unavailable"})
     except ValueError as exc:
         return json_response(400, headers, {"error": str(exc), "code": "invalid_request"})
     except Exception:

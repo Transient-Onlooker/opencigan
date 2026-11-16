@@ -128,6 +128,26 @@ class ApiTests(unittest.TestCase):
                     self.assertNotIn("secret details", error.exception.read().decode())
                 fetch.assert_called_once()
 
+    def test_uncached_failure_reports_remaining_backoff_and_recovers(self):
+        now = [100.0]
+        clock = SimpleNamespace(monotonic=lambda: now[0])
+        result = [{"id": "2:school", "name": "school", "region": "region"}]
+        with patch("backend.app.cache", Cache(retry_delay=5)), patch("backend.cache.time", clock), \
+                patch("backend.app.search_schools", side_effect=[RuntimeError("unavailable"), result]) as fetch:
+            with self.assertRaises(HTTPError) as first:
+                self.get("/api/v1/schools?q=school")
+            self.assertEqual(first.exception.code, 503)
+            now[0] = 101.2
+            with self.assertRaises(HTTPError) as delayed:
+                self.get("/api/v1/schools?q=school")
+            self.assertEqual(delayed.exception.code, 503)
+            self.assertEqual(delayed.exception.headers["Retry-After"], "4")
+            self.assertEqual(json.load(delayed.exception)["code"], "upstream_unavailable")
+            self.assertEqual(fetch.call_count, 1)
+            now[0] = 105
+            self.assertEqual(self.get("/api/v1/schools?q=school")["schools"], result)
+            self.assertEqual(fetch.call_count, 2)
+
     def test_school_search_and_meals(self):
         with patch("backend.app.search_schools", return_value=[{"id": "2:school", "name": "school", "region": "region"}]):
             self.assertEqual(self.get("/api/v1/schools?q=school")["schools"][0]["id"], "2:school")

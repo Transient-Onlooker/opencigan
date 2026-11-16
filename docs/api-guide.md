@@ -116,7 +116,7 @@ RSS는 `/api/v1/timetable/history.rss?school=1234%3A예시학교&grade=2&class=3
 | 405 | `method_not_allowed` | 지원하지 않는 메서드 |
 | 429 | `rate_limited` | 현재 프로세스 기준 호출 제한; `Retry-After` 사용 |
 | 503 | `history_disabled` | 변경 이력 저장 비활성화 |
-| 503 | `upstream_unavailable` | 원본/키/기타 조회 실패 |
+| 503 | `upstream_unavailable` | 원본/키/기타 조회 실패. 캐시에 데이터가 없고 재시도 대기 중이면 `Retry-After`에 남은 초를 표시 |
 
 응답 오류에는 `error`(메시지)와 `code`(식별자)가 포함됩니다. Python API의 요청 제한은 **프로세스별 `REMOTE_ADDR`당 60회/60초**이며 `status` 조회는 제외됩니다. 역방향 프록시 뒤에서는 여러 사용자가 같은 IP로 인식될 수 있으므로 이 설정을 그대로 인터넷에 공개하지 마세요. 실패 시 과도한 동시 재시도 대신 `Retry-After`와 백오프를 지키세요.
 

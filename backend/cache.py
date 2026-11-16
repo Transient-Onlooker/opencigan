@@ -1,11 +1,18 @@
 import json
 import logging
+import math
 import threading
 import time
 from collections import OrderedDict
 
 logger = logging.getLogger("opensigan.cache")
 RESOURCE_TYPES = frozenset(("timetable", "school_search", "neis_school_search", "meals"))
+
+
+class CacheBackoffError(RuntimeError):
+    def __init__(self, seconds):
+        super().__init__("cached fetch failure is in backoff")
+        self.retry_after = max(1, math.ceil(seconds))
 
 
 class Cache:
@@ -39,7 +46,7 @@ class Cache:
                 if retry_after > now:
                     if value is not None:
                         return output(self._stale(value), "stale")
-                    raise RuntimeError("cached fetch failure is in backoff")
+                    raise CacheBackoffError(retry_after - now)
 
         lock = self.locks[hash(key) % len(self.locks)]
         with lock:
@@ -58,7 +65,7 @@ class Cache:
                     if retry_after > now:
                         if value is not None:
                             return output(self._stale(value), "stale")
-                        raise RuntimeError("cached fetch failure is in backoff")
+                        raise CacheBackoffError(retry_after - now)
 
             try:
                 value = fetch()
