@@ -25,6 +25,43 @@ async function mockApi(page, delayedSearch, onSchoolSearch) {
   });
 }
 
+test('shared school and class stay pending until the matching timetable is verified', async ({ page }) => {
+  const previous = { id: '1:봄빛초등학교', name: '봄빛초등학교', region: '서울' };
+  let release;
+  const waiting = new Promise((resolve) => { release = resolve; });
+  let markRequested;
+  const requested = new Promise((resolve) => { markRequested = resolve; });
+  await page.clock.setFixedTime(new Date('2026-11-09T02:00:00Z'));
+  await page.addInitScript((saved) => {
+    localStorage.setItem('opensigan-school', JSON.stringify(saved));
+    localStorage.setItem('opensigan-grade', '5');
+    localStorage.setItem('opensigan-class', '2');
+  }, previous);
+  await page.route('**/api/v1/**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/v1/schools') return route.fulfill({ json: { schools: [school], stale: false } });
+    if (url.pathname === '/api/v1/timetable') {
+      const id = url.searchParams.get('school');
+      if (id === school.id) {
+        markRequested();
+        await waiting;
+        return route.fulfill({ json: { ...timetable, records: [{ grade: 1, class: 7, date: week, period: 1, subject: '공유 수업' }] } });
+      }
+      return route.fulfill({ json: { ...timetable, schoolId: previous.id, records: [{ grade: 5, class: 2, date: week, period: 1, subject: '기존 수업' }] } });
+    }
+    return route.fulfill({ json: { schools: [], meals: [], changes: [], stale: false } });
+  });
+  await page.goto('/' + sharedHash());
+  await requested;
+  await expect(page.getByRole('heading', { name: previous.name })).toBeVisible();
+  await expect(page.getByText('5학년 2반', { exact: false }).first()).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('opensigan-class'))).toBe('2');
+  release();
+  await expect(page.getByRole('heading', { name: school.name })).toBeVisible();
+  await expect(page.getByRole('table').getByText('공유 수업')).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('opensigan-class'))).toBe('7');
+});
+
 test('school settings backup restores display preferences and bell times', async ({ page }) => {
   await mockApi(page);
   await page.goto('/' + sharedHash(1));
