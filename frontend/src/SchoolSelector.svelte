@@ -4,6 +4,7 @@
   export let schoolQuery: string;
   export let schoolResults: School[];
   export let schoolSearchState: string;
+  export let schoolSearchRetryable: boolean;
   export let grade: number;
   export let classroom: number;
   export let classroomDraft: string;
@@ -28,6 +29,7 @@
       <div class="search-results">
         {#each schoolResults as item (item.id)}<button class="school-option" onclick={() => chooseSchool(item)}><strong>{item.name}</strong><span>{item.region}</span></button>{/each}
         {#if schoolSearchState}<p>{schoolSearchState}</p>{/if}
+        {#if schoolSearchRetryable}<button type="button" class="text-button" onclick={findSchool}>학교 검색 다시 시도</button>{/if}
       </div>
     {/if}
   </div>

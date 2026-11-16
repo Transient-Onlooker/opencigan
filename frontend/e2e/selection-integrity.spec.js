@@ -472,9 +472,10 @@ test('school search shows matching saved results on failure and clears the notic
   await expect(page.locator('.search-results p').filter({ hasText: '이 화면에 저장된 검색 결과' })).toBeVisible();
   await expect(page.getByRole('button', { name: /봄빛고등학교/ })).toBeVisible();
   fail = false;
-  await search.fill('봄빛고');
+  await page.getByRole('button', { name: '학교 검색 다시 시도' }).click();
   await expect(page.getByRole('button', { name: /봄빛고등학교/ })).toBeVisible();
   await expect(page.locator('.search-results p').filter({ hasText: '이 화면에 저장된 검색 결과' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '학교 검색 다시 시도' })).toHaveCount(0);
 });
 
 test('meal menu search, allergy filters, NEIS details and timetable date link work together', async ({ page }) => {
