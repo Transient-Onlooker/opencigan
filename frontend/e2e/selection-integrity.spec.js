@@ -132,6 +132,7 @@ test('settings icon remains visible and aligned in both themes on desktop and mo
   }
   await settings.click();
   await expect(page.getByRole('heading', { name: '설정', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '기존 개인 데이터 내보내기' })).toHaveCount(0);
 });
 
 test('collapsed settings cards align and remain keyboard accessible across themes and widths', async ({ page }) => {
@@ -993,63 +994,32 @@ test('weekday bell times save independently and are included in school backup', 
   await expect(page.getByLabel('요일별 1교시 시작')).toHaveValue('10:00');
 });
 
-test('personal schedule preserves entered dates when saving lessons and events', async ({ page, browserName, context }) => {
+test('retired personal timetable preserves and exports data from all classes', async ({ page }) => {
   await mockApi(page);
-  if (browserName === 'chromium') await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const saved = [
+    { key: `personal_timetable_v1:${school.id}:1:1`, value: JSON.stringify({ version: 1, entries: [{ subject: '개인 수업' }], events: [{ title: '개인 일정' }] }) },
+    { key: 'personal_timetable_v1:다른학교:2:3', value: '{기존 원문 그대로' },
+  ];
+  await page.addInitScript((records) => {
+    for (const { key, value } of records) if (!localStorage.getItem(key)) localStorage.setItem(key, value);
+    localStorage.setItem('unrelated-setting', 'do-not-export');
+  }, saved);
   await page.goto('/' + sharedHash(1));
-  await page.getByRole('button', { name: '설정', exact: true }).click();
-  await page.getByText('개인 시간표·일정', { exact: true }).click();
-  const personal = page.getByRole('region', { name: '개인 시간표', exact: true });
-  await personal.getByLabel('과목명', { exact: true }).fill('개인 수업');
-  const specificDate = personal.getByLabel('특정 일자 (선택)');
-  if (browserName === 'chromium') {
-    await page.evaluate(() => navigator.clipboard.writeText('20261109'));
-    await specificDate.focus();
-    await specificDate.press('Control+V');
-    await expect(specificDate).toHaveValue(week);
-  } else {
-    await specificDate.fill(week);
-  }
-  await personal.getByRole('button', { name: '저장', exact: true }).click();
-  await expect(personal.getByRole('table')).toContainText('개인 수업');
-  await personal.getByRole('button', { name: /일정 \/ 시험 오버레이/ }).click();
-  await personal.getByLabel('날짜', { exact: true }).fill(week);
-  await personal.getByLabel('제목', { exact: true }).fill('개인 일정');
-  await personal.getByRole('button', { name: '추가', exact: true }).click();
-  await expect(personal.locator('.events-list')).toContainText(week);
-  await expect(personal.locator('.events-list')).toContainText('개인 일정');
-});
-
-test('personal timetable saves, replaces and deletes local lessons without changing source data', async ({ page }) => {
-  await mockApi(page);
-  await page.goto('/' + sharedHash(1));
-  await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
-  await expect(page.getByText('개인 시간표·일정', { exact: true })).toBeHidden();
-  await page.getByRole('button', { name: '설정', exact: true }).click();
-  await page.getByText('개인 시간표·일정', { exact: true }).click();
-  const personal = page.getByRole('region', { name: '개인 시간표', exact: true });
-  await personal.getByLabel('과목명', { exact: true }).fill('개인 수학');
-  await personal.getByRole('button', { name: '저장', exact: true }).click();
-  await expect(personal.getByRole('table')).toContainText('개인 수학');
-  await personal.getByLabel('과목명', { exact: true }).fill('수정한 수학');
-  await personal.getByRole('button', { name: '저장', exact: true }).click();
-  await expect(personal.getByRole('table')).toContainText('수정한 수학');
-  await expect(personal.getByRole('table')).not.toContainText('개인 수학');
-  const download = page.waitForEvent('download');
-  await personal.getByRole('button', { name: '시간표 PNG 저장' }).click();
-  expect((await download).suggestedFilename()).toMatch(/개인_시간표.*\.png$/);
-  await page.getByRole('button', { name: '시간표', exact: true }).click();
   await expect(page.locator('#timetable-panel').getByRole('table')).toContainText('과목1');
+  await expect(page.locator('#timetable-panel')).not.toContainText('개인 수업');
   await page.getByRole('button', { name: '설정', exact: true }).click();
-  await expect(personal.getByRole('table')).toContainText('수정한 수학');
+  await expect(page.getByText('개인 시간표·일정', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: '개인 시간표', exact: true })).toHaveCount(0);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: '기존 개인 데이터 내보내기' }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toBe('opencigan-personal-data.json');
+  const chunks = [];
+  for await (const chunk of await file.createReadStream()) chunks.push(chunk);
+  const backup = JSON.parse(Buffer.concat(chunks).toString());
+  expect(backup.format).toBe('opencigan-personal-data');
+  expect(backup.entries).toEqual(expect.arrayContaining(saved));
+  expect(backup.entries).toHaveLength(2);
   await page.reload();
-  await page.getByRole('button', { name: '설정', exact: true }).click();
-  await page.getByText('개인 시간표·일정', { exact: true }).click();
-  await expect(personal.getByRole('table')).toContainText('수정한 수학');
-  await personal.getByRole('button', { name: /수정한 수학 삭제/ }).click();
-  await expect(personal.getByRole('table')).not.toContainText('수정한 수학');
-  await page.reload();
-  await page.getByRole('button', { name: '설정', exact: true }).click();
-  await page.getByText('개인 시간표·일정', { exact: true }).click();
-  await expect(personal.getByRole('table')).not.toContainText('수정한 수학');
+  for (const { key, value } of saved) expect(await page.evaluate((k) => localStorage.getItem(k), key)).toBe(value);
 });
