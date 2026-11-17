@@ -226,7 +226,8 @@ export function replaceNavigationState(
 export function pushNavigationState(
   state: NavigationState,
   currentMonday: string,
-  win?: NavigationHistoryWindow
+  win?: NavigationHistoryWindow,
+  url?: string
 ): boolean {
   const target = resolveWindow(win);
   if (!target || !target.history) return false;
@@ -237,7 +238,7 @@ export function pushNavigationState(
   }
 
   const nextHistoryState = prepareHistoryStateObject(target.history.state, state);
-  target.history.pushState(nextHistoryState, '');
+  target.history.pushState(nextHistoryState, '', url);
   return true;
 }
 

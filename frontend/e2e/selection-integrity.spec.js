@@ -25,6 +25,27 @@ async function mockApi(page, delayedSearch, onSchoolSearch) {
   });
 }
 
+test('shared address follows class selection and browser history', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/?source=test' + sharedHash(1));
+  const classes = page.locator('.quick-class select').nth(1);
+  await expect(classes).toHaveValue('1');
+  await expect(page.locator('#timetable-panel').getByRole('table')).toContainText('과목1');
+  await classes.selectOption('2');
+  await expect.poll(() => new URL(page.url()).hash).toContain('class=2');
+  expect(new URL(page.url()).searchParams.get('source')).toBe('test');
+  await expect(page.locator('#timetable-panel').getByRole('table')).toContainText('과목2');
+  await page.goBack();
+  await expect(classes).toHaveValue('1');
+  expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('class')).toBe('1');
+  await page.goForward();
+  await expect(classes).toHaveValue('2');
+  expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('class')).toBe('2');
+  await page.getByRole('button', { name: '학급 링크 복사' }).click();
+  const shared = new URL(await page.getByLabel('공유 링크', { exact: true }).inputValue());
+  expect(new URLSearchParams(shared.hash.slice(1)).get('class')).toBe('2');
+});
+
 test('notification settings link follows theme, keyboard and mobile layout', async ({ page }) => {
   await mockApi(page);
   await page.addInitScript(() => { if (!localStorage.getItem('opensigan-theme')) localStorage.setItem('opensigan-theme', 'light'); });
