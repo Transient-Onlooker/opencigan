@@ -172,6 +172,31 @@ class ApiTests(unittest.TestCase):
 
             factory.return_value.get_meals.assert_called_once()
 
+    def test_meal_provider_value_error_returns_503_and_backs_off(self):
+        path = "/api/v1/meals?school=B10%3A1234567&from=2026-11-09&to=2026-11-15"
+        with patch("backend.app.cache", Cache(retry_delay=60)), patch.dict("os.environ", {"NEIS_API_KEY": "test-key"}), \
+                patch("backend.app.NEISClient.from_environment") as factory:
+            fetch = factory.return_value.get_meals
+            fetch.side_effect = ValueError("private provider details")
+            for _ in range(2):
+                with self.assertRaises(HTTPError) as error:
+                    self.get(path)
+                self.assertEqual(error.exception.code, 503)
+                self.assertNotIn("private provider details", error.exception.read().decode())
+            fetch.assert_called_once()
+
+    def test_meal_provider_value_error_keeps_stale_meals(self):
+        path = "/api/v1/meals?school=B10%3A1234567&from=2026-11-09&to=2026-11-15"
+        with patch("backend.app.cache", Cache(ttl=0, retry_delay=60)), patch.dict("os.environ", {"NEIS_API_KEY": "test-key"}), \
+                patch("backend.app.NEISClient.from_environment") as factory:
+            fetch = factory.return_value.get_meals
+            fetch.side_effect = [[Meal("2026-11-10", "lunch", "rice(1)")], ValueError("invalid upstream data")]
+            self.assertFalse(self.get(path)["stale"])
+            result = self.get(path)
+            self.assertTrue(result["stale"])
+            self.assertEqual(result["meals"][0]["dishes"], ["rice(1)"])
+            self.assertEqual(fetch.call_count, 2)
+
     def test_timetable_rejects_cached_week_outside_korean_current_and_next_week(self):
         test_cache = Cache()
         invalid_week = "2026-11-02"
