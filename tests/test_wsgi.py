@@ -112,7 +112,8 @@ class WsGITests(unittest.TestCase):
 
     @patch.dict(os.environ, {"OPENCIGAN_PROXY_IP_SIGNING_KEY": "s" * 32, "OPENCIGAN_ACCESS_LOG_DB": "fixture"})
     @patch("backend.app._access_log_recorder")
-    def test_signed_and_unsigned_requests_have_separate_limits(self, recorder):
+    @patch("backend.app.shutter.check", return_value=(True, 0))
+    def test_signed_and_unsigned_requests_have_separate_limits(self, _shutter, recorder):
         timestamp = str(int(time.time()))
         message = "\n".join(("GET", "/api/v1/unknown", "", "203.0.113.9", timestamp))
         signature = hmac.new(b"s" * 32, message.encode(), hashlib.sha256).hexdigest()
