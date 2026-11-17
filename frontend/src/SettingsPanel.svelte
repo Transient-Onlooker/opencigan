@@ -174,7 +174,7 @@
 
 <section id="settings-panel" hidden={view !== 'settings'} aria-labelledby="settings-title">
           <h2 id="settings-title">설정</h2>
-          <p><a href="./webhooks.html">시간표 변경 알림 관리</a></p>
+          <a class="notification-link" href="./webhooks.html">시간표 변경 알림 관리 <span aria-hidden="true">↗</span></a>
           <label class="settings-search">설정 검색<input type="search" value={settingsQuery} oninput={(event) => updateSettingsSearch(event.currentTarget.value)} maxlength="60" placeholder="예: 교시, 알레르기, 백업" /></label>
           {#if settingsQuery.trim()}
             {#if searchResults.length}
@@ -344,6 +344,7 @@
 
 <style>
 .settings-search{display:grid;gap:5px;margin:0 0 12px;font-size:13px;color:var(--muted)}
+.notification-link,.notification-link:visited{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;margin:0 0 12px;padding:10px 14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:14px;font-weight:650;line-height:1.4;text-decoration:none}.notification-link:hover{background:var(--soft);border-color:var(--ink)}.notification-link:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .personal-export{margin:16px 0;color:var(--muted);font-size:12px;line-height:1.6}.personal-export button{min-height:44px}
 .settings-search input{min-height:44px;max-width:100%;width:100%;border:1px solid var(--line);padding:8px;background:var(--surface);color:var(--ink)}
 .settings-results{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}

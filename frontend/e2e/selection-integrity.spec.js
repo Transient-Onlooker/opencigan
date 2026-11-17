@@ -25,6 +25,35 @@ async function mockApi(page, delayedSearch, onSchoolSearch) {
   });
 }
 
+test('notification settings link follows theme, keyboard and mobile layout', async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript(() => { if (!localStorage.getItem('opensigan-theme')) localStorage.setItem('opensigan-theme', 'light'); });
+  await page.route('**/webhooks.html', (route) => route.fulfill({ contentType: 'text/html; charset=utf-8', body: '<h1>알림 관리</h1>' }));
+  await page.goto('/');
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  const link = page.getByRole('link', { name: '시간표 변경 알림 관리' });
+  await expect(link).toHaveAttribute('href', './webhooks.html');
+  for (const width of [320, 390, 800, 1366]) {
+    await page.setViewportSize({ width, height: 844 });
+    const bounds = await link.boundingBox();
+    expect(bounds.height).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  }
+  await page.keyboard.press('Tab');
+  await link.focus();
+  await expect(link).toBeFocused();
+  await expect(link).toHaveCSS('outline-style', 'solid');
+  await link.hover();
+  await expect(link).toHaveCSS('color', 'rgb(17, 17, 17)');
+  await page.getByRole('button', { name: '다크 모드로 전환' }).click();
+  await expect(link).toHaveCSS('color', 'rgb(245, 245, 245)');
+  await link.click();
+  await expect(page.getByRole('heading', { name: '알림 관리' })).toBeVisible();
+  await page.goBack();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await expect(link).toHaveCSS('color', 'rgb(245, 245, 245)');
+});
+
 test('build version appears only at the bottom of settings', async ({ page }) => {
   await mockApi(page);
   await page.addInitScript(() => localStorage.setItem('opensigan-theme', 'light'));
