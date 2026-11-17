@@ -49,7 +49,7 @@ flowchart LR
 
 | 영역 | 현재 판단 | 세부 작업 |
 | --- | --- | --- |
-| **P0 · 핵심 기능·보안·공개 인프라** | **Pages + Workers VPC 비공개 Tunnel·Worker 요청 제한 우선**, 공개 API/ICS·가용성 검증 잔여 | [P0 공개 전 필수 작업](roadmap/core-quality.md) |
+| **P0 · 핵심 기능·보안·공개 인프라** | **공식 Pages 사이트 이전 사용자 완료 보고**, 기본 비공개 Tunnel/Functions 연결 기록 있음. 요청 제한·원본 IP·공개 API/ICS·가용성 검증은 잔여 | [P0 공개 전 필수 작업](roadmap/core-quality.md) |
 | **P1 · 사용자 경험** | 기존 기능 구현, UI/UX 개선 다수 대기 | [학교·시간표·설정·급식 UX](roadmap/user-experience.md) |
 | **P2 · 외부 개발자 연동** | API·ICS·관리 도구 일부 구현, 외부 운영 검증 대기 | [API·캘린더·로그](roadmap/api-operations.md) |
 | **P3–P4 · 자동화와 확장** | 부분 구현 또는 아이디어·운영 검증 대기 | [알림·장기 확장·아이디어](roadmap/automation-and-future.md) |
@@ -78,9 +78,9 @@ flowchart LR
 
 [상세 배치와 검증 조건](roadmap/refactoring-and-release.md#배치-7-착수-조건과-리팩터링-순서) · [코드 수준 실행 설계](refactoring-plan.md) · [리팩터링 전 QA 기준선](refactoring-baseline-2026-11-15.md)
 
-### 오늘의 P0 Cloudflare Tunnel 작업
+### 2026-11-17 Cloudflare 이전 완료 보고 · 당일 QA 계획
 
-**[Cloudflare Pages + Workers VPC + Tunnel 구축 체크리스트](cloudflare-tunnel-rollout.md)**를 따릅니다. `pages.dev` → Worker Service Binding → VPC Tunnel → Pi API를 검증합니다. **ICS는 검증된 `opencigan.pages.dev` 또는 기존 `.ts.net` 주소로 제공하며 공식 `mcv.kr` 동일 도메인이 필수 조건은 아닙니다.** 공식 웹사이트를 Pages로 옮기기로 할 때에만 MCVKR CNAME을 변경합니다. `mcv.kr` 전체 DNS와 기존 WARP/Funnel은 유지합니다.
+**공식 웹사이트 `opencigan.mcv.kr`의 Cloudflare Pages 이전을 사용자가 완료했다고 확인했다.** 이전 작업 자체는 완료로 분류하고 [실행 체크리스트](cloudflare-tunnel-rollout.md)에는 보안·장애 복구·ICS 구독 및 Funnel 종료 판단 등 **실제 남은 과제**를 유지한다. DNS/TLS·전체 API·PWA·실캘린더 앱 검증은 **오늘 시행 예정인 QA**로 분리하며 결과가 나오기 전까지 통과로 표시하지 않는다. `.ts.net` 구독 URL은 사이트 이전과 별개이므로 [Funnel 단계적 퇴역](operations.md#tailscale-funnel-단계적-퇴역) 조건이 충족되기 전에는 공개 경로를 없애지 않는다. Pi의 컴시간 전용 WARP 출구는 유지한다.
 
 ### 공개 서비스 전 주요 검증 게이트
 
