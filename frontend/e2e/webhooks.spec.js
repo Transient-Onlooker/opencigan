@@ -1,5 +1,26 @@
 import { expect, test } from '@playwright/test';
 
+test('webhook page shares the app brand and supports light, dark and system themes', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/webhooks.html');
+  for (const [preference, expected] of [['light', 'light'], ['dark', 'dark'], ['system', 'dark']]) {
+    await page.evaluate((value) => localStorage.setItem('opensigan-theme', value), preference);
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', expected);
+    const brand = page.getByRole('link', { name: 'Opencigan', exact: true });
+    await expect(brand.locator('svg')).toBeVisible();
+    await expect(brand).toHaveAttribute('href', './');
+    await page.keyboard.press('Tab');
+    await brand.focus();
+    await expect(brand).toHaveCSS('outline-style', 'solid');
+    for (const width of [320, 390, 800, 1366]) {
+      await page.setViewportSize({ width, height: 844 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      expect((await page.getByLabel('Webhook 주소').boundingBox()).height).toBeGreaterThanOrEqual(44);
+    }
+  }
+});
+
 test('subscription management uses bearer token and keeps secrets out of storage', async ({ page }) => {
   const id = 'a'.repeat(24), token = 'b'.repeat(43), calls = [];
   await page.route('**/api/v1/webhooks**', async (route) => {
