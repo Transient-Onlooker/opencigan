@@ -25,6 +25,32 @@ async function mockApi(page, delayedSearch, onSchoolSearch) {
   });
 }
 
+test('build version appears only at the bottom of settings', async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript(() => localStorage.setItem('opensigan-theme', 'light'));
+  await page.goto('/');
+  const version = page.locator('.build-info');
+  const expectedSha = (process.env.VITE_BUILD_SHA || process.env.GITHUB_SHA || '0123456789abcdef0123456789abcdef01234567').slice(0, 7);
+  await expect(version).toHaveCount(1);
+  await expect(version).toHaveText(`웹 버전 ${expectedSha}`);
+  await expect(version).toBeHidden();
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  await expect(version).toBeHidden();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  const settings = page.locator('#settings-panel');
+  await expect(settings.locator(':scope > .build-info')).toBeVisible();
+  await expect(settings.locator(':scope > :last-child')).toHaveClass(/build-info/);
+  for (const width of [320, 390, 800, 1366]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  }
+  await page.getByRole('button', { name: '다크 모드로 전환' }).click();
+  await expect(version).toBeVisible();
+  await expect(version).toHaveText(`웹 버전 ${expectedSha}`);
+  await page.getByRole('button', { name: '시간표', exact: true }).click();
+  await expect(version).toBeHidden();
+});
+
 test('return action follows the timetable view and preserves the selected class', async ({ page }) => {
   await mockApi(page);
   await page.addInitScript(() => Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }));

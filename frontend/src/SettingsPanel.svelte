@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import Icon from './Icon.svelte';
+  import BuildInfo from './BuildInfo.svelte';
   import PersonalTimetable from './PersonalTimetable.svelte';
   import { allergens } from './allergens';
   import { calculateLessonTimes, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
@@ -284,6 +285,7 @@
                <details class="allergy-settings" bind:open={settingsOpen.allergies}><summary>알레르기 관리 {allergySelection.length ? `(${allergySelection.length}개 선택)` : ''}</summary><div class="allergy-grid">{#each allergens as name, index}<label><input type="checkbox" checked={allergySelection.includes(index + 1)} onchange={(event) => toggleAllergy(index + 1, event.currentTarget.checked)} /><span>{index + 1}. {name}</span></label>{/each}</div><p>선택 항목은 이 브라우저에만 저장돼요. NEIS에서 알레르기가 표시되지 않았더라도 안전하다는 뜻은 아니에요.</p></details>
              </details>
           </div>
+          <BuildInfo />
         </section>
 
 <style>
