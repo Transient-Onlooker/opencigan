@@ -6,7 +6,7 @@ import unittest
 from http.client import HTTPConnection
 from unittest.mock import Mock, patch
 
-from backend.app import Handler, ThreadingWSGIServer, make_app, serve, _rate_clients, resolve_client_ip
+from backend.app import Handler, ThreadingWSGIServer, make_app, serve, _rate_clients, _waitress_proxy_kwargs, resolve_client_ip
 from backend.cache import Cache
 
 
@@ -246,6 +246,22 @@ class WsGITests(unittest.TestCase):
             self.assertEqual(resolve_client_ip({
                 'REMOTE_ADDR': '127.0.0.1', 'HTTP_X_FORWARDED_FOR': '198.51.100.1',
             }), '127.0.0.1')
+
+    def test_waitress_proxy_kwargs_empty_without_trusted_proxies(self):
+        with patch.dict(os.environ, {'OPENCIGAN_TRUSTED_PROXIES': ''}):
+            self.assertEqual(_waitress_proxy_kwargs(), {})
+
+    def test_waitress_proxy_kwargs_mirror_loopback_proxy(self):
+        with patch.dict(os.environ, {'OPENCIGAN_TRUSTED_PROXIES': '127.0.0.1/32, ::1/128'}):
+            self.assertEqual(_waitress_proxy_kwargs(), {
+                'trusted_proxy': '127.0.0.1',
+                'trusted_proxy_count': 1,
+                'trusted_proxy_headers': {'x-forwarded-for'},
+            })
+
+    def test_waitress_proxy_kwargs_ignore_non_loopback(self):
+        with patch.dict(os.environ, {'OPENCIGAN_TRUSTED_PROXIES': '10.0.0.0/8'}):
+            self.assertEqual(_waitress_proxy_kwargs(), {})
 
 
 if __name__ == "__main__":
