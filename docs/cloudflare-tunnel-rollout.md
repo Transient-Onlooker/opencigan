@@ -64,7 +64,24 @@ command -v cloudflared && cloudflared --version
 - [ ] ICS·공개 API에는 JS/Managed Challenge·Cloudflare Access 로그인 강제 적용 금지. 봇 차단이 정상 학생·캘린더/외부 클라이언트를 차단하지 않는지 검증.
 - [ ] **IP 신뢰 경계:** Pages/Worker의 사용자가 보낸 `X-Forwarded-For`/`Forwarded`를 그대로 Pi에 전달하지 않는다. 실제 엣지 IP 정보 전달 방식을 명확히 설계하고 Worker→Pi 헤더 위변조·프록시 홉·`OPENCIGAN_TRUSTED_PROXIES`를 테스트. 현재 백엔드는 `CF-Connecting-IP`를 직접 사용하지 않음. 다른 외부망 2곳에서 IP별 로그·429 제한을 실측.
 - [ ] **원본 API의 캐시·CORS·ETag·304·HEAD·웹훅 서명·관리자 인증 유지**, Worker 429와 Pi `429 rate_limited`, `503 service_overloaded`, `503 upstream_unavailable` 구분. Worker 자체 오류의 CORS와 `Retry-After` 노출은 허용 출처에 한해 구현·단위 테스트했다. Worker의 `ALLOWED_ORIGINS`를 Pi의 `ALLOWED_ORIGIN`과 맞춰 배포하고 실제 경로를 검증해야 한다.
-- [ ] Cloudflare Pages의 사용자 지정 도메인에 적용되는 zone WAF는 `mcv.kr` zone의 소유자/운영자가 관리함. Workers 레벨 제한으로 가능한 것과 WAF 보호 범위의 차이를 문서화.
+- [x] Cloudflare Pages 사용자 지정 도메인의 zone WAF와 Worker 수준 방어의 차이 및 현재 경로별 제한을 아래에 문서화했다. WAF 활성 여부와 운영 임계치의 적정성은 별도로 검증해야 한다.
+
+### 공개 경로 방어 범위 (2026-11-18 확인)
+
+`mcv.kr` zone은 외부 제공자가 운영하므로 이 프로젝트 계정에서 해당 zone의 WAF 규칙이나 Challenge를 설정·확인할 수 있다고 가정하지 않는다. 아래 Worker 검사는 Pages의 `/api/*` 요청이 Service Binding을 통해 게이트웨이에 도달한 뒤 적용된다. Pages 정적 파일이나 Worker에 도달하기 전 요청에는 Worker 제한이 적용되지 않으며, Worker의 경로·메서드·크기 검사는 zone WAF의 공격 탐지나 네트워크 차단 전체를 대체하지 않는다. 실제 적용된 zone WAF 정책은 미확인이다.
+
+활성 Worker 버전 `62d0377b-ceae-4550-a012-33e582f90f0c`의 Rate Limiting binding은 아래와 같다. 한도는 60초 기준이며 Cloudflare의 지점별 대략적인 제한이어서 전역으로 정확한 요청 수를 보장하지 않는다. IP가 없거나 유효하지 않으면 `unidentified` 키를 공유한다.
+
+| 요청 경로 | Worker에서 적용하는 제한 |
+| --- | --- |
+| 학교·NEIS 학교 검색 | 검색 20회 |
+| 시간표 | 일반 60회 및 시간표 40회 |
+| ICS·변경 RSS | 일반 60회 및 캘린더 20회 |
+| 급식·상태·변경 이력·관리·웹훅·분석 | 일반 60회 공유 |
+
+OPTIONS 사전 요청은 Worker 요청량 제한을 건너뛰어 원본에 전달한다. 허용되지 않은 경로·메서드는 거절하고 요청 본문은 최대 4,096바이트로 제한한다. Worker 한도 초과는 `429 edge_rate_limited`와 `Retry-After`를 반환하며, Pi의 IP별 제한과 전체 셔터는 별도 계층이다. Worker에서 정상 캘린더·API 요청에 JS Challenge를 적용하지 않는다. 관리·웹훅의 인증은 Pi의 기존 정책이 담당하며, 웹훅 활성화나 인증 통과를 이 문서에서 보장하지 않는다.
+
+현재 급식·관리·웹훅은 각각 독립된 Worker 한도를 갖지 않는다. 원본 IP 전달과 서로 다른 외부망의 실측, 실제 요청량에 따른 한도 적정성, WAF 적용 여부 및 정상 클라이언트에 대한 영향은 미검증이다. 운영 트래픽 측정과 검증 없이 별도 한도나 Challenge를 추가하지 않는다.
 
 ## Phase 4 — 공식 사이트 이전 완료 보고 및 실사용 QA
 
