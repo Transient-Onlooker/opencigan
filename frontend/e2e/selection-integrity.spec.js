@@ -846,7 +846,7 @@ test('active allergy filter remains visible without a selected school or meal da
   await page.addInitScript(() => localStorage.setItem('opensigan-meal-allergy-filter', 'unmarked'));
   await page.goto('/');
   await page.getByRole('button', { name: '급식', exact: true }).click();
-  await expect(page.getByText('학교를 먼저 선택해 주세요')).toBeVisible();
+  await expect(page.locator('#meals-panel').getByText('학교를 먼저 선택해 주세요')).toBeVisible();
   const note = page.locator('.meal-filter-note');
   await expect(note).toContainText('선택한 알레르기 0개');
   await expect(note).toContainText('미표시 메뉴도 안전을 보장하지 않습니다');
