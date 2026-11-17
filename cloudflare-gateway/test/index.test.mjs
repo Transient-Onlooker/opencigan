@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import worker from '../src/index.mjs';
 
 const req = (path, init = {}) => new Request('https://opencigan.pages.dev' + path, init);
@@ -156,4 +157,49 @@ test('HEAD failures contain no response body', async () => {
   const response = await worker.fetch(req('/api/v1/status',{method:'HEAD'}), {});
   assert.equal(response.status, 503);
   assert.equal(await response.text(), '');
+});
+
+
+test('signed visitor IP uses Cloudflare IP and binds method path and query', async () => {
+  const { env, calls } = setup();
+  env.PROXY_IP_SIGNING_KEY = 'long-shared-key-for-testing-only-0123456789abcdef';
+  const result = await worker.fetch(req('/api/v1/timetable?school=2%3AExample&grade=2', {
+    headers: {
+      'CF-Connecting-IP': '203.0.113.9', 'X-Forwarded-For': '192.0.2.44',
+      'X-Opencigan-Client-IP': '192.0.2.44', 'X-Opencigan-IP-Signature': 'spoofed',
+    },
+  }), env);
+  assert.equal(result.status, 200);
+  assert.equal(calls.length, 1);
+  const h = calls[0].headers;
+  const ts = h.get('x-opencigan-ip-timestamp');
+  assert.equal(h.get('x-opencigan-client-ip'), '203.0.113.9');
+  assert.ok(Math.abs(Date.now()/1000 - Number(ts)) < 60);
+  assert.equal(h.get('x-forwarded-for'), null);
+  const message = ['GET','/api/v1/timetable','school=2%3AExample&grade=2','203.0.113.9',ts].join('\n');
+  assert.equal(h.get('x-opencigan-ip-signature'), createHmac('sha256', env.PROXY_IP_SIGNING_KEY).update(message).digest('hex'));
+});
+
+test('malformed edge IP does not produce signed attribution', async () => {
+  const { env, calls } = setup();
+  env.PROXY_IP_SIGNING_KEY = 'long-shared-key-for-testing-only-0123456789abcdef';
+  for (const ip of ['999.1.1.1', 'not-an-ip', '1.2.3.4:5555']) {
+    assert.equal((await worker.fetch(req('/api/v1/status', {headers:{
+      'CF-Connecting-IP': ip, 'X-Opencigan-Client-IP': '198.51.100.1',
+    }}),env)).status, 200);
+  }
+  assert.equal(calls.length, 3);
+  for (const request of calls) {
+    assert.equal(request.headers.get('x-opencigan-client-ip'), null);
+    assert.equal(request.headers.get('x-opencigan-ip-signature'), null);
+  }
+});
+
+test('invalid configured signing key fails closed', async () => {
+  const { env, calls } = setup();
+  env.PROXY_IP_SIGNING_KEY = 'short';
+  const response = await worker.fetch(req('/api/v1/status',{headers:{'CF-Connecting-IP':'203.0.113.9'}}),env);
+  assert.equal(response.status, 503);
+  assert.equal(calls.length, 0);
+  assert.equal((await response.json()).code, 'gateway_unavailable');
 });

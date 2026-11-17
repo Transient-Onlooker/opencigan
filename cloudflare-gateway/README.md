@@ -25,3 +25,9 @@ From repository root: `node --test cloudflare-gateway/test/*.test.mjs`
 From `frontend`: `npm test` includes the Pages Service Binding tests.
 
 Reference: [Cloudflare Workers VPC](https://developers.cloudflare.com/workers-vpc/) · [Pages Service bindings](https://developers.cloudflare.com/pages/functions/bindings/) · [Worker Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/).
+
+### Optional signed visitor IP (code only; not enabled in production)
+
+Configure the same random secret of at least 32 UTF-8 bytes on Pi as OPENCIGAN_PROXY_IP_SIGNING_KEY, then set it on the Worker using wrangler secret put PROXY_IP_SIGNING_KEY --name opensigan-private-api. Do not commit a real secret or expose it through a VITE_ variable. The Worker signs the Cloudflare-reported client IP, original method, path and raw query; Pi verifies the HMAC with a 60-second time window and otherwise uses the direct peer address.
+
+When signing is enabled, Pi does not trust unsigned Forwarded or X-Forwarded-For, including the Waitress loopback proxy configuration. This is not authentication and does not persist logs on its own. Enable OPENCIGAN_ACCESS_LOG_DB and the separate admin token for durable log filtering. Real-client IP propagation and two-network verification remain deployment gates. See docs/proxy-client-ip.md.
