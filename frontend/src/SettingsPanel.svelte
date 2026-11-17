@@ -7,6 +7,7 @@
   import { calculateLessonTimes, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
   import type { School } from './api';
   import type { DisplaySettings } from './personalization';
+  import type { MealAllergyFilter } from './meal-filter';
   export let view: 'timetable' | 'meals' | 'settings';
   export let school: School | null;
   export let week: string;
@@ -29,6 +30,9 @@
   export let enabledMealTypes: string[];
   export let showAllergenNumbers: boolean;
   export let allergySelection: number[];
+  export let mealAllergyFilter: MealAllergyFilter;
+  export let setMealAllergyFilter: (value: string) => void;
+  export let openAllergySettingsRequest: number;
   export let setClassDisplay: (value: boolean) => void;
   export let setTheme: (value: string) => void;
   export let setAnimationsEnabled: (value: boolean) => void;
@@ -61,6 +65,15 @@
   $: aliasTeachers = [...new Set([...teacherNames, ...Object.keys(displaySettings.teacherAliases)])].sort((a, b) => a.localeCompare(b, 'ko-KR'));
   $: visibleAliasTeachers = aliasTeachers.filter((name) => `${name} ${displaySettings.teacherAliases[name] ?? ''}`.toLocaleLowerCase('ko-KR').includes(teacherAliasQuery.trim().toLocaleLowerCase('ko-KR')));
   let settingsOpen = { general: false, display: false, advanced: false, times: false, backup: false, meals: false, allergies: false, personal: false };
+  let handledAllergySettingsRequest = 0;
+  let allergyFilterControl: HTMLSelectElement;
+  $: if (openAllergySettingsRequest !== handledAllergySettingsRequest) {
+    handledAllergySettingsRequest = openAllergySettingsRequest;
+    settingsQuery = '';
+    settingsOpen.meals = true;
+    settingsOpen.allergies = true;
+    tick().then(() => { allergyFilterControl?.focus(); allergyFilterControl?.scrollIntoView({ block: 'center' }); });
+  }
   let settingsContent: HTMLElement;
   let searchResults: { name: string; category: string; target: HTMLElement; panel: HTMLDetailsElement }[] = [];
   let ruleSchool = '';
@@ -282,7 +295,7 @@
                <div class="meal-preference-options" aria-label="표시할 식사"><span>표시할 식사</span>{#each mealTypes as type}<label><input type="checkbox" checked={enabledMealTypes.includes(type)} disabled={enabledMealTypes.length === 1 && enabledMealTypes.includes(type)} onchange={(event) => toggleMealType(type, event.currentTarget.checked)} />{type}</label>{/each}</div>
                <label class="meal-number-toggle"><input type="checkbox" checked={showAllergenNumbers} onchange={(event) => setAllergenNumbersVisible(event.currentTarget.checked)} />메뉴의 알레르기 번호 표시</label>
                <p>하루·주간 보기와 표시 설정은 이 브라우저에 저장돼요. 주의 알레르기 경고는 항상 표시됩니다.</p>
-               <details class="allergy-settings" bind:open={settingsOpen.allergies}><summary>알레르기 관리 {allergySelection.length ? `(${allergySelection.length}개 선택)` : ''}</summary><div class="allergy-grid">{#each allergens as name, index}<label><input type="checkbox" checked={allergySelection.includes(index + 1)} onchange={(event) => toggleAllergy(index + 1, event.currentTarget.checked)} /><span>{index + 1}. {name}</span></label>{/each}</div><p>선택 항목은 이 브라우저에만 저장돼요. NEIS에서 알레르기가 표시되지 않았더라도 안전하다는 뜻은 아니에요.</p></details>
+               <details class="allergy-settings" bind:open={settingsOpen.allergies}><summary>알레르기 관리 {allergySelection.length ? `(${allergySelection.length}개 선택)` : ''}</summary><label class="meal-filter-setting">메뉴 표시 방식<select bind:this={allergyFilterControl} value={mealAllergyFilter} onchange={(event) => setMealAllergyFilter(event.currentTarget.value)}><option value="all">모든 메뉴</option><option value="marked">선택 알레르기 표시 메뉴</option><option value="unmarked">선택 알레르기 미표시 메뉴</option></select></label><div class="allergy-grid">{#each allergens as name, index}<label><input type="checkbox" checked={allergySelection.includes(index + 1)} onchange={(event) => toggleAllergy(index + 1, event.currentTarget.checked)} /><span>{index + 1}. {name}</span></label>{/each}</div><p>선택 항목은 이 브라우저에만 저장돼요. NEIS에서 알레르기가 표시되지 않았더라도 안전하다는 뜻은 아니에요.</p></details>
              </details>
           </div>
           <BuildInfo />
@@ -323,6 +336,7 @@
 .meal-preferences p{font-size:12px;line-height:1.6;color:var(--muted);margin:4px 0 12px}
 .allergy-settings summary{cursor:pointer;font-size:14px;font-weight:700;min-height:44px;align-content:center}
 .allergy-settings summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.meal-filter-setting{display:grid;gap:5px;margin:8px 0;font-size:13px}.meal-filter-setting select{width:100%;min-height:44px;padding:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:16px}
 .allergy-settings p{font-size:12px;line-height:1.6;color:var(--muted);margin:12px 0}
 .allergy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:10px}
 .allergy-grid label{display:flex;align-items:center;gap:8px;min-height:38px;font-size:14px;cursor:pointer}

@@ -7,7 +7,8 @@
   import ShareTools from './ShareTools.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import TimetablePanel from './TimetablePanel.svelte';
-  import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readSchoolPreference, writeSchoolPreference, readTheme, writeTheme, readAnimations, writeAnimations, readMealSchool, writeMealSchool } from './preferences';
+  import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readMealAllergyFilter, saveMealAllergyFilter, readSchoolPreference, writeSchoolPreference, readTheme, writeTheme, readAnimations, writeAnimations, readMealSchool, writeMealSchool } from './preferences';
+  import type { MealAllergyFilter } from './meal-filter';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
   import { saveSelection, readSelection, gradesInTimetable, classesInGrade, createSelectionState, createSharedSelectionSession, validateSharedCandidate, type PendingSharedClass } from './selection';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
@@ -49,6 +50,8 @@
   let lessonTimeState = '';
   let settingsBackupState = '';
   let allergySelection: number[] = [];
+  let mealAllergyFilter: MealAllergyFilter = 'all';
+  let openAllergySettingsRequest = 0;
   let tableRefreshState = '';
   let timetableCheckedAt = '';
   let exportState = '';
@@ -361,6 +364,12 @@
     allergySelection = checked ? [...new Set([...allergySelection, id])].sort((a, b) => a - b) : allergySelection.filter((value) => value !== id);
     try { saveAllergies(localStorage, allergySelection); } catch { /* 설정은 현재 페이지에서 유지됩니다. */ }
   }
+  function setMealAllergyFilter(value: string) {
+    if (value !== 'all' && value !== 'marked' && value !== 'unmarked') return;
+    mealAllergyFilter = value;
+    try { saveMealAllergyFilter(localStorage, value); } catch { /* 설정은 현재 페이지에서 유지됩니다. */ }
+  }
+  function openAllergySettings() { view = 'settings'; openAllergySettingsRequest += 1; }
 
   function saveMealPreferences() {
     try { persistMealPreferences(localStorage, { view: mealView, types: enabledMealTypes, showAllergenNumbers }); }
@@ -798,6 +807,7 @@
     themeMedia?.addEventListener?.('change', onThemeMedia);
     try {
       allergySelection = readAllergies(localStorage);
+      mealAllergyFilter = readMealAllergyFilter(localStorage);
       const savedMealSettings = readMealPreferences(localStorage, mealTypes, { view: mealView, types: enabledMealTypes, showAllergenNumbers });
       mealView = savedMealSettings.view;
       enabledMealTypes = savedMealSettings.types;
@@ -845,8 +855,8 @@
     <CalendarNav {view} {inputFocused} selectView={(value) => view = value} />
     <div id="calendar" class="calendar-content" tabindex="-1">
         <TimetablePanel {view} {timetableView} {school} {timetable} {week} {current} {today} {selectedDay} {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {tableState} {tableRefreshState} {timetableCheckedAt} {timetableFromDevice} {exportState} {exportBusy} {imageShareCancelled} {canExport} {weekendClasses} {classError} {sharedClassState} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} lessonTimes={selectedDayTimes} {comparableClasses} {gradeRecords} bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {dates} {periods} {filtered} {missingWeekdays} {observedClassCount} {teacherNames} {historyOpen} {historyDisabled} {historyLoading} {historyError} {historyChanges} {visibleHistory} {historyCursor} bind:historyScope {exportTimetable} {sharePng} {refreshTimetable} {currentWeek} {selectTimetableView} {selectGrade} {selectClass} {changeWeek} {loadTimetable} {selectTimetableDate} {toggleHistory} {loadHistory} {dateText} {shortDate} {timeText} {changeTypeText} {subjectStyle} />
-        <MealsPanel {view} {mealDate} {today} {mealView} {mealDates} {mealDateDraft} {dateError} {neis} {school} {neisSearchState} {neisLoading} {neisResults} {mealState} {hasMeals} {mealLoading} {meals} {visibleMealTypes} {allergySelection} {showAllergenNumbers} {current} {mealsStale} {todayMeals} {setMealView} {changeMealDate} {dateText} {updateMealDateDraft} {selectMealDate} {chooseNeis} {connectMeals} {loadMeals} {selectMealTimetableDate} />
-        <SettingsPanel {view} {school} {week} dark={isDark} {useClassDisplay} {classError} {grade} {classroom} {theme} {animationsEnabled} {displaySettings} {subjectNames} {teacherNames} {lessonTimePeriods} {lessonTimeDrafts} {weekdayTimeDrafts} {lessonTimeState} {settingsBackupState} {mealTypes} {enabledMealTypes} {showAllergenNumbers} {allergySelection} {setClassDisplay} {setTheme} {setAnimationsEnabled} {setColorMode} {saveAlias} {saveSubjectColor} {clearSubjectColors} {saveDisplaySettings} {editLessonTime} {editWeekdayTime} {clearWeekdayTime} {applyLessonTimeRules} {saveLessonTimes} {clearLessonTimes} {downloadSettingsBackup} {importSettingsFile} {resetDisplaySettings} {toggleMealType} {setAllergenNumbersVisible} {toggleAllergy} />
+        <MealsPanel {view} {mealDate} {today} {mealView} {mealDates} {mealDateDraft} {dateError} {neis} {school} {neisSearchState} {neisLoading} {neisResults} {mealState} {hasMeals} {mealLoading} {meals} {visibleMealTypes} {allergySelection} {mealAllergyFilter} {openAllergySettings} {showAllergenNumbers} {current} {mealsStale} {todayMeals} {setMealView} {changeMealDate} {dateText} {updateMealDateDraft} {selectMealDate} {chooseNeis} {connectMeals} {loadMeals} {selectMealTimetableDate} />
+        <SettingsPanel {view} {school} {week} dark={isDark} {useClassDisplay} {classError} {grade} {classroom} {theme} {animationsEnabled} {displaySettings} {subjectNames} {teacherNames} {lessonTimePeriods} {lessonTimeDrafts} {weekdayTimeDrafts} {lessonTimeState} {settingsBackupState} {mealTypes} {enabledMealTypes} {showAllergenNumbers} {allergySelection} {mealAllergyFilter} {setMealAllergyFilter} {openAllergySettingsRequest} {setClassDisplay} {setTheme} {setAnimationsEnabled} {setColorMode} {saveAlias} {saveSubjectColor} {clearSubjectColors} {saveDisplaySettings} {editLessonTime} {editWeekdayTime} {clearWeekdayTime} {applyLessonTimeRules} {saveLessonTimes} {clearLessonTimes} {downloadSettingsBackup} {importSettingsFile} {resetDisplaySettings} {toggleMealType} {setAllergenNumbersVisible} {toggleAllergy} />
     </div>
     <ShareTools {view} {school} {classActionsReady} {apiNotConfigured} {shareUrl} {shareState} {subscriptionUrl} {subscriptionState} {subscriptionPanelOpen} {subscriptionMode} {subscriptionTimesConsent} {canExport} {exportBusy} {shareClass} {subscribeTimetable} {exportTimetable} {changeSubscriptionMode} setSubscriptionTimesConsent={(value) => { subscriptionTimesConsent = value; updateSubscriptionUrl(); }} {copySubscription} />
     <footer><div class="footer-open"><svg class="github-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .75a11.25 11.25 0 0 0-3.56 21.92c.56.1.77-.24.77-.54v-2.1c-3.13.68-3.79-1.33-3.79-1.33-.51-1.3-1.25-1.64-1.25-1.64-1.02-.7.08-.69.08-.69 1.13.08 1.72 1.16 1.72 1.16 1 1.72 2.63 1.22 3.27.93.1-.72.39-1.22.7-1.5-2.5-.28-5.13-1.25-5.13-5.56 0-1.23.44-2.24 1.16-3.03-.12-.28-.5-1.43.11-2.98 0 0 .95-.3 3.1 1.16A10.8 10.8 0 0 1 12 6.17c.96 0 1.92.13 2.82.38 2.15-1.46 3.1-1.16 3.1-1.16.61 1.55.23 2.7.11 2.98.72.79 1.16 1.8 1.16 3.03 0 4.32-2.63 5.27-5.14 5.55.4.35.76 1.03.76 2.08v3.1c0 .3.2.65.78.54A11.25 11.25 0 0 0 12 .75Z"/></svg><div><strong>함께 만드는 오픈소스</strong><p>Opencigan은 오픈소스 프로젝트예요. GitHub에서 함께 기여해 주세요.</p><div class="footer-links"><a href="https://github.com/Transient-Onlooker/opencigan">Opencigan GitHub ↗</a><a href="https://github.com/hegelty/pycomcigan">pycomcigan ↗</a><a href="https://opencigan.mcv.kr/">Opencigan 사이트 ↗</a><a href="/api-docs.html">API 문서</a></div></div></div></footer>
