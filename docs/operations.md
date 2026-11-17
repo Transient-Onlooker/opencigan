@@ -93,21 +93,25 @@ PY
 **사용자 확인:** `opencigan.mcv.kr`의 Cloudflare Pages 이전을 마쳤다. 기존 배포 기록에는 Pages Functions → Worker Service Binding → Workers VPC → Pi `cloudflared` QUIC → 로컬 Python API의 상태 응답이 확인돼 있다. 다만 공식 호스트의 현재 DNS/TLS·전체 기능·원본 IP·Rate Limiting·ICS 자동 갱신은 별도의 운영 QA가 필요하다. `mcv.kr`은 타사 DNS zone이므로 전체 NS나 zone-wide WAF는 변경하지 않는다.
 
 - 사이트 배포·기본 API 연결은 **완료 보고/기존 기록**, 기능별 검증은 [P0 체크리스트](cloudflare-tunnel-rollout.md)의 **2026-11-17 예정 QA**에 남겨 둔다.
-- GitHub Pages와 기존 Tailscale Funnel은 별도 복구·구독 호환성 판단 전까지 유지한다. Cloudflare Workers VPC는 베타 기능이므로 버전·가용성 변화를 관찰한다.
+- GitHub Pages는 별도 복구 판단 전까지 유지한다. Tailscale Funnel은 아래 실행 기록과 같이 중지했다. Cloudflare Workers VPC는 베타 기능이므로 버전·가용성 변화를 관찰한다.
 - Pi의 컴시간 전용 WARP 출구 `OPENCIGAN_COMCIGAN_PROXY`는 **Funnel과 별개**이므로 중단하지 않는다.
 
-**클라이언트 IP·보안:** PR #96의 서명된 IP 전달 경로는 코드에 구현됐지만 실제 Worker/Pi 동일 키 설정과 서로 다른 외부망에서의 IP·로그·429 실측은 미확인이다. 임의 X-Forwarded-For·Forwarded를 신뢰하지 않으며 자세한 조건은 [IP 보안 문서](proxy-client-ip.md)를 따른다. 관리자 인증·Webhook 기본 비활성·CORS/ICS 304·429/503 계약을 유지한다.
+**클라이언트 IP·보안:** PR #96의 서명된 IP 전달 코드는 Worker에 배포했고 Pi의 서명 키를 Worker 비밀값에 등록했다. 서로 다른 외부망에서의 실제 서명 검증·IP·로그·429 실측은 미확인이다. 임의 X-Forwarded-For·Forwarded를 신뢰하지 않으며 자세한 조건은 [IP 보안 문서](proxy-client-ip.md)를 따른다. 관리자 인증·Webhook 기본 비활성·CORS/ICS 304·429/503 계약을 유지한다.
 
 ### Tailscale Funnel 단계적 퇴역
 
-**권장: 지금 삭제하지 말고 당일 QA 후 가역적으로 비활성화한다.** Funnel은 기존 `*.ts.net` 공개 HTTPS 주소를 제공하는 별도 진입점이다. 사이트 CNAME을 Cloudflare로 옮겨도 **기존 외부 캘린더 구독이나 스크립트는 자동으로 새 URL을 사용하지 않는다.**
+**2026-11-17 23:14 KST 확인:** 사용자가 기존 `.ts.net` 캘린더 구독자가 없다고 확인하고 Pi에서 `sudo tailscale funnel --https=443 off`를 실행했다. `tailscale funnel status --json`은 `{}`이고 기존 공개 주소는 연결되지 않았다. 중지 전 HTTPS 443의 `/api`는 `http://127.0.0.1:8000/api`, `/api/v1/status`는 `http://127.0.0.1:8000/api/v1/status`를 가리켰다. 중지 전 설정은 작업 PC의 `AppData/Local/Temp/opencigan-funnel-before-20261117.json`에도 기록되어 있으나 임시 파일이므로 장기 보관을 보장하지 않는다. Tailscale 사설 연결은 활성이고 `opencigan-cloudflared.service`는 active였다. WARP 설정은 이 작업에서 변경하지 않았으며 별도 동작 검사는 하지 않았다.
+
+**같은 시각 검증·주의:** `opencigan.pages.dev`에서 상태·학교 검색·NEIS 학교 검색·시간표·급식·ICS가 각각 HTTP 200이었고 ICS는 `VCALENDAR`를 포함했다. 반면 `opencigan.mcv.kr`은 PC와 Pi에서 DNS 조회가 실패했으며 Cloudflare·Google 공개 DNS도 `mcv.kr` 권한 DNS 관련 SERVFAIL을 반환했다. 단일 시점의 관찰로 원인은 확정되지 않았고 Funnel 중지와의 인과관계도 확인되지 않았다. 공식 주소가 복구되기 전에는 `https://opencigan.pages.dev/`를 사용할 수 있다. 실제 캘린더 앱 자동 갱신, 외부망 복수 지점, 공식 주소의 DNS/TLS 및 전체 기능 검증은 남아 있다.
+
+Funnel은 `*.ts.net` 공개 HTTPS 주소를 제공하는 별도 진입점이다. 기존 외부 스크립트는 자동으로 새 URL을 사용하지 않는다. 아래는 향후 재활성화 또는 점검 시 참고할 절차다.
 
 1. 현재 Funnel 구성을 읽기 전용으로 확인해 공개 포트·경로와 복귀할 원래 명령을 기록한다. 기존 `.ts.net` ICS 링크가 앱/UI/문서·사용자의 캘린더 구독에 남아 있는지, 신규 링크가 Cloudflare URL인지 확인한다.
 2. 서로 다른 네트워크에서 새 Cloudflare 주소의 웹·API·ICS(TLS, VCALENDAR, ETag/304, 새 구독·갱신), 인증·오류·Rate Limit을 점검한다. 기존 구독자에게 URL 재등록을 안내하거나 병행 제공 방침을 결정한다.
 3. 대체 경로가 검증되고 기존 주소에 의존하는 구독자가 없거나 이전을 안내했다면, **Funnel만 중지**한다. 중지 전후 `tailscale funnel status --json`으로 상태를 확인하고 원래 포트/옵션의 명령에 `off`를 붙인다. 예를 들어 443 HTTPS 설정이라면 `tailscale funnel --https=443 off`다. 실제 설정이 다르면 그대로 복사해 사용한다. `tailscale funnel reset`, `tailscale down`, `tailscale up` 또는 클라이언트 제거를 종료 방법으로 사용하지 않는다.
 4. 중지 후 새 Cloudflare 주소에서 웹/API/ICS가 계속 동작하는지 확인하고 429/503·VPC 연결·사용자 오류를 관찰한다. 문제가 생기면 기록한 원래 Funnel 명령으로 공개 경로를 복구한다.
 
-**범위:** Funnel 외부 공개만 중지한다. Tailscale 사설 네트워크, Cloudflare `cloudflared` Tunnel, Pi의 컴시간 전용 WARP 출구는 서로 다른 구성 요소이므로 그대로 보존한다. 위 절차는 **실행 기록이 아닌 운영 계획**이다.
+**범위:** Funnel 외부 공개만 중지한다. Tailscale 사설 네트워크, Cloudflare `cloudflared` Tunnel, Pi의 컴시간 전용 WARP 출구는 서로 다른 구성 요소이므로 그대로 보존한다. 위 번호 목록은 향후 운영 절차이며 현재 실행 상태는 위 확인 기록을 따른다.
 
 공식 문서: [Cloudflare Pages Custom domains](https://developers.cloudflare.com/pages/configuration/custom-domains/) · [Workers VPC](https://developers.cloudflare.com/workers-vpc/) · [Pages Service bindings](https://developers.cloudflare.com/pages/functions/bindings/) · [Worker Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
 
