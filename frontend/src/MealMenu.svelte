@@ -10,7 +10,6 @@
     visibleTypes,
     allergySelection,
     allergyFilter,
-    onAllergySettings,
     showAllergenNumbers,
     timetableFrom,
     timetableTo,
@@ -23,7 +22,6 @@
     visibleTypes: string[];
     allergySelection: number[];
     allergyFilter: MealAllergyFilter;
-    onAllergySettings: () => void;
     showAllergenNumbers: boolean;
     timetableFrom: string;
     timetableTo: string;
@@ -41,9 +39,6 @@
 <div class="meal-filters" aria-label="급식 메뉴 검색 및 필터">
   <label>메뉴 검색<input type="search" maxlength="100" bind:value={query} placeholder="조회한 식단에서 검색" /></label>
 </div>
-{#if allergyFilter !== 'all'}
-  <p class="meal-filter-note">알레르기 필터 적용 중 · 미표시 메뉴도 안전을 보장하지 않습니다.{!allergySelection.length ? ' 주의 알레르기를 선택해 주세요.' : ''} <button type="button" class="text-button" onclick={onAllergySettings}>알레르기 설정</button></p>
-{/if}
 <div class="meal-days">
   {#each dates as date (date)}
     <article class="meal-day" class:current={date === today} aria-label={date + ' 식단'}>
@@ -106,9 +101,7 @@
   .meal-filters label{display:grid;gap:5px;flex:1;min-width:min(220px,100%);font-size:13px;font-weight:650}
   .meal-filters input,.meal-day button{width:100%;min-height:44px;max-width:100%;padding:8px 10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit}
   .meal-day button{width:auto;cursor:pointer;font-size:13px}
-  .meal-filter-note,.meal-range-note{font-size:12px;color:var(--muted);line-height:1.6;overflow-wrap:anywhere}
-  .meal-filter-note{margin:-4px 0 14px}
-  .meal-filter-note button{min-height:44px}
+  .meal-range-note{font-size:12px;color:var(--muted);line-height:1.6;overflow-wrap:anywhere}
   .meal-days{display:grid;gap:14px}
   .meal-day{min-width:0;border:1px solid var(--line)}
   .meal-day.current{border-color:var(--ink)}
