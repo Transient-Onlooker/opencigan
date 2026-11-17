@@ -39,7 +39,10 @@ def get_meals(query, cache, query_param, client, school_type):
         raise RuntimeError("NEIS API key is not configured")
 
     def fetch_meals():
-        meals = client.from_environment().get_meals(school, start, end)
+        try:
+            meals = client.from_environment().get_meals(school, start, end)
+        except ValueError as exc:
+            raise RuntimeError("NEIS meal request failed") from exc
         return {
             "meals": [
                 {"date": meal.date, "type": meal.meal_type,

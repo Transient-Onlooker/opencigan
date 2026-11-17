@@ -87,7 +87,7 @@ OPTIONS 사전 요청은 Worker 요청량 제한을 건너뛰어 원본에 전�
 
 위 구간에서 기록된 IP별 60초 이동 창 최대치는 비루프백 일반 요청 24건·OPTIONS 1건, 루프백 일반 요청 4건이었다. 이는 소량의 관측치이며 공유망 피크나 Worker `unidentified` 비율을 보증하지 않는다. **Pi 배포 전 코드 변경:** 서명 모드에서 검증된 IP별 일반 요청을 제한하고, 서명 없는 요청은 원격 주소별 `unsigned` 별도 버킷을 사용한다. Funnel의 여러 사용자는 루프백 버킷을 공유할 수 있다. Pi의 OPTIONS는 IP 제한과 셔터 모두에서 제외된다. Worker 운영 버전도 OPTIONS를 제한하지 않으며, 후속 코드의 별도 `preflight:` 카운터는 아직 배포 전이다. Worker는 Pi의 서명 검증 이전에 Cloudflare 제공 IP를 기준으로 기존 제한을 적용하므로 이를 Pi에서 검증된 서명 IP와 혼동하지 않는다. 새 OPTIONS 제한의 운영 배포는 공유망 영향 확인 전까지 보류한다.
 
-**기존 Worker 정리 (2026-11-18 KST):** `opensigan-workers-api`는 운영·미리보기 Pages 바인딩의 대상이 아니고 최근 7일 관측 요청이 없었다. workers.dev 공개 경로만 비활성화했으며, Worker·연결된 D1·비밀키는 보존한다. 복구 시 해당 Worker의 workers.dev 설정을 다시 활성화한다. 현재 Pages가 사용하는 `opensigan-private-api`와 VPC는 유지했고, 작업 후 공식 상태 API는 200이었다.
+**기존 Worker 정리 (2026-11-18 KST):** `opensigan-workers-api`는 운영·미리보기 Pages 바인딩의 대상이 아니고 최근 7일 관측 요청이 없었다. 사용자 요청에 따라 연결된 `opensigan-cache` D1을 SQL로 백업해 복원·무결성과 11행을 확인한 후 해당 Worker와 D1을 삭제했다. 백업에는 Worker 비밀키가 포함되지 않는다. 현재 Pages가 사용하는 `opensigan-private-api`와 VPC는 유지했고, 작업 후 공식 상태 API는 200이었다.
 
 현재 급식·관리·웹훅은 각각 독립된 Worker 한도를 갖지 않는다. 원본 IP 전달과 서로 다른 외부망의 실측, 실제 요청량에 따른 한도 적정성, WAF 적용 여부 및 정상 클라이언트에 대한 영향은 미검증이다. 운영 트래픽 측정과 검증 없이 별도 한도나 Challenge를 추가하지 않는다.
 
