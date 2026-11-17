@@ -780,6 +780,7 @@ test('meal menu search, allergy filters, NEIS details and timetable date link wo
   await expect(page.getByText('김치볶음밥(5.6)')).toBeVisible();
   await expect(page.getByText('계란말이(1.2)')).toHaveCount(0);
   await page.getByRole('searchbox', { name: '메뉴 검색' }).fill('');
+  await page.getByRole('searchbox', { name: '메뉴 검색' }).blur();
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByText('급식 설정', { exact: true }).click();
   await page.getByText('알레르기 관리 (1개 선택)', { exact: true }).click();
