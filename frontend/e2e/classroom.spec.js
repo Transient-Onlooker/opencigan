@@ -119,8 +119,17 @@ test('switching classes updates lessons, PNG and both links', async ({ page }) =
   await page.getByRole('button', { name: '캘린더 구독 링크' }).click();
   const subscription = page.getByLabel(/시간표 구독 URL/);
   await expect(subscription).toHaveValue(/class=2&weeks=2&mode=summary$/);
+  const preview = page.locator('#subscription-example');
+  await expect(preview).toContainText('종일 일정 하나');
+  await expect(preview).toContainText('설명을 위한 예시');
   await page.getByRole('combobox', { name: /일정 표시 방식/ }).selectOption('periods');
+  await expect(preview).toContainText('수업마다 시간 없는 종일 일정');
   await expect(subscription).toHaveValue(/class=2&weeks=2$/);
+  await page.getByRole('combobox', { name: /일정 표시 방식/ }).selectOption('timed');
+  await expect(preview).toContainText('시각 미설정');
+  await expect(page.getByText(/입력하지 않은 교시는 ‘교시 시각 미설정’/)).toBeVisible();
+  await expect(subscription).toHaveCount(0);
+  await page.getByRole('combobox', { name: /일정 표시 방식/ }).selectOption('periods');
   await classes.selectOption('1');
   await expect(subscription).toHaveCount(0);
   await expect(classes).toHaveValue('1');
