@@ -100,6 +100,7 @@ test('return action follows the timetable view and preserves the selected class'
   await expect(backToToday).toHaveCount(0);
   await expect(backToWeek).toHaveCount(0);
   await tabs.getByRole('button', { name: '오늘', exact: true }).click();
+  await expect(panel.locator('.quick-class select').nth(1)).toHaveValue('2');
   await expect(backToToday).toHaveCount(0);
   await panel.getByLabel('날짜', { exact: true }).fill('2026-11-10');
   await panel.getByLabel('날짜', { exact: true }).blur();
@@ -121,9 +122,21 @@ test('return action follows the timetable view and preserves the selected class'
     await expect(backToToday).toHaveCount(0);
     await backToWeek.click();
     await expect(backToWeek).toHaveCount(0);
-    await expect(panel.locator('.quick-class select').nth(1)).toHaveValue('2');
+    if (tab === '1학년') {
+      await expect(panel.locator('.quick-class select')).toHaveCount(1);
+      await expect(panel.locator('.quick-class select').first()).toHaveValue('1');
+      await expect(panel.getByLabel('비교 날짜')).toHaveValue(week);
+      await expect(panel.locator('.grade-compact')).toContainText('1반');
+      await expect(panel.locator('.grade-compact')).toContainText('2반');
+      await page.setViewportSize({ width: 1366, height: 844 });
+      await expect(panel.getByRole('region', { name: '1학년 학급별 비교 시간표' })).toBeVisible();
+      await page.setViewportSize({ width: 320, height: 844 });
+    } else {
+      await expect(panel.locator('.quick-class select').nth(1)).toHaveValue('2');
+    }
   }
   await tabs.getByRole('button', { name: '이번 주', exact: true }).click();
+  await expect(panel.locator('.quick-class select').nth(1)).toHaveValue('2');
   const download = page.waitForEvent('download');
   await panel.getByRole('button', { name: '이미지 저장·공유' }).click();
   expect((await download).suggestedFilename()).toMatch(/1학년2반_week_2026-11-09\.png$/);
