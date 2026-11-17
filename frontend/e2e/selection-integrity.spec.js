@@ -724,6 +724,39 @@ test('meal date errors preserve the applied date and valid input fetches the mat
   await expect(input).toHaveAttribute('aria-invalid', 'false');
 });
 
+test('meal return button follows day, week and Korea midnight', async ({ page }) => {
+  await mockApi(page);
+  await page.clock.setFixedTime(new Date('2026-11-15T14:59:00Z'));
+  await page.goto('/' + sharedHash(1));
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  const panel = page.locator('#meals-panel');
+  const back = panel.getByRole('button', { name: '오늘로', exact: true });
+  const date = panel.getByLabel('날짜 선택');
+  await expect(date).toHaveValue('2026-11-15');
+  await expect(back).toHaveCount(0);
+  await panel.getByRole('button', { name: '이전 날짜' }).click();
+  await expect(back).toBeVisible();
+  await back.click();
+  await expect(date).toHaveValue('2026-11-15');
+  await panel.getByRole('button', { name: '주간 식단' }).click();
+  await expect(back).toHaveCount(0);
+  await panel.getByRole('button', { name: '이전 급식 주' }).click();
+  await expect(back).toBeVisible();
+  await back.click();
+  await expect(back).toHaveCount(0);
+  await date.fill('2026-11-14');
+  await date.blur();
+  await expect(back).toHaveCount(0);
+  await page.clock.setFixedTime(new Date('2026-11-15T15:01:00Z'));
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(back).toBeVisible();
+  await back.click();
+  await expect(date).toHaveValue('2026-11-16');
+  await expect(back).toHaveCount(0);
+  await panel.getByRole('button', { name: '하루 식단' }).click();
+  await expect(back).toHaveCount(0);
+});
+
 test('meal loading, failure and an empty successful response are distinct', async ({ page }) => {
   let release;
   const pending = new Promise((resolve) => { release = resolve; });
