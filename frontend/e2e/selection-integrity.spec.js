@@ -28,7 +28,7 @@ async function mockApi(page, delayedSearch, onSchoolSearch) {
 test('notification settings link follows theme, keyboard and mobile layout', async ({ page }) => {
   await mockApi(page);
   await page.addInitScript(() => { if (!localStorage.getItem('opensigan-theme')) localStorage.setItem('opensigan-theme', 'light'); });
-  await page.route('**/webhooks.html', (route) => route.fulfill({ contentType: 'text/html', body: '<h1>알림 관리</h1>' }));
+  await page.route('**/webhooks.html', (route) => route.fulfill({ contentType: 'text/html; charset=utf-8', body: '<h1>알림 관리</h1>' }));
   await page.goto('/');
   await page.getByRole('button', { name: '설정', exact: true }).click();
   const link = page.getByRole('link', { name: '시간표 변경 알림 관리' });
