@@ -766,13 +766,16 @@ test('today view shows matching meals on wide screens without changing meal tab 
   await panel.getByRole('button', { name: '오늘', exact: true }).click();
   const aside = panel.locator('.today-meals');
   await expect(aside).toBeVisible();
+  await expect(panel.getByRole('complementary', { name: /급식/ })).toBeVisible();
+  await panel.locator('#today-date').focus();
+  await expect(panel.locator('#today-date')).toBeFocused();
   await expect(aside).toContainText('식단 2026-11-09');
   const before = mealRequests.filter((from) => from === '2026-11-09').length;
   await panel.locator('#today-date').fill('2026-11-10');
   await panel.locator('#today-date').blur();
   await expect(aside).toContainText('화요일 식단');
   expect(mealRequests.filter((from) => from === '2026-11-09').length).toBe(before);
-  for (const width of [320, 375, 390, 768, 820]) {
+  for (const width of [320, 375, 390, 640, 768, 820]) {
     await page.setViewportSize({ width, height: 844 });
     await expect(aside).toBeHidden();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
@@ -798,6 +801,18 @@ test('today columns show timetable and meal failures independently', async ({ pa
   await panel.getByRole('button', { name: '오늘', exact: true }).click();
   await expect(panel.getByRole('alert')).toContainText('시간표');
   await expect(panel.locator('.today-meals')).toContainText('식단 2026-11-09');
+});
+
+test('today timetable remains visible when meal lookup fails', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 1280, height: 844 });
+  await page.route('**/api/v1/meals?*', (route) => route.fulfill({ status: 503, json: { code: 'upstream_unavailable' } }));
+  await page.goto('/' + sharedHash(1));
+  const panel = page.locator('#timetable-panel');
+  await expect(panel.getByRole('table')).toContainText('과목1');
+  await panel.getByRole('button', { name: '오늘', exact: true }).click();
+  await expect(panel.locator('.lesson-list')).toContainText('과목1');
+  await expect(panel.locator('.today-meals').getByRole('alert')).toContainText('급식을 불러오지 못했어요');
 });
 
 test('meal return button follows day, week and Korea midnight', async ({ page }) => {
