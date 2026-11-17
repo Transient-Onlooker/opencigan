@@ -19,6 +19,8 @@
 
 **공개 전 필요**
 
+- [x] **P0 · GitHub Pages 빌드의 중지된 Funnel 주소 제거:** 2026-11-18 저장소 변수 `API_BASE_URL`을 종료된 `.ts.net`에서 `https://opencigan.pages.dev`로 변경했다. 대체 상태 API가 GitHub Pages 출처에 CORS를 허용하는 것을 확인했다. 새 빌드 배포와 실제 캘린더 앱 검증은 별도 게이트로 유지한다.
+
 ### P0 — Cloudflare Pages + Workers VPC + Tunnel · 비공개 API·봇 방어
 
 > **2026-11-17 상태 갱신:** 공식 웹사이트 `opencigan.mcv.kr`의 Cloudflare Pages 이전은 **사용자가 완료했다고 확인**했다. 기존 Pages → Worker → VPC → Pi 상태 API 연결 기록과는 별개로, 현재 DNS/TLS/전체 API·ICS 동작은 이 문서에서 독립 재검증한 결과가 아니다. **2026-11-17 예정 QA는 완료 처리하지 않고 검증 목록으로 보존**한다. MCVKR은 타사 서브도메인 서비스여서 `mcv.kr` DNS zone 전체를 관리하지 않는다. [단계별 P0 실행 체크리스트](../cloudflare-tunnel-rollout.md).
@@ -32,7 +34,7 @@
 **2026-11-17 당일 QA 예정 — 아직 통과 처리하지 않음**
 
 - [ ] **Pages 이전 후 공개 경로·기능 QA:** `opencigan.mcv.kr`의 DNS/CNAME·TLS, 정적 자산·서비스 워커/PWA·공유 링크, `/api/v1/*`의 학교 검색·시간표·급식·관리자 인증·CORS·HEAD/OPTIONS·ETag/304·429/503을 실제 배포에서 점검. 점검 결과와 적용 SHA를 별도로 기록하며 QA를 수행하기 전에는 완료로 표시하지 않는다.
-- [ ] **NEW-02 · 선택된 공개 ICS 엔드포인트 실사용 검증 (동일 도메인 강제 없음):** 구독 주소는 `https://opencigan.pages.dev/api/v1/timetable.ics` 계열 또는 기존 `https://rpi.tail9802be.ts.net/api/v1/timetable.ics` 계열 중 운영자가 선택하여 제공해도 된다(학급·학교·주차·표시 모드 등의 실제 쿼리는 기존 생성기 그대로 사용). `opencigan.mcv.kr/api/v1/...`와의 동일 출처는 요구하지 않음. **실제 외부 접속, ICS 본문·ETag/304, Apple/Google Calendar 재구독·자동 갱신, TLS·접속 지속성·캐시·운영 중단 시 대체 안내**를 검증하면 완료 판정. 주소를 바꾸면 기존 캘린더 구독은 자동 이전되지 않으므로 재등록 안내 또는 기존 주소 병행 운영.
+- [ ] **NEW-02 · 선택된 공개 ICS 엔드포인트 실사용 검증 (동일 도메인 강제 없음):** Funnel 중지 후 공개 구독은 `https://opencigan.pages.dev/api/v1/timetable.ics` 또는 공식 Pages 호스트를 사용한다. 기존 `.ts.net`은 현재 공개되지 않는다. **실제 외부 접속, ICS 본문·ETag/304, Apple/Google Calendar 재구독·자동 갱신, TLS·접속 지속성·캐시·운영 중단 시 대체 안내**를 검증하면 완료 판정.
 **QA 이외의 잔여 운영 과제**
 
 - [ ] **P0 · 롤백/베타 가용성:** Cloudflare Pages / Worker VPC Beta / cloudflared 연결 장애, 429·503, 캐시·원본 가용성을 분리하고 복구 경로를 검증한다. 기존 GitHub Pages·Tailscale Funnel은 대체 경로의 필요성 확인 전까지 보존하고, 컴시간 전용 Pi WARP 출구 프록시는 유지한다.
