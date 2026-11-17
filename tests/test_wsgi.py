@@ -1,7 +1,10 @@
 import io
+import hashlib
+import hmac
 import json
 import os
 import threading
+import time
 import unittest
 from http.client import HTTPConnection
 from unittest.mock import Mock, patch
@@ -106,6 +109,27 @@ class WsGITests(unittest.TestCase):
             )
             self.assertEqual(status, "429 Too Many Requests")
             self.assertEqual(json.loads(body.decode("utf-8"))["code"], "rate_limited")
+
+    @patch.dict(os.environ, {"OPENCIGAN_PROXY_IP_SIGNING_KEY": "s" * 32, "OPENCIGAN_ACCESS_LOG_DB": "fixture"})
+    @patch("backend.app._access_log_recorder")
+    @patch("backend.app.shutter.check", return_value=(True, 0))
+    def test_signed_and_unsigned_requests_have_separate_limits(self, _shutter, recorder):
+        timestamp = str(int(time.time()))
+        message = "\n".join(("GET", "/api/v1/unknown", "", "203.0.113.9", timestamp))
+        signature = hmac.new(b"s" * 32, message.encode(), hashlib.sha256).hexdigest()
+        signed = {"X-Opencigan-Client-IP": "203.0.113.9", "X-Opencigan-IP-Timestamp": timestamp,
+                  "X-Opencigan-IP-Signature": signature}
+        for _ in range(60):
+            self.assertEqual(self._call_app("GET", "/api/v1/unknown", remote_addr="127.0.0.1")[0], "404 Not Found")
+        self.assertEqual(self._call_app("GET", "/api/v1/unknown", remote_addr="127.0.0.1")[0], "429 Too Many Requests")
+        self.assertEqual(self._call_app("GET", "/api/v1/unknown", remote_addr="127.0.0.1", headers=signed)[0], "404 Not Found")
+        self.assertEqual(recorder.submit.call_args.args[0]["client_ip"], "203.0.113.9")
+        forged = {**signed, "X-Opencigan-IP-Signature": "0" * 64}
+        self.assertEqual(self._call_app("GET", "/api/v1/unknown", remote_addr="127.0.0.1", headers=forged)[0], "429 Too Many Requests")
+        self.assertEqual(self._call_app("OPTIONS", "/api/v1/unknown", remote_addr="127.0.0.1")[0], "204 No Content")
+        for _ in range(59):
+            self.assertEqual(self._call_app("GET", "/api/v1/unknown", remote_addr="127.0.0.1", headers=signed)[0], "404 Not Found")
+        self.assertEqual(self._call_app("GET", "/api/v1/unknown", remote_addr="127.0.0.1", headers=signed)[0], "429 Too Many Requests")
 
     @patch.dict(os.environ, {"OPENCIGAN_ACCESS_LOG_DB": "fixture"})
     @patch("backend.app._access_log_recorder")

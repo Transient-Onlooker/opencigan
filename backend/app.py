@@ -340,10 +340,12 @@ _access_log_recorder = AccessLogRecorder(_access_log_store)
 atexit.register(_access_log_recorder.close)
 
 
-def dispatch_request(method, path, query_string, cache_instance=None, client=None, request_origin=None, request_body=None, request_headers=None, shutter_instance=None):
+def dispatch_request(method, path, query_string, cache_instance=None, client=None, request_origin=None, request_body=None, request_headers=None, shutter_instance=None, rate_client=None):
     received_at = datetime.now(timezone(timedelta(hours=9)))
     started = time.perf_counter()
-    response = _dispatch_request(method, path, query_string, cache_instance, client, request_origin, request_body, request_headers, shutter_instance)
+    if rate_client is None:
+        rate_client = ("unsigned", client) if client and os.environ.get("OPENCIGAN_PROXY_IP_SIGNING_KEY") else client
+    response = _dispatch_request(method, path, query_string, cache_instance, rate_client, request_origin, request_body, request_headers, shutter_instance)
     if method in ("GET", "HEAD") and path in ("/api/v1/schools", "/api/v1/neis/schools", "/api/v1/timetable", "/api/v1/timetable.ics", "/api/v1/timetable/history", "/api/v1/timetable/history.rss", "/api/v1/meals") and os.environ.get("OPENCIGAN_ANALYTICS_DB"):
         metadata = {}
         if (path == "/api/v1/timetable" or response[0] >= 500) and response[1].get("Content-Type", "").startswith("application/json"):
@@ -471,7 +473,9 @@ def make_app(cache_instance=None, trusted_proxies=None):
         method = environ.get("REQUEST_METHOD", "GET").upper()
         path = environ.get("PATH_INFO", "") or "/"
         query_string = environ.get("QUERY_STRING", "")
-        client = resolve_client_ip(environ, trusted_proxies=trusted_proxies)
+        signing_key = os.environ.get("OPENCIGAN_PROXY_IP_SIGNING_KEY", "")
+        verified_client = verify_signed_client_ip(environ, signing_key) if signing_key else None
+        client = verified_client or resolve_client_ip(environ, trusted_proxies=trusted_proxies)
 
         status_code, headers, body = dispatch_request(
             method=method,
@@ -479,6 +483,7 @@ def make_app(cache_instance=None, trusted_proxies=None):
             query_string=query_string,
             cache_instance=cache_instance,
             client=client,
+            rate_client=verified_client,
             request_origin=environ.get("HTTP_ORIGIN"),
             request_body=_read_request_body(environ.get("wsgi.input"), environ.get("CONTENT_LENGTH")) if (method == "POST" and path == "/api/v1/analytics/pageview") or (method in ("POST", "PUT") and path.startswith("/api/v1/webhooks")) else None,
             request_headers={"Authorization": environ.get("HTTP_AUTHORIZATION", ""), "If-None-Match": environ.get("HTTP_IF_NONE_MATCH", ""), "Referer": environ.get("HTTP_REFERER", "")},
