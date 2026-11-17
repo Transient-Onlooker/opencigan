@@ -200,10 +200,10 @@
     return preference === 'dark' || (preference === 'system' && prefersDark);
   }
 
-  function subjectStyle(subject: string | null | undefined) {
-    const color = subjectColor(subject, displaySettings);
+  $: subjectStyle = ((settings: DisplaySettings) => (subject: string | null | undefined) => {
+    const color = subjectColor(subject, settings);
     return color ? `background-color:${color};color:${subjectTextColor(color)}` : undefined;
-  }
+  })(displaySettings);
   $: classDisplayKey = school ? `opensigan-class-display:${school.id}:${grade}:${classroom}` : '';
   $: if (classDisplayKey) loadClassDisplay(classDisplayKey, schoolDisplaySettings);
 

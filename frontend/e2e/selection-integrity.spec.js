@@ -291,6 +291,37 @@ test('subject settings manage several colors and aliases with school and class i
   await expect(page.getByLabel('이전과목 표시 이름', { exact: true })).toHaveValue('이전별칭');
 });
 
+test('subject colors update immediately and respect school and class settings', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  const panel = page.locator('#timetable-panel');
+  await expect(panel.getByRole('table')).toContainText('과목1');
+  const lesson = panel.getByRole('table').locator('strong', { hasText: '과목1' });
+  const settings = page.getByRole('button', { name: '설정', exact: true });
+  const timetableTab = page.getByRole('button', { name: '시간표', exact: true });
+  await settings.click();
+  await page.getByText('과목·교사 상세 설정', { exact: true }).click();
+  await page.getByLabel('과목 색상', { exact: true }).selectOption('custom');
+  await page.getByText('과목 색상·표시 이름 관리', { exact: true }).click();
+  await page.getByLabel('과목1 색상', { exact: true }).fill('#123456');
+  await timetableTab.click();
+  await expect(lesson).toHaveCSS('background-color', 'rgb(18, 52, 86)');
+  await settings.click();
+  await page.getByText('시간표 표시 설정', { exact: true }).click();
+  await page.getByLabel('1학년 1반만 따로 설정').check();
+  await page.getByLabel('과목1 색상', { exact: true }).fill('#abcdef');
+  await timetableTab.click();
+  await expect(lesson).toHaveCSS('background-color', 'rgb(171, 205, 239)');
+  await settings.click();
+  await page.getByLabel('1학년 1반만 따로 설정').uncheck();
+  await timetableTab.click();
+  await expect(lesson).toHaveCSS('background-color', 'rgb(18, 52, 86)');
+  await settings.click();
+  await page.getByRole('button', { name: '과목1 설정 초기화' }).click();
+  await timetableTab.click();
+  await expect(lesson).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+});
+
 test('multiple teacher aliases include saved names and affect timetable search', async ({ page }) => {
   await mockApi(page);
   await page.addInitScript((id) => {
