@@ -99,6 +99,21 @@
   $: if ((school?.id ?? '') !== ruleSchool) {
     ruleSchool = school?.id ?? '';
     ruleStart = ''; ruleDuration = ''; ruleBreak = ''; ruleLunchAfter = ''; ruleLunch = '';
+    try {
+      const saved = JSON.parse(localStorage.getItem('opensigan-lesson-rules:' + ruleSchool) || 'null');
+      if (saved && typeof saved === 'object') {
+        ruleStart = typeof saved.start === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(saved.start) ? saved.start : '';
+        ruleDuration = /^\d{1,4}$/.test(saved.duration) ? saved.duration : '';
+        ruleBreak = /^\d{1,4}$/.test(saved.break) ? saved.break : '';
+        ruleLunchAfter = /^\d{1,2}$/.test(saved.lunchAfter) ? saved.lunchAfter : '';
+        ruleLunch = /^\d{1,4}$/.test(saved.lunch) ? saved.lunch : '';
+      }
+    } catch { /* 계산 입력은 저장소 없이도 사용할 수 있습니다. */ }
+  }
+  function saveRuleDraft() {
+    if (!ruleSchool) return;
+    try { localStorage.setItem('opensigan-lesson-rules:' + ruleSchool, JSON.stringify({ start: ruleStart, duration: ruleDuration, break: ruleBreak, lunchAfter: ruleLunchAfter, lunch: ruleLunch })); }
+    catch { /* 계산 입력은 현재 화면에 유지됩니다. */ }
   }
   $: rulePreview = calculateLessonTimes(ruleStart, ruleDuration, ruleBreak, ruleLunchAfter, ruleLunch, lessonTimePeriods.length);
   function settingsMatch(labels: string, query: string) {
@@ -239,11 +254,11 @@
                <summary>학교 교시 시각 설정</summary>
                <p class="display-settings-hint">학교에서 확인한 실제 시작·종료 시각을 입력해 주세요. 설정은 이 브라우저의 해당 학교에만 저장되며, 입력하지 않은 교시는 추측하지 않습니다.</p>
                <div class="lesson-rule-grid">
-                 <label>1교시 시작 시각<input type="time" bind:value={ruleStart} /></label>
-                 <label>수업 시간 (분)<input type="number" min="1" max="1440" step="1" value={ruleDuration} oninput={(event) => ruleDuration = event.currentTarget.value} /></label>
-                 <label>기본 쉬는 시간 (분)<input type="number" min="0" max="1440" step="1" value={ruleBreak} oninput={(event) => ruleBreak = event.currentTarget.value} /></label>
-                 <label>점심시간 시작<select bind:value={ruleLunchAfter}><option value="">점심시간 없음</option>{#each lessonTimePeriods.slice(0, -1) as period}<option value={String(period)}>{period}교시 후</option>{/each}</select></label>
-                 {#if ruleLunchAfter}<label>점심시간 길이 (분)<input type="number" min="0" max="1440" step="1" value={ruleLunch} oninput={(event) => ruleLunch = event.currentTarget.value} /></label>{/if}
+                 <label>1교시 시작 시각<input type="time" bind:value={ruleStart} onchange={(event) => { ruleStart = event.currentTarget.value; saveRuleDraft(); }} /></label>
+                 <label>수업 시간 (분)<input type="number" min="1" max="1440" step="1" value={ruleDuration} oninput={(event) => ruleDuration = event.currentTarget.value} onchange={saveRuleDraft} /></label>
+                 <label>기본 쉬는 시간 (분)<input type="number" min="0" max="1440" step="1" value={ruleBreak} oninput={(event) => ruleBreak = event.currentTarget.value} onchange={saveRuleDraft} /></label>
+                 <label>점심시간 시작<select bind:value={ruleLunchAfter} onchange={(event) => { ruleLunchAfter = event.currentTarget.value; saveRuleDraft(); }}><option value="">점심시간 없음</option>{#each lessonTimePeriods.slice(0, -1) as period}<option value={String(period)}>{period}교시 후</option>{/each}</select></label>
+                 {#if ruleLunchAfter}<label>점심시간 길이 (분)<input type="number" min="0" max="1440" step="1" value={ruleLunch} oninput={(event) => ruleLunch = event.currentTarget.value} onchange={saveRuleDraft} /></label>{/if}
                </div>
                {#if rulePreview}
                  <div class="lesson-preview" aria-label="계산된 교시 시각 미리보기">
@@ -257,7 +272,7 @@
                {/if}
                <details class="lesson-time-detail" bind:open={lessonDetailsOpen}>
                  <summary>상세 시간 설정하기</summary>
-                 <p class="display-settings-hint">직접 수정한 시각이 저장됩니다. 계산 규칙은 현재 화면의 미리보기이며 저장되지 않아요. 교시별 계산값으로 되돌리거나 전체 계산값을 다시 적용할 수 있어요.</p>
+                 <p class="display-settings-hint">직접 수정한 시각이 저장됩니다. 계산 입력은 이 학교의 브라우저에만 별도로 보관되며 백업 파일에는 포함되지 않아요. 실제 시각을 바꾸려면 계산값을 적용하고 저장해 주세요.</p>
                <div class="lesson-time-grid">
                  {#each lessonTimePeriods as period}
                    <div class="lesson-time-row">
