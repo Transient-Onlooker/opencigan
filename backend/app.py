@@ -494,6 +494,26 @@ class ThreadingWSGIServer(socketserver.ThreadingMixIn, wsgiref.simple_server.WSG
     allow_reuse_address = True
 
 
+def _waitress_proxy_kwargs():
+    """Mirror OPENCIGAN_TRUSTED_PROXIES into Waitress proxy settings.
+
+    Waitress drops X-Forwarded-For unless the immediate proxy is trusted
+    in its own configuration, so the application-level trust list alone
+    never sees the header when serving through a loopback proxy such as
+    Tailscale Funnel. Only loopback proxies are mirrored: the server binds
+    to loopback, so the immediate peer is always local.
+    """
+    networks = parse_trusted_proxies(os.environ.get("OPENCIGAN_TRUSTED_PROXIES", ""))
+    for addr in ("127.0.0.1", "::1"):
+        if any(ipaddress.ip_address(addr) in net for net in networks):
+            return {
+                "trusted_proxy": addr,
+                "trusted_proxy_count": 1,
+                "trusted_proxy_headers": {"x-forwarded-for"},
+            }
+    return {}
+
+
 def serve(host=None, port=None, wsgi_app=None):
     host = host or os.environ.get("HOST", "127.0.0.1")
     port = int(port or os.environ.get("PORT", "8000"))
@@ -504,7 +524,7 @@ def serve(host=None, port=None, wsgi_app=None):
 
         threads = int(os.environ.get("THREADS", "8"))
         logger.info("Starting Waitress WSGI server on %s:%s (threads=%d)", host, port, threads)
-        waitress.serve(target_app, host=host, port=port, threads=threads)
+        waitress.serve(target_app, host=host, port=port, threads=threads, **_waitress_proxy_kwargs())
     except ImportError:
         logger.info("Waitress not installed. Serving with ThreadingWSGIServer on %s:%s", host, port)
         server = wsgiref.simple_server.make_server(
