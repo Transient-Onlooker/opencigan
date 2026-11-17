@@ -18,6 +18,7 @@ from backend.cache import Cache, CacheBackoffError
 from backend.http_core import json_response, make_response_headers, preflight_response, query_param as _query_param, timetable_filters
 from backend.analytics import ApiRecorder
 from backend.access_logs import AccessLogRecorder, AccessLogStore, classify_origin
+from backend.signed_client_ip import verify_signed_client_ip
 from backend.ical import render_timetable_ics
 from backend.history_feed import render_history_feed
 from backend.shutter import Shutter
@@ -105,6 +106,13 @@ def resolve_client_ip(environ, trusted_proxies=None):
     remote_addr = environ.get("REMOTE_ADDR")
     if not remote_addr:
         return remote_addr
+
+    # Opt-in signed attribution: never trust unsigned XFF/Forwarded on this
+    # path, including from the public Funnel that also connects to loopback.
+    signing_key = os.environ.get("OPENCIGAN_PROXY_IP_SIGNING_KEY", "")
+    if signing_key:
+        verified = verify_signed_client_ip(environ, signing_key)
+        return verified if verified is not None else str(_clean_ip_str(remote_addr) or remote_addr)
 
     if trusted_proxies is None:
         env_proxies = os.environ.get("OPENCIGAN_TRUSTED_PROXIES", "")
@@ -503,6 +511,11 @@ def _waitress_proxy_kwargs():
     Tailscale Funnel. Only loopback proxies are mirrored: the server binds
     to loopback, so the immediate peer is always local.
     """
+    # Waitress rewrites REMOTE_ADDR from X-Forwarded-For when proxy trust is
+    # enabled. Signed mode MUST retain the socket peer, or an unsigned Funnel
+    # request can bypass the HMAC fallback via rewritten REMOTE_ADDR.
+    if os.environ.get("OPENCIGAN_PROXY_IP_SIGNING_KEY"):
+        return {}
     networks = parse_trusted_proxies(os.environ.get("OPENCIGAN_TRUSTED_PROXIES", ""))
     for addr in ("127.0.0.1", "::1"):
         if any(ipaddress.ip_address(addr) in net for net in networks):

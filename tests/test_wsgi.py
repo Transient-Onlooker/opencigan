@@ -259,6 +259,14 @@ class WsGITests(unittest.TestCase):
                 'trusted_proxy_headers': {'x-forwarded-for'},
             })
 
+
+    def test_signed_mode_disables_waitress_forwarded_ip_rewrite(self):
+        with patch.dict(os.environ, {
+            "OPENCIGAN_TRUSTED_PROXIES": "127.0.0.1/32",
+            "OPENCIGAN_PROXY_IP_SIGNING_KEY": "long-shared-key-for-testing-only-0123456789abcdef",
+        }):
+            self.assertEqual(_waitress_proxy_kwargs(), {})
+
     def test_waitress_proxy_kwargs_ignore_non_loopback(self):
         with patch.dict(os.environ, {'OPENCIGAN_TRUSTED_PROXIES': '10.0.0.0/8'}):
             self.assertEqual(_waitress_proxy_kwargs(), {})

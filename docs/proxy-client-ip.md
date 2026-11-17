@@ -98,3 +98,22 @@
    - 학교, 기숙사, 통신사 CGNAT(Carrier-Grade NAT) 등 다수의 사용자가 하나의 공인 IP를 공유하는 환경에서는 해당 공인 IP에 대해 60회/60초 한도가 공동 적용됩니다. 이는 IP 기반 레이트 리미트의 고유한 한계입니다.
 4. **비표준 헤더:**
    - `CF-Connecting-IP`, `X-Real-IP`, `True-Client-IP` 등 공급자별 비표준 헤더는 직접 조회하지 않습니다. 역방향 프록시 계층에서 표준 `X-Forwarded-For` 체인으로 매핑하여 전달하도록 권장합니다.
+
+---
+
+## 7. Workers VPC 원본 IP 서명 전달 (코드 준비, 실제 운영 미검증)
+
+Cloudflare Pages → Private Worker → Workers VPC → Pi 환경에서는 기존 Funnel에서도 루프백을 통해 접근할 수 있습니다. 이때 루프백의 X-Forwarded-For를 신뢰하면 IP 위조 가능성이 있으므로 별도 공유 비밀키로 서명된 IP만 인식합니다.
+
+- Worker는 Cloudflare의 CF-Connecting-IP를 검증하고 X-Opencigan-Client-IP, X-Opencigan-IP-Timestamp, X-Opencigan-IP-Signature를 직접 생성합니다. 외부 요청의 동명 헤더는 전달하지 않습니다.
+- HMAC-SHA256의 UTF-8 입력은 METHOD, PATH, RAW_QUERY, IP, UNIX_SECONDS를 각각 LF로 이어 붙입니다. 16진수 소문자 서명을 사용하고 서버는 타임스탬프 ±60초를 허용합니다.
+- Pi에 OPENCIGAN_PROXY_IP_SIGNING_KEY가 설정되면 유효한 서명이 있을 때만 해당 IP를 사용합니다. 누락·만료·변조된 경우 소켓 피어 IP로 돌아가고, 기존 X-Forwarded-For / Forwarded는 무시합니다.
+- 서명 방식 활성화 시 Waitress의 trusted_proxy 설정을 비활성화하여 X-Forwarded-For가 REMOTE_ADDR를 먼저 덮어쓰지 못하게 합니다. 키를 설정하지 않으면 기존 Waitress/프록시 설정을 유지합니다.
+- 서명은 관리자 인증이 아닌 원본 IP 귀속 수단입니다. 요청 전체를 인증하거나 단기 재전송을 차단하는 프로토콜은 아닙니다. 비공개 터널과 서비스 접근 통제를 병행합니다.
+
+### 활성화 및 검증
+
+1. 충분히 무작위인 32바이트 이상의 동일한 비밀키를 Pi의 OPENCIGAN_PROXY_IP_SIGNING_KEY에 먼저 설정하고, Worker의 PROXY_IP_SIGNING_KEY는 Wrangler secret으로 설정합니다. 키를 저장소나 프런트엔드 빌드 변수에 넣지 않습니다.
+2. 두 네트워크에서 API를 각각 한 번 호출하여 Pi의 IP별 Rate Limit 및 접속 로그가 실제 공인 IP와 일치하는지 확인합니다. 서명이 깨진 요청과 기존 Funnel 경로의 동작도 검증해야 합니다.
+3. 장기 접속 로그는 별도 OPENCIGAN_ACCESS_LOG_DB와 OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN이 있어야 활성화됩니다. 이 작업은 해당 설정·운영 배포를 수행하지 않습니다.
+4. 실운영 환경에서 Cloudflare의 CF-Connecting-IP가 Pages Service Binding에 보존되는지, VPC 통신에서 서명 헤더가 전달되는지 검증할 때까지 완료로 표시하지 않습니다.

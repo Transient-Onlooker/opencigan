@@ -26,6 +26,38 @@ function jsonError(code, status, request, allowedOrigins, extraHeaders = {}) {
   );
 }
 
+
+function normalizeClientIp(ip) {
+  if (typeof ip !== 'string' || ip.length > 45) return null;
+  if (/^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(ip)) {
+    return ip.split('.').every(part => Number(part) <= 255) ? ip : null;
+  }
+  if (ip.includes(':')) {
+    try {
+      const host = new URL('http://[' + ip + ']/').hostname;
+      if (host.startsWith('[') && host.endsWith(']')) return host.slice(1, -1);
+    } catch { /* Invalid IPv6. */ }
+  }
+  return null;
+}
+
+async function attachSignedClientIp(headers, request, env, url, clientIp) {
+  const secret = env.PROXY_IP_SIGNING_KEY;
+  if (secret === undefined || secret === null || secret === '') return;
+  const encoder = new TextEncoder();
+  if (typeof secret !== 'string' || encoder.encode(secret).byteLength < 32) {
+    throw new Error('invalid client IP signing configuration');
+  }
+  if (clientIp === 'unidentified') return;
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const payload = [request.method.toUpperCase(), url.pathname, url.search.slice(1), clientIp, timestamp].join('\n');
+  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), {name: 'HMAC', hash: 'SHA-256'}, false, ['sign']);
+  const signature = new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(payload)));
+  headers.set('X-Opencigan-Client-IP', clientIp);
+  headers.set('X-Opencigan-IP-Timestamp', timestamp);
+  headers.set('X-Opencigan-IP-Signature', Array.from(signature, b => b.toString(16).padStart(2, '0')).join(''));
+}
+
 export default {
   async fetch(request, env) {
     const allowedOrigins = (env?.ALLOWED_ORIGINS || '').split(',').map(origin => origin.trim()).filter(Boolean);
@@ -52,8 +84,7 @@ export default {
     // Only the Cloudflare-injected client IP is used for the edge limiter.
     // This Worker has workers_dev=false and is callable by Pages service binding only.
     // A missing/invalid IP is grouped under 'unidentified' rather than trusting XFF.
-    const ip = request.headers.get('CF-Connecting-IP') ?? '';
-    const clientKey = ip.length <= 45 && /^[0-9a-f.:]+$/i.test(ip) ? ip : 'unidentified';
+    const clientKey = normalizeClientIp(request.headers.get('CF-Connecting-IP')) || 'unidentified';
     if (request.method !== 'OPTIONS') {
       const search = path === '/api/v1/schools' || path === '/api/v1/neis/schools';
       const category = path === '/api/v1/timetable.ics' || path === '/api/v1/timetable/history.rss'
@@ -103,11 +134,11 @@ export default {
       const value = request.headers.get(key);
       if (value !== null) headers.set(key, value);
     }
-    // Never pass visitor-supplied Forwarded, X-Forwarded-For, CF-Connecting-IP,
-    // CF-Access headers, or arbitrary Host values into the Pi trust boundary.
-    // Origin-side per-IP attribution remains a separate P0 verification gate.
+    // Never forward untrusted visitor-supplied IP headers to Pi.
+    // Only this Worker may create authenticated client IP headers.
     const destination = new URL(url.pathname + url.search, ORIGIN);
     try {
+      await attachSignedClientIp(headers, request, env, url, clientKey);
       const outbound = new Request(destination, {
         method: request.method,
         headers,
