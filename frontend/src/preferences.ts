@@ -1,4 +1,5 @@
 import type { NeisSchool, School } from './api';
+import type { MealAllergyFilter } from './meal-filter';
 
 export type MealPreferences = { view: 'day' | 'week'; types: string[]; showAllergenNumbers: boolean };
 export type ThemePreference = 'light' | 'dark' | 'system';
@@ -57,6 +58,15 @@ export function saveMealPreferences(storage: Pick<Storage, 'setItem'>, preferenc
 
 export function saveAllergies(storage: Pick<Storage, 'setItem'>, allergies: number[]) {
   storage.setItem('opensigan-allergies', JSON.stringify(allergies));
+}
+
+export function readMealAllergyFilter(storage: Pick<Storage, 'getItem'>): MealAllergyFilter {
+  const value = storage.getItem('opensigan-meal-allergy-filter');
+  return value === 'marked' || value === 'unmarked' ? value : 'all';
+}
+
+export function saveMealAllergyFilter(storage: Pick<Storage, 'setItem'>, value: MealAllergyFilter) {
+  storage.setItem('opensigan-meal-allergy-filter', value);
 }
 
 export function readSchoolPreference<T>(storage: Pick<Storage, 'getItem'>, prefix: string, schoolId: string, parse: (value: unknown) => T, fallback: () => T): T {

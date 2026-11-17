@@ -2,6 +2,7 @@
   import MealMenu from './MealMenu.svelte';
   import { addDays, pasteDate } from './date';
   import type { Meal, NeisSchool, School } from './api';
+  import type { MealAllergyFilter } from './meal-filter';
   export let view: 'timetable' | 'meals' | 'settings';
   export let mealDate: string;
   export let today: string;
@@ -20,6 +21,8 @@
   export let meals: Meal[];
   export let visibleMealTypes: string[];
   export let allergySelection: number[];
+  export let mealAllergyFilter: MealAllergyFilter;
+  export let openAllergySettings: () => void;
   export let showAllergenNumbers: boolean;
   export let current: string;
   export let mealsStale: boolean;
@@ -56,6 +59,8 @@
                  {today}
                  visibleTypes={visibleMealTypes}
                  {allergySelection}
+                 allergyFilter={mealAllergyFilter}
+                 onAllergySettings={openAllergySettings}
                  {showAllergenNumbers}
                  timetableFrom={current}
                  timetableTo={addDays(current, 13)}

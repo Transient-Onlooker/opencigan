@@ -9,6 +9,8 @@
     today,
     visibleTypes,
     allergySelection,
+    allergyFilter,
+    onAllergySettings,
     showAllergenNumbers,
     timetableFrom,
     timetableTo,
@@ -20,6 +22,8 @@
     today: string;
     visibleTypes: string[];
     allergySelection: number[];
+    allergyFilter: MealAllergyFilter;
+    onAllergySettings: () => void;
     showAllergenNumbers: boolean;
     timetableFrom: string;
     timetableTo: string;
@@ -28,7 +32,6 @@
   } = $props();
 
   let query = $state('');
-  let allergyFilter = $state<MealAllergyFilter>('all');
 
   function sourceText(value: string) {
     return value.replace(/<br\s*\/?>/gi, '\n');
@@ -37,16 +40,9 @@
 
 <div class="meal-filters" aria-label="급식 메뉴 검색 및 필터">
   <label>메뉴 검색<input type="search" maxlength="100" bind:value={query} placeholder="조회한 식단에서 검색" /></label>
-  <label>알레르기 필터
-    <select bind:value={allergyFilter}>
-      <option value="all">모든 메뉴</option>
-      <option value="marked">선택 알레르기 표시 메뉴</option>
-      <option value="unmarked">선택 알레르기 미표시 메뉴</option>
-    </select>
-  </label>
 </div>
 {#if allergyFilter !== 'all'}
-  <p class="meal-filter-note">선택한 알레르기 번호를 기준으로 메뉴를 표시합니다. 미표시 메뉴도 안전을 보장하지 않습니다.{!allergySelection.length ? ' 설정에서 주의 알레르기를 선택하세요.' : ''}</p>
+  <p class="meal-filter-note">알레르기 필터 적용 중 · 미표시 메뉴도 안전을 보장하지 않습니다.{!allergySelection.length ? ' 주의 알레르기를 선택해 주세요.' : ''} <button type="button" class="text-button" onclick={onAllergySettings}>알레르기 설정</button></p>
 {/if}
 <div class="meal-days">
   {#each dates as date (date)}
@@ -108,10 +104,11 @@
 <style>
   .meal-filters{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}
   .meal-filters label{display:grid;gap:5px;flex:1;min-width:min(220px,100%);font-size:13px;font-weight:650}
-  .meal-filters input,.meal-filters select,.meal-day button{width:100%;min-height:44px;max-width:100%;padding:8px 10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit}
+  .meal-filters input,.meal-day button{width:100%;min-height:44px;max-width:100%;padding:8px 10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit}
   .meal-day button{width:auto;cursor:pointer;font-size:13px}
   .meal-filter-note,.meal-range-note{font-size:12px;color:var(--muted);line-height:1.6;overflow-wrap:anywhere}
   .meal-filter-note{margin:-4px 0 14px}
+  .meal-filter-note button{min-height:44px}
   .meal-days{display:grid;gap:14px}
   .meal-day{min-width:0;border:1px solid var(--line)}
   .meal-day.current{border-color:var(--ink)}
@@ -133,6 +130,6 @@
   .meal-source-details{margin-top:8px}
   .meal-source-details summary{min-height:44px;align-content:center;cursor:pointer;font-size:13px}
   .meal-source-text{white-space:pre-line;overflow-wrap:anywhere}
-  .meal-source-details:focus-within,.meal-day button:focus-visible,.meal-filters input:focus-visible,.meal-filters select:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .meal-source-details:focus-within,.meal-day button:focus-visible,.meal-filters input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
   @media(max-width:540px){.meal-types{grid-template-columns:1fr}.meal-types>section{border-right:0;border-bottom:1px solid var(--line)}.meal-types>section:last-child{border-bottom:0}}
 </style>

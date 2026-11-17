@@ -31,6 +31,18 @@ test('school preferences isolate keys and recover malformed stored data', () => 
   assert.equal(values.get('pref:b'), '{bad');
 });
 
+test('meal allergy filter is saved independently and ignores invalid values', () => {
+  const values = new Map();
+  const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+  assert.equal(prefs.readMealAllergyFilter(storage), 'all');
+  prefs.saveMealAllergyFilter(storage, 'marked');
+  assert.equal(prefs.readMealAllergyFilter(storage), 'marked');
+  prefs.saveMealAllergyFilter(storage, 'unmarked');
+  assert.equal(prefs.readMealAllergyFilter(storage), 'unmarked');
+  values.set('opensigan-meal-allergy-filter', 'invalid');
+  assert.equal(prefs.readMealAllergyFilter(storage), 'all');
+});
+
 test('meal school links remain scoped to the selected timetable school', () => {
   const values = new Map();
   const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
