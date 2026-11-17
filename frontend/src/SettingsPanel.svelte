@@ -1,8 +1,7 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import Icon from './Icon.svelte';
   import BuildInfo from './BuildInfo.svelte';
-  import PersonalTimetable from './PersonalTimetable.svelte';
   import { allergens } from './allergens';
   import { calculateLessonTimes, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
   import type { School } from './api';
@@ -10,8 +9,6 @@
   import type { MealAllergyFilter } from './meal-filter';
   export let view: 'timetable' | 'meals' | 'settings';
   export let school: School | null;
-  export let week: string;
-  export let dark: boolean;
   export let useClassDisplay: boolean;
   export let classError: boolean;
   export let grade: number;
@@ -64,7 +61,26 @@
   $: if ((school?.id ?? '') !== teacherAliasSchool) { teacherAliasSchool = school?.id ?? ''; teacherAliasQuery = ''; }
   $: aliasTeachers = [...new Set([...teacherNames, ...Object.keys(displaySettings.teacherAliases)])].sort((a, b) => a.localeCompare(b, 'ko-KR'));
   $: visibleAliasTeachers = aliasTeachers.filter((name) => `${name} ${displaySettings.teacherAliases[name] ?? ''}`.toLocaleLowerCase('ko-KR').includes(teacherAliasQuery.trim().toLocaleLowerCase('ko-KR')));
-  let settingsOpen = { general: false, display: false, advanced: false, times: false, backup: false, meals: false, allergies: false, personal: false };
+  let settingsOpen = { general: false, display: false, advanced: false, times: false, backup: false, meals: false, allergies: false };
+  let hasPersonalData = false;
+  let personalExportState = '';
+  onMount(() => {
+    try { hasPersonalData = Object.keys(localStorage).some((key) => key.startsWith('personal_timetable_v1:')); }
+    catch { hasPersonalData = false; }
+  });
+  function exportPersonalData() {
+    try {
+      const entries = Object.keys(localStorage).filter((key) => key.startsWith('personal_timetable_v1:'))
+        .map((key) => ({ key, value: localStorage.getItem(key) }));
+      const blob = new Blob([JSON.stringify({ format: 'opencigan-personal-data', version: 1, entries }, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url; link.download = 'opencigan-personal-data.json';
+      document.body.append(link); link.click(); link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      personalExportState = '기존 개인 데이터 다운로드를 시작했어요.';
+    } catch { personalExportState = '개인 데이터를 읽거나 저장하지 못했어요. 브라우저 저장소를 확인해 주세요.'; }
+  }
   let handledAllergySettingsRequest = 0;
   let allergyFilterControl: HTMLSelectElement;
   $: if (openAllergySettingsRequest !== handledAllergySettingsRequest) {
@@ -103,10 +119,9 @@
       const summary = panel.querySelector<HTMLElement>(':scope > summary');
       if (!summary) continue;
       const category = summary.textContent?.trim() ?? '';
-      if ((panel.classList.contains('personal-timetable-panel') || panel.classList.contains('allergy-settings')) && settingsMatch(category, query)) {
+      if (panel.classList.contains('allergy-settings') && settingsMatch(category, query)) {
         searchResults.push({ name: category, category, target: summary, panel });
       }
-      if (panel.classList.contains('personal-timetable-panel')) continue;
       for (const element of panel.querySelectorAll<HTMLElement>('label, button')) {
         if (element.closest('details') !== panel) continue;
         const target = element.tagName === 'LABEL' ? element.querySelector<HTMLElement>('input,select') : element;
@@ -148,12 +163,6 @@
             </div>
           </details>
            {#if school}
-             <details class="personal-timetable-panel" hidden={!settingsMatch('개인 시간표 일정 시험', settingsQuery)} bind:open={settingsOpen.personal}>
-               <summary>개인 시간표·일정</summary>
-               {#if view === 'settings'}
-                 {#key `${school.id}:${grade}:${classroom}`}<PersonalTimetable schoolId={school.id} schoolName={school.name} {grade} {classroom} {week} {dark} {displaySettings} />{/key}
-               {/if}
-             </details>
              <details class="display-settings" hidden={!settingsMatch('시간표 표시 교사 날짜 변경 변동 배지 테두리 밀도 종료 요일 학급', settingsQuery)} bind:open={settingsOpen.display}>
                <summary>시간표 표시 설정</summary>
                <label class="display-toggle"><input type="checkbox" checked={useClassDisplay} disabled={classError} onchange={(event) => setClassDisplay(event.currentTarget.checked)} /> {grade}학년 {classroom}반만 따로 설정</label>
@@ -298,11 +307,15 @@
                <details class="allergy-settings" bind:open={settingsOpen.allergies}><summary>알레르기 관리 {allergySelection.length ? `(${allergySelection.length}개 선택)` : ''}</summary><label class="meal-filter-setting">메뉴 표시 방식<select bind:this={allergyFilterControl} value={mealAllergyFilter} onchange={(event) => setMealAllergyFilter(event.currentTarget.value)}><option value="all">모든 메뉴</option><option value="marked">선택 알레르기 표시 메뉴</option><option value="unmarked">선택 알레르기 미표시 메뉴</option></select></label><div class="allergy-grid">{#each allergens as name, index}<label><input type="checkbox" checked={allergySelection.includes(index + 1)} onchange={(event) => toggleAllergy(index + 1, event.currentTarget.checked)} /><span>{index + 1}. {name}</span></label>{/each}</div><p>선택 항목은 이 브라우저에만 저장돼요. NEIS에서 알레르기가 표시되지 않았더라도 안전하다는 뜻은 아니에요.</p></details>
              </details>
           </div>
+          {#if hasPersonalData}
+            <div class="personal-export"><p>이 브라우저에 이전 개인 시간표·일정 데이터가 남아 있어요. 파일에는 모든 학교·학급의 개인 데이터가 포함되므로 보관에 주의해 주세요.</p><button class="secondary-button" type="button" onclick={exportPersonalData}>기존 개인 데이터 내보내기</button>{#if personalExportState}<p role="status">{personalExportState}</p>{/if}</div>
+          {/if}
           <BuildInfo />
         </section>
 
 <style>
 .settings-search{display:grid;gap:5px;margin:0 0 12px;font-size:13px;color:var(--muted)}
+.personal-export{margin:16px 0;color:var(--muted);font-size:12px;line-height:1.6}.personal-export button{min-height:44px}
 .settings-search input{min-height:44px;max-width:100%;width:100%;border:1px solid var(--line);padding:8px;background:var(--surface);color:var(--ink)}
 .settings-results{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
 .settings-results button{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;min-height:44px;padding:10px 8px;border:0;border-bottom:1px solid var(--line);background:var(--surface);color:var(--ink);text-align:left;cursor:pointer}
