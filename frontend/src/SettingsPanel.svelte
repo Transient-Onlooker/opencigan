@@ -3,7 +3,7 @@
   import Icon from './Icon.svelte';
   import BuildInfo from './BuildInfo.svelte';
   import { allergens } from './allergens';
-  import { calculateLessonTimes, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
+  import { calculateLessonTimes, validateLessonTimeDrafts, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
   import type { School } from './api';
   import type { DisplaySettings } from './personalization';
   import type { MealAllergyFilter } from './meal-filter';
@@ -94,10 +94,13 @@
   let searchResults: { name: string; category: string; target: HTMLElement; panel: HTMLDetailsElement }[] = [];
   let ruleSchool = '';
   let lessonDetailsOpen = false;
+  let weekdayDetailsOpen = false;
+  let timeError: ReturnType<typeof validateLessonTimeDrafts> = null;
   let weekdaySelection = 1;
   let ruleStart = '', ruleDuration = '', ruleBreak = '', ruleLunchAfter = '', ruleLunch = '';
   $: if ((school?.id ?? '') !== ruleSchool) {
     ruleSchool = school?.id ?? '';
+    timeError = null;
     ruleStart = ''; ruleDuration = ''; ruleBreak = ''; ruleLunchAfter = ''; ruleLunch = '';
     try {
       const saved = JSON.parse(localStorage.getItem('opensigan-lesson-rules:' + ruleSchool) || 'null');
@@ -114,6 +117,15 @@
     if (!ruleSchool) return;
     try { localStorage.setItem('opensigan-lesson-rules:' + ruleSchool, JSON.stringify({ start: ruleStart, duration: ruleDuration, break: ruleBreak, lunchAfter: ruleLunchAfter, lunch: ruleLunch })); }
     catch { /* 계산 입력은 현재 화면에 유지됩니다. */ }
+  }
+  function submitLessonTimes() {
+    timeError = validateLessonTimeDrafts(lessonTimeDrafts, weekdayTimeDrafts);
+    if (timeError) {
+      if (timeError.day) { weekdaySelection = timeError.day; weekdayDetailsOpen = true; }
+      else lessonDetailsOpen = true;
+      return;
+    }
+    saveLessonTimes();
   }
   $: rulePreview = calculateLessonTimes(ruleStart, ruleDuration, ruleBreak, ruleLunchAfter, ruleLunch, lessonTimePeriods.length);
   function settingsMatch(labels: string, query: string) {
@@ -265,7 +277,7 @@
                    <strong>계산 미리보기</strong>
                    <p>학교에서 확인한 시간과 비교해 주세요. 적용하면 아래 입력값이 교체되며 저장 전에는 반영되지 않아요.</p>
                    <ol>{#each lessonTimePeriods as period}<li>{period}교시 {rulePreview[period].start}–{rulePreview[period].end}</li>{/each}</ol>
-                   <button class="secondary-button" type="button" onclick={() => rulePreview && applyLessonTimeRules(rulePreview)}>계산값 입력란에 적용</button>
+                   <button class="secondary-button" type="button" onclick={() => { if (rulePreview) { timeError = null; applyLessonTimeRules(rulePreview); } }}>계산값 입력란에 적용</button>
                  </div>
                {:else if ruleStart || ruleDuration || ruleBreak || ruleLunchAfter || ruleLunch}
                  <p class="state-inline" role="status">시작 시각과 수업·쉬는 시간을 입력하고, 선택한 점심시간과 하루 범위를 확인해 주세요.</p>
@@ -277,27 +289,29 @@
                  {#each lessonTimePeriods as period}
                    <div class="lesson-time-row">
                      <strong>{period}교시</strong>
-                     <label>시작 <input type="time" aria-label={`${period}교시 시작`} value={lessonTimeDrafts[period]?.start ?? ''} oninput={(event) => editLessonTime(period, 'start', event.currentTarget.value)} /></label>
-                     <label>종료 <input type="time" aria-label={`${period}교시 종료`} value={lessonTimeDrafts[period]?.end ?? ''} oninput={(event) => editLessonTime(period, 'end', event.currentTarget.value)} /></label>
-                     {#if rulePreview}<button class="text-button lesson-time-revert" type="button" aria-label={`${period}교시 계산값으로 되돌리기`} onclick={() => { if (rulePreview) { editLessonTime(period, 'start', rulePreview[period].start); editLessonTime(period, 'end', rulePreview[period].end); } }}>계산값 복귀</button>{/if}
+                     <label>시작 <input type="time" aria-label={`${period}교시 시작`} aria-invalid={timeError?.day === 0 && timeError.period === period} aria-describedby={timeError?.day === 0 && timeError.period === period ? 'lesson-time-error' : undefined} value={lessonTimeDrafts[period]?.start ?? ''} oninput={(event) => { timeError = null; editLessonTime(period, 'start', event.currentTarget.value); }} /></label>
+                     <label>종료 <input type="time" aria-label={`${period}교시 종료`} aria-invalid={timeError?.day === 0 && timeError.period === period} aria-describedby={timeError?.day === 0 && timeError.period === period ? 'lesson-time-error' : undefined} value={lessonTimeDrafts[period]?.end ?? ''} oninput={(event) => { timeError = null; editLessonTime(period, 'end', event.currentTarget.value); }} /></label>
+                     {#if timeError?.day === 0 && timeError.period === period}<p id="lesson-time-error" class="lesson-validation" role="alert">{timeError.message}</p>{/if}
+                     {#if rulePreview}<button class="text-button lesson-time-revert" type="button" aria-label={`${period}교시 계산값으로 되돌리기`} onclick={() => { if (rulePreview) { timeError = null; editLessonTime(period, 'start', rulePreview[period].start); editLessonTime(period, 'end', rulePreview[period].end); } }}>계산값 복귀</button>{/if}
                    </div>
                  {/each}
                </div>
                </details>
-               <details class="lesson-time-detail">
+               <details class="lesson-time-detail" bind:open={weekdayDetailsOpen}>
                  <summary>요일별 예외 시각</summary>
                  <p class="display-settings-hint">요일별로 입력한 교시만 공통 시각보다 우선합니다. 시작·종료를 모두 입력하거나 공통 시각으로 되돌리세요.</p>
                  <label>요일 선택 <select bind:value={weekdaySelection}><option value={1}>월요일</option><option value={2}>화요일</option><option value={3}>수요일</option><option value={4}>목요일</option><option value={5}>금요일</option><option value={6}>토요일</option><option value={7}>일요일</option></select></label>
                  <div class="lesson-time-grid">{#each lessonTimePeriods as period}
                    <div class="lesson-time-row">
                      <strong>{period}교시</strong>
-                     <label>시작 <input type="time" aria-label={`요일별 ${period}교시 시작`} value={weekdayTimeDrafts[weekdaySelection]?.[period]?.start ?? ''} oninput={(event) => editWeekdayTime(weekdaySelection, period, 'start', event.currentTarget.value)} /></label>
-                     <label>종료 <input type="time" aria-label={`요일별 ${period}교시 종료`} value={weekdayTimeDrafts[weekdaySelection]?.[period]?.end ?? ''} oninput={(event) => editWeekdayTime(weekdaySelection, period, 'end', event.currentTarget.value)} /></label>
-                     {#if weekdayTimeDrafts[weekdaySelection]?.[period]}<button class="text-button lesson-time-revert" type="button" aria-label={`요일별 ${period}교시 공통 시각으로 되돌리기`} onclick={() => clearWeekdayTime(weekdaySelection, period)}>공통 시각 사용</button>{/if}
+                     <label>시작 <input type="time" aria-label={`요일별 ${period}교시 시작`} aria-invalid={timeError?.day === weekdaySelection && timeError.period === period} aria-describedby={timeError?.day === weekdaySelection && timeError.period === period ? 'lesson-time-error' : undefined} value={weekdayTimeDrafts[weekdaySelection]?.[period]?.start ?? ''} oninput={(event) => { timeError = null; editWeekdayTime(weekdaySelection, period, 'start', event.currentTarget.value); }} /></label>
+                     <label>종료 <input type="time" aria-label={`요일별 ${period}교시 종료`} aria-invalid={timeError?.day === weekdaySelection && timeError.period === period} aria-describedby={timeError?.day === weekdaySelection && timeError.period === period ? 'lesson-time-error' : undefined} value={weekdayTimeDrafts[weekdaySelection]?.[period]?.end ?? ''} oninput={(event) => { timeError = null; editWeekdayTime(weekdaySelection, period, 'end', event.currentTarget.value); }} /></label>
+                     {#if timeError?.day === weekdaySelection && timeError.period === period}<p id="lesson-time-error" class="lesson-validation" role="alert">{timeError.message}</p>{/if}
+                     {#if weekdayTimeDrafts[weekdaySelection]?.[period]}<button class="text-button lesson-time-revert" type="button" aria-label={`요일별 ${period}교시 공통 시각으로 되돌리기`} onclick={() => { timeError = null; clearWeekdayTime(weekdaySelection, period); }}>공통 시각 사용</button>{/if}
                    </div>
                  {/each}</div>
                </details>
-               <div class="lesson-time-actions"><button class="secondary-button" type="button" onclick={(event) => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); event.currentTarget.focus(); saveLessonTimes(); }}><Icon name="save" /> 시각 저장</button><button class="secondary-button" type="button" onclick={clearLessonTimes}>시각 초기화</button></div>
+               <div class="lesson-time-actions"><button class="secondary-button" type="button" onclick={(event) => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); event.currentTarget.focus(); submitLessonTimes(); }}><Icon name="save" /> 시각 저장</button><button class="secondary-button" type="button" onclick={() => { timeError = null; clearLessonTimes(); }}>시각 초기화</button></div>
                {#if lessonTimeState}<p class="state-inline" role="status">{lessonTimeState}</p>{/if}
              </details>
              <details class="settings-backup" hidden={!settingsMatch('설정 백업 복원 파일 저장 가져오기 내보내기 초기화', settingsQuery)} bind:open={settingsOpen.backup}>
@@ -352,6 +366,7 @@
 .lesson-time-settings{margin:0 0 14px;padding:0 14px 14px;border:1px solid var(--line)}.lesson-time-settings summary{min-height:44px;align-content:center;cursor:pointer;font-size:14px;font-weight:650}.lesson-time-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.lesson-time-row{display:grid;grid-template-columns:50px repeat(2,minmax(0,1fr));gap:8px;align-items:center;min-width:0;font-size:13px}.lesson-time-row>strong{font-size:13px;white-space:nowrap}.lesson-time-row label{display:grid;gap:4px;min-width:0;color:var(--muted)}.lesson-time-row input{min-width:0;width:100%;min-height:44px;padding:7px 8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:16px}.lesson-time-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 0}.lesson-time-settings .state-inline{margin-top:10px}
 .lesson-rule-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px;margin:12px 0}.lesson-rule-grid label{display:grid;gap:4px;min-width:0;font-size:13px;color:var(--muted)}.lesson-rule-grid input,.lesson-rule-grid select{width:100%;min-width:0;min-height:44px;padding:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:16px}.lesson-preview{margin:12px 0;padding:12px;border:1px solid var(--line)}.lesson-preview p{color:var(--muted);font-size:13px}.lesson-preview ol{display:flex;flex-wrap:wrap;gap:6px 18px;list-style:none;padding:0;font-size:13px}
 .lesson-time-detail{margin-top:12px;border-top:1px solid var(--line)}.lesson-time-revert{grid-column:2 / -1;justify-self:start;min-height:44px}
+.lesson-validation{grid-column:1 / -1;margin:0;color:var(--ink);font-size:13px}
 @media(max-width:700px){.lesson-time-grid{grid-template-columns:1fr}.lesson-time-row{grid-template-columns:50px repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.display-settings-grid input:not([type="checkbox"]),.display-settings-grid select{font-size:16px}}
 .allergy-settings{border-top:1px solid var(--line);margin:0 0 12px}

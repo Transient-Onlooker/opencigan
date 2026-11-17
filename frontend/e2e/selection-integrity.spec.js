@@ -957,7 +957,7 @@ test('lesson time rules preview lunch and require explicit application and savin
   await expect(page.getByLabel('5교시 시작', { exact: true })).toHaveValue('13:05');
   await page.getByLabel('5교시 시작', { exact: true }).fill('12:00');
   await page.getByRole('button', { name: '시각 저장', exact: true }).click();
-  await expect(page.getByText(/시간 순서와 겹침 여부/)).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: /겹치거나 순서가 맞지/ })).toBeVisible();
   expect(await page.evaluate((id) => localStorage.getItem('opensigan-lesson-times:' + id), school.id)).toBeNull();
   await page.getByLabel('5교시 시작', { exact: true }).fill('13:10');
   expect(await page.evaluate((id) => localStorage.getItem('opensigan-lesson-times:' + id), school.id)).toBeNull();
@@ -1012,6 +1012,35 @@ test('weekday bell times save independently and are included in school backup', 
   await page.getByLabel('Opencigan 설정 JSON 파일 불러오기').setInputFiles({ name: 'school.json', mimeType: 'application/json', buffer: backupFile });
   await expect(page.getByText('현재 학교의 설정을 복원했어요.')).toBeVisible();
   await expect(page.getByLabel('요일별 1교시 시작')).toHaveValue('10:00');
+});
+
+test('invalid lesson times identify the affected inputs and preserve saved times', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('학교 교시 시각 설정', { exact: true }).click();
+  await page.getByText('상세 시간 설정하기', { exact: true }).click();
+  await page.getByLabel('1교시 시작', { exact: true }).fill('09:00');
+  await page.getByLabel('1교시 종료', { exact: true }).fill('09:50');
+  await page.getByLabel('2교시 시작', { exact: true }).fill('10:00');
+  await page.getByLabel('2교시 종료', { exact: true }).fill('10:50');
+  await page.getByRole('button', { name: '시각 저장', exact: true }).click();
+  await expect(page.getByText('이 학교의 교시 시각을 저장했어요.')).toBeVisible();
+  const stored = await page.evaluate((id) => localStorage.getItem('opensigan-lesson-times:' + id), school.id);
+  await page.getByLabel('1교시 종료', { exact: true }).fill('08:00');
+  await page.getByRole('button', { name: '시각 저장', exact: true }).press('Enter');
+  await expect(page.getByRole('alert').filter({ hasText: /1교시 종료 시각은 시작 시각보다 늦어야/ })).toBeVisible();
+  await expect(page.getByLabel('1교시 종료', { exact: true })).toHaveAttribute('aria-invalid', 'true');
+  expect(await page.evaluate((id) => localStorage.getItem('opensigan-lesson-times:' + id), school.id)).toBe(stored);
+  await page.getByLabel('1교시 종료', { exact: true }).fill('09:50');
+  await page.getByText('요일별 예외 시각', { exact: true }).click();
+  await page.getByLabel('요일 선택').selectOption('2');
+  await page.getByLabel('요일별 1교시 시작').fill('09:30');
+  await page.getByLabel('요일별 1교시 종료').fill('10:10');
+  await page.getByRole('button', { name: '시각 저장', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: /화요일.*겹치/ })).toBeVisible();
+  await expect(page.getByLabel('요일별 1교시 시작')).toHaveAttribute('aria-invalid', 'true');
+  expect(await page.evaluate((id) => localStorage.getItem('opensigan-lesson-times:' + id), school.id)).toBe(stored);
 });
 
 test('retired personal timetable preserves and exports data from all classes', async ({ page }) => {

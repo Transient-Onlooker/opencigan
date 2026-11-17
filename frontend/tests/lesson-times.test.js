@@ -10,6 +10,19 @@ const exports = {};
 runInNewContext(compiled, { exports, Intl });
 const { dailyLessonOverview, parseLessonTimes, koreaClockMinutes, calculateLessonTimes, lessonTimesForDate } = exports;
 
+test('draft validation identifies missing, reversed and overlapping times including weekday overrides', () => {
+  const validate = exports.validateLessonTimeDrafts;
+  const common = { 1: { start: '09:00', end: '09:50' }, 2: { start: '10:00', end: '10:50' } };
+  assert.equal(validate(common, {}), null);
+  assert.match(validate({ 1: { start: '09:00', end: '' } }, {}).message, /모두 입력/);
+  assert.match(validate({ 1: { start: '10:00', end: '09:00' } }, {}).message, /늦어야/);
+  assert.equal(validate({ ...common, 2: { start: '09:40', end: '10:50' } }, {}).period, 2);
+  const error = validate(common, { 2: { 1: { start: '09:30', end: '10:10' } } });
+  assert.equal(error.day, 2);
+  assert.equal(error.period, 1);
+  assert.match(error.message, /화요일.*겹치/);
+});
+
 const records = [
   { date: '2026-11-16', grade: 1, class: 1, period: 1, subject: '국어', isChanged: false },
   { date: '2026-11-16', grade: 1, class: 1, period: 2, subject: '수학', isChanged: true },

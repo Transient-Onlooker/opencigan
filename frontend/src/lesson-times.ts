@@ -14,6 +14,32 @@ function minutes(value: string): number | null {
   return hours * 60 + part;
 }
 
+export function validateLessonTimeDrafts(common: LessonTimes, weekdays: WeekdayLessonTimes): { day: number; period: number; message: string } | null {
+  const validate = (entries: LessonTimes, day: number, overrides?: LessonTimes) => {
+    const ordered = Object.entries(entries).map(([period, entry]) => ({ period: Number(period), ...entry })).sort((a, b) => a.period - b.period);
+    let previous: typeof ordered[number] | undefined;
+    for (const entry of ordered) {
+      if (!entry.start && !entry.end && !overrides) continue;
+      if (!entry.start || !entry.end || minutes(entry.start) === null || minutes(entry.end) === null) return { day, period: entry.period, message: `${entry.period}교시 시작과 종료 시각을 모두 입력해 주세요.` };
+      if (entry.start >= entry.end) return { day, period: entry.period, message: `${entry.period}교시 종료 시각은 시작 시각보다 늦어야 해요.` };
+      if (previous && entry.start < previous.end) {
+        const period = overrides && !overrides[entry.period] && overrides[previous.period] ? previous.period : entry.period;
+        return { day, period, message: `${previous.period}교시와 ${entry.period}교시 시각이 겹치거나 순서가 맞지 않아요.` };
+      }
+      previous = entry;
+    }
+    return null;
+  };
+  const commonError = validate(common, 0);
+  if (commonError) return commonError;
+  const actual = Object.fromEntries(Object.entries(common).filter(([, entry]) => entry.start || entry.end));
+  for (const [day, overrides] of Object.entries(weekdays)) {
+    const error = validate({ ...actual, ...overrides }, Number(day), overrides);
+    if (error) return { ...error, message: `${['', '월', '화', '수', '목', '금', '토', '일'][Number(day)]}요일 ${error.message}` };
+  }
+  return null;
+}
+
 export function calculateLessonTimes(start: string, duration: string, breakMinutes: string, lunchAfter: string, lunchMinutes: string, count: number): LessonTimes | null {
   const initial = minutes(start);
   if (initial === null || !/^\d+$/.test(duration) || !/^\d+$/.test(breakMinutes) || !Number.isInteger(count) || count < 1 || count > 20) return null;
