@@ -104,12 +104,35 @@ test('timetable and calendar use separate category budgets alongside the general
   ]);
 });
 
-test('OPTIONS bypasses rate limits for CORS preflight and still reaches Pi', async () => {
-  const { env, calls } = setup({ search: false, general: false });
-  const response = await worker.fetch(req('/api/v1/schools', { method: 'OPTIONS', headers: {Origin: 'https://opencigan.mcv.kr'} }), env);
+test('OPTIONS uses a separate preflight key and forwards allowed CORS requests', async () => {
+  const { env, calls, limits } = setup({ search: false });
+  const response = await worker.fetch(req('/api/v1/schools', { method: 'OPTIONS', headers: {Origin: 'https://opencigan.mcv.kr', 'CF-Connecting-IP': '203.0.113.9'} }), env);
   assert.equal(response.status, 200);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].headers.get('origin'), 'https://opencigan.mcv.kr');
+  assert.deepEqual(limits, [['general', 'preflight:203.0.113.9']]);
+});
+
+test('excessive preflights are rejected before reaching Pi without consuming normal keys', async () => {
+  const { env, calls, limits } = setup();
+  env.GENERAL_RATE.limit = async ({key}) => { limits.push(['general', key]); return { success: !key.startsWith('preflight:') }; };
+  const headers = {Origin: 'https://opencigan.mcv.kr', 'CF-Connecting-IP': '203.0.113.9'};
+  const blocked = await worker.fetch(req('/api/v1/meals', {method: 'OPTIONS', headers}), env);
+  assert.equal(blocked.status, 429);
+  assert.equal(blocked.headers.get('retry-after'), '60');
+  assert.equal(blocked.headers.get('access-control-allow-origin'), 'https://opencigan.mcv.kr');
+  assert.equal(calls.length, 0);
+  assert.equal((await worker.fetch(req('/api/v1/meals', {headers}), env)).status, 200);
+  assert.deepEqual(limits, [['general', 'preflight:203.0.113.9'], ['general', '203.0.113.9']]);
+});
+
+test('preflight limiter failure returns 503 and never forwards to Pi', async () => {
+  const { env, calls } = setup();
+  env.GENERAL_RATE.limit = async () => { throw new Error('limiter unavailable'); };
+  const response = await worker.fetch(req('/api/v1/meals', {method: 'OPTIONS'}), env);
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).code, 'gateway_unavailable');
+  assert.equal(calls.length, 0);
 });
 
 test('webhook PUT preserves authorization and JSON body', async () => {
