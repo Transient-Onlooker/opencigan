@@ -693,6 +693,47 @@ test('meal date errors preserve the applied date and valid input fetches the mat
   await expect(input).toHaveAttribute('aria-invalid', 'false');
 });
 
+test('meal loading, failure and an empty successful response are distinct', async ({ page }) => {
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  let calls = 0;
+  await mockApi(page);
+  await page.route('**/api/v1/meals?*', async (route) => {
+    calls += 1;
+    if (calls === 1) {
+      await pending;
+      return route.fulfill({ status: 503, json: { code: 'upstream_unavailable' } });
+    }
+    return route.fulfill({ json: { meals: [], stale: false } });
+  });
+  await page.goto('/' + sharedHash(1));
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  const panel = page.locator('#meals-panel');
+  await expect(panel.getByRole('status').filter({ hasText: '식단을 불러오고 있어요' })).toBeVisible();
+  release();
+  await expect(panel.getByRole('alert')).toContainText('급식을 불러오지 못했어요');
+  await expect(panel.getByRole('alert')).toContainText('표시할 급식 정보가 없어요');
+  await expect(panel.getByText('이 날짜에 등록된 식단이 없어요.')).toHaveCount(0);
+  await panel.getByRole('button', { name: '다시 시도' }).click();
+  await expect(panel.getByRole('alert')).toHaveCount(0);
+  await expect(panel.getByText('이 날짜에 등록된 식단이 없어요.')).toBeVisible();
+});
+
+test('stale meal data and hidden meal types are identified on mobile and desktop', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('opensigan-meal-preferences', JSON.stringify({ view: 'day', types: ['조식'], showAllergenNumbers: true })));
+  await mockApi(page);
+  await page.route('**/api/v1/meals?*', (route) => route.fulfill({ json: { meals: [{ date: week, type: '중식', dishes: ['밥'] }], stale: true } }));
+  await page.goto('/' + sharedHash(1));
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  const panel = page.locator('#meals-panel');
+  await expect(panel.getByRole('status').filter({ hasText: '저장된 급식 정보' })).toBeVisible();
+  await expect(panel.getByText('표시하도록 설정한 식사에 등록된 식단이 없어요.')).toBeVisible();
+  for (const width of [320, 390, 800, 1366]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  }
+});
+
 test('refresh keeps the visible timetable while announcing progress and failure', async ({ page }) => {
   let release;
   const pending = new Promise((resolve) => { release = resolve; });
