@@ -1,5 +1,9 @@
 .brand{display:inline-flex;align-items:center;gap:10px;color:var(--ink);font-size:17px;font-weight:800;text-decoration:none}
 .brand:visited{color:var(--ink)}
+.settings-return{display:flex;align-items:center;min-height:44px;width:fit-content;margin-bottom:12px;color:var(--ink);font-weight:700;text-decoration:none}
+.settings-return:visited{color:var(--ink)}
+.settings-return:hover{text-decoration:underline}
+.settings-return:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .brand-mark{display:grid;place-items:center;width:30px;height:30px;background:var(--ink);color:var(--surface);flex:none}
 .brand-mark svg{width:21px;height:21px}
 main{width:min(1080px,calc(100% - 32px));min-width:0}
