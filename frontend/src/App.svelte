@@ -155,7 +155,13 @@
   $: isDark = themeIsDark(theme, systemDark);
   $: if (analyticsReady && view !== 'settings') trackPageView(view === 'meals' ? '/meals' : '/timetable');
   $: if (navigationReady && !applyingNavigation && !classError && !pendingSharedClass) {
-    pushNavigationState({ version: 1, view, timetableView, school, grade: Number(grade), classroom: Number(classroom), week, selectedDay, mealDate }, current);
+    let navigationUrl: string | undefined;
+    if (school && readSharedClass(window.location.hash)) {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.hash = new URL(shareClassUrl(nextUrl.href, school, Number(grade), Number(classroom))).hash;
+      navigationUrl = nextUrl.href;
+    }
+    pushNavigationState({ version: 1, view, timetableView, school, grade: Number(grade), classroom: Number(classroom), week, selectedDay, mealDate }, current, undefined, navigationUrl);
   }
 
   function applyNavigation(state: NavigationState | null) {
