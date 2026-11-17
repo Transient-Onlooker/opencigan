@@ -17,7 +17,7 @@ flowchart TD
   WARP --> Comcigan["컴시간"]
 ```
 
-**핵심:** 공개 도메인 없이 먼저 `<project>.pages.dev`에서 Pages/Functions·Worker·Workers VPC·Pi Tunnel을 검증하고, **마지막 단계에서만** MCVKR의 `opencigan.mcv.kr` CNAME을 Pages에 연결한다. 도메인 구매/네임서버 이전/별도 `opencigan-api.mcv.kr` 생성은 이 경로의 필수 조건이 아니다.
+**핵심:** 별도의 사용자 도메인 없이 `<project>.pages.dev`에서 Pages/Functions·Worker·Workers VPC·Pi Tunnel을 검증한다. **ICS/공개 API는 검증된 `opencigan.pages.dev` 또는 기존 `.ts.net` 호스트로 계속 제공할 수 있으며 `opencigan.mcv.kr`과 동일 출처일 필요는 없다.** MCVKR CNAME 변경은 공식 웹사이트까지 Pages로 이전하기로 할 때만 수행하는 **선택 단계**다. 도메인 구매·네임서버 이전·별도 `opencigan-api.mcv.kr` 생성은 필수가 아니다.
 
 - Cloudflare의 **일반 Tunnel Published Application**은 Cloudflare zone에서 관리되는 CNAME이 필요하므로 여기서는 사용하지 않는다. 외부 MCVKR DNS의 CNAME을 `<UUID>.cfargotunnel.com`에 단순 연결하는 방식도 동작한다고 가정하지 않는다.
 - **Workers VPC**는 Cloudflare Tunnel을 비공개 원본 연결로 이용하는 별도 기능이다. 2026-11-16 기준 Free 플랜에서 이용 가능한 **베타** 기능이며 변경 가능성이 있으므로 먼저 계정에서 지원 여부 확인.
@@ -66,12 +66,12 @@ command -v cloudflared && cloudflared --version
 - [ ] **원본 API의 캐시·CORS·ETag·304·HEAD·웹훅 서명·관리자 인증 유지**, Worker 429와 Pi `429 rate_limited`, `503 service_overloaded`, `503 upstream_unavailable` 구분. Worker 자체 오류의 CORS와 `Retry-After` 노출은 허용 출처에 한해 구현·단위 테스트했다. Worker의 `ALLOWED_ORIGINS`를 Pi의 `ALLOWED_ORIGIN`과 맞춰 배포하고 실제 경로를 검증해야 한다.
 - [ ] Cloudflare Pages의 사용자 지정 도메인에 적용되는 zone WAF는 `mcv.kr` zone의 소유자/운영자가 관리함. Workers 레벨 제한으로 가능한 것과 WAF 보호 범위의 차이를 문서화.
 
-## Phase 4 — 마지막에 MCVKR CNAME 연결
+## Phase 4 — 선택적 공식 웹사이트 CNAME 이전 및 ICS 공개 호스트 검증
 
 - [ ] **MCVKR CNAME을 아직 변경하지 않고** Pages 기본 주소 `<project>.pages.dev`에서 홈페이지 및 `/api/v1/status`, 급식·시간표·학교 검색·공유·PNG/PDF, 관리자/알림, `.ics`를 검증.
-- [ ] Cloudflare Pages 프로젝트의 **Custom domains → Set up a domain**에 `opencigan.mcv.kr` 등록. MCVKR에서 CNAME 대상을 `<project>.pages.dev`로 변경(기존 `transient-onlooker.github.io` 값은 기록/백업). 수동 CNAME만 먼저 바꾸는 것이 아니라 Pages에도 도메인을 등록해야 함.
-- [ ] HTTPS 인증서 활성화·커스텀 도메인 Pages 라우팅·기존 공유 링크·OG 미리보기·리다이렉트·PWA/Service Worker 캐시를 확인.
-- [ ] **API와 ICS를 같은 도메인 `https://opencigan.mcv.kr/api/v1/...`로 제공**. 새 ICS 구독·ETag/304·실제 캘린더 앱 자동 갱신을 테스트. 기존 Tailscale `.ts.net` 구독은 자동 이전되지 않으므로 재등록 안내 또는 한시적 유지.
+- [ ] **웹사이트 호스트 이전을 선택한 경우에만** Cloudflare Pages의 **Custom domains → Set up a domain**에 `opencigan.mcv.kr` 등록하고 MCVKR CNAME을 `<project>.pages.dev`로 변경(기존 `transient-onlooker.github.io` 값은 기록/백업). **ICS만을 위해서는 실행하지 않는다.**
+- [ ] **웹사이트 호스트 이전을 선택한 경우에만** HTTPS 인증서 활성화·커스텀 도메인 Pages 라우팅·기존 공유 링크·OG 미리보기·리다이렉트·PWA/Service Worker 캐시를 확인.
+- [ ] **선택한 공개 ICS 호스트로 구독 제공:** `opencigan.pages.dev` 또는 기존 Tailscale `.ts.net`의 `/api/v1/timetable.ics`를 이용하며 `opencigan.mcv.kr` 동일 출처는 필수가 아님. 클라이언트 직접 접근·TLS·정상 VCALENDAR·ETag/304·Apple/Google Calendar 실제 구독·갱신·장애 시 대체 경로를 검증. 기존 구독 URL은 자동으로 다른 호스트로 이전되지 않으므로 변경 시 재등록 안내 또는 한시적 병행 운영.
 - [ ] GitHub Pages/Tailscale Funnel을 즉시 제거하지 않는다. GitHub/Cloudflare Pages 자동 배포 충돌을 막고, 실측 결과에 따라 종료 여부 결정.
 
 ## Phase 5 — 롤백 및 완료 게이트
@@ -82,11 +82,11 @@ command -v cloudflared && cloudflared --version
 
 | 게이트 | 통과 조건 |
 | --- | --- |
-| Pages | `pages.dev`에서 프런트·API 경로 정상, custom domain 등록 후 CNAME/TLS 정상 |
+| Pages | `pages.dev`에서 프런트·API 경로 정상, TLS·캐시 확인. 공식 웹사이트 이전을 선택했을 때만 custom domain/CNAME 검사 |
 | Workers VPC | cloudflared QUIC 안정, Worker→Pi 비공개 HTTP fetch 정상, Pi 외부 포트 개방 없음 |
 | 보안 | Worker 경로·인증·대략적 Rate Limiting + Pi 자체 제한, 위조 IP 차단 검증 |
 | 데이터 | 학교/시간표/급식 정상, 기존 WARP와 NEIS 동작 보존 |
-| ICS | 실제 캘린더 구독·갱신 및 ETag 304, 기존 링크 재등록 방안 |
+| ICS | 선택된 `pages.dev` 또는 `.ts.net`에서 실제 구독·갱신 및 ETag 304·TLS, 호스트 변경 시 기존 링크 재등록/병행 운영 방안 (동일 출처 강제 없음) |
 | 운영 | DNS·Pages·Worker·Pi 각각 독립 롤백, 적용 SHA와 증거 기록 |
 
 ## 공식 근거 (2026-11-16 검증)

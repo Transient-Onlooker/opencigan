@@ -12,7 +12,7 @@ timeline
     QA 기준선 : 리팩터링 전 자동 회귀와 배포 상태 기록
     리팩터링 : 선택·데이터 세션과 UI·백엔드 경계 분리 : 최종 검증 진행
     UX 개선 : 설정 화면과 기본 사용 흐름 개편 대기
-    운영 검증 : Pages와 Workers VPC Tunnel P0 : MCVKR CNAME과 실제 IP 검증
+    운영 검증 : Pages와 Workers VPC Tunnel P0 : ICS 호스트와 실제 IP 검증
     후속 기능 : 알림 안정화와 장기 확장
 ```
 
@@ -80,7 +80,7 @@ flowchart LR
 
 ### 오늘의 P0 Cloudflare Tunnel 작업
 
-**[Cloudflare Pages + Workers VPC + Tunnel 구축 체크리스트](cloudflare-tunnel-rollout.md)**를 따릅니다. 먼저 Pages의 `pages.dev` → Worker Service Binding → VPC Tunnel → Pi API를 검증하고, 마지막에만 MCVKR CNAME을 Pages로 변경합니다. `mcv.kr` 전체 DNS와 기존 WARP/Funnel은 유지합니다.
+**[Cloudflare Pages + Workers VPC + Tunnel 구축 체크리스트](cloudflare-tunnel-rollout.md)**를 따릅니다. `pages.dev` → Worker Service Binding → VPC Tunnel → Pi API를 검증합니다. **ICS는 검증된 `opencigan.pages.dev` 또는 기존 `.ts.net` 주소로 제공하며 공식 `mcv.kr` 동일 도메인이 필수 조건은 아닙니다.** 공식 웹사이트를 Pages로 옮기기로 할 때에만 MCVKR CNAME을 변경합니다. `mcv.kr` 전체 DNS와 기존 WARP/Funnel은 유지합니다.
 
 ### 공개 서비스 전 주요 검증 게이트
 

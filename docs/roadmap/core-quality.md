@@ -3,7 +3,7 @@
 > 시간표·API 기반, 운영 전에 확인해야 할 품질과 보안 게이트를 정리합니다. 체크박스 **[x]는 코드 구현 기록**이지 운영 배포·실기기 QA 완료를 뜻하지 않습니다. [전체 개요](../roadmap.md)로 돌아가기.
 
 ## P0 — 핵심 시간표와 API 기반
-**2차 QA(2026-11-17) 사용자 보고**: mcv.kr에서 학교 검색 3곳·다음 주·다른 학교 조회에 503 없이 성공해 가용성은 회복된 것으로 관측됐으나 장애 UX 재현은 못 했다. 공식 ICS는 여전히 기존 .ts.net 링크이고 Pages 자체 출처 ICS는 응답했다고 보고. 공식 도메인 전환·ETag/304·실캘린더 앱 검증은 미완료. NEW-08 수능일 공백은 원본 검증 전 미확정. [QA2 요약](../qa-2026-11-17.md).
+**2차 QA(2026-11-17) 사용자 보고**: mcv.kr에서 학교 검색 3곳·다음 주·다른 학교 조회에 503 없이 성공해 가용성은 회복된 것으로 관측됐으나 장애 UX 재현은 못 했다. 공식 사이트가 제공한 ICS는 기존 .ts.net 링크이고 Pages 자체 출처 ICS는 응답했다고 보고. **후속 결정: ICS는 `pages.dev` 또는 기존 `.ts.net` 중 선택하여 유지하며 `mcv.kr` 동일 도메인 전환은 필수가 아님.** 선택한 호스트의 ETag/304·실캘린더 앱·TLS·운영 안정성 검증은 미완료. NEW-08 수능일 공백은 원본 검증 전 미확정. [QA2 요약](../qa-2026-11-17.md).
 
 
 
@@ -28,8 +28,8 @@
 - [ ] **P0 · Pages Functions → Worker 연결:** Pages Service Binding으로 Worker를 호출, Worker는 VPC Service로 Pi에 전달. 기존 JSON API·HEAD/OPTIONS·CORS·ETag/304·ICS/급식/시간표/관리자 인증 계약 유지.
 - [ ] **P0 · 봇/남용 방어:** `mcv.kr` zone WAF는 직접 설정할 수 없으므로 Worker 레벨 경로 검증, 요청량 제한(Rate Limiting binding), 캐시/요청 폭주 방어를 사용. 학교 검색·시간표·급식·ICS·관리/웹훅별 정책 구분, 정상 캘린더/API 사용자를 Challenge로 막지 않기.
 - [ ] **P0 · IP 신뢰·보안 경계:** Worker→VPC→Pi로 원본 클라이언트 IP가 안전하게 전달되도록 설계·검증. 현재 `resolve_client_ip()`는 `CF-Connecting-IP`를 직접 파싱하지 않음. 외부망 두 곳에서 IP별 제한/접속 로그 검증, 사용자 제공 XFF·Forwarded 신뢰 금지.
-- [ ] **P0 · 최종 CNAME 연결:** Cloudflare Pages Custom domains에 `opencigan.mcv.kr`을 등록하고 **MCVKR CNAME만 `<project>.pages.dev`로 변경**. 기존 `mcv.kr` 전체 NS나 다른 서브도메인 DNS는 변경하지 않음. 외부 TLS, 서비스, ICS 구독 갱신 확인.
-- [ ] **NEW-02 · 공개 API/ICS URL 정상화:** 같은 `https://opencigan.mcv.kr/api/v1/...` 경로로 API/ICS 제공; 기존 Tailscale `.ts.net` 구독 URL의 이전/재등록 방안과 혼합 버전 운영 검증.
+- [ ] **선택 과제 · 공식 웹사이트 Cloudflare Pages 이전:** `opencigan.mcv.kr` 웹사이트 자체를 Pages에서 운영하기로 결정할 경우에만 Pages Custom domains 등록 → **MCVKR CNAME만** `<project>.pages.dev`로 변경하고 TLS·공유 링크·PWA·롤백 검증. `mcv.kr` 전체 NS나 다른 서브도메인은 변경하지 않음. **ICS 구독 제공을 위해 이 CNAME 이전은 필요하지 않으며, 현재 웹사이트 호스트를 유지하는 경우 P0 출시 차단 조건으로 취급하지 않음.**
+- [ ] **NEW-02 · 선택된 공개 ICS 엔드포인트 실사용 검증 (동일 도메인 강제 없음):** 구독 주소는 `https://opencigan.pages.dev/api/v1/timetable.ics` 계열 또는 기존 `https://rpi.tail9802be.ts.net/api/v1/timetable.ics` 계열 중 운영자가 선택하여 제공해도 된다(학급·학교·주차·표시 모드 등의 실제 쿼리는 기존 생성기 그대로 사용). `opencigan.mcv.kr/api/v1/...`와의 동일 출처는 요구하지 않음. **실제 외부 접속, ICS 본문·ETag/304, Apple/Google Calendar 재구독·자동 갱신, TLS·접속 지속성·캐시·운영 중단 시 대체 안내**를 검증하면 완료 판정. 주소를 바꾸면 기존 캘린더 구독은 자동 이전되지 않으므로 재등록 안내 또는 기존 주소 병행 운영.
 - [ ] **P0 · 롤백/베타 가용성:** Cloudflare Pages / Worker VPC Beta / cloudflared 연결 장애, 429·503, 캐시·원본 가용성을 분리하고 기존 GitHub Pages·Tailscale Funnel·Pi WARP 출구 프록시로 단계별 복구 가능하게 유지.
 
 **별도 출구 경로:** 컴시간 전용 `OPENCIGAN_COMCIGAN_PROXY`/WARP는 Pi에서 컴시간으로 나가는 경로로 유지하고, Tunnel 수신 구조와 섞지 않는다.
@@ -51,5 +51,5 @@
 - [x] 학교·학년·반을 바꿔도 시간표, PNG, 공유 링크와 캘린더 구독의 대상 학급이 일치하도록 개선 (공유 복원·주차 검증 대기·내보내기 및 링크 대상 Chromium·WebKit 회귀)
 - [x] 한 날짜·교시에 복수 수업 레코드가 있을 때 일반 주간 시간표와 학년 비교에서 수업이 누락되지 않도록 표시 개선 (복수 레코드·변동 배지 회귀 테스트)
 - [ ] 모바일 고정 하단 메뉴가 마지막 수업·검색 결과·입력창을 가리지 않도록 레이아웃 개선 (320px 세로·667px 가로 화면과 입력 포커스 자동 검사 완료; 실기기 키보드·회전은 남음)
-- [ ] 캘린더 구독 공개 도메인(\`opencigan.mcv.kr\`) 외부 접근성 검증 (해당 도메인은 Pages 404; 기존 Tailscale 구독 주소는 ETag·304 외부 확인 완료)
+- [ ] 선택한 ICS 공개 호스트(`opencigan.pages.dev` 또는 기존 `.ts.net`)의 외부 접근성·TLS·ETag/304 및 실제 캘린더 앱 구독·갱신 검증 (종전 `opencigan.mcv.kr` 동일 출처 의존성 제거; 기존 Tailscale 주소의 ETag·304 외부 확인 기록은 유지)
 - [ ] 모바일 실기기(iOS Safari, Android Chrome) 및 캘린더 앱(Apple Calendar, Google Calendar) 구독 연동 검증 (실기기 게이트)
