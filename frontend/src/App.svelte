@@ -119,7 +119,8 @@
   let mealsRefreshAt = 0;
   const schoolSearchSession = createSchoolSearchSession((results, message, retryable = false) => { schoolResults = results; schoolSearchState = message; schoolSearchRetryable = retryable; });
   const mealSession = createMealSession((state) => {
-    neis = state.neis; neisResults = state.candidates; neisSearchState = state.searchState; neisLoading = state.neisLoading;
+    if (neis !== state.neis) neis = state.neis;
+    neisResults = state.candidates; neisSearchState = state.searchState; neisLoading = state.neisLoading;
     meals = state.meals; hasMeals = state.hasMeals; mealsStale = state.stale; mealState = state.error;
     mealLoading = state.loading; mealsRefreshAt = state.refreshAt;
   });
