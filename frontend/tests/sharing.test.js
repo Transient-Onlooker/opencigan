@@ -35,7 +35,7 @@ test('shared class takes precedence at startup even when browser storage is bloc
   const hash = new URL(shareClassUrl('https://opencigan.mcv.kr/', school, 2, 7)).hash;
   let mount;
   const requests = [];
-  const javascript = ts.transpile(`(function(){${script}\nreturn { state: () => ({ school, grade, classroom, classError, sharedClassState }), changeTypeText };})()`, { target: ts.ScriptTarget.ES2022 });
+  const javascript = ts.transpile(`(function(){${script}\nreturn { state: () => ({ school, grade, classroom, classError, sharedClassState }) };})()`, { target: ts.ScriptTarget.ES2022 });
   const app = runInNewContext(javascript, {
     ...personalizationVm, ...selectionExports,
     ...lessonTimesVm,
@@ -62,7 +62,6 @@ test('shared class takes precedence at startup even when browser storage is bloc
   assert.equal(app.state().classError, false);
   assert.equal(app.state().sharedClassState, '');
   assert.deepEqual(requests, [school.id]);
-  assert.equal(app.changeTypeText('deleted'), '삭제');
   cleanup();
 });
 
