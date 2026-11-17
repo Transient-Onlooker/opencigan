@@ -128,6 +128,19 @@ class ApiTests(unittest.TestCase):
                     self.assertNotIn("secret details", error.exception.read().decode())
                 fetch.assert_called_once()
 
+    def test_provider_failure_logs_type_without_sensitive_exception_or_query(self):
+        with patch("backend.app.search_schools", side_effect=RuntimeError("secret-api-key")), \
+                self.assertLogs("opensigan", level="INFO") as logs:
+            with self.assertRaises(HTTPError) as error:
+                self.get("/api/v1/schools?q=private-school-query")
+        self.assertEqual(error.exception.code, 503)
+        captured = "\n".join(logs.output)
+        self.assertIn("route=/api/v1/schools", captured)
+        self.assertIn("error_type=RuntimeError", captured)
+        self.assertIn("HTTP request method=GET status=503", captured)
+        self.assertNotIn("secret-api-key", captured)
+        self.assertNotIn("private-school-query", captured)
+
     def test_uncached_failure_reports_remaining_backoff_and_recovers(self):
         now = [100.0]
         clock = SimpleNamespace(monotonic=lambda: now[0])
