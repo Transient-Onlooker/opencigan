@@ -21,16 +21,22 @@
 
 ### P0 — Cloudflare Pages + Workers VPC + Tunnel · 비공개 API·봇 방어
 
-> **2026-11-16 설계 정정:** MCVKR은 타사 서브도메인 서비스이고 `mcv.kr` DNS zone은 사용자 소유가 아니다. **Cloudflare zone 네임서버 이전 및 `opencigan-api.mcv.kr` 직접 생성은 계획에서 제외.** [단계별 P0 실행 체크리스트](../cloudflare-tunnel-rollout.md).
+> **2026-11-17 상태 갱신:** 공식 웹사이트 `opencigan.mcv.kr`의 Cloudflare Pages 이전은 **사용자가 완료했다고 확인**했다. 기존 Pages → Worker → VPC → Pi 상태 API 연결 기록과는 별개로, 현재 DNS/TLS/전체 API·ICS 동작은 이 문서에서 독립 재검증한 결과가 아니다. **2026-11-17 예정 QA는 완료 처리하지 않고 검증 목록으로 보존**한다. MCVKR은 타사 서브도메인 서비스여서 `mcv.kr` DNS zone 전체를 관리하지 않는다. [단계별 P0 실행 체크리스트](../cloudflare-tunnel-rollout.md).
 
-- [ ] **P0 · Pages 정적 배포 및 Functions 경로:** 기존 GitHub Pages와 별개로 Cloudflare Pages의 `<project>.pages.dev`에서 UI·정적 자산·`/api/v1/*` Functions 라우트를 검증. 외부 CNAME은 마지막에만 변경.
-- [ ] **P0 · Cloudflare Tunnel 비공개 백엔드:** Pi `cloudflared` QUIC 연결 → Workers VPC Service (`127.0.0.1:8000`) → Worker의 VPC Service binding을 구성. **일반 Tunnel Published Application 공개 DNS를 요구하지 않는 방식**으로 구현·테스트. 현재 Free/Beta 가용성 확인 필요.
-- [ ] **P0 · Pages Functions → Worker 연결:** Pages Service Binding으로 Worker를 호출, Worker는 VPC Service로 Pi에 전달. 기존 JSON API·HEAD/OPTIONS·CORS·ETag/304·ICS/급식/시간표/관리자 인증 계약 유지.
+- [x] **P0 · Cloudflare Pages 정적 사이트·Functions 배포 (구성 완료):** `opencigan.pages.dev`에서 정적 빌드와 `/api/v1/status` 응답을 확인한 기존 기록이 있다. 공식 `opencigan.mcv.kr`의 Pages 전환 완료는 사용자 보고다. 정적 자산/PWA 및 전체 API 실측은 아래 **당일 QA**에서 확인한다.
+- [x] **P0 · Cloudflare Tunnel 비공개 백엔드 연결 (기존 연결 기록):** Pi `cloudflared` QUIC → Workers VPC Service (`127.0.0.1:8000`) → API Worker binding의 생성·연결과 상태 응답을 기록했다. 장기 안정성·Beta 변경·복구 검증은 계속 미완료다.
+- [x] **P0 · Pages Functions → Worker → VPC 연결 (기본 경로):** Pages Service Binding과 VPC binding을 구성하고 상태 200·입력 오류 400·HEAD 200·OPTIONS 204를 확인했다. 나머지 JSON API·CORS·ETag/304·ICS·관리자 인증 계약의 운영 QA는 별도 미완료다.
 - [ ] **P0 · 봇/남용 방어:** `mcv.kr` zone WAF는 직접 설정할 수 없으므로 Worker 레벨 경로 검증, 요청량 제한(Rate Limiting binding), 캐시/요청 폭주 방어를 사용. 학교 검색·시간표·급식·ICS·관리/웹훅별 정책 구분, 정상 캘린더/API 사용자를 Challenge로 막지 않기.
 - [ ] **P0 · IP 신뢰·보안 경계:** Worker→VPC→Pi로 원본 클라이언트 IP가 안전하게 전달되도록 설계·검증. 현재 `resolve_client_ip()`는 `CF-Connecting-IP`를 직접 파싱하지 않음. 외부망 두 곳에서 IP별 제한/접속 로그 검증, 사용자 제공 XFF·Forwarded 신뢰 금지.
-- [ ] **선택 과제 · 공식 웹사이트 Cloudflare Pages 이전:** `opencigan.mcv.kr` 웹사이트 자체를 Pages에서 운영하기로 결정할 경우에만 Pages Custom domains 등록 → **MCVKR CNAME만** `<project>.pages.dev`로 변경하고 TLS·공유 링크·PWA·롤백 검증. `mcv.kr` 전체 NS나 다른 서브도메인은 변경하지 않음. **ICS 구독 제공을 위해 이 CNAME 이전은 필요하지 않으며, 현재 웹사이트 호스트를 유지하는 경우 P0 출시 차단 조건으로 취급하지 않음.**
+- [x] **공식 웹사이트 Cloudflare Pages 이전 (사용자 완료 보고):** `opencigan.mcv.kr`의 Pages 이전은 완료했다고 보고됐다. 외부 DNS/CNAME·TLS·공유 링크·PWA의 사후 실측은 **당일 QA**로 분리하며 이전 자체를 미완료 개발 항목으로 남기지 않는다. `mcv.kr` 전체 NS/타 서브도메인 변경은 대상이 아니다.
+**2026-11-17 당일 QA 예정 — 아직 통과 처리하지 않음**
+
+- [ ] **Pages 이전 후 공개 경로·기능 QA:** `opencigan.mcv.kr`의 DNS/CNAME·TLS, 정적 자산·서비스 워커/PWA·공유 링크, `/api/v1/*`의 학교 검색·시간표·급식·관리자 인증·CORS·HEAD/OPTIONS·ETag/304·429/503을 실제 배포에서 점검. 점검 결과와 적용 SHA를 별도로 기록하며 QA를 수행하기 전에는 완료로 표시하지 않는다.
 - [ ] **NEW-02 · 선택된 공개 ICS 엔드포인트 실사용 검증 (동일 도메인 강제 없음):** 구독 주소는 `https://opencigan.pages.dev/api/v1/timetable.ics` 계열 또는 기존 `https://rpi.tail9802be.ts.net/api/v1/timetable.ics` 계열 중 운영자가 선택하여 제공해도 된다(학급·학교·주차·표시 모드 등의 실제 쿼리는 기존 생성기 그대로 사용). `opencigan.mcv.kr/api/v1/...`와의 동일 출처는 요구하지 않음. **실제 외부 접속, ICS 본문·ETag/304, Apple/Google Calendar 재구독·자동 갱신, TLS·접속 지속성·캐시·운영 중단 시 대체 안내**를 검증하면 완료 판정. 주소를 바꾸면 기존 캘린더 구독은 자동 이전되지 않으므로 재등록 안내 또는 기존 주소 병행 운영.
-- [ ] **P0 · 롤백/베타 가용성:** Cloudflare Pages / Worker VPC Beta / cloudflared 연결 장애, 429·503, 캐시·원본 가용성을 분리하고 기존 GitHub Pages·Tailscale Funnel·Pi WARP 출구 프록시로 단계별 복구 가능하게 유지.
+**QA 이외의 잔여 운영 과제**
+
+- [ ] **P0 · 롤백/베타 가용성:** Cloudflare Pages / Worker VPC Beta / cloudflared 연결 장애, 429·503, 캐시·원본 가용성을 분리하고 복구 경로를 검증한다. 기존 GitHub Pages·Tailscale Funnel은 대체 경로의 필요성 확인 전까지 보존하고, 컴시간 전용 Pi WARP 출구 프록시는 유지한다.
+- [ ] **P0 · Tailscale Funnel 단계적 퇴역:** Cloudflare로 모든 신규 웹/API/ICS 구독 주소가 이전됐는지, 기존 `.ts.net` 구독자·외부 자동화가 남아 있는지와 장애 시 우회 경로를 먼저 확인한다. 이후 Funnel 설정을 기록하고 **Funnel 공개 노출만 가역적으로 중지**한 뒤 Cloudflare 정상 작동을 감시한다. Tailscale 클라이언트·tailnet 접속·Pi WARP·Cloudflare Tunnel은 중지/삭제하지 않는다. [운영 절차](../operations.md#tailscale-funnel-단계적-퇴역).
 
 **별도 출구 경로:** 컴시간 전용 `OPENCIGAN_COMCIGAN_PROXY`/WARP는 Pi에서 컴시간으로 나가는 경로로 유지하고, Tunnel 수신 구조와 섞지 않는다.
 

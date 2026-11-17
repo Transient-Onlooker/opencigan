@@ -88,19 +88,26 @@ PY
 
 복구 시에는 서비스와 DB에 쓰는 다른 프로세스를 모두 중지하고, 복구 전 현재 DB도 별도 백업으로 보존합니다. 검증된 배포 전 백업을 **새 경로**에 복사한 뒤 구버전의 `OPENCIGAN_HISTORY_DB`가 그 복사본을 가리키도록 설정하고 재시작합니다. 구버전 실행 중에는 새 DB의 스키마나 WAL 파일을 직접 교체하지 않습니다. 백업 이후 관측한 이력은 복구본에 포함되지 않으므로 보존한 새 DB와 혼동하지 마세요. 적용 전후에는 `PRAGMA integrity_check`와 테스트 학교의 이력 조회를 확인합니다. 이 절차는 운영 DB에서 실행한 검증 결과가 아닙니다.
 
-## Cloudflare Pages + Workers VPC 전환 계획 (P0, 미적용)
+## Cloudflare Pages + Workers VPC 구성 (2026-11-17 공식 사이트 이전 완료 보고)
 
-**현재 MCVKR 서브도메인은 사용자가 소유한 DNS zone이 아닙니다.** `mcv.kr` 네임서버 변경 또는 zone-wide WAF 변경을 시도하지 않습니다. [실행 체크리스트](cloudflare-tunnel-rollout.md)에 따라 아래 구성을 병렬 검증합니다.
+**사용자 확인:** `opencigan.mcv.kr`의 Cloudflare Pages 이전을 마쳤다. 기존 배포 기록에는 Pages Functions → Worker Service Binding → Workers VPC → Pi `cloudflared` QUIC → 로컬 Python API의 상태 응답이 확인돼 있다. 다만 공식 호스트의 현재 DNS/TLS·전체 기능·원본 IP·Rate Limiting·ICS 자동 갱신은 별도의 운영 QA가 필요하다. `mcv.kr`은 타사 DNS zone이므로 전체 NS나 zone-wide WAF는 변경하지 않는다.
 
-1. 기존 GitHub Pages와 무관하게 Cloudflare Pages `<project>.pages.dev` 배포 및 `/api/v1/*` Pages Functions를 준비.
-2. Pages Functions의 Service Binding → API Worker. Worker는 Workers VPC Service binding으로 Pi의 로컬 HTTP API에 연결.
-3. Raspberry Pi의 `cloudflared`는 Workers VPC용 비공개 Tunnel을 QUIC로 사용. 공개 Tunnel hostname이나 별도의 Cloudflare 소유 DNS zone은 필수 아님.
-4. Worker 경계에서 요청 경로·메서드 검증과 Rate Limiting binding으로 남용을 제한. `mcv.kr`의 WAF 정책을 사용자 계정이 관리한다고 가정하지 않기.
-5. `pages.dev`에서 프런트·API·ICS와 프록시 IP 신뢰를 검증한 다음 **Cloudflare Pages Custom domains 등록 → MCVKR CNAME만 Pages 주소로 변경**.
+- 사이트 배포·기본 API 연결은 **완료 보고/기존 기록**, 기능별 검증은 [P0 체크리스트](cloudflare-tunnel-rollout.md)의 **2026-11-17 예정 QA**에 남겨 둔다.
+- GitHub Pages와 기존 Tailscale Funnel은 별도 복구·구독 호환성 판단 전까지 유지한다. Cloudflare Workers VPC는 베타 기능이므로 버전·가용성 변화를 관찰한다.
+- Pi의 컴시간 전용 WARP 출구 `OPENCIGAN_COMCIGAN_PROXY`는 **Funnel과 별개**이므로 중단하지 않는다.
 
-기존 Tailscale Funnel과 GitHub Pages, 운영 Pi의 `release-warp-20261116`, 컴시간 전용 WARP 출구 프록시는 검증 전까지 유지합니다. Cloudflare Workers VPC는 2026-11 현재 Free 플랜에서도 사용 가능한 **베타**이므로 가용성·기능 변화를 추적하고, 문제 시 기존 Funnel 경로로 돌릴 수 있게 합니다.
+**클라이언트 IP·보안:** PR #96의 서명된 IP 전달 경로는 코드에 구현됐지만 실제 Worker/Pi 동일 키 설정과 서로 다른 외부망에서의 IP·로그·429 실측은 미확인이다. 임의 X-Forwarded-For·Forwarded를 신뢰하지 않으며 자세한 조건은 [IP 보안 문서](proxy-client-ip.md)를 따른다. 관리자 인증·Webhook 기본 비활성·CORS/ICS 304·429/503 계약을 유지한다.
 
-**클라이언트 IP·보안:** 현재 Python API는 `X-Forwarded-For`/`Forwarded`를 신뢰된 피어에서 파싱하지만 `CF-Connecting-IP`를 직접 파싱하지 않습니다. Worker→Pi 경로의 실제 헤더를 테스트하고 **외부 사용자 임의 헤더를 검증 없이 전달하지 말 것**. 관리자 인증·Webhook 기본 비활성·CORS/ICS 304·429/503 계약을 유지합니다.
+### Tailscale Funnel 단계적 퇴역
+
+**권장: 지금 삭제하지 말고 당일 QA 후 가역적으로 비활성화한다.** Funnel은 기존 `*.ts.net` 공개 HTTPS 주소를 제공하는 별도 진입점이다. 사이트 CNAME을 Cloudflare로 옮겨도 **기존 외부 캘린더 구독이나 스크립트는 자동으로 새 URL을 사용하지 않는다.**
+
+1. 현재 Funnel 구성을 읽기 전용으로 확인해 공개 포트·경로와 복귀할 원래 명령을 기록한다. 기존 `.ts.net` ICS 링크가 앱/UI/문서·사용자의 캘린더 구독에 남아 있는지, 신규 링크가 Cloudflare URL인지 확인한다.
+2. 서로 다른 네트워크에서 새 Cloudflare 주소의 웹·API·ICS(TLS, VCALENDAR, ETag/304, 새 구독·갱신), 인증·오류·Rate Limit을 점검한다. 기존 구독자에게 URL 재등록을 안내하거나 병행 제공 방침을 결정한다.
+3. 대체 경로가 검증되고 기존 주소에 의존하는 구독자가 없거나 이전을 안내했다면, **Funnel만 중지**한다. 중지 전후 `tailscale funnel status --json`으로 상태를 확인하고 원래 포트/옵션의 명령에 `off`를 붙인다. 예를 들어 443 HTTPS 설정이라면 `tailscale funnel --https=443 off`다. 실제 설정이 다르면 그대로 복사해 사용한다. `tailscale funnel reset`, `tailscale down`, `tailscale up` 또는 클라이언트 제거를 종료 방법으로 사용하지 않는다.
+4. 중지 후 새 Cloudflare 주소에서 웹/API/ICS가 계속 동작하는지 확인하고 429/503·VPC 연결·사용자 오류를 관찰한다. 문제가 생기면 기록한 원래 Funnel 명령으로 공개 경로를 복구한다.
+
+**범위:** Funnel 외부 공개만 중지한다. Tailscale 사설 네트워크, Cloudflare `cloudflared` Tunnel, Pi의 컴시간 전용 WARP 출구는 서로 다른 구성 요소이므로 그대로 보존한다. 위 절차는 **실행 기록이 아닌 운영 계획**이다.
 
 공식 문서: [Cloudflare Pages Custom domains](https://developers.cloudflare.com/pages/configuration/custom-domains/) · [Workers VPC](https://developers.cloudflare.com/workers-vpc/) · [Pages Service bindings](https://developers.cloudflare.com/pages/functions/bindings/) · [Worker Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
 
