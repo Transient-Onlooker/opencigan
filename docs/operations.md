@@ -102,7 +102,7 @@ PY
 
 **2026-11-17 23:14 KST 확인:** 사용자가 기존 `.ts.net` 캘린더 구독자가 없다고 확인하고 Pi에서 `sudo tailscale funnel --https=443 off`를 실행했다. `tailscale funnel status --json`은 `{}`이고 기존 공개 주소는 연결되지 않았다. 중지 전 HTTPS 443의 `/api`는 `http://127.0.0.1:8000/api`, `/api/v1/status`는 `http://127.0.0.1:8000/api/v1/status`를 가리켰다. 중지 전 설정은 작업 PC의 `AppData/Local/Temp/opencigan-funnel-before-20261117.json`에도 기록되어 있으나 임시 파일이므로 장기 보관을 보장하지 않는다. Tailscale 사설 연결은 활성이고 `opencigan-cloudflared.service`는 active였다. WARP 설정은 이 작업에서 변경하지 않았으며 별도 동작 검사는 하지 않았다.
 
-**같은 시각 검증·주의:** `opencigan.pages.dev`에서 상태·학교 검색·NEIS 학교 검색·시간표·급식·ICS가 각각 HTTP 200이었고 ICS는 `VCALENDAR`를 포함했다. 반면 `opencigan.mcv.kr`은 PC와 Pi에서 DNS 조회가 실패했으며 Cloudflare·Google 공개 DNS도 `mcv.kr` 권한 DNS 관련 SERVFAIL을 반환했다. 단일 시점의 관찰로 원인은 확정되지 않았고 Funnel 중지와의 인과관계도 확인되지 않았다. 공식 주소가 복구되기 전에는 `https://opencigan.pages.dev/`를 사용할 수 있다. 실제 캘린더 앱 자동 갱신, 외부망 복수 지점, 공식 주소의 DNS/TLS 및 전체 기능 검증은 남아 있다.
+**같은 시각 검증·주의:** `opencigan.pages.dev`에서 상태·학교 검색·NEIS 학교 검색·시간표·급식·ICS가 각각 HTTP 200이었고 ICS는 `VCALENDAR`를 포함했다. `opencigan.mcv.kr`은 PC와 Pi에서 DNS 조회가 실패했고 Cloudflare·Google 공개 DNS도 `mcv.kr` 권한 DNS 관련 SERVFAIL을 반환했다. **23:16 KST 재확인에서는** Cloudflare DNS가 `opencigan.pages.dev` CNAME을 반환했고 공식 주소 상태 API도 HTTP 200으로 회복됐다. 장애 원인과 Funnel 중지와의 인과관계는 확인되지 않았다. 실제 캘린더 앱 자동 갱신, 외부망 복수 지점, 공식 주소의 전체 기능과 지속적인 DNS 안정성 검증은 남아 있다.
 
 Funnel은 `*.ts.net` 공개 HTTPS 주소를 제공하는 별도 진입점이다. 기존 외부 스크립트는 자동으로 새 URL을 사용하지 않는다. 아래는 향후 재활성화 또는 점검 시 참고할 절차다.
 
