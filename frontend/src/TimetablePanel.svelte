@@ -5,6 +5,9 @@
   import GradeComparison from './GradeComparison.svelte';
   import TeacherTimetable from './TeacherTimetable.svelte';
   import TodayLessons from './TodayLessons.svelte';
+  import MealMenu from './MealMenu.svelte';
+  import type { Meal, NeisSchool } from './api';
+  import type { MealAllergyFilter } from './meal-filter';
   import WeekGrid from './WeekGrid.svelte';
   import { addDays } from './date';
   import type { DisplaySettings } from './personalization';
@@ -67,6 +70,7 @@
   export let shortDate: (value: string) => string;
   export let timeText: (value: string | null | undefined, withSeconds?: boolean) => string;
   export let subjectStyle: (subject: string | null | undefined) => string | undefined;
+  export let todayMeal: { neis: NeisSchool | null; neisLoading: boolean; neisSearchState: string; mealState: string; hasMeals: boolean; mealLoading: boolean; meals: Meal[]; mealsStale: boolean; visibleMealTypes: string[]; allergySelection: number[]; mealAllergyFilter: MealAllergyFilter; showAllergenNumbers: boolean; loadMeals: (preserve?: boolean) => void };
 </script>
 
 <section id="timetable-panel" hidden={view !== 'timetable'} aria-labelledby="timetable-title">
@@ -79,6 +83,7 @@
            <div class="quick-class-hint">이번 주·다음 주만 조회할 수 있어요. <Help label="시간표 조회 범위" text="원본 서비스가 제공하는 현재 주와 다음 주를 조회합니다. 과거 또는 더 먼 미래의 시간표는 제공하지 않아요." /></div>
           {#if tableState}<div class="notice" role="alert">{tableRefreshState === '새로고침 실패' ? '새로고침 실패. ' : ''}{timetable ? '이전 시간표를 표시하고 있어요. ' : '이 학교와 주에 저장된 시간표가 없어요. '}{tableState}{tableRefreshState === '새로고침 실패' && timetableCheckedAt ? ' · 마지막 확인 ' + timeText(timetableCheckedAt, true) : ''} <button class="text-button" onclick={() => loadTimetable(!!timetable)}>다시 시도</button></div>{/if}
           {#if tableLoading && timetable}<p class="state-inline" role="status">새 시간표를 확인하는 동안 이전 시간표를 표시하고 있어요.</p>{/if}
+          <div class:today-layout={timetableView === 'today'}><div class="timetable-content">
           {#if !school}<div class="state-message"><strong>학교를 먼저 선택해 주세요</strong><p>학교와 학급을 선택하면 시간표가 표시돼요.</p></div>
           {:else if tableLoading && !timetable}<div class="state-message" role="status"><strong>시간표를 불러오고 있어요.</strong></div>
           {:else if classError}<div class="state-message">{sharedClassState || '현재 선택은 유지했어요. 시간표에 등록된 반을 선택하거나 반 입력을 확인해 주세요.'}</div>
@@ -91,11 +96,30 @@
           {:else if timetable && timetableView === 'week' && filtered.length}
             <WeekGrid {school} {grade} {classroom} {dates} {today} {week} {current} {periods} {filtered} {displaySettings} {missingWeekdays} {timetable} {timetableFromDevice} {tableState} {dateText} {subjectStyle} />
           {:else if !tableState}<div class="state-message"><strong>선택한 학급의 시간표 데이터가 없어요.</strong><p>학교와 학년·반을 확인해 주세요. 해당 기간의 원본 데이터가 제공되지 않은 이유는 확인되지 않습니다.</p></div>{/if}
+          </div>
+          {#if view === 'timetable' && timetableView === 'today' && school}
+            <aside class="today-meals" aria-labelledby="today-meals-title">
+              <h3 id="today-meals-title">{dateText(selectedDay)} 급식</h3>
+              {#if todayMeal.neisLoading}<p role="status">급식을 연결하고 있어요.</p>
+              {:else if !todayMeal.neis}<p>{todayMeal.neisSearchState || '급식 학교를 연결해 주세요.'}</p>
+              {:else}
+                {#if todayMeal.mealState}<div class="notice" role="alert">급식을 불러오지 못했어요. {todayMeal.hasMeals ? '이전 급식 정보를 표시하고 있어요. ' : ''}{todayMeal.mealState} <button class="text-button" onclick={() => todayMeal.loadMeals(true)}>다시 시도</button></div>{/if}
+                {#if todayMeal.mealLoading}<p role="status">{todayMeal.hasMeals ? '이전 식단을 표시하며 확인하고 있어요.' : '식단을 불러오고 있어요.'}</p>{/if}
+                {#if todayMeal.mealsStale && todayMeal.hasMeals}<p class="notice">저장된 급식 정보예요. 최신 정보가 아닐 수 있습니다.</p>{/if}
+                {#if todayMeal.hasMeals}<MealMenu meals={todayMeal.meals} dates={[selectedDay]} {today} visibleTypes={todayMeal.visibleMealTypes} allergySelection={todayMeal.allergySelection} allergyFilter={todayMeal.mealAllergyFilter} showAllergenNumbers={todayMeal.showAllergenNumbers} timetableFrom={current} timetableTo={addDays(current, 13)} formatDate={(date) => dateText(date, { month: 'numeric', day: 'numeric', weekday: 'long' })} />{/if}
+              {/if}
+            </aside>
+          {/if}
+          </div>
            {#if timetable}<div class="freshness" aria-live="polite">{#if timetableFromDevice}<span>이 기기에 저장된 시간표 · 최신 정보가 아닐 수 있어요</span>{:else if timetable.stale}<span>저장된 시간표 · 최신 정보가 아닐 수 있어요</span>{/if}<span>원본 갱신 {timeText(timetable.sourceUpdatedAt)}</span></div>{/if}
            {#if timetable?.records.length}<details class="dataset-details"><summary>수업 데이터 규모 · 학급 {observedClassCount}개 · 교사 이름 {teacherNames.length}개</summary><p>선택한 주에 수집된 수업 기록 기준입니다. 학교 전체 학급·교사 수가 아닐 수 있고, 교사 이름 누락이나 동명이인이 있으면 실제 인원과 다를 수 있어요.</p></details>{/if}
         </section>
 
 <style>
+#timetable-panel{container-type:inline-size}
+.timetable-content{min-width:0}
+.today-meals{display:none;min-width:0}
+@container (min-width: 900px){.today-layout{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:20px;align-items:start}.today-meals{display:block}.today-meals h3{font-size:17px;margin:0 0 10px}}
 .last-fetched{font-size:12px;color:var(--muted);white-space:nowrap}
 .dataset-details{margin:8px 0 0;font-size:12px;color:var(--muted)}
 .dataset-details summary{display:list-item;width:fit-content;min-height:36px;align-content:center;cursor:pointer}

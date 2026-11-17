@@ -152,6 +152,10 @@
   $: lessonTimePeriods = Array.from({ length: Math.max(8, ...((timetable?.records ?? []).map((r) => Number(r.period)).filter((period) => Number.isInteger(period) && period > 0 && period <= 20))) }, (_, i) => i + 1);
   $: visibleMealTypes = mealTypes.filter((type) => enabledMealTypes.includes(type));
   $: mealDates = Array.from({ length: 7 }, (_, index) => addDays(monday(mealDate), index));
+  $: if (school && neis && (view === 'meals' || view === 'timetable' && timetableView === 'today')) {
+    view; timetableView; selectedDay; mealDate;
+    loadMeals();
+  }
   $: isDark = themeIsDark(theme, systemDark);
   $: if (analyticsReady && view !== 'settings') trackPageView(view === 'meals' ? '/meals' : '/timetable');
   $: if (navigationReady && !applyingNavigation && !classError && !pendingSharedClass) {
@@ -490,14 +494,10 @@
     timetableView = value;
     exportState = '';
     if (value === 'today' || value === 'grade') selectedDay = week === current ? today : week;
-    if (value === 'today') {
-      mealDate = selectedDay; mealDateDraft = selectedDay; dateError = '';
-      loadMeals();
-    }
   }
   function loadMeals(preserve = false) {
     if (!school || !neis) return;
-    const from = monday(mealDate);
+    const from = monday(view === 'timetable' && timetableView === 'today' ? selectedDay : mealDate);
     mealSession.load(neis.id, from, addDays(from, 6), preserve, () => Date.now(), refreshInterval, getMeals, errorText);
   }
   function refreshCalendar(refreshData = true) {
@@ -537,9 +537,8 @@
     const input = event.currentTarget as HTMLInputElement;
     const value = input.value;
     if (value && input.validity.valid && value >= week && value <= addDays(week, 6)) {
-      if (selectedDay === value && mealDate === value && !dateError) return;
-      selectedDay = value; mealDate = value; mealDateDraft = value; dateError = '';
-      loadMeals();
+      if (selectedDay === value) return;
+      selectedDay = value;
     } else if (!editing) input.value = selectedDay;
   }
   function todayMeals() { refreshCalendar(); mealDate = today; mealDateDraft = today; dateError = ''; loadMeals(); }
@@ -834,7 +833,7 @@
     {/if}
     <CalendarNav {view} {inputFocused} selectView={(value) => view = value} />
     <div id="calendar" class="calendar-content" tabindex="-1">
-        <TimetablePanel {view} {timetableView} {school} {timetable} {week} {current} {today} {selectedDay} {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {tableState} {tableRefreshState} {timetableCheckedAt} {timetableFromDevice} {exportState} {exportBusy} {imageShareCancelled} {canExport} {weekendClasses} {classError} {sharedClassState} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} lessonTimes={selectedDayTimes} {comparableClasses} {gradeRecords} bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {dates} {periods} {filtered} {missingWeekdays} {observedClassCount} {teacherNames} {exportTimetable} {sharePng} {refreshTimetable} {currentWeek} {selectTimetableView} {selectGrade} {selectClass} {changeWeek} {loadTimetable} {selectTimetableDate} {dateText} {shortDate} {timeText} {subjectStyle} />
+        <TimetablePanel {view} {timetableView} {school} {timetable} {week} {current} {today} {selectedDay} {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {tableState} {tableRefreshState} {timetableCheckedAt} {timetableFromDevice} {exportState} {exportBusy} {imageShareCancelled} {canExport} {weekendClasses} {classError} {sharedClassState} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} lessonTimes={selectedDayTimes} {comparableClasses} {gradeRecords} bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {dates} {periods} {filtered} {missingWeekdays} {observedClassCount} {teacherNames} {exportTimetable} {sharePng} {refreshTimetable} {currentWeek} {selectTimetableView} {selectGrade} {selectClass} {changeWeek} {loadTimetable} {selectTimetableDate} {dateText} {shortDate} {timeText} {subjectStyle} todayMeal={{ neis, neisLoading, neisSearchState, mealState, hasMeals, mealLoading, meals, mealsStale, visibleMealTypes, allergySelection, mealAllergyFilter, showAllergenNumbers, loadMeals }} />
         <MealsPanel {view} {mealDate} {today} {mealView} {mealDates} {mealDateDraft} {dateError} {neis} {school} {neisSearchState} {neisLoading} {neisResults} {mealState} {hasMeals} {mealLoading} {meals} {visibleMealTypes} {allergySelection} {mealAllergyFilter} {openAllergySettings} {showAllergenNumbers} {current} {mealsStale} {todayMeals} {setMealView} {changeMealDate} {dateText} {updateMealDateDraft} {selectMealDate} {chooseNeis} {connectMeals} {loadMeals} {selectMealTimetableDate} />
         <SettingsPanel {view} {school} {useClassDisplay} {classError} {grade} {classroom} {theme} {animationsEnabled} {displaySettings} {subjectNames} {teacherNames} {lessonTimePeriods} {lessonTimeDrafts} {weekdayTimeDrafts} {lessonTimeState} {settingsBackupState} {mealTypes} {enabledMealTypes} {showAllergenNumbers} {allergySelection} {mealAllergyFilter} {setMealAllergyFilter} {openAllergySettingsRequest} {setClassDisplay} {setTheme} {setAnimationsEnabled} {setColorMode} {saveAlias} {saveSubjectColor} {clearSubjectColors} {saveDisplaySettings} {editLessonTime} {editWeekdayTime} {clearWeekdayTime} {applyLessonTimeRules} {saveLessonTimes} {clearLessonTimes} {downloadSettingsBackup} {importSettingsFile} {resetDisplaySettings} {toggleMealType} {setAllergenNumbersVisible} {toggleAllergy} />
     </div>
