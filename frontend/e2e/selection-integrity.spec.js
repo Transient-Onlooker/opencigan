@@ -783,6 +783,7 @@ test('meal menu search, allergy filters, NEIS details and timetable date link wo
   await page.goto('/' + sharedHash(1));
   await page.getByRole('button', { name: '급식', exact: true }).click();
   await expect(page.getByText('열량(NEIS 원문): 650 kcal')).toBeVisible();
+  await expect(page.locator('.meal-filter-note')).toHaveCount(0);
   const allergyWarning = page.locator('.meal-types li.warning').filter({ hasText: '계란말이' });
   await expect(allergyWarning).toContainText('⚠ 주의: 1. 난류');
   await expect(allergyWarning).toHaveCSS('border-left-color', 'rgb(196, 38, 61)');
@@ -797,6 +798,7 @@ test('meal menu search, allergy filters, NEIS details and timetable date link wo
   await page.getByLabel('메뉴 표시 방식').selectOption('marked');
   await page.getByRole('button', { name: '급식', exact: true }).click();
   await expect(page.getByText('알레르기 필터 적용 중', { exact: false })).toBeVisible();
+  await expect(page.locator('.meal-filter-note')).toContainText('선택한 알레르기 1개');
   await expect(page.getByText('계란말이(1.2)')).toBeVisible();
   await expect(page.getByText('김치볶음밥(5.6)')).toHaveCount(0);
   await page.getByRole('button', { name: '알레르기 설정', exact: true }).click();
@@ -821,6 +823,7 @@ test('meal menu search, allergy filters, NEIS details and timetable date link wo
   await page.getByLabel('메뉴 표시 방식').selectOption('marked');
   await page.getByRole('button', { name: '급식', exact: true }).click();
   await expect(page.getByText(/주의 알레르기를 선택해 주세요/)).toBeVisible();
+  await expect(page.locator('.meal-filter-note')).toContainText('선택한 알레르기 0개');
   await expect(page.getByText('검색·필터에 맞는 메뉴가 없어요.')).toBeVisible();
   await page.getByRole('button', { name: '알레르기 설정', exact: true }).click();
   await page.getByRole('checkbox', { name: '1. 난류' }).check();
@@ -836,6 +839,32 @@ test('meal menu search, allergy filters, NEIS details and timetable date link wo
   await page.getByRole('button', { name: '이 날짜 시간표' }).click();
   await expect(page.locator('#timetable-panel')).toBeVisible();
   await expect(page.locator('#today-date')).toHaveValue(week);
+});
+
+test('active allergy filter remains visible without a selected school or meal data', async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript(() => localStorage.setItem('opensigan-meal-allergy-filter', 'unmarked'));
+  await page.goto('/');
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  await expect(page.locator('#meals-panel').getByText('학교를 먼저 선택해 주세요')).toBeVisible();
+  const note = page.locator('.meal-filter-note');
+  await expect(note).toContainText('선택한 알레르기 0개');
+  await expect(note).toContainText('미표시 메뉴도 안전을 보장하지 않습니다');
+  await page.reload();
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  await expect(note).toBeVisible();
+  await note.getByRole('button', { name: '알레르기 설정' }).click();
+  await expect(page.getByLabel('메뉴 표시 방식')).toBeFocused();
+});
+
+test('active allergy filter is visible when the school has no meals', async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript(() => localStorage.setItem('opensigan-meal-allergy-filter', 'marked'));
+  await page.route('**/api/v1/meals?*', (route) => route.fulfill({ json: { meals: [], stale: false } }));
+  await page.goto('/' + sharedHash(1));
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  await expect(page.locator('.meal-filter-note')).toContainText('선택한 알레르기 0개');
+  await expect(page.getByRole('button', { name: '알레르기 설정' })).toBeVisible();
 });
 
 test('meal settings keep allergy preferences and allow search navigation into the nested panel', async ({ page }) => {
