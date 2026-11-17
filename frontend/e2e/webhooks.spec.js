@@ -1,5 +1,22 @@
 import { expect, test } from '@playwright/test';
 
+test('direct webhook entry returns to settings on mobile and desktop', async ({ page }) => {
+  for (const width of [320, 1366]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto('/webhooks.html');
+    const link = page.getByRole('link', { name: '설정으로 돌아가기' });
+    await expect(link).toHaveAttribute('href', './?view=settings');
+    expect((await link.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await link.focus();
+    await expect(link).toHaveCSS('outline-style', 'solid');
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\?view=settings$/);
+    await expect(page.locator('#settings-panel')).toBeVisible();
+    await page.reload();
+    await expect(page.locator('#settings-panel')).toBeVisible();
+  }
+});
+
 test('webhook page shares the app brand and supports light, dark and system themes', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/webhooks.html');

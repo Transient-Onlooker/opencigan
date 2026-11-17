@@ -794,6 +794,7 @@
     if (typeof window.history?.replaceState === 'function') {
       const savedNavigation = !shared ? getNavigationFromHistory(current) : null;
       if (savedNavigation) applyNavigation(savedNavigation);
+      if (new URLSearchParams(window.location.search).get('view') === 'settings') view = 'settings';
       replaceNavigationState({ version: 1, view, timetableView, school, grade: Number(grade), classroom: Number(classroom), week, selectedDay, mealDate });
       navigationReady = true;
     }
