@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 
 test('playground sends timetable filters and timed calendar parameters safely', async ({ page }) => {
@@ -27,4 +28,36 @@ test('playground sends timetable filters and timed calendar parameters safely', 
   await timetable.getByRole('button', { name: 'Try request' }).click();
   await expect(timetable.locator('.result')).toContainText('Enter a valid API server origin');
   expect(requests).toHaveLength(2);
+});
+
+test('Cloudflare custom domain uses same-origin API without an explicit origin', async ({ page }) => {
+  const hostname = 'opencigan.mcv.kr';
+  const requestUrls = [];
+
+  await page.route(`https://${hostname}/**`, async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api-docs.html') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+        body: readFileSync(new URL('../public/api-docs.html', import.meta.url), 'utf8'),
+      });
+    }
+    if (url.pathname === '/api/v1/status') {
+      requestUrls.push(url.toString());
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: '{"status":"ok","scope":"process liveness"}',
+      });
+    }
+    return route.fulfill({ status: 200, body: '' });
+  });
+
+  await page.goto(`https://${hostname}/api-docs.html`);
+  await expect(page.getByLabel('API server origin (optional)')).toHaveValue('');
+  const statusEndpoint = page.locator('[data-path="/api/v1/status"]');
+  await statusEndpoint.getByRole('button', { name: 'Try request' }).click();
+  await expect(statusEndpoint.locator('.result')).toContainText('HTTP 200');
+  expect(requestUrls).toEqual([`https://${hostname}/api/v1/status`]);
 });
