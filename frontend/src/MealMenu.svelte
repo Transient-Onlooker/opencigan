@@ -53,7 +53,7 @@
         {/if}
       </header>
       {#if !meals.some((meal) => meal.date === date && visibleTypes.includes(meal.type))}
-        <p class="meal-day-empty">이 날짜에 등록된 식단이 없어요.</p>
+        <p class="meal-day-empty">{meals.some((meal) => meal.date === date) ? '표시하도록 설정한 식사에 등록된 식단이 없어요.' : '이 날짜에 등록된 식단이 없어요.'}</p>
       {:else}
         <div class="meal-types">
           {#each visibleTypes as type}
