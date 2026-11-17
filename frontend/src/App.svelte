@@ -17,14 +17,13 @@
   import { shareClassUrl, readSharedClass } from './sharing';
   import { saveTimetablePdf, saveTimetablePng, shareTimetablePng, type ExportOptions } from './export-png';
   import { createTimetableSession } from './timetable-cache';
-  import { createHistorySession } from './history-session';
   import { createMealSession } from './meal-session';
   import { createSchoolSearchSession } from './school-search-session';
   import { classLessons, teacherLessons, teacherNamesInTimetable, teacherSuggestions as findTeacherSuggestions, selectedTeacherName as findSelectedTeacherName, gradeLessons, comparisonClasses, missingWeekdayDates, observedClassCount as countObservedClasses, subjectNamesInTimetable } from './timetable-view';
   import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, parseWeekdayLessonTimes, lessonTimesForDate, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
   import { createClassDisplayPreferences, defaultDisplaySettings, parseDisplaySettings, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
   import { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, saveLessonTimePreferences, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
-  import { apiNotConfigured, getMeals, getTimetable, getTimetableHistory, searchSchools, searchNeisSchools, timetableSubscriptionUrl, type Meal, type NeisSchool, type School, type TimetableRecord, type TimetableResponse, type TimetableChange } from './api';
+  import { apiNotConfigured, getMeals, getTimetable, searchSchools, searchNeisSchools, timetableSubscriptionUrl, type Meal, type NeisSchool, type School, type TimetableRecord, type TimetableResponse } from './api';
 
   let school: School | null = null;
   let neis: NeisSchool | null = null;
@@ -124,19 +123,6 @@
     meals = state.meals; hasMeals = state.hasMeals; mealsStale = state.stale; mealState = state.error;
     mealLoading = state.loading; mealsRefreshAt = state.refreshAt;
   });
-  let historyOpen = false;
-  let historyLoading = false;
-  let historyDisabled = false;
-  let historyError = '';
-  let historyChanges: TimetableChange[] = [];
-  let historyScope: 'class' | 'school' = 'class';
-  $: visibleHistory = historyScope === 'school' ? historyChanges : historyChanges.filter(
-    (change) => Number(change.grade) === Number(grade) && Number(change.class) === Number(classroom));
-  let historyCursor: string | null = null;
-  const historySession = createHistorySession((state) => {
-    historyLoading = state.loading; historyDisabled = state.disabled; historyError = state.error;
-    historyChanges = state.changes; historyCursor = state.cursor;
-  });
 
   $: filtered = classLessons(timetable?.records ?? [], grade, classroom);
   $: dayRecords = (timetable?.records ?? []).filter((r) => r.date === selectedDay);
@@ -184,7 +170,7 @@
     view = state.view; timetableView = state.timetableView;
     if (state.school && previousSchool !== state.school.id) chooseSchool(state.school, true);
     else if (!state.school) {
-      timetableSession.cancel(); mealSession.cancel(); historySession.cancel();
+      timetableSession.cancel(); mealSession.cancel();
       selectionState.update({ school: null }); timetableSession.update({ data: null, loading: false }); mealSession.update({ neis: null, meals: [], loading: false }); schoolEditorOpen = true;
       try { localStorage.removeItem('opensigan-school'); } catch { /* 현재 탐색을 유지합니다. */ }
     } else {
@@ -194,7 +180,6 @@
       persistClassSelection();
     }
     shareUrl = ''; subscriptionUrl = ''; shareState = ''; subscriptionState = '';
-    historySession.cancel(); historySession.update({ changes: [], cursor: null, loading: false }); historyOpen = false;
     applyingNavigation = false;
   }
 
@@ -209,7 +194,6 @@
     if (!value || Number.isNaN(Date.parse(value))) return '정보 없음';
     return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: withSeconds ? '2-digit' : undefined }).format(new Date(value));
   }
-  function changeTypeText(type: string) { return type === 'added' ? '추가' : type === 'deleted' ? '삭제' : type === 'changed' ? '변경' : type; }
   function errorText(error: unknown) { return error instanceof Error ? error.message : '요청을 완료하지 못했어요.'; }
 
   function themeIsDark(preference: 'light' | 'dark' | 'system', prefersDark: boolean) {
@@ -408,7 +392,7 @@
     if (selectionState.prepareSchool(value, keepClass, keepSharedValidation)) classError = false;
     classroomDraft = String(classroom);
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
-    schoolSearchSession.cancel(); mealSession.cancel(); historySession.cancel();
+    schoolSearchSession.cancel(); mealSession.cancel();
     selectionState.update({ school: value }); schoolQuery = value.name; schoolResults = []; schoolSearchState = ''; schoolSearchRetryable = false; schoolEditorOpen = false;
     teacherQuery = '';
     try { schoolDisplaySettings = readSchoolPreference(localStorage, 'opensigan-display:', value.id, parseDisplaySettings, defaultDisplaySettings); }
@@ -421,7 +405,6 @@
     lessonTimeDrafts = { ...lessonTimes }; lessonTimeState = '';
     subscriptionTimesConsent = false;
     settingsBackupState = '';
-    historySession.reset(); historyOpen = false;
     mealSession.reset();
     if (shouldPersistSelection) {
       persistSelection({ school: value, grade, classroom });
@@ -497,13 +480,6 @@
       onFailure: () => { if (tableRefreshState === '갱신 중') tableRefreshState = '새로고침 실패'; },
     });
   }
-  async function loadHistory(append = false) {
-    await historySession.load(school?.id, week, append, () => ({ schoolId: school?.id, week }), getTimetableHistory, errorText);
-  }
-  function toggleHistory() {
-    historyOpen = !historyOpen;
-    if (historyOpen && !historyChanges.length && !historyDisabled) void loadHistory();
-  }
   function selectTimetableView(value: typeof timetableView) {
     timetableView = value;
     exportState = '';
@@ -528,10 +504,8 @@
       cancelSharedSelection();
       selectionState.update({ week: validWeek });
       selectedDay = selectedDay < week ? week : selectedDay > addDays(week, 6) ? addDays(week, 6) : selectedDay;
-      historySession.reset();
       if (refreshData) {
         loadTimetable();
-        if (historyOpen) void loadHistory();
       }
     }
     if (mealDate === previousToday && today !== previousToday) { mealDate = today; mealDateDraft = today; if (refreshData) loadMeals(); }
@@ -545,9 +519,9 @@
     refreshCalendar(false); const next = addDays(week, delta * 7);
     if (next < current || next > addDays(current, 7)) return;
     if (next !== week) cancelSharedSelection();
-    tableRefreshState = ''; exportState = ''; teacherQuery = ''; selectionState.update({ week: next }); selectedDay = week === current ? today : week; historySession.reset(); historyOpen = false; loadTimetable(false, true);
+    tableRefreshState = ''; exportState = ''; teacherQuery = ''; selectionState.update({ week: next }); selectedDay = week === current ? today : week; loadTimetable(false, true);
   }
-  function currentWeek() { refreshCalendar(false); const preserve = week === current; const reopenHistory = historyOpen; tableRefreshState = ''; if (!preserve) { cancelSharedSelection(); teacherQuery = ''; } selectionState.update({ week: current }); selectedDay = today; historySession.reset(); loadTimetable(preserve); if (reopenHistory) void loadHistory(); }
+  function currentWeek() { refreshCalendar(false); const preserve = week === current; tableRefreshState = ''; if (!preserve) { cancelSharedSelection(); teacherQuery = ''; } selectionState.update({ week: current }); selectedDay = today; loadTimetable(preserve); }
   function changeMealDate(delta: number) {
     const next = addDays(mealDate, delta);
     if (!validMealDate(next)) { dateError = '1900년 이후의 올바른 날짜를 선택해 주세요.'; return; }
@@ -574,7 +548,6 @@
     mealDate = value; mealDateDraft = value; dateError = '';
     if (needsTimetable) {
       tableRefreshState = ''; teacherQuery = '';
-      historySession.reset(); historyOpen = false;
       loadTimetable(false, true);
     }
     loadMeals();
@@ -829,7 +802,7 @@
     return () => {
       stopNavigation();
       sharedSelection.cancel();
-      clearInterval(calendarTimer); document.removeEventListener('visibilitychange', onVisibilityChange); document.removeEventListener('focusin', onFocusIn); document.removeEventListener('focusout', onFocusOut); window.removeEventListener('focus', onFocus); themeMedia?.removeEventListener?.('change', onThemeMedia); historySession.cancel();
+      clearInterval(calendarTimer); document.removeEventListener('visibilitychange', onVisibilityChange); document.removeEventListener('focusin', onFocusIn); document.removeEventListener('focusout', onFocusOut); window.removeEventListener('focus', onFocus); themeMedia?.removeEventListener?.('change', onThemeMedia);
       schoolSearchSession.cancel(); mealSession.cancel(); timetableSession.cancel();
     };
   });
@@ -854,7 +827,7 @@
     {/if}
     <CalendarNav {view} {inputFocused} selectView={(value) => view = value} />
     <div id="calendar" class="calendar-content" tabindex="-1">
-        <TimetablePanel {view} {timetableView} {school} {timetable} {week} {current} {today} {selectedDay} {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {tableState} {tableRefreshState} {timetableCheckedAt} {timetableFromDevice} {exportState} {exportBusy} {imageShareCancelled} {canExport} {weekendClasses} {classError} {sharedClassState} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} lessonTimes={selectedDayTimes} {comparableClasses} {gradeRecords} bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {dates} {periods} {filtered} {missingWeekdays} {observedClassCount} {teacherNames} {historyOpen} {historyDisabled} {historyLoading} {historyError} {historyChanges} {visibleHistory} {historyCursor} bind:historyScope {exportTimetable} {sharePng} {refreshTimetable} {currentWeek} {selectTimetableView} {selectGrade} {selectClass} {changeWeek} {loadTimetable} {selectTimetableDate} {toggleHistory} {loadHistory} {dateText} {shortDate} {timeText} {changeTypeText} {subjectStyle} />
+        <TimetablePanel {view} {timetableView} {school} {timetable} {week} {current} {today} {selectedDay} {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {tableState} {tableRefreshState} {timetableCheckedAt} {timetableFromDevice} {exportState} {exportBusy} {imageShareCancelled} {canExport} {weekendClasses} {classError} {sharedClassState} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} lessonTimes={selectedDayTimes} {comparableClasses} {gradeRecords} bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {dates} {periods} {filtered} {missingWeekdays} {observedClassCount} {teacherNames} {exportTimetable} {sharePng} {refreshTimetable} {currentWeek} {selectTimetableView} {selectGrade} {selectClass} {changeWeek} {loadTimetable} {selectTimetableDate} {dateText} {shortDate} {timeText} {subjectStyle} />
         <MealsPanel {view} {mealDate} {today} {mealView} {mealDates} {mealDateDraft} {dateError} {neis} {school} {neisSearchState} {neisLoading} {neisResults} {mealState} {hasMeals} {mealLoading} {meals} {visibleMealTypes} {allergySelection} {mealAllergyFilter} {openAllergySettings} {showAllergenNumbers} {current} {mealsStale} {todayMeals} {setMealView} {changeMealDate} {dateText} {updateMealDateDraft} {selectMealDate} {chooseNeis} {connectMeals} {loadMeals} {selectMealTimetableDate} />
         <SettingsPanel {view} {school} {useClassDisplay} {classError} {grade} {classroom} {theme} {animationsEnabled} {displaySettings} {subjectNames} {teacherNames} {lessonTimePeriods} {lessonTimeDrafts} {weekdayTimeDrafts} {lessonTimeState} {settingsBackupState} {mealTypes} {enabledMealTypes} {showAllergenNumbers} {allergySelection} {mealAllergyFilter} {setMealAllergyFilter} {openAllergySettingsRequest} {setClassDisplay} {setTheme} {setAnimationsEnabled} {setColorMode} {saveAlias} {saveSubjectColor} {clearSubjectColors} {saveDisplaySettings} {editLessonTime} {editWeekdayTime} {clearWeekdayTime} {applyLessonTimeRules} {saveLessonTimes} {clearLessonTimes} {downloadSettingsBackup} {importSettingsFile} {resetDisplaySettings} {toggleMealType} {setAllergenNumbersVisible} {toggleAllergy} />
     </div>

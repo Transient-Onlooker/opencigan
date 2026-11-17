@@ -448,19 +448,28 @@ test('class settings backup restores the selected class without changing another
   expect(await page.evaluate((key) => localStorage.getItem(key), otherKey)).toBeNull();
 });
 
-test('disabled history is compact without hiding source change badges', async ({ page }) => {
+test('history controls are absent while source change badges remain visible', async ({ page }) => {
   await mockApi(page);
+  let historyRequests = 0;
   await page.route('**/api/v1/timetable?*', (route) => route.fulfill({ json: {
-    ...timetable, records: timetable.records.map((record) => ({ ...record, isChanged: true })),
+    ...timetable, records: timetable.records.map((record) => ({ ...record, teacher: '김교사', isChanged: true })),
   } }));
-  await page.route('**/api/v1/timetable/history?*', (route) => route.fulfill({ status: 503, json: { code: 'history_disabled' } }));
+  await page.route('**/api/v1/timetable/history?*', (route) => { historyRequests++; return route.fulfill({ status: 503, json: { code: 'history_disabled' } }); });
   await page.goto('/' + sharedHash(1));
   const panel = page.locator('#timetable-panel');
   await expect(panel.locator('.change-label').first()).toBeVisible();
-  await panel.getByRole('button', { name: '시간표 변경 이력 보기' }).click();
-  await expect(panel.getByRole('status').filter({ hasText: '변경 이력은 현재 제공되지 않아요.' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: /시간표 변경 이력/ })).toHaveCount(0);
+  await expect(panel.getByText(/변경 이력은 현재 제공되지 않아요/)).toHaveCount(0);
   await expect(panel.locator('.history-section')).toHaveCount(0);
+  const views = panel.getByRole('group', { name: '시간표 보기' });
+  await views.getByRole('button', { name: '오늘', exact: true }).click();
   await expect(panel.locator('.change-label').first()).toBeVisible();
+  await views.getByRole('button', { name: '1학년', exact: true }).click();
+  await expect(panel.locator('.change-label:visible').first()).toBeVisible();
+  await views.getByRole('button', { name: '교사', exact: true }).click();
+  await panel.getByLabel('교사별 주간 시간표').fill('김교사');
+  await expect(panel.locator('.change-label').first()).toBeVisible();
+  expect(historyRequests).toBe(0);
 });
 
 test('invalid shared classroom explains why the saved class is retained', async ({ page }) => {

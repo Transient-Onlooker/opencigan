@@ -2,14 +2,13 @@
   import Icon from './Icon.svelte';
   import Help from './Help.svelte';
   import QuickClass from './QuickClass.svelte';
-  import HistoryPanel from './HistoryPanel.svelte';
   import GradeComparison from './GradeComparison.svelte';
   import TeacherTimetable from './TeacherTimetable.svelte';
   import TodayLessons from './TodayLessons.svelte';
   import WeekGrid from './WeekGrid.svelte';
   import { addDays } from './date';
   import type { DisplaySettings } from './personalization';
-  import type { School, TimetableRecord, TimetableResponse, TimetableChange } from './api';
+  import type { School, TimetableRecord, TimetableResponse } from './api';
   import type { LessonTimes, dailyLessonOverview } from './lesson-times';
   export let view: 'timetable' | 'meals' | 'settings';
   export let timetableView: 'today' | 'week' | 'grade' | 'teacher';
@@ -54,14 +53,6 @@
   export let missingWeekdays: string[];
   export let observedClassCount: number;
   export let teacherNames: string[];
-  export let historyOpen: boolean;
-  export let historyDisabled: boolean;
-  export let historyLoading: boolean;
-  export let historyError: string;
-  export let historyChanges: TimetableChange[];
-  export let visibleHistory: TimetableChange[];
-  export let historyCursor: string | null;
-  export let historyScope: 'class' | 'school';
   export let exportTimetable: (format: 'PNG' | 'PDF') => Promise<void>;
   export let sharePng: () => Promise<void>;
   export let refreshTimetable: () => void;
@@ -72,12 +63,9 @@
   export let changeWeek: (delta: number) => void;
   export let loadTimetable: (preserve?: boolean) => void;
   export let selectTimetableDate: (event: Event) => void;
-  export let toggleHistory: () => void;
-  export let loadHistory: (append?: boolean) => Promise<void>;
   export let dateText: (value: string, options?: Intl.DateTimeFormatOptions) => string;
   export let shortDate: (value: string) => string;
   export let timeText: (value: string | null | undefined, withSeconds?: boolean) => string;
-  export let changeTypeText: (value: string) => string;
   export let subjectStyle: (subject: string | null | undefined) => string | undefined;
 </script>
 
@@ -105,9 +93,6 @@
           {:else if !tableState}<div class="state-message"><strong>선택한 학급의 시간표 데이터가 없어요.</strong><p>학교와 학년·반을 확인해 주세요. 해당 기간의 원본 데이터가 제공되지 않은 이유는 확인되지 않습니다.</p></div>{/if}
            {#if timetable}<div class="freshness" aria-live="polite">{#if timetableFromDevice}<span>이 기기에 저장된 시간표 · 최신 정보가 아닐 수 있어요</span>{:else if timetable.stale}<span>저장된 시간표 · 최신 정보가 아닐 수 있어요</span>{/if}<span>원본 갱신 {timeText(timetable.sourceUpdatedAt)}</span></div>{/if}
            {#if timetable?.records.length}<details class="dataset-details"><summary>수업 데이터 규모 · 학급 {observedClassCount}개 · 교사 이름 {teacherNames.length}개</summary><p>선택한 주에 수집된 수업 기록 기준입니다. 학교 전체 학급·교사 수가 아닐 수 있고, 교사 이름 누락이나 동명이인이 있으면 실제 인원과 다를 수 있어요.</p></details>{/if}
-          {#if timetable}
-            <HistoryPanel {historyOpen} {historyDisabled} {historyLoading} {historyError} {historyChanges} {visibleHistory} {historyCursor} bind:historyScope {toggleHistory} {loadHistory} {dateText} {timeText} {changeTypeText} />
-          {/if}
         </section>
 
 <style>
