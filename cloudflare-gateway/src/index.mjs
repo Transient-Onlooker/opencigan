@@ -85,7 +85,14 @@ export default {
     // This Worker has workers_dev=false and is callable by Pages service binding only.
     // A missing/invalid IP is grouped under 'unidentified' rather than trusting XFF.
     const clientKey = normalizeClientIp(request.headers.get('CF-Connecting-IP')) || 'unidentified';
-    if (request.method !== 'OPTIONS') {
+    if (request.method === 'OPTIONS') {
+      try {
+        const { success } = await env.GENERAL_RATE.limit({ key: `preflight:${clientKey}` });
+        if (!success) return error('edge_rate_limited', 429, { 'Retry-After': '60' });
+      } catch {
+        return error('gateway_unavailable', 503);
+      }
+    } else {
       const search = path === '/api/v1/schools' || path === '/api/v1/neis/schools';
       const category = path === '/api/v1/timetable.ics' || path === '/api/v1/timetable/history.rss'
         ? 'calendar' : path === '/api/v1/timetable' ? 'timetable' : null;
