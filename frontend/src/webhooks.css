@@ -1,0 +1,14 @@
+.brand{display:inline-flex;align-items:center;gap:10px;color:var(--ink);font-size:17px;font-weight:800;text-decoration:none}
+.brand:visited{color:var(--ink)}
+.brand-mark{display:grid;place-items:center;width:30px;height:30px;background:var(--ink);color:var(--surface);flex:none}
+.brand-mark svg{width:21px;height:21px}
+main{width:min(1080px,calc(100% - 32px));min-width:0}
+header{padding-bottom:16px}
+header h1{margin:24px 0 8px}
+header p{margin:0}
+form{align-items:end}
+form label{flex:1 1 180px}
+input,select,button{border-color:var(--line)}
+input:focus-visible,select:focus-visible,button:focus-visible,.brand:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+@media(max-width:440px){main{margin-top:20px}h1{font-size:24px}h2{font-size:18px}.actions button{flex:1 1 100%}}
