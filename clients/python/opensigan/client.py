@@ -47,7 +47,11 @@ class OpensiganClient:
         return f"{self.base_url}{path}" + (f"?{query}" if query else "")
 
     def _request(self, url, headers=None, timeout=None):
-        request = urllib.request.Request(url, headers={"Accept": "application/json", **(headers or {})}, method="GET")
+        request = urllib.request.Request(url, headers={
+            "Accept": "application/json",
+            "User-Agent": "OpenCigan-Python-Client (+https://github.com/Transient-Onlooker/opencigan)",
+            **(headers or {}),
+        }, method="GET")
         timeout = _validate_timeout(self.timeout if timeout is None else timeout)
         try:
             try:

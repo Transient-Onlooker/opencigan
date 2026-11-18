@@ -4,7 +4,7 @@
 
 ## P2 — 외부 개발자 연동
 
-- [ ] **Python 기본 클라이언트의 Cloudflare 403 조사**: 2026-11-18 단일 네트워크에서 공식 도메인과 Pages 기본 도메인의 상태 API가 Python 기본 `urllib` 사용자 에이전트에 HTTP 403 `error code: 1010`을 반환했다. 같은 환경에서 curl 기본 사용자 에이전트와 `python-requests/2.34.2`는 200이었다. 제공 Python 클라이언트는 `urllib`을 사용하므로 영향과 Cloudflare 차단 원인·허용 가능한 해결책을 확인하고, 실제 Python 클라이언트와 여러 네트워크에서 회귀 검증한다. 차단 원인이나 정책 변경 필요성은 아직 확정하지 않았다.
+- [ ] **Python 기본 클라이언트의 Cloudflare 403 조사**: 2026-11-18 단일 네트워크에서 공식 도메인과 Pages 기본 도메인의 상태 API가 Python 기본 `urllib` 사용자 에이전트에 HTTP 403 `error code: 1010`을 반환했다. 같은 환경에서 curl 기본 사용자 에이전트와 `python-requests/2.34.2`는 200이었다. 제공 Python 클라이언트가 자체 User-Agent로 식별하도록 수정했다. 일반 `urllib` 호출의 차단 원인과 영향, 여러 외부 네트워크에서의 동작은 추가 확인이 필요하다. Cloudflare 정책 변경 필요성은 아직 확정하지 않았다.
 
 ### P2 — ‘만들어주세요’ 기능 요청 접수·관리 (P0 운영 안정화 후, 미구현)
 

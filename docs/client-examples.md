@@ -71,6 +71,7 @@ const meals = await client.getMeals('B10:1234567', '2026-11-16', '2026-11-20');
 ## Python Client (`clients/python`)
 
 The Python client (`opensigan`) uses Python standard library `urllib` only (zero third-party dependencies).
+It identifies itself with an `OpenCigan-Python-Client` User-Agent on JSON and calendar requests. Cloudflare may reject the default `Python-urllib` User-Agent on the public host; this client identification does not guarantee that other network or rate-limit policies will allow a request.
 
 For scripts outside the example, add `clients/python` to `PYTHONPATH`. Its timeout is a socket-operation timeout, not a total elapsed deadline for a slowly streaming response.
 
