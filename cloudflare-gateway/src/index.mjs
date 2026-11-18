@@ -95,11 +95,15 @@ export default {
     } else {
       const search = path === '/api/v1/schools' || path === '/api/v1/neis/schools';
       const category = path === '/api/v1/timetable.ics' || path === '/api/v1/timetable/history.rss'
-        ? 'calendar' : path === '/api/v1/timetable' ? 'timetable' : null;
+        ? 'CALENDAR_RATE' : path === '/api/v1/timetable' ? 'TIMETABLE_RATE'
+        : path === '/api/v1/meals' ? 'MEAL_RATE'
+        : path.startsWith('/api/v1/admin/') ? 'ADMIN_RATE'
+        : path === '/api/v1/webhooks' || webhook ? 'WEBHOOK_RATE' : null;
+      const categoryLimiter = category ? env[category] : null;
+      if (category && !categoryLimiter) return error('gateway_unconfigured', 503);
       try {
         const { success } = await (search ? env.SEARCH_RATE : env.GENERAL_RATE).limit({ key: clientKey });
-        const categoryLimiter = category === 'calendar' ? env.CALENDAR_RATE : env.TIMETABLE_RATE;
-        const categoryAllowed = success && category
+        const categoryAllowed = success && categoryLimiter
           ? (await categoryLimiter.limit({ key: clientKey })).success : true;
         if (!success || !categoryAllowed) {
           return error('edge_rate_limited', 429, { 'Retry-After': '60' });

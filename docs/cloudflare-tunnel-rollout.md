@@ -60,7 +60,7 @@ command -v cloudflared && cloudflared --version
 ## Phase 3 — API/봇 방어·실제 IP 검증
 
 - [x] **Worker 경계에서 허용 경로·HTTP 메서드·요청 크기 검증** 구현. 알려진 API 경로와 메서드만 Pi로 전달하고 본문은 원본과 같은 4,096바이트로 제한한다. 관리/웹훅 인증은 원본에서 유지하며 범용 URL 프록시는 제공하지 않는다. 단위 테스트 완료; Worker 운영 배포와 실제 인증 경로 검증은 별도로 필요하다.
-- [ ] **Workers Rate Limiting binding**으로 검색·시간표·ICS별 요청률 제한을 구현. 코드에는 일반 요청 상한과 별도의 시간표·캘린더 상한, JSON 429 및 `Retry-After`를 추가했다. 예시 값은 테스트용이며 실제 트래픽을 관측한 뒤 정하고 바인딩을 함께 배포해야 한다. 배포·관측은 미완료. 이 제한은 대략적·PoP별이며 엄밀한 전역 방어가 아니라 기존 Pi 제한과 함께 사용한다.
+- [ ] **Workers Rate Limiting binding**으로 검색·시간표·급식·ICS·관리·웹훅별 요청률 제한을 구현. 코드에는 일반 요청 상한과 별도 범주별 상한, JSON 429 및 `Retry-After`를 추가했다. 신규 `MEAL_RATE`·`ADMIN_RATE`·`WEBHOOK_RATE` 바인딩이 없으면 해당 경로가 503이므로 배포 전에 실제 Worker 구성에 반드시 추가하고 스테이징에서 먼저 검증한다. 예시 값은 테스트용이며 실제 트래픽을 관측한 뒤 정한다. 배포·관측은 미완료이며 웹훅 백엔드는 별도 활성화하지 않는다. 이 제한은 대략적·PoP별이며 엄밀한 전역 방어가 아니라 기존 Pi 제한과 함께 사용한다.
 - [ ] ICS·공개 API에는 JS/Managed Challenge·Cloudflare Access 로그인 강제 적용 금지. 봇 차단이 정상 학생·캘린더/외부 클라이언트를 차단하지 않는지 검증.
 - [ ] **IP 신뢰 경계:** Pages/Worker의 사용자가 보낸 `X-Forwarded-For`/`Forwarded`를 그대로 Pi에 전달하지 않는다. 실제 엣지 IP 정보 전달 방식을 명확히 설계하고 Worker→Pi 헤더 위변조·프록시 홉·`OPENCIGAN_TRUSTED_PROXIES`를 테스트. 현재 백엔드는 `CF-Connecting-IP`를 직접 사용하지 않음. 다른 외부망 2곳에서 IP별 로그·429 제한을 실측.
 - [ ] **원본 API의 캐시·CORS·ETag·304·HEAD·웹훅 서명·관리자 인증 유지**, Worker 429와 Pi `429 rate_limited`, `503 service_overloaded`, `503 upstream_unavailable` 구분. Worker 자체 오류의 CORS와 `Retry-After` 노출은 허용 출처에 한해 구현·단위 테스트했다. Worker의 `ALLOWED_ORIGINS`를 Pi의 `ALLOWED_ORIGIN`과 맞춰 배포하고 실제 경로를 검증해야 한다.

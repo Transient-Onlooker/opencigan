@@ -18,6 +18,9 @@ function setup({search = true, general = true, failFetch = false, blockedKey = '
     GENERAL_RATE: { limit: async ({key}) => { limits.push(['general', key]); return { success: general }; } },
     TIMETABLE_RATE: { limit: async ({key}) => { limits.push(['timetable', key]); return { success: blockedKey !== `timetable:${key}` }; } },
     CALENDAR_RATE: { limit: async ({key}) => { limits.push(['calendar', key]); return { success: blockedKey !== `calendar:${key}` }; } },
+    MEAL_RATE: { limit: async ({key}) => { limits.push(['meal', key]); return { success: blockedKey !== `meal:${key}` }; } },
+    ADMIN_RATE: { limit: async ({key}) => { limits.push(['admin', key]); return { success: blockedKey !== `admin:${key}` }; } },
+    WEBHOOK_RATE: { limit: async ({key}) => { limits.push(['webhook', key]); return { success: blockedKey !== `webhook:${key}` }; } },
   };
   return { env, calls, limits };
 }
@@ -32,10 +35,39 @@ test('only /api/v1/ routes are forwarded; no open proxy', async () => {
   assert.equal(calls.length, 0);
 });
 
-test('requires VPC service and both limiters', async () => {
+test('requires VPC service and existing core limiters', async () => {
   const response = await worker.fetch(req('/api/v1/status'), {});
   assert.equal(response.status, 503);
   assert.equal((await response.json()).code, 'gateway_unconfigured');
+});
+
+test('meal, admin and webhook limits reject only their own category before forwarding', async () => {
+  const ip = '203.0.113.9';
+  const headers = {'CF-Connecting-IP': ip};
+  for (const [category, path, init] of [
+    ['meal', '/api/v1/meals', {}],
+    ['admin', '/api/v1/admin/analytics', {}],
+    ['webhook', '/api/v1/webhooks', {method: 'POST'}],
+    ['webhook', '/api/v1/webhooks/abcdefghijklmnopqrstuvwx/deliveries', {}],
+  ]) {
+    const { env, calls, limits } = setup({blockedKey: `${category}:${ip}`});
+    const response = await worker.fetch(req(path, {...init, headers}), env);
+    assert.equal(response.status, 429);
+    assert.equal(response.headers.get('retry-after'), '60');
+    assert.equal(calls.length, 0);
+    assert.deepEqual(limits, [['general', ip], [category, ip]]);
+    assert.equal((await worker.fetch(req('/api/v1/timetable', {headers}), env)).status, 200);
+  }
+});
+
+test('missing category binding fails closed for that category without disrupting others', async () => {
+  const { env, calls } = setup();
+  delete env.MEAL_RATE;
+  const response = await worker.fetch(req('/api/v1/meals'), env);
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).code, 'gateway_unconfigured');
+  assert.equal(calls.length, 0);
+  assert.equal((await worker.fetch(req('/api/v1/status'), env)).status, 200);
 });
 
 test('private request URL remains fixed and conditional ICS headers survive', async () => {
@@ -123,7 +155,7 @@ test('excessive preflights are rejected before reaching Pi without consuming nor
   assert.equal(blocked.headers.get('access-control-allow-origin'), 'https://opencigan.mcv.kr');
   assert.equal(calls.length, 0);
   assert.equal((await worker.fetch(req('/api/v1/meals', {headers}), env)).status, 200);
-  assert.deepEqual(limits, [['general', 'preflight:203.0.113.9'], ['general', '203.0.113.9']]);
+  assert.deepEqual(limits, [['general', 'preflight:203.0.113.9'], ['general', '203.0.113.9'], ['meal', '203.0.113.9']]);
 });
 
 test('preflight limiter failure returns 503 and never forwards to Pi', async () => {

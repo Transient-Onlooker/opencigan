@@ -34,6 +34,21 @@
       "name": "CALENDAR_RATE",
       "namespace_id": "961304",
       "simple": { "limit": 20, "period": 60 }
+    },
+    {
+      "name": "MEAL_RATE",
+      "namespace_id": "961305",
+      "simple": { "limit": 40, "period": 60 }
+    },
+    {
+      "name": "ADMIN_RATE",
+      "namespace_id": "961306",
+      "simple": { "limit": 20, "period": 60 }
+    },
+    {
+      "name": "WEBHOOK_RATE",
+      "namespace_id": "961307",
+      "simple": { "limit": 10, "period": 60 }
     }
   ]
 }
