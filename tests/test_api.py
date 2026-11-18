@@ -150,6 +150,7 @@ class ApiTests(unittest.TestCase):
             with self.assertRaises(HTTPError) as first:
                 self.get("/api/v1/schools?q=school")
             self.assertEqual(first.exception.code, 503)
+            self.assertEqual(first.exception.headers["Retry-After"], "5")
             now[0] = 101.2
             with self.assertRaises(HTTPError) as delayed:
                 self.get("/api/v1/schools?q=school")

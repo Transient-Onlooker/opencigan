@@ -341,8 +341,9 @@ class CacheTests(unittest.TestCase):
         def fail():
             calls.append(1)
             raise RuntimeError("unavailable")
-        with self.assertRaisesRegex(RuntimeError, "unavailable"):
+        with self.assertRaises(cache_module.CacheBackoffError) as first:
             cache.get("week", fail)
+        self.assertEqual(first.exception.retry_after, 60)
         with self.assertRaisesRegex(RuntimeError, "backoff"):
             cache.get("week", fail)
         self.assertEqual(len(calls), 1)

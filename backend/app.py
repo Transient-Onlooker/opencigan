@@ -45,6 +45,13 @@ _MAX_FORWARDED_HEADER_LEN = 1024
 _MAX_FORWARDED_HOPS = 16
 
 
+def _log_request_failure(path, exc):
+    route = path if path in ("/api/v1/schools", "/api/v1/timetable", "/api/v1/timetable.ics",
+                             "/api/v1/timetable/history", "/api/v1/timetable/history.rss",
+                             "/api/v1/neis/schools", "/api/v1/meals") else "other"
+    logger.error("request failed route=%s error_type=%s", route, type(exc).__name__)
+
+
 @functools.lru_cache(maxsize=64)
 def _parse_trusted_cidr_item(item):
     try:
@@ -326,15 +333,14 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
 
         return json_response(200, headers, result)
     except CacheBackoffError as exc:
+        if exc.__cause__ is not None:
+            _log_request_failure(path, exc.__cause__)
         headers["Retry-After"] = str(exc.retry_after)
         return json_response(503, headers, {"error": "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", "code": "upstream_unavailable"})
     except ValueError as exc:
         return json_response(400, headers, {"error": str(exc), "code": "invalid_request"})
     except Exception as exc:
-        route = path if path in ("/api/v1/schools", "/api/v1/timetable", "/api/v1/timetable.ics",
-                                 "/api/v1/timetable/history", "/api/v1/timetable/history.rss",
-                                 "/api/v1/neis/schools", "/api/v1/meals") else "other"
-        logger.error("request failed route=%s error_type=%s", route, type(exc).__name__)
+        _log_request_failure(path, exc)
         return json_response(503, headers, {"error": "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", "code": "upstream_unavailable"})
 
 
