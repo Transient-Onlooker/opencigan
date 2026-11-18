@@ -72,6 +72,7 @@ class Cache:
                             return output(self._stale(value), "stale")
                         raise CacheBackoffError(retry_after - now)
 
+            started_at = time.monotonic()
             try:
                 value = fetch()
                 try:
@@ -88,6 +89,7 @@ class Cache:
                         observed_at = datetime.now(timezone.utc).isoformat()
                         self.refresh_observations[resource] = {**self.refresh_observations.get(resource, {}),
                                                                "result": "failure", "observedAt": observed_at,
+                                                               "durationMs": max(0, round((now - started_at) * 1000)),
                                                                "lastFailureAt": observed_at}
                 status = exc.code if isinstance(exc, HTTPError) and type(exc.code) is int and 100 <= exc.code <= 599 else None
                 logger.warning("cache refresh failed resource=%s fallback=%s error_type=%s upstream_http_status=%s",
@@ -98,12 +100,13 @@ class Cache:
                     raise CacheBackoffError(self.retry_delay) from exc
                 raise
 
+            duration_ms = max(0, round((time.monotonic() - started_at) * 1000))
             with self.guard:
                 if resource:
                     observed_at = datetime.now(timezone.utc).isoformat()
                     result = "success" if len(cached) <= self.max_bytes else "not_cached"
                     self.refresh_observations[resource] = {**self.refresh_observations.get(resource, {}),
-                                                           "result": result, "observedAt": observed_at,
+                                                           "result": result, "observedAt": observed_at, "durationMs": duration_ms,
                                                            **({"lastSuccessAt": observed_at} if result == "success" else {})}
                 if len(cached) <= self.max_bytes:
                     self._store(key, cached, time.monotonic(), 0)

@@ -2,11 +2,38 @@ import unittest
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from urllib.error import HTTPError
+from unittest.mock import patch
 
 from backend.cache import Cache
 
 
 class CacheIntegrityTests(unittest.TestCase):
+    def test_refresh_duration_records_completed_attempts_not_hits_or_backoff(self):
+        cache = Cache(ttl=60, retry_delay=60)
+        clock = [100.0]
+        key = ("timetable", "private-school")
+
+        def success():
+            clock[0] += 1.25
+            return {"records": []}
+
+        def fail():
+            clock[0] += 2.5
+            raise TimeoutError("private details")
+
+        with patch("backend.cache.time.monotonic", side_effect=lambda: clock[0]):
+            cache.get(key, success)
+            self.assertEqual(cache.observations()["timetable"]["durationMs"], 1250)
+            cache.get(key, lambda: self.fail("cache hit must not fetch"))
+            self.assertEqual(cache.observations()["timetable"]["durationMs"], 1250)
+            cache.ttl = 0
+            with self.assertLogs("opensigan.cache", level="WARNING"):
+                self.assertTrue(cache.get(key, fail)["stale"])
+            self.assertEqual(cache.observations()["timetable"]["durationMs"], 2500)
+            self.assertTrue(cache.get(key, lambda: self.fail("backoff must not fetch"))["stale"])
+            self.assertEqual(cache.observations()["timetable"]["durationMs"], 2500)
+        self.assertNotIn("private", str(cache.observations()))
+
     def test_refresh_observations_are_private_and_change_only_on_fetch(self):
         cache = Cache(ttl=60, retry_delay=60)
         key = ("school_search", "private-school")
