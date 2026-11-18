@@ -20,3 +20,22 @@ test('Pages API function forwards exact request to the service binding', async (
   assert.equal(passed, request);
   assert.equal(result.status, 304);
 });
+
+test('Pages API function returns a safe 503 when the service binding rejects', async () => {
+  const env = { OPENCIGAN_GATEWAY: { fetch: async () => { throw new Error('private service details'); } } };
+  const result = await onRequest({ env, request: new Request('https://example.pages.dev/api/v1/status') });
+  assert.equal(result.status, 503);
+  assert.equal(result.headers.get('cache-control'), 'no-store');
+  const body = await result.text();
+  assert.equal(JSON.parse(body).code, 'gateway_unavailable');
+  assert.doesNotMatch(body, /private service details/);
+});
+
+test('Pages API function does not return a body for HEAD errors', async () => {
+  const request = new Request('https://example.pages.dev/api/v1/status', { method: 'HEAD' });
+  for (const env of [{}, { OPENCIGAN_GATEWAY: { fetch: async () => { throw new Error('unavailable'); } } }]) {
+    const result = await onRequest({ env, request });
+    assert.equal(result.status, 503);
+    assert.equal(await result.text(), '');
+  }
+});
