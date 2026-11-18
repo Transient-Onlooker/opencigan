@@ -139,7 +139,13 @@ class AnalyticsStore:
                 (SELECT COUNT(*) FROM api_requests a WHERE a.day=d.day) api_requests
                 FROM (SELECT day FROM page_views WHERE day >= ? UNION SELECT day FROM api_requests WHERE day >= ?) d
                 ORDER BY d.day""", (start, start)).fetchall()
-            routes = db.execute("SELECT route, COUNT(*) requests, SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) errors, ROUND(AVG(duration_ms), 2) avg_ms FROM api_requests WHERE day >= ? GROUP BY route ORDER BY requests DESC", (start,)).fetchall()
+            routes = db.execute("""SELECT route, COUNT(*) requests,
+                SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) errors,
+                ROUND(AVG(duration_ms), 2) avg_ms,
+                SUM(CASE WHEN failure_kind = 'upstream_unavailable' THEN 1 ELSE 0 END) data_failures,
+                SUM(CASE WHEN failure_kind = 'service_overloaded' THEN 1 ELSE 0 END) overload_errors,
+                SUM(CASE WHEN status >= 500 AND failure_kind IS NULL THEN 1 ELSE 0 END) unclassified_server_errors
+                FROM api_requests WHERE day >= ? GROUP BY route ORDER BY requests DESC""", (start,)).fetchall()
             cache = db.execute("SELECT cache_status, COUNT(*) count FROM api_requests WHERE day >= ? AND cache_status IS NOT NULL GROUP BY cache_status", (start,)).fetchall()
             failures = db.execute("SELECT failure_kind, COUNT(*) count FROM api_requests WHERE day >= ? AND failure_kind IS NOT NULL GROUP BY failure_kind", (start,)).fetchall()
             hourly = db.execute("""SELECT substr(occurred_at, 1, 13) || ':00:00+09:00' hour,
