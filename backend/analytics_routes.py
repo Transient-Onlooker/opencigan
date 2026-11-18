@@ -39,7 +39,7 @@ def record_pageview(method, request_body, client, headers, analytics_store, rate
     return 202, headers, body
 
 
-def analytics_summary(method, query_string, request_headers, headers, analytics_store, api_recorder):
+def analytics_summary(method, query_string, request_headers, headers, analytics_store, api_recorder, current_cache):
     if method not in ("GET", "HEAD"):
         return json_response(405, headers, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
     token = os.environ.get("OPENCIGAN_ANALYTICS_ADMIN_TOKEN", "")
@@ -60,6 +60,7 @@ def analytics_summary(method, query_string, request_headers, headers, analytics_
         days = int(values[0])
         result = store.summary(days)
         result["droppedApiEvents"] = api_recorder.dropped
+        result["refreshObservations"] = current_cache.observations()
     except (ValueError, TypeError):
         return json_response(400, headers, {"error": "조회 기간은 1~90일이어야 합니다", "code": "invalid_request"})
     except (OSError, sqlite3.Error):

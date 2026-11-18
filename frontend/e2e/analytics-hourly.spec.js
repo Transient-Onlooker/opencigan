@@ -7,6 +7,7 @@ test('admin hourly diagnostics show data, support older servers, and clear on lo
       { route: '/api/v1/timetable', requests: 2, errors: 1, avg_ms: 10, data_failures: 1, overload_errors: 0, unclassified_server_errors: 0 },
       { route: '/api/v1/meals', requests: 1, errors: 0, avg_ms: 5 },
     ],
+    refreshObservations: { timetable: { result: 'failure', observedAt: '2026-11-18T02:00:00+00:00' } },
     apiHourly: [{ hour: '2026-11-18T11:00:00+09:00', requests: 2, errors: 1,
       upstream_errors: 1, overload_errors: 0, cache_hits: 1, stale_responses: 0 }],
   };
@@ -22,13 +23,19 @@ test('admin hourly diagnostics show data, support older servers, and clear on lo
   const routes = page.getByRole('region', { name: '경로별 통계 표' }).locator('tbody tr');
   await expect(routes.nth(0).locator('td')).toHaveText(['/api/v1/timetable', '2', '1', '1', '0', '0', '10']);
   await expect(routes.nth(1).locator('td')).toHaveText(['/api/v1/meals', '1', '0', '—', '—', '—', '5']);
+  const observations = page.getByRole('region', { name: '데이터 갱신 관측 표' });
+  await expect(observations).toContainText('아직 관측 없음');
+  await expect(observations).toContainText('실패');
   await page.getByRole('button', { name: '잠금' }).click();
   await expect(page.locator('#hourly tr')).toHaveCount(0);
+  await expect(page.locator('#refresh-observations tr')).toHaveCount(0);
   await expect(page.getByLabel('관리자 토큰')).toHaveValue('');
   delete summary.apiHourly;
+  delete summary.refreshObservations;
   await page.getByLabel('관리자 토큰').fill('test-token');
   await page.getByRole('button', { name: '조회 / 새로고침' }).click();
   await expect(page.locator('#hourly-state')).toHaveText('현재 서버에서는 시간대별 통계를 제공하지 않습니다.');
+  await expect(page.locator('#refresh-state')).toHaveText('현재 서버에서는 갱신 관측을 제공하지 않습니다.');
   await expect(table).toBeHidden();
   summary.apiHourly = [];
   await page.getByRole('button', { name: '조회 / 새로고침' }).click();

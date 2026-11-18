@@ -300,7 +300,7 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
         return record_pageview(method, request_body, client, headers, _analytics_store, _rate_allowed)
 
     if path == "/api/v1/admin/analytics":
-        return analytics_summary(method, query_string, request_headers, headers, _analytics_store, _api_recorder)
+        return analytics_summary(method, query_string, request_headers, headers, _analytics_store, _api_recorder, current_cache)
 
     if method not in ("GET", "HEAD"):
         return json_response(405, headers, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})

@@ -6,6 +6,28 @@ from backend.cache import Cache
 
 
 class CacheIntegrityTests(unittest.TestCase):
+    def test_refresh_observations_are_private_and_change_only_on_fetch(self):
+        cache = Cache(ttl=60, retry_delay=60)
+        key = ("school_search", "private-school")
+        self.assertEqual(cache.observations(), {})
+        cache.get(key, lambda: {"schools": []})
+        first = cache.observations()
+        self.assertEqual(first["school_search"]["result"], "success")
+        self.assertNotIn("private-school", str(first))
+        cache.get(key, lambda: self.fail("cache hit must not fetch"))
+        self.assertEqual(cache.observations(), first)
+        cache.ttl = 0
+        cache.retry_delay = 0
+        with self.assertLogs("opensigan.cache", level="WARNING"):
+            cache.get(key, lambda: (_ for _ in ()).throw(RuntimeError("private error")))
+        failure = cache.observations()
+        self.assertEqual(failure["school_search"]["result"], "failure")
+        self.assertNotIn("private", str(failure))
+        failure["school_search"]["result"] = "tampered"
+        self.assertEqual(cache.observations()["school_search"]["result"], "failure")
+        cache.get(key, lambda: {"schools": []})
+        self.assertEqual(cache.observations()["school_search"]["result"], "success")
+
     def test_failed_refresh_logs_resource_and_fallback_without_request_data(self):
         cache = Cache(ttl=0, retry_delay=60)
         key = ("timetable", "private-school", "2026-11-09")

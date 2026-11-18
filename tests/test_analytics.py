@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from backend.analytics import AnalyticsStore, ApiRecorder
 from backend.app import Handler, dispatch_request, _read_request_body, _rate_clients
+from backend.cache import Cache
 
 
 class AnalyticsTests(unittest.TestCase):
@@ -116,6 +117,16 @@ class AnalyticsTests(unittest.TestCase):
             )
             self.assertEqual(authorized, 200)
             self.assertEqual(json.loads(body)["visitors"], 1)
+            self.assertIn("refreshObservations", json.loads(body))
+            observed_cache = Cache()
+            observed_cache.get(("timetable", "private-school"), lambda: {"records": []})
+            status, _, body = dispatch_request(
+                "GET", "/api/v1/admin/analytics", "days=30", cache_instance=observed_cache,
+                request_headers={"Authorization": "Bearer admin-secret"},
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(json.loads(body)["refreshObservations"]["timetable"]["result"], "success")
+            self.assertNotIn(b"private-school", body)
 
     def test_invalid_pageview_and_invalid_period_are_rejected(self):
         store = self.store()

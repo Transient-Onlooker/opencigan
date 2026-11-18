@@ -5,6 +5,7 @@ interface Summary {
   visitors: number; sessions: number; pageViews: number; apiRequests: number;
   apiErrorRate: number; apiAverageMs: number; droppedApiEvents: number;
   cacheStatuses?: Record<string, number>; failureKinds?: Record<string, number>;
+  refreshObservations?: Record<string, { result: 'success' | 'failure'; observedAt: string }>;
   apiHourly?: { hour: string; requests: number; errors: number; upstream_errors: number; overload_errors: number; cache_hits: number; stale_responses: number }[];
   daily: { day: string; visitors: number; sessions: number; page_views: number; api_requests: number }[];
   routes: { route: string; requests: number; errors: number; avg_ms: number; data_failures?: number; overload_errors?: number; unclassified_server_errors?: number }[];
@@ -18,6 +19,8 @@ const state = document.querySelector<HTMLParagraphElement>('#state')!;
 const results = document.querySelector<HTMLElement>('#results')!;
 const hourlyState = document.querySelector<HTMLElement>('#hourly-state')!;
 const hourlyTable = document.querySelector<HTMLElement>('#hourly-table')!;
+const refreshState = document.querySelector<HTMLElement>('#refresh-state')!;
+const refreshTable = document.querySelector<HTMLElement>('#refresh-table')!;
 let request: AbortController | undefined;
 
 function rows(selector: string, values: (string | number)[][]) {
@@ -69,6 +72,14 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
     }
     rows('#daily', data.daily.map((d) => [d.day, d.visitors, d.sessions, d.page_views, d.api_requests]));
     rows('#routes', data.routes.map((r) => [r.route, r.requests, r.errors, r.data_failures ?? '—', r.overload_errors ?? '—', r.unclassified_server_errors ?? '—', r.avg_ms]));
+    const observations = data.refreshObservations;
+    const resourceLabels = [['school_search', '시간표 학교 검색'], ['timetable', '시간표'], ['neis_school_search', '급식 학교 검색'], ['meals', '급식']];
+    rows('#refresh-observations', observations ? resourceLabels.map(([key, label]) => {
+      const entry = observations[key];
+      return [label, entry ? entry.result === 'success' ? '성공' : '실패' : '아직 관측 없음', entry ? new Date(entry.observedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—'];
+    }) : []);
+    refreshTable.hidden = !observations;
+    refreshState.textContent = observations ? '' : '현재 서버에서는 갱신 관측을 제공하지 않습니다.';
     const hourly = data.apiHourly;
     rows('#hourly', (hourly ?? []).map((h) => [h.hour.slice(0, 16).replace('T', ' '), h.requests, h.errors, h.upstream_errors, h.overload_errors, h.cache_hits, h.stale_responses]));
     hourlyTable.hidden = !hourly?.length;
@@ -87,5 +98,6 @@ document.querySelector('#clear')!.addEventListener('click', () => {
   token.value = ''; results.hidden = true;
   document.querySelector('#metrics')!.replaceChildren(); rows('#daily', []); rows('#routes', []); rows('#hourly', []);
   hourlyTable.hidden = true; hourlyState.textContent = '';
+  rows('#refresh-observations', []); refreshTable.hidden = true; refreshState.textContent = '';
   state.textContent = '잠겼습니다. 다시 조회하려면 토큰을 입력하세요.'; token.focus();
 });
