@@ -2,14 +2,16 @@
 // This function is not included in GitHub Pages' static Vite output.
 export async function onRequest(context) {
   const gateway = context.env?.OPENCIGAN_GATEWAY;
+  const error = (code) => new Response(
+    context.request.method === 'HEAD' ? null : JSON.stringify({ code, message: 'API 연결을 처리하지 못했어요.' }),
+    { status: 503, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } },
+  );
   if (!gateway || typeof gateway.fetch !== 'function') {
-    return new Response(
-      JSON.stringify({ code: 'gateway_unconfigured', message: 'API 연결이 아직 설정되지 않았어요.' }),
-      {
-        status: 503,
-        headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
-      },
-    );
+    return error('gateway_unconfigured');
   }
-  return gateway.fetch(context.request);
+  try {
+    return await gateway.fetch(context.request);
+  } catch {
+    return error('gateway_unavailable');
+  }
 }
