@@ -7,7 +7,7 @@ interface Summary {
   cacheStatuses?: Record<string, number>; failureKinds?: Record<string, number>;
   apiHourly?: { hour: string; requests: number; errors: number; upstream_errors: number; overload_errors: number; cache_hits: number; stale_responses: number }[];
   daily: { day: string; visitors: number; sessions: number; page_views: number; api_requests: number }[];
-  routes: { route: string; requests: number; errors: number; avg_ms: number }[];
+  routes: { route: string; requests: number; errors: number; avg_ms: number; data_failures?: number; overload_errors?: number; unclassified_server_errors?: number }[];
 }
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
@@ -68,7 +68,7 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
       card.append(heading, number); metrics.append(card);
     }
     rows('#daily', data.daily.map((d) => [d.day, d.visitors, d.sessions, d.page_views, d.api_requests]));
-    rows('#routes', data.routes.map((r) => [r.route, r.requests, r.errors, r.avg_ms]));
+    rows('#routes', data.routes.map((r) => [r.route, r.requests, r.errors, r.data_failures ?? '—', r.overload_errors ?? '—', r.unclassified_server_errors ?? '—', r.avg_ms]));
     const hourly = data.apiHourly;
     rows('#hourly', (hourly ?? []).map((h) => [h.hour.slice(0, 16).replace('T', ' '), h.requests, h.errors, h.upstream_errors, h.overload_errors, h.cache_hits, h.stale_responses]));
     hourlyTable.hidden = !hourly?.length;

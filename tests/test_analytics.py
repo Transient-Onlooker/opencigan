@@ -81,6 +81,20 @@ class AnalyticsTests(unittest.TestCase):
             self.assertEqual(recorder.submit.call_args.args[:3], ("/api/v1/timetable", "GET", 503))
             self.assertEqual(recorder.submit.call_args.args[4:], (None, "service_overloaded"))
 
+    def test_route_diagnostics_distinguish_overload_and_unclassified_errors(self):
+        store = self.store()
+        store.record_api("/api/v1/timetable", "GET", 503, 10, None, "upstream_unavailable")
+        store.record_api("/api/v1/timetable", "GET", 503, 20, None, "service_overloaded")
+        store.record_api("/api/v1/timetable", "GET", 500, 30)
+        store.record_api("/api/v1/timetable", "GET", 400, 40)
+        store.record_api("/api/v1/meals", "GET", 200, 10)
+        routes = {row["route"]: row for row in store.summary()["routes"]}
+        self.assertEqual(routes["/api/v1/timetable"], {
+            "route": "/api/v1/timetable", "requests": 4, "errors": 4, "avg_ms": 25.0,
+            "data_failures": 1, "overload_errors": 1, "unclassified_server_errors": 1,
+        })
+        self.assertEqual(routes["/api/v1/meals"]["data_failures"], 0)
+
     def test_pageview_endpoint_and_admin_authentication(self):
         store = self.store()
         payload = json.dumps({

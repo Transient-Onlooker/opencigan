@@ -259,6 +259,9 @@ paths:
                         requests: { type: integer, minimum: 0 }
                         errors: { type: integer, minimum: 0 }
                         avg_ms: { type: number, minimum: 0 }
+                        data_failures: { type: integer, minimum: 0, description: Generic upstream_unavailable responses; not proof of provider failure. }
+                        overload_errors: { type: integer, minimum: 0, description: service_overloaded responses. }
+                        unclassified_server_errors: { type: integer, minimum: 0, description: HTTP 5xx records without a recorded failure category, including older data. }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { description: Missing or incorrect bearer token. }
         '503': { description: Analytics disabled or storage temporarily unavailable. }
