@@ -131,6 +131,40 @@ class WsGITests(unittest.TestCase):
             self.assertEqual(self._call_app("GET", "/api/v1/unknown", remote_addr="127.0.0.1", headers=signed)[0], "404 Not Found")
         self.assertEqual(self._call_app("GET", "/api/v1/unknown", remote_addr="127.0.0.1", headers=signed)[0], "429 Too Many Requests")
 
+    @patch.dict(os.environ, {"OPENCIGAN_ANALYTICS_ADMIN_TOKEN": "test-token",
+                            "OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN": "test-token",
+                            "OPENCIGAN_PROXY_IP_SIGNING_KEY": ""})
+    @patch("backend.app.shutter.check", return_value=(True, 0))
+    def test_admin_auth_attempts_are_rate_limited_separately_per_client(self, _shutter):
+        paths = ("/api/v1/admin/analytics", "/api/v1/admin/access-logs")
+        for i in range(60):
+            status, _, _ = self._call_app("GET", paths[i % 2], remote_addr="203.0.113.9")
+            self.assertEqual(status, "401 Unauthorized")
+        status, headers, body = self._call_app("GET", paths[0], remote_addr="203.0.113.9")
+        self.assertEqual(status, "429 Too Many Requests")
+        self.assertGreater(int(headers["Retry-After"]), 0)
+        self.assertEqual(json.loads(body)["code"], "rate_limited")
+        self.assertEqual(self._call_app("GET", paths[1], remote_addr="203.0.113.10")[0], "401 Unauthorized")
+        self.assertEqual(self._call_app("GET", "/api/v1/status", remote_addr="203.0.113.9")[0], "200 OK")
+        self.assertEqual(self._call_app("GET", "/api/v1/unknown", remote_addr="203.0.113.9")[0], "404 Not Found")
+        self.assertEqual(self._call_app("OPTIONS", paths[0], remote_addr="203.0.113.9")[0], "204 No Content")
+
+    @patch.dict(os.environ, {"OPENCIGAN_ANALYTICS_ADMIN_TOKEN": "test-token",
+                            "OPENCIGAN_PROXY_IP_SIGNING_KEY": "s" * 32})
+    def test_admin_limit_keeps_verified_and_unsigned_clients_separate(self):
+        path = "/api/v1/admin/analytics"
+        timestamp = str(int(time.time()))
+        payload = "\n".join(("GET", path, "", "203.0.113.9", timestamp))
+        signature = hmac.new(b"s" * 32, payload.encode(), hashlib.sha256).hexdigest()
+        signed = {"X-Opencigan-Client-IP": "203.0.113.9", "X-Opencigan-IP-Timestamp": timestamp,
+                  "X-Opencigan-IP-Signature": signature}
+        for _ in range(60):
+            self.assertEqual(self._call_app("GET", path, remote_addr="127.0.0.1")[0], "401 Unauthorized")
+        self.assertEqual(self._call_app("GET", path, remote_addr="127.0.0.1")[0], "429 Too Many Requests")
+        self.assertEqual(self._call_app("GET", path, remote_addr="127.0.0.1", headers=signed)[0], "401 Unauthorized")
+        forged = {**signed, "X-Opencigan-IP-Signature": "0" * 64}
+        self.assertEqual(self._call_app("GET", path, remote_addr="127.0.0.1", headers=forged)[0], "429 Too Many Requests")
+
     @patch.dict(os.environ, {"OPENCIGAN_ACCESS_LOG_DB": "fixture"})
     @patch("backend.app._access_log_recorder")
     def test_opt_in_trusted_proxies_separates_clients_and_logs_same_identity(self, recorder: Mock):
