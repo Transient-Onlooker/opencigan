@@ -5,6 +5,7 @@
 ## P2 — 외부 개발자 연동
 
 - [ ] **Python 기본 클라이언트의 Cloudflare 403 조사**: 2026-11-18 단일 네트워크에서 공식 도메인과 Pages 기본 도메인의 상태 API가 Python 기본 `urllib` 사용자 에이전트에 HTTP 403 `error code: 1010`을 반환했다. 같은 환경에서 curl 기본 사용자 에이전트와 `python-requests/2.34.2`는 200이었다. 제공 Python 클라이언트가 자체 User-Agent로 식별하도록 수정했다. 일반 `urllib` 호출의 차단 원인과 영향, 여러 외부 네트워크에서의 동작은 추가 확인이 필요하다. Cloudflare 정책 변경 필요성은 아직 확정하지 않았다.
+  - 수정 코드 `d425a0c`를 Pi의 `/home/admin/opensigan-releases/release-d425a0c`에 배포했다. Pi에서 실제 클라이언트로 두 공개 호스트의 상태·학교 검색을 확인하고 관련 테스트 7개를 통과했다. 이전 `release-6c903b7`과 설정은 보존했으며 이번 변경은 Pi의 API 처리 로직을 바꾸지 않는다.
 
 ### P2 — ‘만들어주세요’ 기능 요청 접수·관리 (P0 운영 안정화 후, 미구현)
 
