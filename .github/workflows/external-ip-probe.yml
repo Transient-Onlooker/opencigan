@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/external-ip-probe.yml'
+      - 'frontend/e2e-live/smoke.mjs'
 
 permissions: {}
 
@@ -27,3 +28,18 @@ jobs:
           test "$code" = 200
           echo "Runner egress IP SHA-256: $digest"
           date -u '+Request completed at %Y-%m-%dT%H:%M:%SZ'
+  live-browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: node e2e-live/smoke.mjs
+        working-directory: frontend
