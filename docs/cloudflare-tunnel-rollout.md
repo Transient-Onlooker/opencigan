@@ -64,7 +64,7 @@ command -v cloudflared && cloudflared --version
 - [ ] ICS·공개 API에는 JS/Managed Challenge·Cloudflare Access 로그인 강제 적용 금지. 봇 차단이 정상 학생·캘린더/외부 클라이언트를 차단하지 않는지 검증.
 - [ ] **IP 신뢰 경계:** Pages/Worker의 사용자가 보낸 `X-Forwarded-For`/`Forwarded`를 그대로 Pi에 전달하지 않는다. 실제 엣지 IP 정보 전달 방식을 명확히 설계하고 Worker→Pi 헤더 위변조·프록시 홉·`OPENCIGAN_TRUSTED_PROXIES`를 테스트. 현재 백엔드는 `CF-Connecting-IP`를 직접 사용하지 않음. 다른 외부망 2곳에서 IP별 로그·429 제한을 실측.
 - [ ] **원본 API의 캐시·CORS·ETag·304·HEAD·웹훅 서명·관리자 인증 유지**, Worker 429와 Pi `429 rate_limited`, `503 service_overloaded`, `503 upstream_unavailable` 구분. Worker 자체 오류의 CORS와 `Retry-After` 노출은 허용 출처에 한해 구현·단위 테스트했다. Worker의 `ALLOWED_ORIGINS`를 Pi의 `ALLOWED_ORIGIN`과 맞춰 배포하고 실제 경로를 검증해야 한다.
-  - Pages Function에서 서비스 바인딩이 없거나 호출이 실패하면 내부 예외를 노출하지 않는 503을 반환하고 HEAD 본문은 비운다. Function 자체가 반환하는 오류는 CORS 허용 헤더를 추가하지 않으므로 교차 출처 클라이언트에는 네트워크 오류로 나타날 수 있다. 배포와 전체 CORS 검증은 별도로 남는다.
+  - Pages Function에서 서비스 바인딩이 없거나 호출이 실패하면 내부 예외를 노출하지 않는 503을 반환하고 HEAD 본문은 비운다. Function 자체 오류에도 공식 사이트와 GitHub Pages의 정확한 출처만 CORS를 허용한다. 사전 요청 자체가 503이면 브라우저는 오류 본문을 읽을 수 없다. 이 출처 목록은 Pi·Worker 설정과 함께 관리하며, 배포와 전체 CORS 검증은 별도로 남는다.
 - [x] Cloudflare Pages 사용자 지정 도메인의 zone WAF와 Worker 수준 방어의 차이 및 현재 경로별 제한을 아래에 문서화했다. WAF 활성 여부와 운영 임계치의 적정성은 별도로 검증해야 한다.
 
 ### 공개 경로 방어 범위 (2026-11-18 확인)
