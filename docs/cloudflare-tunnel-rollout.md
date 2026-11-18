@@ -128,3 +128,113 @@ OPTIONS 사전 요청은 Worker 요청량 제한을 건너뛰어 원본에 전�
 - [Pages Functions → Worker Service Binding](https://developers.cloudflare.com/pages/functions/bindings/)
 - [Worker Rate Limiting binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
 - [일반 Tunnel의 DNS 제한](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/dns/)
+
+
+## 2026-11-18 운영 배포 인수인계 — Worker + Raspberry Pi
+
+> **목적:** 저장소의 최신 구현을 실제 운영 Cloudflare Worker와 Raspberry Pi에 안전하게 반영하고, P0 운영 검증을 마무리한다. 이 절은 실행 담당 에이전트를 위한 작업 가이드다. 특정 명령·도구·배포 순서를 고정하지 않으며, 실행 시점의 `main`과 실제 운영 상태를 다시 확인해 가장 적절한 방법을 선택한다. 이 기록을 작성한 시점에는 **배포나 운영 설정 변경이 수행되지 않았다.**
+
+### 1. 확인된 운영 기준선
+
+#### Cloudflare Worker
+
+- Worker 이름: `opensigan-private-api`
+- 확인한 활성 deployment: `3d215ebd-dd6d-4393-b127-d7d577ed305f`
+- 확인한 활성 version: `62d0377b-ceae-4550-a012-33e582f90f0c` (version number 4), 트래픽 100%
+- 해당 버전 생성 시각: 2026-11-17 11:17:19 UTC (KST 20:17)
+- `PRIVATE_API` VPC Service ID: `01a1e508-9473-7c43-b9ab-1b76b0600696`
+- `PROXY_IP_SIGNING_KEY`는 `secret_text` binding으로 존재한다. **Secret 원문은 읽거나 출력·복사·저장소 반영하지 말고 binding 존재와 연결만 확인한다.**
+- 당시 확인한 기존 Rate Limit binding:
+  | Binding | Namespace ID | Limit / period |
+  | --- | ---: | ---: |
+  | `GENERAL_RATE` | `961302` | 60 / 60초 |
+  | `SEARCH_RATE` | `961301` | 20 / 60초 |
+  | `TIMETABLE_RATE` | `961303` | 40 / 60초 |
+  | `CALENDAR_RATE` | `961304` | 20 / 60초 |
+- 같은 활성 버전에서 `MEAL_RATE`, `ADMIN_RATE`, `WEBHOOK_RATE`는 확인되지 않았다. 현재 `main`의 `cloudflare-gateway/src/index.mjs`는 급식·관리·웹훅 경로를 각각 해당 binding으로 제한하며, 테스트도 각 카테고리의 독립 제한과 binding 누락 시 동작을 다룬다.
+- 현재 `main`의 `cloudflare-gateway/wrangler.example.jsonc`에는 신규 binding 예시가 다음과 같이 기재되어 있다: `MEAL_RATE` 40/60초, `ADMIN_RATE` 20/60초, `WEBHOOK_RATE` 10/60초 및 예시 namespace ID `961305`·`961306`·`961307`. 이는 **예시 설정**이므로 실제 계정의 namespace 사용 여부와 생성·할당 방법을 확인한 뒤 적용한다. 기존 네 개의 namespace ID와 제한값은 유지한다. 임의 숫자를 무작위 생성해 실제 namespace로 간주하거나 기존 namespace와 충돌시키지 않는다.
+- 당시 `ALLOWED_ORIGINS` binding은 `plain_text`로 존재했다. 이전 조회 출력에는 `https://opencigan.mcv.kr,http://opencigan.mcv.kr,https://transient-onlooker.github.io`가 표시됐다. 다만 이후 배포 스크립트가 이 문자열과의 동등성 검사에서 중단됐다. 해당 실행은 실제 운영 값을 다시 출력하지 않았으므로 불일치 원인은 확정하지 않는다. **실행 시점의 활성 버전에서 실제 값을 다시 읽고**, Pages·공식 사이트·GitHub Pages의 현재 출처와 비교해 보존 또는 조정 근거를 남긴다. 문서/예시 문자열을 무조건 덮어쓰지 않는다.
+- `main` 기준 Worker 코드 SHA는 당시 `e8e2406c54b660a9e5e2a9c1202a6308ae6f5fb8`였다. 실제 작업 시에는 이 SHA를 고정해서 그대로 배포하기보다 최신 `main`을 다시 확인하고 해당 소스·테스트·설정을 같은 커밋 기준으로 맞춘다.
+
+#### 배포 시도 결과 — 변경 없음
+
+- 2026-11-18 PowerShell 배포 스크립트는 계정 인증, 활성 버전, VPC Service ID, Secret binding 존재를 확인한 뒤 `ALLOWED_ORIGINS` 비교에서 중단됐다.
+- 출력: `DEPLOYMENT_ERROR=Existing allowed origins differ from expected production configuration.` 및 `No production deployment was confirmed.`
+- 중단 지점은 신규 Rate Limit namespace 생성과 Worker 소스 업로드·배포보다 앞이다. 따라서 이 시도에서 신규 namespace 생성, Worker 배포, 롤백은 실행되지 않았다.
+- 이전 스크립트를 그대로 반복하기보다, 실제 운영값을 읽어 설정을 구성하는 방식으로 바꾼다. 운영 설정을 문서의 예상값과 일치시키기 위해 불필요하게 변경하지 않는다.
+
+#### Raspberry Pi
+
+- SSH 접속 대상은 사용자가 쓰는 Tailscale 주소 `admin@100.66.182.87`이며 키는 `%USERPROFILE%\\.ssh\\rpi5_ed25519`다. 배포 담당 에이전트는 이미 Pi 접근 권한이 있다.
+- 현재 API 서비스: `opensigan.service`, `systemd --user`에서 active/running, 당시 MainPID `1463`
+- 실행 작업 디렉터리: `/home/admin/opensigan-releases/release-fdea474`
+- Git 비교 기준 `fdea4745d0eb7a7079790568a9cc9fa87c8c8ce6` → 당시 `main` `e8e2406c54b660a9e5e2a9c1202a6308ae6f5fb8`: `main`이 37개 커밋 앞서 있었다. 이는 비교 당시 기준이며 실행 시점의 현재 HEAD·Pi working tree를 다시 확인한다.
+- `opensigan.service`는 다음 환경 파일을 사용한다.
+  - `/home/admin/.config/opensigan/neis.env` (ignore_errors=yes)
+  - `/home/admin/.config/opensigan/analytics.env`
+  - `/home/admin/.local/share/opencigan/access-logs/service.env`
+- 프로세스 환경에서 다음 키가 존재하는 것을 확인했다: `OPENCIGAN_PROXY_IP_SIGNING_KEY`, `OPENCIGAN_TRUSTED_PROXIES`, `OPENCIGAN_ACCESS_LOG_DB`, `OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN`, `OPENCIGAN_ANALYTICS_DB`, `OPENCIGAN_COMCIGAN_PROXY`. **값은 비밀이므로 출력·로그·PR에 기록하지 않는다.**
+- `OPENCIGAN_HISTORY_DB`는 프로세스 환경에서 확인되지 않았다. 최신 코드가 이를 실제로 필요로 하는지와 이력 기능의 운영 정책을 확인하고, 단순히 누락처럼 보인다는 이유로 임의 경로를 설정하지 않는다.
+- 접속 로그 DB 파일은 존재했고 읽기 전용 조회 결과 641건, 최신 기록 `2026-11-18T16:59:46.745548+09:00`, 서로 다른 client IP 19개였다. 최근 route/status 집계에서 시간표·급식·학교 검색·페이지뷰 요청이 확인됐다. 기존 로그 데이터는 유지하고, 배포 후 새 요청이 추가되는지 확인한다.
+- 로컬 API `http://127.0.0.1:8000/api/v1/status`는 HTTP 200, 포트 8000은 `127.0.0.1`에만 LISTEN 중이었다. 외부 인터페이스에 직접 바인딩하지 않는 현재 경계를 보존한다.
+- `opencigan-cloudflared.service`는 active/running, 실행 파일 `/home/admin/.local/bin/cloudflared`, 버전 `2026.11.0`이다. PATH에서 `cloudflared` 명령이 검색되지 않았던 것은 실행 파일 부재를 뜻하지 않는다.
+- `opensigan-preview.service`도 active/running으로 관측됐다. 운영 API 서비스와 LAN preview의 작업 디렉터리·빌드 산출물·역할을 구분해 필요 범위만 갱신한다.
+- `tailscale funnel status --json`은 `{}`를 반환했다. Funnel 공개 중지 상태를 유지하고, 사설 Tailscale·Cloudflare Tunnel·컴시간 전용 WARP 출구는 서로 다른 기능이므로 함께 끄거나 제거하지 않는다.
+
+#### 공개 경로에서 확인한 응답
+
+| 요청 | 결과 | 해석 |
+| --- | --- | --- |
+| `https://opencigan.mcv.kr/api/v1/status` | HTTP 200, `process liveness` | 공개 경로에서 프로세스 생존 응답 |
+| `https://opencigan.pages.dev/api/v1/status` | HTTP 200, `process liveness` | Pages 경로에서 프로세스 생존 응답 |
+| 공식 도메인 `/api/v1/meals` (필수 학교 파라미터 없이 호출) | HTTP 400 `invalid_request` | 입력 검증 응답이며 장애로 판정하지 않음. 유효한 학교 파라미터로 다시 검사 |
+| 공식 도메인 `/api/v1/admin/access-logs` (인증 없이 호출) | HTTP 401 `unauthorized` | 비인증 관리자 접근 거부가 기대대로 동작 |
+
+상태 API의 200만으로 시간표·급식 데이터 정확성이나 모든 API 경로의 정상성을 보장하지 않는다.
+
+### 2. 실행 담당 에이전트 작업 가이드
+
+#### A. 배포 전 최신 상태 확인과 보존
+
+1. 저장소 최신 `main`, GitHub Actions, Worker 코드·테스트·`wrangler.example.jsonc`를 다시 확인한다. 이전 SHA는 비교 기준으로만 사용한다.
+2. Worker의 현재 활성 deployment/version과 모든 binding을 다시 조회한다. 작업 중 다른 배포가 있었다면 새 기준으로 비교한다.
+3. 기존 `PRIVATE_API` VPC Service ID, `PROXY_IP_SIGNING_KEY` secret binding, 기존 네 Rate Limit namespace/limit/period, 실제 `ALLOWED_ORIGINS`를 보존하는 방향으로 구성한다. Secret 원문은 읽지 않는다.
+4. 허용 출처가 현재 Pages Function·공식 사이트·GitHub Pages의 실제 요청 출처와 다른 경우 원인을 확인하고, 현재 필요한 출처를 기준으로 조정 여부를 판단한다. 기존 출처를 설명 없이 삭제하거나 예시 문자열로 덮어쓰지 않는다.
+5. 신규 세 Rate Limit namespace는 Cloudflare 계정에서 유효하고 고유한 값인지 확인하고 적절한 방식으로 생성·연결한다. 예시 설정의 값은 참고하되 실제 운영 할당 여부를 확인한다. 기존 namespace를 재사용하거나 무작위 숫자를 임의 생성하지 않는다.
+6. Pi의 현재 실행 SHA·작업 트리·릴리스 구조·systemd unit/drop-in·환경 파일·포트·WARP 및 cloudflared 상태를 읽기 전용으로 재확인한다. 운영 비밀값은 출력하지 않는다.
+7. SQLite 접속 로그·분석 및 실제 사용 중인 이력 DB가 있다면 DB별 경로와 WAL 여부를 확인하고 일관성 있는 백업을 준비한다. WAL 사용 DB는 DB 파일 하나만 복사하는 방식으로 백업하지 않는다. 기존 로그 641건을 포함한 운영 데이터는 유지한다.
+
+#### B. Cloudflare Worker 반영
+
+- 최신 `cloudflare-gateway/src/index.mjs`와 테스트를 같은 `main` SHA에서 가져와 사용한다. 배포 전 Worker 단위 테스트와 Wrangler dry-run/build를 확인한다.
+- 현재 코드가 요구하는 `SEARCH_RATE`, `GENERAL_RATE`, `TIMETABLE_RATE`, `CALENDAR_RATE`, `MEAL_RATE`, `ADMIN_RATE`, `WEBHOOK_RATE`가 모두 연결되도록 한다. 예시 제한은 60초 기준 검색 20, 일반 60, 시간표 40, 캘린더 20, 급식 40, 관리자 20, 웹훅 10이다. 실제 트래픽·기존 Pi 제한·공유망 영향을 고려해 합리적으로 조정할 수 있으며, 변경 근거를 남긴다.
+- OPTIONS/preflight는 일반 API 요청과 분리된 `preflight:` 키를 사용한다. 정상 브라우저 사전 요청이 일반 요청 예산을 소모하지 않는지, 과도한 preflight는 적절히 제한되는지 확인한다.
+- 실제 배포 구성은 활성 운영값을 기반으로 만든다. VPC Service ID와 기존 Secret binding을 보존하고, 대시보드에만 설정된 일반 변수가 있을 수 있으므로 변수 유지 옵션도 검토한다. Secret 원문을 재등록하거나 PR·로그에 남기지 않는다.
+- 가능하면 staging/preview에서 먼저 검증하고, 운영 적용은 가역적인 배포 버전 전환을 활용한다. 운영 적용 직후 활성 version과 트래픽 비율, 모든 binding을 다시 조회한다.
+- 배포 후 status, 학교 검색, 시간표, **유효한 school 값이 포함된 급식**, ICS GET/HEAD/OPTIONS 및 ETag/304, 관리자 미인증 401, 웹훅 인증/본문 전달을 확인한다. Rate Limit 429와 `Retry-After`는 실제 사용자 트래픽을 과도하게 발생시키지 않는 테스트 키·안전한 시험 방법으로 검증한다.
+- Worker 오류 503, Pi 제한 429, 상류 장애 503을 구분하고 CORS 허용 출처·응답 헤더가 정상인지 확인한다. 문제가 있으면 이전 Worker version으로 되돌릴 수 있도록 이전 version ID와 절차를 기록한다.
+
+#### C. Raspberry Pi 최신 릴리스 적용
+
+- 당시 Pi는 `release-fdea474`에서 실행됐고 최신 `main`보다 37개 커밋 뒤처져 있었다. 실제 적용 전 다시 비교해 어떤 backend·설정·프런트 preview 변경이 필요한지 살펴본다.
+- 새 릴리스 디렉터리와 해당 버전의 가상환경/의존성을 준비하고, 가능한 테스트를 새 릴리스에서 먼저 실행한 뒤 서비스 전환한다. 기존 릴리스와 롤백 가능한 경로는 남긴다. 현재 작업 디렉터리를 직접 덮어쓰거나 구버전 복구 수단을 먼저 삭제하지 않는다.
+- 기존 환경 파일 세 개의 위치·권한·systemd 참조를 보존한다. 환경 파일을 저장소의 기본값으로 덮어쓰지 않는다. IP 서명 키, trusted proxy 목록, 접속 로그 DB/관리자 토큰, 분석 DB, NEIS 설정 및 컴시간 프록시 설정을 새 릴리스에서도 사용할 수 있는지 확인한다.
+- `OPENCIGAN_HISTORY_DB`는 최신 코드의 실제 요구사항과 기존 데이터 정책을 확인한 뒤 필요할 때만 설정한다. 운영 이력 DB를 새로 만들거나 기존 DB 경로를 바꾸는 경우 별도 백업·마이그레이션·복구 확인을 거친다.
+- `opensigan.service`의 `127.0.0.1:8000` 바인딩을 유지한다. `opencigan-cloudflared.service`와 실행 파일 `/home/admin/.local/bin/cloudflared`를 보존한다. LAN preview는 별도 서비스이므로 동일 릴리스가 필요한지 확인하고 API 서비스와 혼동하지 않는다.
+- **컴시간 전용 `OPENCIGAN_COMCIGAN_PROXY`/WARP 출구는 유지한다.** Funnel을 재활성화하거나 Tailscale 클라이언트·사설 tailnet·WARP를 제거하는 방식으로 배포하지 않는다.
+- 서비스 전환 후 systemd 상태, 로컬 status 200, loopback-only port, cloudflared 연결, 컴시간 WARP 경유 요청, 기존 DB 무결성 및 새 접속 로그 추가를 확인한다.
+
+#### D. 종단 QA 및 완료 판정
+
+- Worker와 Pi의 코드/설정이 서로 호환되는 배포 순서를 선택한다. Pi 코드가 먼저 필요한 변경인지, Worker가 먼저 적용 가능한 하위 호환 변경인지 확인해 서비스 중단을 최소화한다.
+- 서로 다른 외부망 두 곳에서 요청해 서명된 IP가 Pi 로그와 IP별 제한에 동일하게 반영되는지 확인한다. 사용자가 보낸 `X-Forwarded-For`·`Forwarded` 위조 값이 실제 client IP로 채택되지 않는지 확인한다.
+- 기존 접속 로그 데이터가 유지되고 신규 로그가 쌓이는지, 로그에 Secret·관리자 토큰·민감한 헤더/본문이 남지 않는지 확인한다.
+- 학교 검색·시간표·급식·ICS·관리자·웹훅·분석 등 실제 공개 기능을 검사한다. 단일 `/status` 200만으로 전체 완료 처리하지 않는다.
+- 장애 복구 시 Worker 이전 version 전환과 Pi 이전 release 복귀가 가능한지 확인한다. 실제 롤백 시험이 부담되면 최소한 절차·필요 정보·복구 가능성을 검증하고 미실행 사실을 기록한다.
+- 최종 결과에는 적용한 Git SHA, Worker version/deployment ID, binding 이름과 비밀값이 아닌 namespace/limit 정보, Pi release/commit, 서비스 상태, QA 결과, 롤백 기준을 남긴다. 확인하지 않은 항목은 미완료로 유지한다.
+
+### 3. 코드 수정이 필요한 경우
+
+이 작업의 주목적은 **이미 `main`에 구현된 Worker/Pi 변경을 운영에 안전하게 반영하는 것**이다. 배포 과정에서 실제 코드 결함·누락·호환성 문제가 발견되면 해당 에이전트가 이 문서에서 임의로 구현 범위를 넓히지 말고, 필요한 코드 변경과 이유·영향·테스트를 별도 후속 작업으로 로드맵에 기록한다. 코드 수정이 배포에 반드시 필요한 경우에는 수정 대상과 근거를 명확히 분리해 사용자에게 보고하고 별도 승인/작업으로 처리한다.
+
+**완료 조건:** Worker 최신 코드와 세 신규 Rate Limit binding이 실제 운영에 반영되고, Pi의 호환 릴리스가 환경·데이터·WARP·Tunnel을 보존하며 적용되며, 외부망 IP·로그·핵심 API·ICS·인증·429/503 및 복구 경로 검증 결과가 기록된 뒤에만 P0 운영 배포 항목을 완료 처리한다.

@@ -42,6 +42,8 @@
 - [ ] **P0 · 롤백/베타 가용성:** Cloudflare Pages / Worker VPC Beta / cloudflared 연결 장애, 429·503, 캐시·원본 가용성을 분리하고 복구 경로를 검증한다. 기존 GitHub Pages·Tailscale Funnel은 대체 경로의 필요성 확인 전까지 보존하고, 컴시간 전용 Pi WARP 출구 프록시는 유지한다.
 - [ ] **P0 · Tailscale Funnel 단계적 퇴역:** Cloudflare로 모든 신규 웹/API/ICS 구독 주소가 이전됐는지, 기존 `.ts.net` 구독자·외부 자동화가 남아 있는지와 장애 시 우회 경로를 먼저 확인한다. 이후 Funnel 설정을 기록하고 **Funnel 공개 노출만 가역적으로 중지**한 뒤 Cloudflare 정상 작동을 감시한다. Tailscale 클라이언트·tailnet 접속·Pi WARP·Cloudflare Tunnel은 중지/삭제하지 않는다. [운영 절차](../operations.md#tailscale-funnel-단계적-퇴역).
 
+- [ ] **P0 · 최신 Worker/Pi 코드 운영 반영 및 종단 검증 (2026-11-18 인수인계):** 현재 운영 Worker와 Raspberry Pi가 저장소 최신 코드·설정과 일치하는지 확인하고, 기존 운영 자산을 보존하면서 순차 배포한다. Worker는 활성 버전 `62d0377b-ceae-4550-a012-33e582f90f0c`에서 `MEAL_RATE`·`ADMIN_RATE`·`WEBHOOK_RATE`가 누락된 것을 확인했다. Pi는 `release-fdea474`에서 실행 중이며 해당 기준 커밋은 당시 `main`보다 37개 커밋 뒤처져 있다. 배포 스크립트는 `ALLOWED_ORIGINS`의 하드코딩된 문자열 일치 검사에서 중단되어 실제 배포 전 종료됐고 운영 변경은 발생하지 않았다. 운영 설정을 먼저 재조회해 실제 허용 출처·VPC·Secret binding·기존 Rate Limit namespace를 보존하고, 신규 binding 및 Pi 릴리스를 적용한다. Pi의 환경 파일·SQLite 로그/분석 데이터·systemd 설정·Cloudflare Tunnel·컴시간 전용 WARP를 보존하고 롤백 경로를 확보한다. 상세 인수인계와 확인된 기준선은 [Worker + RPi 운영 배포 인수인계](../cloudflare-tunnel-rollout.md#2026-11-18-운영-배포-인수인계--worker--raspberry-pi)에 기록. **배포·실측 완료 전에는 체크하지 않는다.** 코드 수정이 필요하면 이 작업에서 직접 구현하지 말고 별도 후속 항목으로 기록한다.
+
 **별도 출구 경로:** 컴시간 전용 `OPENCIGAN_COMCIGAN_PROXY`/WARP는 Pi에서 컴시간으로 나가는 경로로 유지하고, Tunnel 수신 구조와 섞지 않는다.
 
 **2026-11-16 QA 후속 ([결함 NEW-01~09](../qa-2026-11-16.md))**
