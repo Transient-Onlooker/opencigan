@@ -248,3 +248,12 @@ command -v cloudflared && cloudflared --version
 - 공개 경로에서 상태·학교 검색·시간표·유효 학교 급식·ICS GET/HEAD 및 ETag 304, GitHub Pages 출처의 OPTIONS 204, 관리자 미인증 401을 확인했다. 웹훅은 활성화하지 않은 상태에서 `webhooks_disabled` 503을 확인했다. 한 외부 경로에서 클라이언트 IP 기록과 위조 전달 헤더 무시를 확인했다. API의 실제 오류 상황 전반을 검증한 것은 아니다.
 - 롤백용 이전 Worker 버전 `62d0377b-ceae-4550-a012-33e582f90f0c`의 버전 전환 dry-run을 확인했다. Pi는 `/home/admin/.config/systemd/user/opensigan.service.d/zzzzzz-opencigan-6c903b7.conf`를 비활성화하고 user systemd 설정을 다시 읽은 뒤 서비스를 재시작하면 기존 릴리스로 돌아갈 수 있다. 실제 롤백은 실행하지 않았다. 백업을 운영 DB에 덮어쓰면 이후 기록이 사라질 수 있으므로 복구 시점과 손실 범위를 먼저 확인한다.
 - **남은 검증:** 서로 다른 외부망에서 실제 IP와 제한 분리, 안전한 방법으로 실제 Worker 429·`Retry-After`와 Pi의 오류 계약, 인증된 관리자 경로 및 실제 캘린더 앱 동기화, 공유망에서의 제한 영향을 확인해야 한다. 공개 Python 기본 `urllib` 사용자 에이전트가 Cloudflare에서 403 `error code: 1010`을 받은 별도 호환성 문제도 [API 로드맵](roadmap/api-operations.md)에 기록했다. 따라서 위 완료 조건과 Phase 3·4 전체 QA는 아직 완료로 표시하지 않는다.
+
+### 2026-11-18 후속 Pi 릴리스 및 재점검
+
+- Pi 운영 서비스는 `/home/admin/opensigan-releases/release-d425a0c`에서 실행 중이다. `opensigan`, `opensigan-preview`, `opencigan-cloudflared`는 active이며 API는 `127.0.0.1:8000`에 수신하고 Funnel 설정은 없다. 이 릴리스는 Python 클라이언트 식별 수정이며 API 처리 로직은 이전 릴리스와 같다.
+- 현재 Pi 롤백은 `/home/admin/.config/systemd/user/opensigan.service.d/zzzzzz-opencigan-d425a0c.conf`를 `.conf`가 아닌 이름으로 비활성화하고 user systemd daemon-reload 및 서비스 재시작 후 `release-6c903b7`과 로컬 상태 응답을 확인한다. 이전 `6c903b7` drop-in을 함께 비활성화하면 `release-fdea474`로 돌아가므로 대상 릴리스를 확인한다. 실제 롤백은 실행하지 않았다.
+- 재점검에서 시간표 공개 요청 하나가 20초 내 완료되지 않았고 WARP 경유 컴시간 상태 요청도 10초 제한에 걸렸다. 직후 WARP·HTTP 브리지의 일반 연결과 컴시간 상태는 200이었으며 재시도한 공개 시간표·유효 학교 급식·ICS GET/304/HEAD도 정상 응답했다. 일시 지연의 위치는 확정하지 않는다. 서비스 로그에는 학교 검색 `HTTPError` 시 오래된 캐시 사용 기록이 있었으며, 이전 503의 원인을 증명하지 않는다.
+- Worker 격리 테스트 18개와 백엔드 API·공개 API·WSGI·서명 IP 테스트 56개가 통과했다. 운영 제한 초과, 서로 다른 외부망 두 곳, 실기기 및 실제 캘린더 앱 검증을 대체하지 않는다.
+- 같은 Pi에서 직접 출구와 WARP SOCKS 출구로 각각 공개 상태 API를 한 번 호출해 서로 다른 공인 출구 IP가 접속 로그에 기록되는 것을 확인했다. 두 요청 모두 위조된 `X-Forwarded-For`·`Forwarded`·서명 IP 헤더를 사용했으나 로그에는 실제 출구 IP가 기록됐다. 이 검사는 실제 IP 값을 기록하지 않았으며, 같은 Pi와 내부망을 공유하므로 독립 실물 네트워크 두 곳의 검증이나 운영 제한 초과 검증을 대체하지 않는다.
+- 공식 호스트의 접속 로그 관리자 API는 인증 없이 401, 기존 관리자 토큰으로 인증 시 200과 JSON 객체를 반환했다. 토큰과 응답 내용은 출력·기록하지 않았다. 다른 관리자 API나 활성화하지 않은 웹훅 인증을 검증한 결과는 아니다.

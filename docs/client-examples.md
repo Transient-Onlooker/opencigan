@@ -73,6 +73,18 @@ const meals = await client.getMeals('B10:1234567', '2026-11-16', '2026-11-20');
 The Python client (`opensigan`) uses Python standard library `urllib` only (zero third-party dependencies).
 It identifies itself with an `OpenCigan-Python-Client` User-Agent on JSON and calendar requests. Cloudflare may reject the default `Python-urllib` User-Agent on the public host; this client identification does not guarantee that other network or rate-limit policies will allow a request.
 
+For direct `urllib` calls, identify your own application rather than impersonating a browser:
+
+```python
+from urllib.request import Request, urlopen
+
+request = Request("https://opencigan.pages.dev/api/v1/status", headers={"User-Agent": "MyScheduleApp/1.0"})
+with urlopen(request, timeout=10) as response:
+    print(response.read().decode("utf-8"))
+```
+
+[Cloudflare's Error 1010 documentation](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1010/) identifies the default `urllib` User-Agent as a possible Browser Integrity Check trigger on Pages hosts and custom domains. An application-specific User-Agent is the documented client-side remedy; this managed check cannot be disabled with a Pages custom-domain rule.
+
 For scripts outside the example, add `clients/python` to `PYTHONPATH`. Its timeout is a socket-operation timeout, not a total elapsed deadline for a slowly streaming response.
 
 ### Installation / Usage
