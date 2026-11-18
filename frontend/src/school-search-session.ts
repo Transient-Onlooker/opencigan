@@ -23,7 +23,7 @@ export function createSchoolSearchSession(onChange: (results: School[], message:
             cache.set(text, { schools: result.schools.slice(), savedAt: Date.now() });
             if (cache.size > 10) cache.delete(cache.keys().next().value!);
           }
-          onChange(result.schools, result.stale ? '저장된 검색 결과예요. 최신 정보가 아닐 수 있습니다.' : result.schools.length ? '' : '검색 결과가 없어요. 컴시간에서 시간표를 제공하지 않는 학교는 검색되지 않을 수 있습니다.');
+          onChange(result.schools, result.stale ? '저장된 검색 결과예요. 최신 정보가 아닐 수 있습니다.' : result.schools.length ? '' : '검색 결과가 없어요. 컴시간에서 시간표를 제공하지 않는 학교는 검색되지 않을 수 있습니다.', result.stale);
         } catch (error) {
           if (controller.signal.aborted || query().trim() !== text) return;
           const saved = cache.get(text);
