@@ -8,6 +8,8 @@
 
 The separate Pi → Comcigan WARP egress proxy is unchanged.
 
+The gateway additionally requires `MEAL_RATE`, `ADMIN_RATE`, and `WEBHOOK_RATE` bindings. These share the normal general per-IP cap but have independent category budgets; OPTIONS uses its separate preflight key. The example values and namespace IDs are for staging only. Before deploying this version, add all three bindings to the actual Worker configuration and choose limits from observed traffic. A missing binding returns 503 for its category; deploy to staging and verify before replacing the active Worker. This does not enable the webhook backend.
+
 ### Cloudflare account setup (after confirming Workers VPC access)
 
 1. Create Cloudflare Pages from the existing GitHub repository with **Root directory: `frontend`**, build command `npm ci && npm run build`, output `dist`. **Set `VITE_API_BASE_URL` to an empty string** (same-origin API via Pages Functions), not the current Tailscale URL. Test only at the `pages.dev` hostname.
