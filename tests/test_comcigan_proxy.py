@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import Mock, patch
+from urllib.error import HTTPError
 from urllib.request import Request
 
 from backend import comcigan_proxy
@@ -31,6 +32,27 @@ class ComciganProxyTests(unittest.TestCase):
         with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": "http://example.org:8080"}):
             with self.assertRaises(ValueError):
                 comcigan_proxy.configure_comcigan_proxy()
+
+    def test_rejection_status_logged_without_request_details(self):
+        import pycomcigan.helpers as helpers
+        original = helpers.urlopen
+        self.addCleanup(setattr, helpers, "urlopen", original)
+        opener = Mock()
+        with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": "http://127.0.0.1:18084"}), \
+             patch.object(comcigan_proxy, "build_opener", return_value=opener):
+            comcigan_proxy.configure_comcigan_proxy()
+            for status in (403, 429):
+                with self.subTest(status=status):
+                    error = HTTPError("http://comci.net:4082/?secret=token", status, "private message", {}, None)
+                    self.addCleanup(error.close)
+                    opener.open.side_effect = error
+                    with self.assertLogs("opensigan.comcigan_proxy", level="WARNING") as logs:
+                        with self.assertRaises(HTTPError) as raised:
+                            helpers.urlopen(Request("http://comci.net:4082/?secret=token"))
+                    self.assertIs(raised.exception, error)
+                    self.assertIn(f"upstream_http_status={status}", logs.output[0])
+                    for private in ("secret", "token", "private message", "comci.net"):
+                        self.assertNotIn(private, logs.output[0])
 
     def test_disabled_does_not_change_urllib(self):
         import pycomcigan.helpers as helpers
