@@ -30,7 +30,7 @@
 - [x] **P0 · Pages Functions → Worker → VPC 연결 (기본 경로):** Pages Service Binding과 VPC binding을 구성하고 상태 200·입력 오류 400·HEAD 200·OPTIONS 204를 확인했다. 나머지 JSON API·CORS·ETag/304·ICS·관리자 인증 계약의 운영 QA는 별도 미완료다.
 - [ ] **P0 · 봇/남용 방어:** `mcv.kr` zone WAF는 직접 설정할 수 없으므로 Worker 레벨 경로 검증, 요청량 제한(Rate Limiting binding), 캐시/요청 폭주 방어를 사용. 학교 검색·시간표·급식·ICS·관리/웹훅별 정책 구분, 정상 캘린더/API 사용자를 Challenge로 막지 않기.
 - [ ] **P0 · IP 신뢰·보안 경계:** Worker→VPC→Pi로 원본 클라이언트 IP가 안전하게 전달되도록 설계·검증. 현재 `resolve_client_ip()`는 `CF-Connecting-IP`를 직접 파싱하지 않음. 외부망 두 곳에서 IP별 제한/접속 로그 검증, 사용자 제공 XFF·Forwarded 신뢰 금지.
-  - Pi에 관리자 통계·접속 로그 API의 별도 IP별 제한을 배포했다. 서명된 IP와 서명 없는 연결은 별도 버킷이며 Pi의 OPTIONS는 제외한다. 격리 회귀 테스트와 Pi 직접/WARP 출구 및 독립 GitHub Actions 네트워크의 실제 IP 기록·위조 헤더 무시 확인은 통과했다. 실제 운영 제한 초과와 IP별 제한 분리 검증은 남는다.
+  - Pi에 관리자 통계·접속 로그 API의 별도 IP별 제한을 배포했다. 서명된 IP와 서명 없는 연결은 별도 버킷이며 Pi의 OPTIONS는 제외한다. 격리 환경에서 서로 다른 두 서명 IP의 제한과 접속 로그가 분리되는지 검사하고, Pi 직접/WARP 출구 및 독립 GitHub Actions 네트워크의 실제 IP 기록·위조 헤더 무시를 확인했다. 실제 운영 제한 초과와 IP별 제한 분리 검증은 남는다.
 - [x] **공식 웹사이트 Cloudflare Pages 이전 (사용자 완료 보고):** `opencigan.mcv.kr`의 Pages 이전은 완료했다고 보고됐다. 외부 DNS/CNAME·TLS·공유 링크·PWA의 사후 실측은 **당일 QA**로 분리하며 이전 자체를 미완료 개발 항목으로 남기지 않는다. `mcv.kr` 전체 NS/타 서브도메인 변경은 대상이 아니다.
 **2026-11-17 당일 QA 예정 — 아직 통과 처리하지 않음**
 

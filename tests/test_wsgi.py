@@ -131,6 +131,28 @@ class WsGITests(unittest.TestCase):
             self.assertEqual(self._call_app("GET", "/api/v1/unknown", remote_addr="127.0.0.1", headers=signed)[0], "404 Not Found")
         self.assertEqual(self._call_app("GET", "/api/v1/unknown", remote_addr="127.0.0.1", headers=signed)[0], "429 Too Many Requests")
 
+    @patch.dict(os.environ, {"OPENCIGAN_PROXY_IP_SIGNING_KEY": "s" * 32, "OPENCIGAN_ACCESS_LOG_DB": "fixture"})
+    @patch("backend.app._access_log_recorder")
+    @patch("backend.app.shutter.check", return_value=(True, 0))
+    def test_verified_clients_have_independent_rate_limits_and_log_identity(self, _shutter, recorder):
+        path = "/api/v1/unknown"
+        timestamp = str(int(time.time()))
+        clients = []
+        for ip in ("203.0.113.9", "198.51.100.10"):
+            message = "\n".join(("GET", path, "", ip, timestamp))
+            signature = hmac.new(b"s" * 32, message.encode(), hashlib.sha256).hexdigest()
+            clients.append({"X-Opencigan-Client-IP": ip, "X-Opencigan-IP-Timestamp": timestamp,
+                            "X-Opencigan-IP-Signature": signature})
+        for _ in range(60):
+            self.assertEqual(self._call_app("GET", path, remote_addr="127.0.0.1", headers=clients[0])[0], "404 Not Found")
+        status, headers, body = self._call_app("GET", path, remote_addr="127.0.0.1", headers=clients[0])
+        self.assertEqual(status, "429 Too Many Requests")
+        self.assertGreater(int(headers["Retry-After"]), 0)
+        self.assertEqual(json.loads(body)["code"], "rate_limited")
+        self.assertEqual(self._call_app("GET", path, remote_addr="127.0.0.1", headers=clients[1])[0], "404 Not Found")
+        events = [(call.args[0]["client_ip"], call.args[0]["status"]) for call in recorder.submit.call_args_list]
+        self.assertEqual(events, [("203.0.113.9", 404)] * 60 + [("203.0.113.9", 429), ("198.51.100.10", 404)])
+
     @patch.dict(os.environ, {"OPENCIGAN_ANALYTICS_ADMIN_TOKEN": "test-token",
                             "OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN": "test-token",
                             "OPENCIGAN_PROXY_IP_SIGNING_KEY": ""})
