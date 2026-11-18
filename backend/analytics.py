@@ -122,8 +122,9 @@ class AnalyticsStore:
     def summary(self, days=30):
         if not isinstance(days, int) or isinstance(days, bool) or not 1 <= days <= 90:
             raise ValueError("days must be between 1 and 90")
-        today = self._now()[0]
+        today, now_text = self._now()
         start = (datetime.fromisoformat(today).date() - timedelta(days=days - 1)).isoformat()
+        hourly_start = (datetime.fromisoformat(now_text) - timedelta(hours=24)).isoformat()
         with closing(self._connect()) as db:
             self._purge_if_due(db, today)
             db.commit()
@@ -141,6 +142,16 @@ class AnalyticsStore:
             routes = db.execute("SELECT route, COUNT(*) requests, SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) errors, ROUND(AVG(duration_ms), 2) avg_ms FROM api_requests WHERE day >= ? GROUP BY route ORDER BY requests DESC", (start,)).fetchall()
             cache = db.execute("SELECT cache_status, COUNT(*) count FROM api_requests WHERE day >= ? AND cache_status IS NOT NULL GROUP BY cache_status", (start,)).fetchall()
             failures = db.execute("SELECT failure_kind, COUNT(*) count FROM api_requests WHERE day >= ? AND failure_kind IS NOT NULL GROUP BY failure_kind", (start,)).fetchall()
+            hourly = db.execute("""SELECT substr(occurred_at, 1, 13) || ':00:00+09:00' hour,
+                COUNT(*) requests,
+                SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) errors,
+                SUM(CASE WHEN failure_kind = 'upstream_unavailable' THEN 1 ELSE 0 END) upstream_errors,
+                SUM(CASE WHEN failure_kind = 'service_overloaded' THEN 1 ELSE 0 END) overload_errors,
+                SUM(CASE WHEN cache_status = 'hit' THEN 1 ELSE 0 END) cache_hits,
+                SUM(CASE WHEN cache_status = 'stale' THEN 1 ELSE 0 END) stale_responses
+                FROM api_requests WHERE day >= ? AND occurred_at >= ? AND occurred_at <= ?
+                GROUP BY substr(occurred_at, 1, 13) ORDER BY hour""",
+                (hourly_start[:10], hourly_start, now_text)).fetchall()
         count = api[0] or 0
         errors = api[1] or 0
         return {
@@ -156,6 +167,7 @@ class AnalyticsStore:
             "routes": [dict(row) for row in routes],
             "cacheStatuses": {row["cache_status"]: row["count"] for row in cache},
             "failureKinds": {row["failure_kind"]: row["count"] for row in failures},
+            "apiHourly": [dict(row) for row in hourly],
         }
 
 

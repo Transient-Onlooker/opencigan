@@ -53,6 +53,27 @@ class AnalyticsTests(unittest.TestCase):
             finally:
                 store.close()
 
+    def test_hourly_diagnostics_distinguish_cache_and_failures_in_last_24_hours(self):
+        store = self.store()
+        events = [
+            ("2026-11-17T10:00:00+09:00", 503, None, "upstream_unavailable"),
+            ("2026-11-17T13:15:00+09:00", 200, "hit", None),
+            ("2026-11-17T13:30:00+09:00", 200, "stale", None),
+            ("2026-11-18T11:00:00+09:00", 503, None, "service_overloaded"),
+            ("2026-11-18T11:30:00+09:00", 503, None, "upstream_unavailable"),
+        ]
+        for when, status, cache_status, failure_kind in events:
+            with patch.object(store, "_now", return_value=(when[:10], when)):
+                store.record_api("/api/v1/timetable", "GET", status, 1, cache_status, failure_kind)
+        with patch.object(store, "_now", return_value=("2026-11-18", "2026-11-18T12:00:00+09:00")):
+            hourly = store.summary(30)["apiHourly"]
+        self.assertEqual(hourly, [
+            {"hour": "2026-11-17T13:00:00+09:00", "requests": 2, "errors": 0, "upstream_errors": 0,
+             "overload_errors": 0, "cache_hits": 1, "stale_responses": 1},
+            {"hour": "2026-11-18T11:00:00+09:00", "requests": 2, "errors": 2, "upstream_errors": 1,
+             "overload_errors": 1, "cache_hits": 0, "stale_responses": 0},
+        ])
+
     def test_request_metadata_is_forwarded_to_analytics(self):
         response = (503, {"Content-Type": "application/json; charset=utf-8"}, b'{"code":"service_overloaded"}')
         with patch("backend.app._dispatch_request", return_value=response), patch("backend.app._api_recorder") as recorder, patch.dict("os.environ", {"OPENCIGAN_ANALYTICS_DB": "enabled"}):
