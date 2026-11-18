@@ -57,6 +57,8 @@ flowchart LR
 
 ### 최근 사용자 제보와 UX 작업
 
+**2026-11-18 신규 성능 이슈 — [#135 시간표 캐시 미스 지연 단축](https://github.com/Transient-Onlooker/opencigan/issues/135):** P1에 미스당 상류 요청 3회→1회와 0.3~0.5초 목표를 등록했다. stale-while-revalidate는 도입하지 않고 TTL 1,800초·캐시 용량 256개/16MB를 유지하며, 실측 전에는 완료 처리하지 않는다. 상세 분석·검증 조건은 [P1 시간표 성능 과제](roadmap/user-experience.md#2026-11-18-시간표-캐시-미스-지연-개선--issue-135)를 참고.
+
 **2026-11-18 신규 요청 — ‘만들어주세요’ 기능 제안 접수**: 회원가입 없는 기능 제안·중복 검색 UI는 [P1](roadmap/user-experience.md), 접수/저장 및 관리자 승인·스팸 방어는 [P2](roadmap/api-operations.md), 공감 투표·개발 상태·승인 후 GitHub Issue 연동은 [P3](roadmap/automation-and-future.md)에 **미구현**으로 등록했다. **P0 공개 운영 안정화/QA보다 앞당기지 않으며** 백엔드·관리 기능이 준비될 때까지 작동하지 않는 제출 화면을 노출하지 않는다.
 **2026-11-17 체육 알리미·Webhook 예약 기능**: [P3 로드맵](roadmap/automation-and-future.md)에 **체육이 있는 날 아침 지정 시각(기본 예시 07:30 KST)에 알림**, 발송 모드/시각 설정, 사용자 방문 없이 실행하는 예약 작업과 중복 방지 요구를 미완료로 추가했다. 즉시 변경 알림·하루 요약과 사전 일정 알림은 서로 다른 발송 모드다.
 
