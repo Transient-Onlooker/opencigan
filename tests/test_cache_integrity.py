@@ -1,6 +1,7 @@
 import unittest
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from urllib.error import HTTPError
 
 from backend.cache import Cache
 
@@ -60,6 +61,23 @@ class CacheIntegrityTests(unittest.TestCase):
         self.assertIn("resource=school_search fallback=none error_type=RuntimeError", logs.output[0])
         self.assertNotIn("private query", logs.output[0])
         self.assertNotIn("secret query", logs.output[0])
+
+    def test_http_error_logs_status_without_url_or_message(self):
+        cache = Cache(ttl=0, retry_delay=60)
+        key = ("school_search", "private-school")
+        cache.get(key, lambda: {"schools": []})
+
+        error = HTTPError("https://example.test/?token=secret", 503, "private response", {}, None)
+        self.addCleanup(error.close)
+
+        def fail():
+            raise error
+
+        with self.assertLogs("opensigan.cache", level="WARNING") as logs:
+            self.assertTrue(cache.get(key, fail)["stale"])
+        self.assertIn("error_type=HTTPError upstream_http_status=503", logs.output[0])
+        for secret in ("example.test", "token", "secret", "private response", "private-school"):
+            self.assertNotIn(secret, logs.output[0])
 
     def test_eviction_during_failed_refresh_returns_inflight_stale_value(self):
         cache = Cache(ttl=0, max_entries=1, lock_stripes=2)

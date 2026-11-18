@@ -5,6 +5,7 @@ import threading
 import time
 from collections import OrderedDict
 from datetime import datetime, timezone
+from urllib.error import HTTPError
 
 logger = logging.getLogger("opensigan.cache")
 RESOURCE_TYPES = frozenset(("timetable", "school_search", "neis_school_search", "meals"))
@@ -88,8 +89,9 @@ class Cache:
                         self.refresh_observations[resource] = {**self.refresh_observations.get(resource, {}),
                                                                "result": "failure", "observedAt": observed_at,
                                                                "lastFailureAt": observed_at}
-                logger.warning("cache refresh failed resource=%s fallback=%s error_type=%s",
-                               resource or "other", "stale" if previous_value is not None else "none", type(exc).__name__)
+                status = exc.code if isinstance(exc, HTTPError) and type(exc.code) is int and 100 <= exc.code <= 599 else None
+                logger.warning("cache refresh failed resource=%s fallback=%s error_type=%s upstream_http_status=%s",
+                               resource or "other", "stale" if previous_value is not None else "none", type(exc).__name__, status)
                 if previous_value is not None:
                     return output(self._stale(previous_value), "stale")
                 if self.retry_delay > 0:
