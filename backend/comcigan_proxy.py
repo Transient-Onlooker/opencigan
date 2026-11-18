@@ -1,10 +1,13 @@
 import os
+import logging
 import threading
+from urllib.error import HTTPError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
 _lock = threading.Lock()
 _configured = False
+logger = logging.getLogger("opensigan.comcigan_proxy")
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -34,7 +37,12 @@ def configure_comcigan_proxy():
             if target.scheme != "http" or target.hostname != "comci.net" or target.port != 4082:
                 raise ValueError("Unexpected Comcigan request target")
             request.set_proxy(parsed.netloc, "http")
-            return opener.open(request, timeout=timeout)
+            try:
+                return opener.open(request, timeout=timeout)
+            except HTTPError as error:
+                if error.code in (403, 429):
+                    logger.warning("comcigan request rejected upstream_http_status=%s", error.code)
+                raise
 
         helpers.urlopen = open_comcigan
         _configured = True
