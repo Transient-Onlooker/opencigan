@@ -9,7 +9,7 @@ import unittest
 from http.client import HTTPConnection
 from unittest.mock import Mock, patch
 
-from backend.app import Handler, ThreadingWSGIServer, make_app, serve, _rate_clients, _waitress_proxy_kwargs, resolve_client_ip
+from backend.app import Handler, SafeWSGIRequestHandler, ThreadingWSGIServer, make_app, serve, _rate_clients, _waitress_proxy_kwargs, resolve_client_ip
 from backend.cache import Cache
 
 
@@ -235,18 +235,20 @@ class WsGITests(unittest.TestCase):
         import wsgiref.simple_server
 
         server = wsgiref.simple_server.make_server(
-            "127.0.0.1", 0, self.app, server_class=ThreadingWSGIServer
+            "127.0.0.1", 0, self.app, server_class=ThreadingWSGIServer, handler_class=SafeWSGIRequestHandler
         )
         port = server.server_port
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
             conn = HTTPConnection("127.0.0.1", port, timeout=5)
-            conn.request("GET", "/api/v1/status")
-            res = conn.getresponse()
-            self.assertEqual(res.status, 200)
-            payload = json.loads(res.read().decode("utf-8"))
+            with self.assertLogs("opensigan", level="INFO") as logs:
+                conn.request("GET", "/api/v1/status?private-query=secret")
+                res = conn.getresponse()
+                self.assertEqual(res.status, 200)
+                payload = json.loads(res.read().decode("utf-8"))
             self.assertEqual(payload["status"], "ok")
+            self.assertNotIn("private-query", "\n".join(logs.output))
             conn.close()
         finally:
             server.shutdown()
