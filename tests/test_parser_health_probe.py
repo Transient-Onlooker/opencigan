@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from backend.parser_health_probe import check_parser
+from backend.parser_health_probe import check_parser, check_timetable_parser
 
 
 class ParserHealthProbeTests(unittest.TestCase):
@@ -20,6 +20,27 @@ class ParserHealthProbeTests(unittest.TestCase):
                 with patch("backend.parser_health_probe.search_schools", return_value=value):
                     with self.assertRaises(RuntimeError):
                         check_parser()
+
+    def test_manual_timetable_check_fetches_only_selected_school(self):
+        def response(school, week):
+            return {"schoolId": school, "weekStart": week, "records": [{"subject": "수학"}]}
+
+        with patch("backend.parser_health_probe.fetch_timetable", side_effect=response) as fetch, \
+                patch("backend.parser_health_probe.search_schools") as search:
+            self.assertEqual(check_timetable_parser("1234:예시학교"), 1)
+            fetch.assert_called_once()
+            self.assertEqual(fetch.call_args.args[0], "1234:예시학교")
+            search.assert_not_called()
+
+    def test_empty_timetable_is_inconclusive_and_malformed_is_rejected(self):
+        def response(school, week):
+            return {"schoolId": school, "weekStart": week, "records": []}
+
+        with patch("backend.parser_health_probe.fetch_timetable", side_effect=response):
+            self.assertEqual(check_timetable_parser("1234:예시학교"), 0)
+        with patch("backend.parser_health_probe.fetch_timetable", return_value={"records": []}):
+            with self.assertRaises(RuntimeError):
+                check_timetable_parser("1234:예시학교")
 
 
 if __name__ == "__main__":

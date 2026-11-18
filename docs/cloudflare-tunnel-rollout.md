@@ -97,6 +97,7 @@ OPTIONS 사전 요청은 Worker 요청량 제한을 건너뛰어 원본에 전�
 
 **2026-11-17 예정 QA (실행 전, 미완료)**
 
+- [x] **2026-11-18 공개 상태·CORS 부분 확인:** 13:35 KST 단일 네트워크에서 공식 주소와 Pages 기본 주소의 HTTPS 상태 API가 각각 200 및 `process liveness`를 반환했고, 공식 주소의 정적 루트 HEAD 200과 GitHub Pages 출처 OPTIONS 204 및 허용 출처 헤더를 확인했다. 운영 SHA·원본 데이터·다른 네트워크·실기기와 나머지 API 계약은 확인하지 않았으며 아래 전체 QA는 미완료다.
 - [ ] Pages 기본 주소와 `opencigan.mcv.kr`의 DNS·TLS·정적 자산·SPA/PWA·캐시·공유·PNG/PDF 및 `/api/v1/status`·학교 검색·시간표·급식·관리자/알림·ICS가 각 호스트에서 정상인지 검증. 기존 GitHub Pages를 제거하지 않는다.
 - [ ] 인증 헤더·쿼리·본문, CORS·HEAD/OPTIONS·ETag/304, 429/503 오류 계약과 Pages Functions의 정적 자산 충돌 여부를 실제 엔드포인트에서 확인한다.
 - [ ] **공식 호스트 이전 사후 QA:** HTTPS 인증서·커스텀 도메인 Pages 라우팅, 기존 공유 링크·OG 미리보기·리다이렉트·PWA/Service Worker 캐시를 확인한다. **사이트 이전 완료**와 **QA 통과**를 혼동하지 않는다.
