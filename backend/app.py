@@ -330,8 +330,11 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
         return json_response(503, headers, {"error": "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", "code": "upstream_unavailable"})
     except ValueError as exc:
         return json_response(400, headers, {"error": str(exc), "code": "invalid_request"})
-    except Exception:
-        logger.exception("upstream request failed")
+    except Exception as exc:
+        route = path if path in ("/api/v1/schools", "/api/v1/timetable", "/api/v1/timetable.ics",
+                                 "/api/v1/timetable/history", "/api/v1/timetable/history.rss",
+                                 "/api/v1/neis/schools", "/api/v1/meals") else "other"
+        logger.error("request failed route=%s error_type=%s", route, type(exc).__name__)
         return json_response(503, headers, {"error": "데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", "code": "upstream_unavailable"})
 
 
@@ -395,7 +398,16 @@ def dispatch_request(method, path, query_string, cache_instance=None, client=Non
     return response
 
 
-class Handler(BaseHTTPRequestHandler):
+class SafeRequestLogging:
+    def log_request(self, code="-", size="-"):
+        method = self.command if self.command in ("GET", "HEAD", "OPTIONS", "POST", "PUT", "DELETE", "PATCH") else "other"
+        logger.info("HTTP request method=%s status=%s", method, code)
+
+    def log_error(self, format, *args):
+        logger.warning("HTTP protocol error")
+
+
+class Handler(SafeRequestLogging, BaseHTTPRequestHandler):
     def _unsupported(self):
         parts = urlsplit(self.path)
         request_body = _read_request_body(self.rfile, self.headers.get("Content-Length")) if (self.command == "POST" and parts.path == "/api/v1/analytics/pageview") or (self.command in ("POST", "PUT") and parts.path.startswith("/api/v1/webhooks")) else None
@@ -502,6 +514,10 @@ app = make_app()
 application = app
 
 
+class SafeWSGIRequestHandler(SafeRequestLogging, wsgiref.simple_server.WSGIRequestHandler):
+    pass
+
+
 class ThreadingWSGIServer(socketserver.ThreadingMixIn, wsgiref.simple_server.WSGIServer):
     daemon_threads = True
     allow_reuse_address = True
@@ -546,7 +562,7 @@ def serve(host=None, port=None, wsgi_app=None):
     except ImportError:
         logger.info("Waitress not installed. Serving with ThreadingWSGIServer on %s:%s", host, port)
         server = wsgiref.simple_server.make_server(
-            host, port, target_app, server_class=ThreadingWSGIServer
+            host, port, target_app, server_class=ThreadingWSGIServer, handler_class=SafeWSGIRequestHandler
         )
         try:
             server.serve_forever()
