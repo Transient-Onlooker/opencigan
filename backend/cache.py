@@ -84,7 +84,10 @@ class Cache:
                 with self.guard:
                     self._store(key, previous_value, previous_fetched_at, now + self.retry_delay)
                     if resource:
-                        self.refresh_observations[resource] = {"result": "failure", "observedAt": datetime.now(timezone.utc).isoformat()}
+                        observed_at = datetime.now(timezone.utc).isoformat()
+                        self.refresh_observations[resource] = {**self.refresh_observations.get(resource, {}),
+                                                               "result": "failure", "observedAt": observed_at,
+                                                               "lastFailureAt": observed_at}
                 logger.warning("cache refresh failed resource=%s fallback=%s error_type=%s",
                                resource or "other", "stale" if previous_value is not None else "none", type(exc).__name__)
                 if previous_value is not None:
@@ -95,7 +98,11 @@ class Cache:
 
             with self.guard:
                 if resource:
-                    self.refresh_observations[resource] = {"result": "success" if len(cached) <= self.max_bytes else "not_cached", "observedAt": datetime.now(timezone.utc).isoformat()}
+                    observed_at = datetime.now(timezone.utc).isoformat()
+                    result = "success" if len(cached) <= self.max_bytes else "not_cached"
+                    self.refresh_observations[resource] = {**self.refresh_observations.get(resource, {}),
+                                                           "result": result, "observedAt": observed_at,
+                                                           **({"lastSuccessAt": observed_at} if result == "success" else {})}
                 if len(cached) <= self.max_bytes:
                     self._store(key, cached, time.monotonic(), 0)
                 else:
