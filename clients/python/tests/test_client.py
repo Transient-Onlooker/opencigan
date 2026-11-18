@@ -186,6 +186,10 @@ class TestOpensiganPythonClient(unittest.TestCase):
         res = self.client.get_status()
         self.assertEqual(res["status"], "ok")
         self.assertEqual(MockServerHandler.last_request_path, "/api/v1/status")
+        self.assertEqual(
+            MockServerHandler.last_request_headers.get("User-Agent"),
+            "OpenCigan-Python-Client (+https://github.com/Transient-Onlooker/opencigan)",
+        )
         self.client.search_neis_schools("서울&학교")
         self.assertEqual(parse_qs(urlsplit(MockServerHandler.last_request_path).query)["q"], ["서울&학교"])
 
