@@ -282,6 +282,12 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
     if method == "OPTIONS":
         return preflight_response(path, headers)
 
+    if client and path in ("/api/v1/admin/analytics", "/api/v1/admin/access-logs"):
+        retry = _rate_allowed(("admin", client))
+        if retry:
+            headers["Retry-After"] = str(retry)
+            return json_response(429, headers, {"error": "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.", "code": "rate_limited"})
+
     if path == '/api/v1/admin/access-logs':
         status, response_headers, body = _access_log_admin(method, query_string, request_headers, headers)
         response_headers['Content-Length'] = str(len(body))
