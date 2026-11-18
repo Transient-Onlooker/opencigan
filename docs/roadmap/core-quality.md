@@ -35,6 +35,7 @@
 
 - [ ] **Pages 이전 후 공개 경로·기능 QA:** `opencigan.mcv.kr`의 DNS/CNAME·TLS, 정적 자산·서비스 워커/PWA·공유 링크, `/api/v1/*`의 학교 검색·시간표·급식·관리자 인증·CORS·HEAD/OPTIONS·ETag/304·429/503을 실제 배포에서 점검. 점검 결과와 적용 SHA를 별도로 기록하며 QA를 수행하기 전에는 완료로 표시하지 않는다.
 - [ ] **NEW-02 · 선택된 공개 ICS 엔드포인트 실사용 검증 (동일 도메인 강제 없음):** Funnel 중지 후 공개 구독은 `https://opencigan.pages.dev/api/v1/timetable.ics` 또는 공식 Pages 호스트를 사용한다. 기존 `.ts.net`은 현재 공개되지 않는다. **실제 외부 접속, ICS 본문·ETag/304, Apple/Google Calendar 재구독·자동 갱신, TLS·접속 지속성·캐시·운영 중단 시 대체 안내**를 검증하면 완료 판정.
+- [x] **NEW-02 · 공개 ICS HTTP 조건부 요청 확인:** 2026-11-18 KST 단일 네트워크에서 `opencigan.pages.dev`와 `opencigan.mcv.kr`에 같은 학교·학급으로 요청하여 HTTPS GET 200·VCALENDAR 시작/종료·ETag·동일 ETag의 조건부 GET 304·HEAD 200을 확인했다. 브라우저/캘린더 앱 구독·자동 갱신, 별도 외부망과 장기 안정성은 위 항목에 남는다.
 **QA 이외의 잔여 운영 과제**
 
 - [ ] **P0 · 롤백/베타 가용성:** Cloudflare Pages / Worker VPC Beta / cloudflared 연결 장애, 429·503, 캐시·원본 가용성을 분리하고 복구 경로를 검증한다. 기존 GitHub Pages·Tailscale Funnel은 대체 경로의 필요성 확인 전까지 보존하고, 컴시간 전용 Pi WARP 출구 프록시는 유지한다.
