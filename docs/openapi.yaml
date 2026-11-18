@@ -223,7 +223,7 @@ paths:
                       type: object
                       required: [result, observedAt]
                       properties:
-                        result: { type: string, enum: [success, failure] }
+                        result: { type: string, enum: [success, failure, not_cached], description: not_cached means the response exceeded the cache size limit. }
                         observedAt: { type: string, format: date-time }
                   cacheStatuses:
                     type: object

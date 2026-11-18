@@ -95,7 +95,7 @@ class Cache:
 
             with self.guard:
                 if resource:
-                    self.refresh_observations[resource] = {"result": "success", "observedAt": datetime.now(timezone.utc).isoformat()}
+                    self.refresh_observations[resource] = {"result": "success" if len(cached) <= self.max_bytes else "not_cached", "observedAt": datetime.now(timezone.utc).isoformat()}
                 if len(cached) <= self.max_bytes:
                     self._store(key, cached, time.monotonic(), 0)
                 else:
