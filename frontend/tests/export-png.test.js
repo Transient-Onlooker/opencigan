@@ -24,7 +24,7 @@ const lessons = [
   { grade: 1, class: 3, date: '2026-11-09', period: 1, subject: '미술', teacher: '김철수' },
 ];
 const options = {
-  view: 'week', schoolName: '보인고등학교', grade: 1, classroom: 2,
+  view: 'week', schoolName: 'A고등학교', grade: 1, classroom: 2,
   selectedDay: '2026-11-09', week: '2026-11-09', teacherName: '', records: lessons, dark: false,
 };
 
@@ -141,14 +141,14 @@ test('unsupported share and share failures fall back to PNG download', async () 
 
 test('buildExportFilename creates safe sanitized filenames for class and teacher views', () => {
   const classFilename = buildExportFilename(options);
-  assert.equal(classFilename, 'Opencigan_보인고등학교_1학년2반_week_2026-11-09.png');
+  assert.equal(classFilename, 'Opencigan_A고등학교_1학년2반_week_2026-11-09.png');
 
   const teacherFilename = buildExportFilename({
     ...options,
     view: 'teacher',
     teacherName: '김철수/선생님*?',
   });
-  assert.equal(teacherFilename, 'Opencigan_보인고등학교_김철수선생님_teacher_2026-11-09.png');
+  assert.equal(teacherFilename, 'Opencigan_A고등학교_김철수선생님_teacher_2026-11-09.png');
 
   const specialCharsFilename = buildExportFilename({
     ...options,
@@ -159,7 +159,7 @@ test('buildExportFilename creates safe sanitized filenames for class and teacher
   assert.equal(specialCharsFilename, 'Opencigan_특수학교_서울_1학년2반_today_2026-11-10.png');
 
   const pdfFilename = buildExportFilename(options, 'pdf');
-  assert.equal(pdfFilename, 'Opencigan_보인고등학교_1학년2반_week_2026-11-09.pdf');
+  assert.equal(pdfFilename, 'Opencigan_A고등학교_1학년2반_week_2026-11-09.pdf');
 
   const ultraLongSchool = '가'.repeat(200);
   const cappedFilename = buildExportFilename({ ...options, schoolName: ultraLongSchool });
@@ -222,7 +222,7 @@ test('createTimetablePng handles empty periods and multiple lessons without thro
   runInNewContext(compiled, sandbox);
   const res = await sandbox.exports.createTimetablePng(multiOptions);
   assert.ok(res.blob);
-  assert.equal(res.filename, 'Opencigan_보인고등학교_1학년2반_week_2026-11-09.png');
+  assert.equal(res.filename, 'Opencigan_A고등학교_1학년2반_week_2026-11-09.png');
   assert.ok(filledTexts.includes('—'), '빈 교시에 em-dash 플레이스홀더가 그려져야 합니다.');
   assert.ok(filledTexts.includes('인공지능 수학'));
   assert.ok(filledTexts.includes('심화 정보통신'));
