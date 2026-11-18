@@ -251,7 +251,9 @@ command -v cloudflared && cloudflared --version
 
 ### 2026-11-18 후속 Pi 릴리스 및 재점검
 
-- Pi 운영 서비스는 `/home/admin/opensigan-releases/release-d425a0c`에서 실행 중이다. `opensigan`, `opensigan-preview`, `opencigan-cloudflared`는 active이며 API는 `127.0.0.1:8000`에 수신하고 Funnel 설정은 없다. 이 릴리스는 Python 클라이언트 식별 수정이며 API 처리 로직은 이전 릴리스와 같다.
+**추가 배포:** 상류 HTTP 오류의 상태 코드만 기록하는 `929c963` 백엔드를 Pi에 적용했다. 운영 접속 로그와 분석 DB는 `/home/admin/opensigan-backups/pre-929c963-20261118/`에 SQLite 온라인 백업했고 무결성을 확인했다. 배포 후 핵심 공개 API·ICS와 WARP 상태 200, 서비스 및 루프백 수신을 확인했다. 롤백은 `zzzzzzz-opencigan-929c963.conf` drop-in을 비활성화하고 user systemd를 다시 읽은 뒤 서비스를 재시작해 `release-d425a0c` 복귀와 상태 API를 확인한다. 실제 롤백은 수행하지 않았다.
+
+- 이전 Pi 운영 서비스는 `/home/admin/opensigan-releases/release-d425a0c`에서 실행됐다. 당시 `opensigan`, `opensigan-preview`, `opencigan-cloudflared`는 active였으며 API는 `127.0.0.1:8000`에 수신하고 Funnel 설정은 없었다. 이 릴리스는 Python 클라이언트 식별 수정이며 API 처리 로직은 이전 릴리스와 같다.
 - 현재 Pi 롤백은 `/home/admin/.config/systemd/user/opensigan.service.d/zzzzzz-opencigan-d425a0c.conf`를 `.conf`가 아닌 이름으로 비활성화하고 user systemd daemon-reload 및 서비스 재시작 후 `release-6c903b7`과 로컬 상태 응답을 확인한다. 이전 `6c903b7` drop-in을 함께 비활성화하면 `release-fdea474`로 돌아가므로 대상 릴리스를 확인한다. 실제 롤백은 실행하지 않았다.
 - 재점검에서 시간표 공개 요청 하나가 20초 내 완료되지 않았고 WARP 경유 컴시간 상태 요청도 10초 제한에 걸렸다. 직후 WARP·HTTP 브리지의 일반 연결과 컴시간 상태는 200이었으며 재시도한 공개 시간표·유효 학교 급식·ICS GET/304/HEAD도 정상 응답했다. 일시 지연의 위치는 확정하지 않는다. 서비스 로그에는 학교 검색 `HTTPError` 시 오래된 캐시 사용 기록이 있었으며, 이전 503의 원인을 증명하지 않는다.
 - Worker 격리 테스트 18개와 백엔드 API·공개 API·WSGI·서명 IP 테스트 56개가 통과했다. 운영 제한 초과, 서로 다른 외부망 두 곳, 실기기 및 실제 캘린더 앱 검증을 대체하지 않는다.
