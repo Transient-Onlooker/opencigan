@@ -39,3 +39,32 @@ test('Pages API function does not return a body for HEAD errors', async () => {
     assert.equal(await result.text(), '');
   }
 });
+
+test('Pages errors allow only the known frontend origins without credentials', async () => {
+  for (const [origin, expected] of [
+    ['https://transient-onlooker.github.io', 'https://transient-onlooker.github.io'],
+    ['https://opencigan.mcv.kr', 'https://opencigan.mcv.kr'],
+    ['https://opencigan.mcv.kr.evil.example', null],
+    ['null', null],
+  ]) {
+    for (const env of [{}, { OPENCIGAN_GATEWAY: { fetch: async () => { throw new Error('unavailable'); } } }]) {
+      const request = new Request('https://opencigan.pages.dev/api/v1/status', { headers: { Origin: origin } });
+      const result = await onRequest({ env, request });
+      assert.equal(result.status, 503);
+      assert.equal(result.headers.get('access-control-allow-origin'), expected);
+      assert.equal(result.headers.get('access-control-allow-credentials'), null);
+      assert.equal(result.headers.get('vary'), 'Origin');
+    }
+  }
+});
+
+test('failed preflight remains a 503 rather than claiming the API is available', async () => {
+  const request = new Request('https://opencigan.pages.dev/api/v1/timetable.ics', {
+    method: 'OPTIONS',
+    headers: { Origin: 'https://transient-onlooker.github.io', 'Access-Control-Request-Method': 'GET' },
+  });
+  const result = await onRequest({ env: {}, request });
+  assert.equal(result.status, 503);
+  assert.equal(result.headers.get('access-control-allow-origin'), 'https://transient-onlooker.github.io');
+  assert.equal(result.headers.get('access-control-allow-methods'), null);
+});
