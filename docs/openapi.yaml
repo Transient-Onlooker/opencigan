@@ -216,6 +216,15 @@ paths:
                   apiErrorRate: { type: number, minimum: 0, maximum: 1 }
                   apiAverageMs: { type: number, minimum: 0 }
                   droppedApiEvents: { type: integer, minimum: 0, description: Process-local count since startup. }
+                  refreshObservations:
+                    type: object
+                    description: Most recent actual cache refresh attempt per resource in this process since restart. Cache hits and backoff responses are not attempts. A single observation does not establish provider-wide readiness.
+                    additionalProperties:
+                      type: object
+                      required: [result, observedAt]
+                      properties:
+                        result: { type: string, enum: [success, failure] }
+                        observedAt: { type: string, format: date-time }
                   cacheStatuses:
                     type: object
                     description: Counts of recorded timetable cache outcomes; older events may have no outcome.

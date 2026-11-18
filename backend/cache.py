@@ -4,6 +4,7 @@ import math
 import threading
 import time
 from collections import OrderedDict
+from datetime import datetime, timezone
 
 logger = logging.getLogger("opensigan.cache")
 RESOURCE_TYPES = frozenset(("timetable", "school_search", "neis_school_search", "meals"))
@@ -28,12 +29,15 @@ class Cache:
         self.max_bytes = max_bytes
         self.bytes_used = 0
         self.entries = OrderedDict()
+        self.refresh_observations = {}
         self.guard = threading.Lock()
         self.locks = tuple(threading.Lock() for _ in range(lock_stripes))
 
     def get(self, key, fetch, *, with_status=False):
         def output(value, status):
             return (value, status) if with_status else value
+
+        resource = key[0] if isinstance(key, tuple) and key and key[0] in RESOURCE_TYPES else None
 
         now = time.monotonic()
         with self.guard:
@@ -79,9 +83,10 @@ class Cache:
                 now = time.monotonic()
                 with self.guard:
                     self._store(key, previous_value, previous_fetched_at, now + self.retry_delay)
-                resource = key[0] if isinstance(key, tuple) and key and key[0] in RESOURCE_TYPES else "other"
+                    if resource:
+                        self.refresh_observations[resource] = {"result": "failure", "observedAt": datetime.now(timezone.utc).isoformat()}
                 logger.warning("cache refresh failed resource=%s fallback=%s error_type=%s",
-                               resource, "stale" if previous_value is not None else "none", type(exc).__name__)
+                               resource or "other", "stale" if previous_value is not None else "none", type(exc).__name__)
                 if previous_value is not None:
                     return output(self._stale(previous_value), "stale")
                 if self.retry_delay > 0:
@@ -89,6 +94,8 @@ class Cache:
                 raise
 
             with self.guard:
+                if resource:
+                    self.refresh_observations[resource] = {"result": "success", "observedAt": datetime.now(timezone.utc).isoformat()}
                 if len(cached) <= self.max_bytes:
                     self._store(key, cached, time.monotonic(), 0)
                 else:
@@ -97,6 +104,10 @@ class Cache:
                         self._store(key, old[0], old[1], time.monotonic() + self.retry_delay)
                         return output(self._stale(old[0]), "stale")
             return output(json.loads(cached), "miss")
+
+    def observations(self):
+        with self.guard:
+            return {resource: value.copy() for resource, value in self.refresh_observations.items()}
 
     @staticmethod
     def _stale(value):
