@@ -5,6 +5,7 @@ interface Summary {
   visitors: number; sessions: number; pageViews: number; apiRequests: number;
   apiErrorRate: number; apiAverageMs: number; droppedApiEvents: number;
   cacheStatuses?: Record<string, number>; failureKinds?: Record<string, number>;
+  apiHourly?: { hour: string; requests: number; errors: number; upstream_errors: number; overload_errors: number; cache_hits: number; stale_responses: number }[];
   daily: { day: string; visitors: number; sessions: number; page_views: number; api_requests: number }[];
   routes: { route: string; requests: number; errors: number; avg_ms: number }[];
 }
@@ -15,6 +16,8 @@ const days = document.querySelector<HTMLSelectElement>('#days')!;
 const button = document.querySelector<HTMLButtonElement>('#load')!;
 const state = document.querySelector<HTMLParagraphElement>('#state')!;
 const results = document.querySelector<HTMLElement>('#results')!;
+const hourlyState = document.querySelector<HTMLElement>('#hourly-state')!;
+const hourlyTable = document.querySelector<HTMLElement>('#hourly-table')!;
 let request: AbortController | undefined;
 
 function rows(selector: string, values: (string | number)[][]) {
@@ -66,6 +69,10 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
     }
     rows('#daily', data.daily.map((d) => [d.day, d.visitors, d.sessions, d.page_views, d.api_requests]));
     rows('#routes', data.routes.map((r) => [r.route, r.requests, r.errors, r.avg_ms]));
+    const hourly = data.apiHourly;
+    rows('#hourly', (hourly ?? []).map((h) => [h.hour.slice(0, 16).replace('T', ' '), h.requests, h.errors, h.upstream_errors, h.overload_errors, h.cache_hits, h.stale_responses]));
+    hourlyTable.hidden = !hourly?.length;
+    hourlyState.textContent = !hourly ? '현재 서버에서는 시간대별 통계를 제공하지 않습니다.' : hourly.length ? '' : '최근 24시간에 기록된 API 요청이 없습니다.';
     results.hidden = false;
     state.textContent = data.pageViews || data.apiRequests ? `조회 완료 · ${new Date().toLocaleTimeString('ko-KR')}` : '선택한 기간에 수집된 이용 기록이 없습니다.';
   } catch (error) {
@@ -78,6 +85,7 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
 document.querySelector('#clear')!.addEventListener('click', () => {
   request?.abort(); request = undefined; button.disabled = false;
   token.value = ''; results.hidden = true;
-  document.querySelector('#metrics')!.replaceChildren(); rows('#daily', []); rows('#routes', []);
+  document.querySelector('#metrics')!.replaceChildren(); rows('#daily', []); rows('#routes', []); rows('#hourly', []);
+  hourlyTable.hidden = true; hourlyState.textContent = '';
   state.textContent = '잠겼습니다. 다시 조회하려면 토큰을 입력하세요.'; token.focus();
 });
