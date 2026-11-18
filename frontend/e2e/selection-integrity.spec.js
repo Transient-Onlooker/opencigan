@@ -874,6 +874,29 @@ test('meal loading, failure and an empty successful response are distinct', asyn
   await expect(panel.getByText('이 날짜에 등록된 식단이 없어요.')).toBeVisible();
 });
 
+test('failed meal refresh marks retained meals stale until a retry succeeds', async ({ page }) => {
+  await mockApi(page);
+  let calls = 0;
+  await page.route('**/api/v1/meals?*', (route) => {
+    calls += 1;
+    if (calls === 2) return route.fulfill({ status: 503, json: { code: 'upstream_unavailable' } });
+    return route.fulfill({ json: { meals: [{ date: week, type: '중식', dishes: [calls === 1 ? '이전 식단' : '갱신 식단'] }], stale: false } });
+  });
+  await page.goto('/' + sharedHash(1));
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  const panel = page.locator('#meals-panel');
+  await expect(panel).toContainText('이전 식단');
+  await page.clock.setFixedTime(new Date('2026-11-09T02:31:00Z'));
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(panel.getByRole('alert')).toContainText('이전 급식 정보를 표시');
+  await expect(panel.getByRole('status').filter({ hasText: '저장된 급식 정보' })).toBeVisible();
+  await expect(panel).toContainText('이전 식단');
+  await panel.getByRole('button', { name: '다시 시도' }).click();
+  await expect(panel).toContainText('갱신 식단');
+  await expect(panel.getByRole('status').filter({ hasText: '저장된 급식 정보' })).toHaveCount(0);
+  await expect(panel.getByRole('alert')).toHaveCount(0);
+});
+
 test('stale meal data and hidden meal types are identified on mobile and desktop', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('opensigan-meal-preferences', JSON.stringify({ view: 'day', types: ['조식'], showAllergenNumbers: true })));
   await mockApi(page);

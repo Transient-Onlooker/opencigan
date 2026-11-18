@@ -21,7 +21,7 @@ async function createApp() {
   const component = await readFile(new URL('../src/App.svelte', import.meta.url), 'utf8');
   const script = component.match(/<script lang="ts">([\s\S]*?)<\/script>/)[1]
     .replace(/^\s*import .*;\s*$/gm, '');
-  const harness = `${script}\nreturn { chooseSchool, chooseNeis, refreshCalendar, changeWeek, currentWeek, state: () => ({ week, tableLoading, mealLoading, timetable, meals, hasMeals, tableState, mealState }) };`;
+  const harness = `${script}\nreturn { chooseSchool, chooseNeis, refreshCalendar, changeWeek, currentWeek, state: () => ({ week, tableLoading, mealLoading, timetable, meals, hasMeals, mealsStale, tableState, mealState }) };`;
   const javascript = ts.transpile(`(function () { ${harness} })()`, { target: ts.ScriptTarget.ES2022 });
   let now = 1_000;
   const calls = { timetable: [], meals: [] };
@@ -97,6 +97,7 @@ test('failed refresh keeps previous results and timetable week changes preserve 
   assert.equal(app.state().timetable.records, table.records);
   assert.equal(app.state().meals[0], meal);
   assert.equal(app.state().hasMeals, true);
+  assert.equal(app.state().mealsStale, true);
   assert.ok(app.state().tableState);
   assert.ok(app.state().mealState);
 

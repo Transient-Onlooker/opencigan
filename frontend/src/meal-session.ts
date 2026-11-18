@@ -64,7 +64,7 @@ export function createMealSession(onChange: (state: MealState) => void) {
       session.update({ error: '', refreshAt: now() + interval, loading: true, requestKey: key });
       void fetch(neisId, from, to, controller.signal)
         .then((data) => { if (!controller.signal.aborted) session.update({ meals: data.meals, stale: data.stale, hasMeals: true, dataKey: key }); })
-        .catch((error) => { if (!controller.signal.aborted) session.update({ error: errorText(error) }); })
+        .catch((error) => { if (!controller.signal.aborted) session.update({ error: errorText(error), stale: state.hasMeals && state.dataKey === key }); })
         .finally(() => { if (!controller.signal.aborted) session.update({ loading: false }); });
     },
   };
