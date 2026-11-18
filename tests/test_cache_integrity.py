@@ -67,8 +67,11 @@ class CacheIntegrityTests(unittest.TestCase):
         key = ("school_search", "private-school")
         cache.get(key, lambda: {"schools": []})
 
+        error = HTTPError("https://example.test/?token=secret", 503, "private response", {}, None)
+        self.addCleanup(error.close)
+
         def fail():
-            raise HTTPError("https://example.test/?token=secret", 503, "private response", {}, None)
+            raise error
 
         with self.assertLogs("opensigan.cache", level="WARNING") as logs:
             self.assertTrue(cache.get(key, fail)["stale"])
