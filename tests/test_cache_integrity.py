@@ -13,6 +13,7 @@ class CacheIntegrityTests(unittest.TestCase):
         cache.get(key, lambda: {"schools": []})
         first = cache.observations()
         self.assertEqual(first["school_search"]["result"], "success")
+        self.assertEqual(first["school_search"]["lastSuccessAt"], first["school_search"]["observedAt"])
         self.assertNotIn("private-school", str(first))
         cache.get(key, lambda: self.fail("cache hit must not fetch"))
         self.assertEqual(cache.observations(), first)
@@ -22,11 +23,14 @@ class CacheIntegrityTests(unittest.TestCase):
             cache.get(key, lambda: (_ for _ in ()).throw(RuntimeError("private error")))
         failure = cache.observations()
         self.assertEqual(failure["school_search"]["result"], "failure")
+        self.assertEqual(failure["school_search"]["lastSuccessAt"], first["school_search"]["lastSuccessAt"])
+        self.assertEqual(failure["school_search"]["lastFailureAt"], failure["school_search"]["observedAt"])
         self.assertNotIn("private", str(failure))
         failure["school_search"]["result"] = "tampered"
         self.assertEqual(cache.observations()["school_search"]["result"], "failure")
         cache.get(key, lambda: {"schools": []})
         self.assertEqual(cache.observations()["school_search"]["result"], "success")
+        self.assertEqual(cache.observations()["school_search"]["lastFailureAt"], failure["school_search"]["lastFailureAt"])
 
     def test_failed_refresh_logs_resource_and_fallback_without_request_data(self):
         cache = Cache(ttl=0, retry_delay=60)
@@ -91,6 +95,8 @@ class CacheIntegrityTests(unittest.TestCase):
         result = cache.get(key, lambda: {"value": "x" * 100})
         self.assertEqual(result, {"value": "old", "stale": True})
         self.assertEqual(cache.observations()["timetable"]["result"], "not_cached")
+        self.assertIn("lastSuccessAt", cache.observations()["timetable"])
+        self.assertNotIn("lastFailureAt", cache.observations()["timetable"])
 
         def fail_if_called():
             self.fail("backoff should prevent another request")
