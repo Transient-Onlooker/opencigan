@@ -251,6 +251,8 @@ command -v cloudflared && cloudflared --version
 
 ### 2026-11-18 후속 Pi 릴리스 및 재점검
 
+**2026-11-19 추가 배포:** 컴시간 403·429 상태를 민감한 요청 정보 없이 기록하는 `c2f1614` 릴리스를 Pi에 적용했다. 접속 로그·분석 DB는 `/home/admin/opensigan-backups/pre-c2f1614-20261119/`에 SQLite 온라인 백업하고 무결성을 확인했다. 배포 후 서비스·WARP·공개 학교 검색·시간표·급식·ICS가 정상 응답했고 Funnel은 비활성 상태다. 롤백은 `zzzzzzzz-opencigan-c2f1614.conf` drop-in을 비활성화하고 user systemd 설정을 다시 읽은 뒤 서비스를 재시작해 `release-929c963` 복귀와 상태 API를 확인한다. 실제 롤백은 수행하지 않았다.
+
 **추가 배포:** 상류 HTTP 오류의 상태 코드만 기록하는 `929c963` 백엔드를 Pi에 적용했다. 운영 접속 로그와 분석 DB는 `/home/admin/opensigan-backups/pre-929c963-20261118/`에 SQLite 온라인 백업했고 무결성을 확인했다. 배포 후 핵심 공개 API·ICS와 WARP 상태 200, 서비스 및 루프백 수신을 확인했다. 롤백은 `zzzzzzz-opencigan-929c963.conf` drop-in을 비활성화하고 user systemd를 다시 읽은 뒤 서비스를 재시작해 `release-d425a0c` 복귀와 상태 API를 확인한다. 실제 롤백은 수행하지 않았다.
 
 - 이전 Pi 운영 서비스는 `/home/admin/opensigan-releases/release-d425a0c`에서 실행됐다. 당시 `opensigan`, `opensigan-preview`, `opencigan-cloudflared`는 active였으며 API는 `127.0.0.1:8000`에 수신하고 Funnel 설정은 없었다. 이 릴리스는 Python 클라이언트 식별 수정이며 API 처리 로직은 이전 릴리스와 같다.
