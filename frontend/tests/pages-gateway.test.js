@@ -58,13 +58,44 @@ test('Pages errors allow only the known frontend origins without credentials', a
   }
 });
 
-test('failed preflight remains a 503 rather than claiming the API is available', async () => {
+test('allowed preflight during an outage lets the actual request expose its 503', async () => {
   const request = new Request('https://opencigan.pages.dev/api/v1/timetable.ics', {
     method: 'OPTIONS',
-    headers: { Origin: 'https://transient-onlooker.github.io', 'Access-Control-Request-Method': 'GET' },
+    headers: { Origin: 'https://transient-onlooker.github.io', 'Access-Control-Request-Method': 'GET', 'Access-Control-Request-Headers': 'if-none-match' },
   });
-  const result = await onRequest({ env: {}, request });
-  assert.equal(result.status, 503);
-  assert.equal(result.headers.get('access-control-allow-origin'), 'https://transient-onlooker.github.io');
-  assert.equal(result.headers.get('access-control-allow-methods'), null);
+  for (const env of [{}, { OPENCIGAN_GATEWAY: { fetch: async () => { throw new Error('unavailable'); } } }]) {
+    const result = await onRequest({ env, request });
+    assert.equal(result.status, 204);
+    assert.equal(result.headers.get('access-control-allow-origin'), 'https://transient-onlooker.github.io');
+    assert.match(result.headers.get('access-control-allow-methods'), /GET/);
+    assert.match(result.headers.get('access-control-allow-headers'), /If-None-Match/i);
+    assert.equal(result.headers.get('cache-control'), 'no-store');
+    const actual = await onRequest({ env, request: new Request(request.url, {headers: {Origin: 'https://transient-onlooker.github.io'}}) });
+    assert.equal(actual.status, 503);
+    assert.equal(actual.headers.get('access-control-allow-origin'), 'https://transient-onlooker.github.io');
+    assert.match((await actual.json()).code, /^gateway_/);
+  }
+});
+
+test('outage preflight does not authorize unknown origins or unsupported methods', async () => {
+  for (const [origin, method] of [
+    ['https://opencigan.mcv.kr.evil.example', 'GET'],
+    ['null', 'GET'],
+    ['https://opencigan.mcv.kr', 'DELETE'],
+    ['https://opencigan.mcv.kr', ''],
+  ]) {
+    const headers = {Origin: origin};
+    if (method) headers['Access-Control-Request-Method'] = method;
+    const result = await onRequest({env: {}, request: new Request('https://opencigan.pages.dev/api/v1/status', {method: 'OPTIONS', headers})});
+    assert.equal(result.status, 503);
+    assert.equal(result.headers.get('access-control-allow-methods'), null);
+  }
+});
+
+test('outage preflight keeps webhook methods separate from read paths', async () => {
+  const headers = {Origin: 'https://opencigan.mcv.kr', 'Access-Control-Request-Method': 'DELETE'};
+  const result = await onRequest({env: {}, request: new Request('https://opencigan.pages.dev/api/v1/webhooks/abcdefghijklmnopqrstuvwx', {method: 'OPTIONS', headers})});
+  assert.equal(result.status, 204);
+  assert.match(result.headers.get('access-control-allow-methods'), /DELETE/);
+  assert.equal(result.headers.get('access-control-allow-credentials'), null);
 });
