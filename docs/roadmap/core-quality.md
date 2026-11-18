@@ -35,6 +35,7 @@
 **2026-11-17 당일 QA 예정 — 아직 통과 처리하지 않음**
 
 - [ ] **Pages 이전 후 공개 경로·기능 QA:** `opencigan.mcv.kr`의 DNS/CNAME·TLS, 정적 자산·서비스 워커/PWA·공유 링크, `/api/v1/*`의 학교 검색·시간표·급식·관리자 인증·CORS·HEAD/OPTIONS·ETag/304·429/503을 실제 배포에서 점검. 점검 결과와 적용 SHA를 별도로 기록하며 QA를 수행하기 전에는 완료로 표시하지 않는다.
+  - 독립 GitHub Actions의 Chromium에서 실제 공식 사이트의 학교 검색·시간표 조회와 표시를 390px·1280px 화면으로 확인했다. 모의 API는 사용하지 않았으며 이 결과는 실기기·PWA·캘린더 앱 전체 검증을 대체하지 않는다.
 - [ ] **NEW-02 · 선택된 공개 ICS 엔드포인트 실사용 검증 (동일 도메인 강제 없음):** Funnel 중지 후 공개 구독은 `https://opencigan.pages.dev/api/v1/timetable.ics` 또는 공식 Pages 호스트를 사용한다. 기존 `.ts.net`은 현재 공개되지 않는다. **실제 외부 접속, ICS 본문·ETag/304, Apple/Google Calendar 재구독·자동 갱신, TLS·접속 지속성·캐시·운영 중단 시 대체 안내**를 검증하면 완료 판정.
 - [x] **NEW-02 · 공개 ICS HTTP 조건부 요청 확인:** 2026-11-18 KST 단일 네트워크에서 `opencigan.pages.dev`와 `opencigan.mcv.kr`에 같은 학교·학급으로 요청하여 HTTPS GET 200·VCALENDAR 시작/종료·ETag·동일 ETag의 조건부 GET 304·HEAD 200을 확인했다. 브라우저/캘린더 앱 구독·자동 갱신, 별도 외부망과 장기 안정성은 위 항목에 남는다.
 **QA 이외의 잔여 운영 과제**
