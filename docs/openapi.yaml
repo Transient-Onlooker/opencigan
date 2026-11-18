@@ -224,6 +224,20 @@ paths:
                     type: object
                     description: Counts of recorded upstream_unavailable and service_overloaded errors.
                     additionalProperties: { type: integer, minimum: 0 }
+                  apiHourly:
+                    type: array
+                    description: Nonempty Asia/Seoul hourly buckets from the last 24 hours, independent of days. First and last buckets may be partial. upstream_errors counts the generic upstream_unavailable response and does not establish provider failure. Async recording can lose events.
+                    items:
+                      type: object
+                      required: [hour, requests, errors, upstream_errors, overload_errors, cache_hits, stale_responses]
+                      properties:
+                        hour: { type: string, format: date-time }
+                        requests: { type: integer, minimum: 0 }
+                        errors: { type: integer, minimum: 0 }
+                        upstream_errors: { type: integer, minimum: 0 }
+                        overload_errors: { type: integer, minimum: 0 }
+                        cache_hits: { type: integer, minimum: 0 }
+                        stale_responses: { type: integer, minimum: 0 }
                   daily:
                     type: array
                     items:
