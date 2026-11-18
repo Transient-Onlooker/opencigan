@@ -30,7 +30,7 @@
 - [x] **P0 · Pages Functions → Worker → VPC 연결 (기본 경로):** Pages Service Binding과 VPC binding을 구성하고 상태 200·입력 오류 400·HEAD 200·OPTIONS 204를 확인했다. 나머지 JSON API·CORS·ETag/304·ICS·관리자 인증 계약의 운영 QA는 별도 미완료다.
 - [ ] **P0 · 봇/남용 방어:** `mcv.kr` zone WAF는 직접 설정할 수 없으므로 Worker 레벨 경로 검증, 요청량 제한(Rate Limiting binding), 캐시/요청 폭주 방어를 사용. 학교 검색·시간표·급식·ICS·관리/웹훅별 정책 구분, 정상 캘린더/API 사용자를 Challenge로 막지 않기.
 - [ ] **P0 · IP 신뢰·보안 경계:** Worker→VPC→Pi로 원본 클라이언트 IP가 안전하게 전달되도록 설계·검증. 현재 `resolve_client_ip()`는 `CF-Connecting-IP`를 직접 파싱하지 않음. 외부망 두 곳에서 IP별 제한/접속 로그 검증, 사용자 제공 XFF·Forwarded 신뢰 금지.
-  - Pi에 관리자 통계·접속 로그 API의 별도 IP별 제한을 배포했다. 서명된 IP와 서명 없는 연결은 별도 버킷이며 Pi의 OPTIONS는 제외한다. 격리 회귀 테스트와 같은 Pi의 서로 다른 직접/WARP 공인 출구 IP 로그 검증은 통과했다. 독립 네트워크 두 곳과 실제 제한 초과 검증은 남는다.
+  - Pi에 관리자 통계·접속 로그 API의 별도 IP별 제한을 배포했다. 서명된 IP와 서명 없는 연결은 별도 버킷이며 Pi의 OPTIONS는 제외한다. 격리 회귀 테스트와 Pi 직접/WARP 출구 및 독립 GitHub Actions 네트워크의 실제 IP 기록·위조 헤더 무시 확인은 통과했다. 실제 운영 제한 초과와 IP별 제한 분리 검증은 남는다.
 - [x] **공식 웹사이트 Cloudflare Pages 이전 (사용자 완료 보고):** `opencigan.mcv.kr`의 Pages 이전은 완료했다고 보고됐다. 외부 DNS/CNAME·TLS·공유 링크·PWA의 사후 실측은 **당일 QA**로 분리하며 이전 자체를 미완료 개발 항목으로 남기지 않는다. `mcv.kr` 전체 NS/타 서브도메인 변경은 대상이 아니다.
 **2026-11-17 당일 QA 예정 — 아직 통과 처리하지 않음**
 
@@ -42,7 +42,7 @@
 - [ ] **P0 · 롤백/베타 가용성:** Cloudflare Pages / Worker VPC Beta / cloudflared 연결 장애, 429·503, 캐시·원본 가용성을 분리하고 복구 경로를 검증한다. 기존 GitHub Pages·Tailscale Funnel은 대체 경로의 필요성 확인 전까지 보존하고, 컴시간 전용 Pi WARP 출구 프록시는 유지한다.
 - [ ] **P0 · Tailscale Funnel 단계적 퇴역:** 기존 `.ts.net` 구독자가 없다는 사용자 확인 후 2026-11-17 Funnel 공개 노출을 중지했고 2026-11-18 중지 상태를 재확인했다. Cloudflare의 장기 안정성, 외부 자동화 의존 여부 및 장애 시 우회 경로는 계속 확인한다. Tailscale 클라이언트·tailnet 접속·Pi WARP·Cloudflare Tunnel은 유지한다. [운영 절차](../operations.md#tailscale-funnel-단계적-퇴역).
 
-- [ ] **P0 · 최신 Worker/Pi 코드 운영 반영 및 종단 검증:** 2026-11-18 Worker에 `6c903b7` 런타임을, Pi에 Python 클라이언트 수정이 포함된 `d425a0c` 릴리스를 배포했다. 일곱 Rate Limit binding, 기존 환경·DB·Tunnel·WARP 및 롤백 경로를 확인했다. 공개 핵심 API, 접속 로그 관리자 인증과 두 공인 출구의 IP 전달은 확인했으나 독립 외부망 비교, 실제 제한 초과 응답과 캘린더 앱 검증은 남았다. 상세 결과와 한계는 [운영 배포 기록](../cloudflare-tunnel-rollout.md#2026-11-18-운영-반영-결과)을 따른다.
+- [ ] **P0 · 최신 Worker/Pi 코드 운영 반영 및 종단 검증:** 2026-11-18 Worker에 `6c903b7` 런타임을, Pi에 상류 오류 진단이 포함된 `929c963` 릴리스를 배포했다. 일곱 Rate Limit binding, 기존 환경·DB·Tunnel·WARP 및 롤백 경로를 확인했다. 공개 핵심 API·접속 로그 관리자 인증과 독립 외부망 간 IP 전달은 확인했으나 실제 제한 초과 응답·IP별 제한 분리와 캘린더 앱 검증은 남았다. 상세 결과와 한계는 [운영 배포 기록](../cloudflare-tunnel-rollout.md#2026-11-18-운영-반영-결과)을 따른다.
 
 **별도 출구 경로:** 컴시간 전용 `OPENCIGAN_COMCIGAN_PROXY`/WARP는 Pi에서 컴시간으로 나가는 경로로 유지하고, Tunnel 수신 구조와 섞지 않는다.
 
@@ -59,7 +59,7 @@
 
 - [x] 시간표·급식·설정·검색·즐겨찾기·공유·저장·새로고침 등 여러 메뉴와 주요 버튼에 직관적인 아이콘을 추가하고, PC·모바일에서 아이콘 스타일과 배치를 통일 (2026-11-15 로컬 구현·브라우저 회귀)
 
-- [ ] 프록시/Tunnel 경유 시 실제 클라이언트별 호출 제한 검증 (로컬 WSGI에서 제한과 접속 로그가 같은 IP를 사용하는지 확인; 실제 외부망 두 곳에서의 검증은 남음)
+- [ ] 프록시/Tunnel 경유 시 실제 클라이언트별 호출 제한 검증 (로컬 WSGI에서 제한과 접속 로그가 같은 IP를 사용하는지, 두 외부망에서 IP가 각각 기록되는지 확인; 실제 운영 환경에서 IP별 제한 분리는 남음)
 - [ ] Tailscale Funnel·Cloudflare Tunnel 등 신뢰된 프록시를 거쳐도 실제 접속자 공인 IP를 서버가 인식하고, IP별 요청 제한·접속 로그에 반영하도록 개선
 - [ ] 전체 시간표/급식 및 모바일 실기기 회귀 검증
 - [ ] [2026-11-14 실사용 브라우저 QA](../browser-qa-2026-11-14.md)의 날짜 입력·외부 학교/학급 공유 링크 검증·시간표 공백 사유 표시 개선 (날짜·공유 회귀와 평일 전체 공백 안내 완료; 제보 당시 원본 확인은 남음)
