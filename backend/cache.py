@@ -84,6 +84,8 @@ class Cache:
                                resource, "stale" if previous_value is not None else "none", type(exc).__name__)
                 if previous_value is not None:
                     return output(self._stale(previous_value), "stale")
+                if self.retry_delay > 0:
+                    raise CacheBackoffError(self.retry_delay) from exc
                 raise
 
             with self.guard:
