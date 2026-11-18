@@ -933,7 +933,7 @@ test('online server failure restores the matching saved timetable and retry reco
   });
   await page.goto('/');
   const panel = page.locator('#timetable-panel');
-  await expect(panel.getByRole('alert')).toContainText('원본에서 데이터를 가져오지');
+  await expect(panel.getByRole('alert')).toContainText('시간표나 급식 데이터를 불러오지');
   await expect(panel.getByText('이 기기에 저장된 시간표 · 최신 정보가 아닐 수 있어요')).toBeVisible();
   await expect(panel.getByRole('table')).toContainText('과목1');
   await panel.getByRole('button', { name: '다시 시도' }).click();
@@ -981,7 +981,7 @@ test('timetable outage without a saved copy leaves meals available and retry rec
   await page.goto('/');
   const panel = page.locator('#timetable-panel');
   await expect(panel.getByRole('alert')).toContainText('이 학교와 주에 저장된 시간표가 없어요');
-  await expect(panel.getByRole('alert')).toContainText('원본에서 데이터를 가져오지');
+  await expect(panel.getByRole('alert')).toContainText('시간표나 급식 데이터를 불러오지');
   await expect(panel.getByRole('table')).toHaveCount(0);
   await page.getByRole('button', { name: '급식', exact: true }).click();
   await expect(page.getByText('김치볶음밥(5.6)').first()).toBeVisible();

@@ -14,7 +14,7 @@ test('distinguishes rate limiting, overload and upstream failure', async () => {
     [429, 'rate_limited', /요청이 너무 많아요/],
     [429, 'edge_rate_limited', /요청이 너무 많아요/],
     [503, 'service_overloaded', /요청이 몰리고/],
-    [503, 'upstream_unavailable', /원본에서 데이터를 가져오지/],
+    [503, 'upstream_unavailable', /시간표나 급식 데이터를 불러오지/],
     [503, 'gateway_unavailable', /API 서버에 연결하지/],
   ]) {
     const error = await apiError(Response.json({ code }, { status }));
