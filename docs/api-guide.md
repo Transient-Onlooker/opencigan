@@ -39,6 +39,8 @@
 | GET | `/api/v1/timetable/history` | `school`, `week` | 선택적 `cursor`. 변경 이력 미설정 시 503 |
 | GET | `/api/v1/timetable/history.rss` | `school`, `grade`, `class` | 학급별 관측 변경 RSS. 이력 미설정 시 503 |
 
+NEIS 학교·급식 정보의 출처는 교육부·시도교육청의 [나이스 교육정보 개방 포털](https://open.neis.go.kr/)입니다. 데이터 재사용 시 [서비스 이용약관](https://open.neis.go.kr/portal/userAgreementPage.do)과 개별 데이터의 조건을 확인하고 출처를 표시하세요. Opencigan의 코드 라이선스는 원본 데이터의 이용 권한을 대신하지 않습니다.
+
 ### 학교 ID는 출처별로 다릅니다
 
 - 컴시간: `학교코드:학교명` (예시: `1234:예시학교`)

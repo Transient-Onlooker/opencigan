@@ -95,6 +95,7 @@
     </article>
   {/each}
 </div>
+<p class="meal-source">급식 정보 출처: 교육부·시도교육청, <a href="https://open.neis.go.kr/">나이스 교육정보 개방 포털</a></p>
 
 <style>
   .meal-filters{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}
@@ -123,6 +124,9 @@
   .meal-source-details{margin-top:8px}
   .meal-source-details summary{min-height:44px;align-content:center;cursor:pointer;font-size:13px}
   .meal-source-text{white-space:pre-line;overflow-wrap:anywhere}
+  .meal-source{margin:10px 0 0;color:var(--muted);font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+  .meal-source a{display:inline-flex;align-items:center;min-height:44px;color:var(--ink);text-underline-offset:3px}
+  .meal-source a:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
   .meal-source-details:focus-within,.meal-day button:focus-visible,.meal-filters input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
   @media(max-width:540px){.meal-types{grid-template-columns:1fr}.meal-types>section{border-right:0;border-bottom:1px solid var(--line)}.meal-types>section:last-child{border-bottom:0}}
 </style>
