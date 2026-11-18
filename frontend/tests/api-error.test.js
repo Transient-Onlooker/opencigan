@@ -27,8 +27,20 @@ test('retains history disabled code and handles non-JSON errors', async () => {
   const history = await apiError(Response.json({ code: 'history_disabled' }, { status: 503 }));
   assert.equal(history.code, 'history_disabled');
   assert.match(history.message, /변경 이력을 제공하지/);
-  const unknown = await apiError(new Response('<html>', { status: 502 }));
-  assert.match(unknown.message, /502/);
+  const unknown = await apiError(new Response('<html>', { status: 500 }));
+  assert.match(unknown.message, /500/);
+});
+
+test('provides actionable guidance for gateway failures, including non-JSON responses', async () => {
+  for (const [status, expected] of [
+    [502, /서버 간 연결에 문제가/],
+    [504, /서버 응답이 늦어요/],
+  ]) {
+    const response = new Response('<html>gateway error</html>', { status, headers: { 'Retry-After': '30' } });
+    const error = await apiError(response);
+    assert.match(error.message, expected);
+    assert.match(error.message, /30초 후 다시 시도/);
+  }
 });
 
 test('uses a valid Retry-After delay without trusting malformed or excessive values', async () => {
