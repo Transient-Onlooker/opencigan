@@ -251,6 +251,8 @@ command -v cloudflared && cloudflared --version
 
 ### 2026-11-18 후속 Pi 릴리스 및 재점검
 
+**2026-11-19 갱신 소요 시간 관측 배포:** Pi `release-1f9a23f`에 관리자 갱신 소요 시간 관측을 적용하고 공개 관리자 페이지의 새 표 헤더와 인증된 관리자 API 응답을 확인했다. 학교 검색의 단일 갱신 소요는 558ms였다. 접속 로그·분석 DB는 `/home/admin/opensigan-backups/pre-1f9a23f-20261119/`에 SQLite 온라인 백업하고 무결성을 확인했다. WARP·서비스는 정상이고 Funnel은 비활성 상태다. 롤백은 `zzzzzzzzz-opencigan-1f9a23f.conf` drop-in을 비활성화하고 user systemd 설정을 다시 읽은 뒤 서비스를 재시작해 `release-c2f1614`와 로컬 상태 API를 확인한다. 실제 롤백은 실행하지 않았다.
+
 **2026-11-19 추가 배포:** 컴시간 403·429 상태를 민감한 요청 정보 없이 기록하는 `c2f1614` 릴리스를 Pi에 적용했다. 접속 로그·분석 DB는 `/home/admin/opensigan-backups/pre-c2f1614-20261119/`에 SQLite 온라인 백업하고 무결성을 확인했다. 배포 후 서비스·WARP·공개 학교 검색·시간표·급식·ICS가 정상 응답했고 Funnel은 비활성 상태다. 롤백은 `zzzzzzzz-opencigan-c2f1614.conf` drop-in을 비활성화하고 user systemd 설정을 다시 읽은 뒤 서비스를 재시작해 `release-929c963` 복귀와 상태 API를 확인한다. 실제 롤백은 수행하지 않았다.
 
 **추가 배포:** 상류 HTTP 오류의 상태 코드만 기록하는 `929c963` 백엔드를 Pi에 적용했다. 운영 접속 로그와 분석 DB는 `/home/admin/opensigan-backups/pre-929c963-20261118/`에 SQLite 온라인 백업했고 무결성을 확인했다. 배포 후 핵심 공개 API·ICS와 WARP 상태 200, 서비스 및 루프백 수신을 확인했다. 롤백은 `zzzzzzz-opencigan-929c963.conf` drop-in을 비활성화하고 user systemd를 다시 읽은 뒤 서비스를 재시작해 `release-d425a0c` 복귀와 상태 API를 확인한다. 실제 롤백은 수행하지 않았다.
