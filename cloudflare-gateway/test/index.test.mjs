@@ -74,7 +74,7 @@ test('private request URL remains fixed and conditional ICS headers survive', as
   const { env, calls } = setup();
   const response = await worker.fetch(req('/api/v1/timetable.ics?school=99', {
     headers: {
-      'If-None-Match': '"abc"', 'Accept': 'text/calendar',
+      'If-None-Match': '"abc"', 'Accept': 'text/calendar', 'User-Agent': 'OpenCigan-Test/1.0',
       'X-Forwarded-For': '9.9.9.9', Forwarded: 'for=9.9.9.9',
       'CF-Connecting-IP': '203.0.113.9', Host: 'evil.example',
     },
@@ -85,6 +85,7 @@ test('private request URL remains fixed and conditional ICS headers survive', as
   const outgoing = calls[0];
   assert.equal(outgoing.url, 'http://127.0.0.1:8000/api/v1/timetable.ics?school=99');
   assert.equal(outgoing.headers.get('if-none-match'), '"abc"');
+  assert.equal(outgoing.headers.get('user-agent'), 'OpenCigan-Test/1.0');
   assert.equal(outgoing.headers.get('x-forwarded-for'), null);
   assert.equal(outgoing.headers.get('forwarded'), null);
   assert.equal(outgoing.headers.get('cf-connecting-ip'), null);

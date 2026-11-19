@@ -173,7 +173,8 @@ class AccessLogStore:
                     duration_ms REAL NOT NULL,
                     cache_status TEXT,
                     referrer_origin TEXT,
-                    origin_class TEXT NOT NULL
+                    origin_class TEXT NOT NULL,
+                    user_agent TEXT
                 );
                 CREATE INDEX IF NOT EXISTS idx_access_logs_day ON access_logs(day);
                 CREATE INDEX IF NOT EXISTS idx_access_logs_client_ip ON access_logs(client_ip);
@@ -182,6 +183,11 @@ class AccessLogStore:
                 CREATE INDEX IF NOT EXISTS idx_access_logs_status ON access_logs(status);
                 CREATE INDEX IF NOT EXISTS idx_access_logs_origin_class ON access_logs(origin_class);
             """)
+            existing_columns = {
+                row[1] for row in db.execute("PRAGMA table_info(access_logs)").fetchall()
+            }
+            if "user_agent" not in existing_columns:
+                db.execute("ALTER TABLE access_logs ADD COLUMN user_agent TEXT")
             self._purge_if_due(db, self._current_day())
             db.commit()
 
@@ -279,6 +285,7 @@ class AccessLogStore:
             "cache_status": opt_str("cache_status", 16),
             "referrer_origin": referrer_origin,
             "origin_class": origin_class,
+            "user_agent": opt_str("user_agent", 300),
         }
 
     def record(
@@ -297,8 +304,8 @@ class AccessLogStore:
                 INSERT INTO access_logs (
                     timestamp, day, client_ip, method, route, school_id, grade,
                     class_nm, week, dates, datatype, status, duration_ms,
-                    cache_status, referrer_origin, origin_class
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    cache_status, referrer_origin, origin_class, user_agent
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     sanitized["timestamp"],
@@ -317,6 +324,7 @@ class AccessLogStore:
                     sanitized["cache_status"],
                     sanitized["referrer_origin"],
                     sanitized["origin_class"],
+                    sanitized["user_agent"],
                 ),
             )
             db.commit()
@@ -472,6 +480,7 @@ class AccessLogStore:
             "cache_status",
             "referrer_origin",
             "origin_class",
+            "user_agent",
         ]
 
         output = io.StringIO()

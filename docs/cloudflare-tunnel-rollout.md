@@ -251,6 +251,8 @@ command -v cloudflared && cloudflared --version
 
 ### 2026-11-18 후속 Pi 릴리스 및 재점검
 
+**2026-11-19 User-Agent 접속 로그:** 운영자가 기존 `release-1f9a23f`를 기준으로 `release-ua20261119`를 배포하고 기존 접속 로그 DB의 컬럼 마이그레이션과 로컬 기록을 확인했다. 이후 Worker 버전 `61422cfc-46d8-4cd1-afbc-f699f7534043`에 User-Agent 전달을 배포했다. 공개 `opencigan.mcv.kr` 상태 API에 고유 User-Agent로 요청해 HTTP 200 및 Pi 로그의 해당 값 기록을 확인했다. 기존 서명 키, VPC와 일곱 요청 제한 바인딩을 유지했다. User-Agent는 사용자 제공 값이며 기존 로그의 값은 복구되지 않는다. [수집·보관 범위](access-logs.md)
+
 **2026-11-19 갱신 소요 시간 관측 배포:** Pi `release-1f9a23f`에 관리자 갱신 소요 시간 관측을 적용하고 공개 관리자 페이지의 새 표 헤더와 인증된 관리자 API 응답을 확인했다. 학교 검색의 단일 갱신 소요는 558ms였다. 접속 로그·분석 DB는 `/home/admin/opensigan-backups/pre-1f9a23f-20261119/`에 SQLite 온라인 백업하고 무결성을 확인했다. WARP·서비스는 정상이고 Funnel은 비활성 상태다. 롤백은 `zzzzzzzzz-opencigan-1f9a23f.conf` drop-in을 비활성화하고 user systemd 설정을 다시 읽은 뒤 서비스를 재시작해 `release-c2f1614`와 로컬 상태 API를 확인한다. 실제 롤백은 실행하지 않았다.
 
 **2026-11-19 추가 배포:** 컴시간 403·429 상태를 민감한 요청 정보 없이 기록하는 `c2f1614` 릴리스를 Pi에 적용했다. 접속 로그·분석 DB는 `/home/admin/opensigan-backups/pre-c2f1614-20261119/`에 SQLite 온라인 백업하고 무결성을 확인했다. 배포 후 서비스·WARP·공개 학교 검색·시간표·급식·ICS가 정상 응답했고 Funnel은 비활성 상태다. 롤백은 `zzzzzzzz-opencigan-c2f1614.conf` drop-in을 비활성화하고 user systemd 설정을 다시 읽은 뒤 서비스를 재시작해 `release-929c963` 복귀와 상태 API를 확인한다. 실제 롤백은 수행하지 않았다.
