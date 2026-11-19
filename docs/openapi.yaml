@@ -225,6 +225,9 @@ paths:
                       properties:
                         result: { type: string, enum: [success, failure, not_cached], description: not_cached means the response exceeded the cache size limit. }
                         observedAt: { type: string, format: date-time }
+                        lastSuccessAt: { type: string, format: date-time }
+                        lastFailureAt: { type: string, format: date-time }
+                        durationMs: { type: integer, minimum: 0, description: Elapsed time of the latest completed refresh attempt in milliseconds; absent on older servers. }
                   cacheStatuses:
                     type: object
                     description: Counts of recorded timetable cache outcomes; older events may have no outcome.

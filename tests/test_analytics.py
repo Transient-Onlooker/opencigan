@@ -126,6 +126,7 @@ class AnalyticsTests(unittest.TestCase):
             )
             self.assertEqual(status, 200)
             self.assertEqual(json.loads(body)["refreshObservations"]["timetable"]["result"], "success")
+            self.assertGreaterEqual(json.loads(body)["refreshObservations"]["timetable"]["durationMs"], 0)
             self.assertNotIn(b"private-school", body)
 
     def test_invalid_pageview_and_invalid_period_are_rejected(self):

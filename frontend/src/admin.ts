@@ -5,7 +5,7 @@ interface Summary {
   visitors: number; sessions: number; pageViews: number; apiRequests: number;
   apiErrorRate: number; apiAverageMs: number; droppedApiEvents: number;
   cacheStatuses?: Record<string, number>; failureKinds?: Record<string, number>;
-  refreshObservations?: Record<string, { result: 'success' | 'failure' | 'not_cached'; observedAt: string; lastSuccessAt?: string; lastFailureAt?: string }>;
+  refreshObservations?: Record<string, { result: 'success' | 'failure' | 'not_cached'; observedAt: string; lastSuccessAt?: string; lastFailureAt?: string; durationMs?: number }>;
   apiHourly?: { hour: string; requests: number; errors: number; upstream_errors: number; overload_errors: number; cache_hits: number; stale_responses: number }[];
   daily: { day: string; visitors: number; sessions: number; page_views: number; api_requests: number }[];
   routes: { route: string; requests: number; errors: number; avg_ms: number; data_failures?: number; overload_errors?: number; unclassified_server_errors?: number }[];
@@ -76,7 +76,7 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
     const resourceLabels = [['school_search', '시간표 학교 검색'], ['timetable', '시간표'], ['neis_school_search', '급식 학교 검색'], ['meals', '급식']];
     rows('#refresh-observations', observations ? resourceLabels.map(([key, label]) => {
       const entry = observations[key];
-      return [label, entry ? entry.result === 'success' ? '성공' : entry.result === 'not_cached' ? '응답 수신 · 캐시 저장 불가' : '실패' : '아직 관측 없음', entry ? new Date(entry.observedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—', entry?.lastSuccessAt ? new Date(entry.lastSuccessAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—', entry?.lastFailureAt ? new Date(entry.lastFailureAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—'];
+      return [label, entry ? entry.result === 'success' ? '성공' : entry.result === 'not_cached' ? '응답 수신 · 캐시 저장 불가' : '실패' : '아직 관측 없음', entry ? new Date(entry.observedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—', entry?.lastSuccessAt ? new Date(entry.lastSuccessAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—', entry?.lastFailureAt ? new Date(entry.lastFailureAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—', typeof entry?.durationMs === 'number' ? `${entry.durationMs.toLocaleString('ko-KR')} ms` : '—'];
     }) : []);
     refreshTable.hidden = !observations;
     refreshState.textContent = observations ? '' : '현재 서버에서는 갱신 관측을 제공하지 않습니다.';
