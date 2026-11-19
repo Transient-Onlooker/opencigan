@@ -117,7 +117,7 @@
   });
   let timetableRefreshAt = 0;
   let mealsRefreshAt = 0;
-  const schoolSearchSession = createSchoolSearchSession((results, message, retryable = false) => { schoolResults = results; schoolSearchState = message; schoolSearchRetryable = retryable; });
+  const schoolSearchSession = createSchoolSearchSession((results, message, retryable = false) => { schoolResults = results; schoolSearchState = message; schoolSearchRetryable = retryable; }, () => localStorage);
   const mealSession = createMealSession((state) => {
     if (neis !== state.neis) neis = state.neis;
     neisResults = state.candidates; neisSearchState = state.searchState; neisLoading = state.neisLoading;
