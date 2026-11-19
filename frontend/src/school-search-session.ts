@@ -32,9 +32,9 @@ export function createSchoolSearchSession(onChange: (results: School[], message:
         try {
           const result = await search(text, controller.signal);
           if (controller.signal.aborted || query().trim() !== text) return;
-          if (!result.stale && result.schools.length) {
+          if (!result.stale) {
             cache.delete(text);
-            cache.set(text, { schools: result.schools.slice(), savedAt: Date.now() });
+            if (result.schools.length) cache.set(text, { schools: result.schools.slice(), savedAt: Date.now() });
             if (cache.size > 10) cache.delete(cache.keys().next().value!);
             try { storage?.().setItem(storageKey, JSON.stringify([...cache])); } catch { /* 현재 화면의 캐시는 유지합니다. */ }
           }
