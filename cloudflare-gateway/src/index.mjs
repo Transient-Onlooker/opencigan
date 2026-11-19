@@ -9,7 +9,7 @@ const READ_PATHS = new Set([
 const MAX_BODY_BYTES = 4096;
 const FORWARD_HEADERS = [
   'accept', 'accept-language', 'authorization', 'content-type', 'origin',
-  'referer', 'if-none-match', 'if-modified-since',
+  'referer', 'if-none-match', 'if-modified-since', 'user-agent',
 ];
 const ORIGIN = 'http://127.0.0.1:8000';
 

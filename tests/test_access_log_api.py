@@ -15,13 +15,14 @@ class AccessLogApiTests(unittest.TestCase):
         config = {'OPENCIGAN_ACCESS_LOG_DB': 'enabled', 'OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN': 'test-secret'}
         with patch.dict('os.environ', config), patch('backend.app._access_log_recorder', recorder), patch('backend.app._access_log_store', return_value=store):
             with patch('backend.app._dispatch_request', return_value=(200, {'Content-Type': 'application/json'}, b'{"cacheStatus":"hit"}')):
-                dispatch_request('GET', '/api/v1/timetable', 'school=2%3AExample&grade=2&class=3&week=2026-11-09&token=private', client='203.0.113.1')
+                dispatch_request('GET', '/api/v1/timetable', 'school=2%3AExample&grade=2&class=3&week=2026-11-09&token=private', client='203.0.113.1', request_headers={'User-Agent': 'OpenCigan-Test/1.0'})
             self.assertTrue(recorder.flush(timeout=2))
             status, _, body = dispatch_request('GET', '/api/v1/admin/access-logs', 'grade=2&class=3', request_headers={'Authorization': 'Bearer test-secret'})
             self.assertEqual(status, 200)
             row = json.loads(body)['items'][0]
             self.assertEqual(row['school_id'], '2:Example')
             self.assertEqual(row['cache_status'], 'hit')
+            self.assertEqual(row['user_agent'], 'OpenCigan-Test/1.0')
             self.assertEqual(row['week'], '2026-11-09')
             self.assertTrue(row['timestamp'].endswith('+09:00'))
             self.assertNotIn('private', json.dumps(row))

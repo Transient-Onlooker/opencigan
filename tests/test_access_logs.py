@@ -1,6 +1,8 @@
 import csv
 import io
 import os
+import sqlite3
+import tempfile
 import threading
 import time
 import unittest
@@ -26,6 +28,26 @@ class AccessLogsTests(unittest.TestCase):
         store = AccessLogStore(":memory:", retention_days=retention_days)
         self.addCleanup(store.close)
         return store
+
+    def test_user_agent_migration_preserves_old_rows_and_escapes_csv(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, 'access.sqlite')
+            store = AccessLogStore(path)
+            store.record({'route': '/old'})
+            store.close()
+            with closing(sqlite3.connect(path)) as db:
+                db.execute('ALTER TABLE access_logs DROP COLUMN user_agent')
+                db.commit()
+            migrated = AccessLogStore(path)
+            try:
+                self.assertIsNone(migrated.query()['items'][0]['user_agent'])
+                migrated.record({'route': '/new', 'user_agent': '=browser' + 'x' * 300})
+                items = migrated.query()['items']
+                self.assertEqual(len(items[0]['user_agent']), 300)
+                rows = list(csv.DictReader(io.StringIO(migrated.export_csv())))
+                self.assertTrue(rows[0]['user_agent'].startswith("'=browser"))
+            finally:
+                migrated.close()
 
     def test_factory_off_by_default(self):
         with patch.dict(os.environ, {}, clear=True):

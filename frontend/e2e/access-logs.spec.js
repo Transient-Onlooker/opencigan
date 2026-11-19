@@ -19,6 +19,7 @@ const log = {
   cache_status: 'hit',
   referrer_origin: 'https://school.example',
   origin_class: 'frontend',
+  user_agent: '<img src=x onerror=alert(1)>',
 };
 
 test('filters, authenticated query, lock clears rows, and CSV uses authenticated fetch', async ({ page }) => {
@@ -58,6 +59,8 @@ test('filters, authenticated query, lock clears rows, and CSV uses authenticated
   await page.getByRole('button', { name: '조회', exact: true }).click();
 
   await expect(page.getByRole('table')).toContainText(log.client_ip);
+  await expect(page.getByRole('table')).toContainText(log.user_agent);
+  await expect(page.locator('#logs-body img')).toHaveCount(0);
   expect(requests).toHaveLength(1);
   const query = requests[0].url.searchParams;
   for (const [key, value] of Object.entries({

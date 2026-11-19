@@ -18,6 +18,7 @@ interface AccessLogItem {
   cache_status: string | null;
   referrer_origin: string;
   origin_class: 'frontend' | 'external' | 'unknown';
+  user_agent?: string | null;
 }
 
 interface QueryResponse {
@@ -128,6 +129,7 @@ function renderRows(items: AccessLogItem[], append: boolean) {
       item.cache_status ?? '-',
       item.referrer_origin || '-',
       item.origin_class || '-',
+      item.user_agent || '-',
     ];
 
     for (const val of fields) {

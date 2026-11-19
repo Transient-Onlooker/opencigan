@@ -1,6 +1,6 @@
 # 접속 로그
 
-요청 수신 시각·일자(KST, `+09:00`), 원시 클라이언트 IP, 메서드·경로, 학교 식별자·학급·조회 주차/날짜, 데이터 종류, 응답 코드·처리 시간·캐시 상태와 출처를 SQLite에 기록합니다. 기본은 비활성화입니다. 운영 활성화 시 원시 IP 수집·보관 안내와 접근 권한을 확인하세요.
+요청 수신 시각·일자(KST, `+09:00`), 원시 클라이언트 IP, 메서드·경로, 학교 식별자·학급·조회 주차/날짜, 데이터 종류, 응답 코드·처리 시간·캐시 상태, 출처와 User-Agent(최대 300자)를 SQLite에 기록합니다. User-Agent는 요청자가 임의로 지정할 수 있는 값입니다. 기본은 비활성화입니다. 운영 활성화 시 IP와 User-Agent 수집·보관 안내와 접근 권한을 확인하세요.
 
 ## 설정
 
@@ -17,7 +17,7 @@ IP는 기존 신뢰 프록시 설정으로 확인한 클라이언트 값입니�
 
 필터: `client_ip`, `school_id`, `grade`, `class`, `start_day`, `end_day`, `route`, `status`, `origin_class`, `cache_status`. 날짜는 KST 일자 `YYYY-MM-DD`입니다. `origin_class`는 `frontend`, `external`, `unknown` 중 하나입니다.
 
-JSON은 `items`, `next_cursor`, `limit`, `has_more`, `dropped`를 반환합니다. 각 행의 `timestamp`는 KST ISO 문자열입니다. `limit`은 기본 50·최대 100이며 다음 페이지는 반환된 `cursor`로 조회합니다. `format=csv`는 같은 필터를 적용한 최신 최대 5,000건을 UTF-8 BOM CSV로 반환합니다. 수식으로 해석될 수 있는 셀을 인용 처리합니다.
+JSON은 `items`, `next_cursor`, `limit`, `has_more`, `dropped`를 반환합니다. 각 행의 `timestamp`는 KST ISO 문자열이며 User-Agent가 없거나 도입 이전에 저장된 행의 `user_agent`는 null입니다. `limit`은 기본 50·최대 100이며 다음 페이지는 반환된 `cursor`로 조회합니다. `format=csv`는 같은 필터를 적용한 최신 최대 5,000건을 UTF-8 BOM CSV로 반환합니다. 수식으로 해석될 수 있는 셀을 인용 처리합니다.
 
 화면은 `/access-logs.html`입니다. 토큰은 저장하지 않고 잠금 시 요청·표시·입력값을 지웁니다. [화면 설명](access-log-ui.md).
 

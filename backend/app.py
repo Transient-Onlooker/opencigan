@@ -406,6 +406,7 @@ def dispatch_request(method, path, query_string, cache_instance=None, client=Non
             'datatype': 'meals' if path == '/api/v1/meals' else 'timetable' if path.startswith('/api/v1/timetable') else 'other',
             'status': response[0], 'duration_ms': (time.perf_counter() - started) * 1000,
             'cache_status': cache_status, 'referrer_origin': referrer_origin, 'origin_class': origin_class,
+            'user_agent': (request_headers or {}).get('User-Agent'),
         }, received_at=received_at)
     return response
 
@@ -423,7 +424,7 @@ class Handler(SafeRequestLogging, BaseHTTPRequestHandler):
     def _unsupported(self):
         parts = urlsplit(self.path)
         request_body = _read_request_body(self.rfile, self.headers.get("Content-Length")) if (self.command == "POST" and parts.path == "/api/v1/analytics/pageview") or (self.command in ("POST", "PUT") and parts.path.startswith("/api/v1/webhooks")) else None
-        status_code, headers, body = dispatch_request(self.command, parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_body, {"Authorization": self.headers.get("Authorization", ""), "Referer": self.headers.get("Referer", "")})
+        status_code, headers, body = dispatch_request(self.command, parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_body, {"Authorization": self.headers.get("Authorization", ""), "Referer": self.headers.get("Referer", ""), "User-Agent": self.headers.get("User-Agent", "")})
         self.send_response(status_code)
         for key, val in headers.items():
             self.send_header(key, val)
@@ -442,7 +443,7 @@ class Handler(SafeRequestLogging, BaseHTTPRequestHandler):
 
     def do_HEAD(self):
         parts = urlsplit(self.path)
-        status_code, headers, body = dispatch_request("HEAD", parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_headers={"Authorization": self.headers.get("Authorization", ""), "If-None-Match": self.headers.get("If-None-Match", ""), "Referer": self.headers.get("Referer", "")})
+        status_code, headers, body = dispatch_request("HEAD", parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_headers={"Authorization": self.headers.get("Authorization", ""), "If-None-Match": self.headers.get("If-None-Match", ""), "Referer": self.headers.get("Referer", ""), "User-Agent": self.headers.get("User-Agent", "")})
         self.send_response(status_code)
         for key, val in headers.items():
             self.send_header(key, val)
@@ -450,7 +451,7 @@ class Handler(SafeRequestLogging, BaseHTTPRequestHandler):
 
     def do_GET(self):
         parts = urlsplit(self.path)
-        status_code, headers, body = dispatch_request("GET", parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_headers={"Authorization": self.headers.get("Authorization", ""), "If-None-Match": self.headers.get("If-None-Match", ""), "Referer": self.headers.get("Referer", "")})
+        status_code, headers, body = dispatch_request("GET", parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_headers={"Authorization": self.headers.get("Authorization", ""), "If-None-Match": self.headers.get("If-None-Match", ""), "Referer": self.headers.get("Referer", ""), "User-Agent": self.headers.get("User-Agent", "")})
         self.send_response(status_code)
         for key, val in headers.items():
             self.send_header(key, val)
@@ -510,7 +511,7 @@ def make_app(cache_instance=None, trusted_proxies=None):
             rate_client=verified_client,
             request_origin=environ.get("HTTP_ORIGIN"),
             request_body=_read_request_body(environ.get("wsgi.input"), environ.get("CONTENT_LENGTH")) if (method == "POST" and path == "/api/v1/analytics/pageview") or (method in ("POST", "PUT") and path.startswith("/api/v1/webhooks")) else None,
-            request_headers={"Authorization": environ.get("HTTP_AUTHORIZATION", ""), "If-None-Match": environ.get("HTTP_IF_NONE_MATCH", ""), "Referer": environ.get("HTTP_REFERER", "")},
+            request_headers={"Authorization": environ.get("HTTP_AUTHORIZATION", ""), "If-None-Match": environ.get("HTTP_IF_NONE_MATCH", ""), "Referer": environ.get("HTTP_REFERER", ""), "User-Agent": environ.get("HTTP_USER_AGENT", "")},
         )
 
         status_line = _STATUS_PHRASES.get(status_code, f"{status_code} Unknown")
