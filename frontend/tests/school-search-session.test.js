@@ -116,3 +116,32 @@ test('search cache retains at most ten successful queries', async () => {
   assert.equal(latest.results.length, 0);
   assert.match(latest.message, /저장된 결과가 없어요/);
 });
+
+test('fresh results survive a new session and are used only for the matching failed query', async () => {
+  const values = new Map();
+  const storage = () => ({ getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) });
+  const school = { id: '123', name: '봄빛고등학교', region: '서울' };
+  const first = exports.createSchoolSearchSession(() => {}, storage);
+  first.find(() => '봄빛', async () => ({ schools: [school], stale: false }), String);
+  await scheduled();
+  let latest;
+  const second = exports.createSchoolSearchSession((results, message, retryable) => { latest = { results, message, retryable }; }, storage);
+  second.find(() => '봄빛', async () => { throw new Error('offline'); }, (error) => error.message);
+  await scheduled();
+  assert.equal(latest.results[0].id, school.id);
+  assert.match(latest.message, /offline.*이 기기에 저장된 검색 결과.*최신 정보가 아닐/);
+  assert.equal(latest.retryable, true);
+  second.find(() => '다른 학교', async () => { throw new Error('offline'); }, String);
+  await scheduled();
+  assert.equal(latest.results.length, 0);
+});
+
+test('unavailable or malformed storage does not prevent searching', async () => {
+  let latest;
+  for (const storage of [() => { throw new Error('blocked'); }, () => ({ getItem: () => '{broken', setItem: () => { throw new Error('full'); } })]) {
+    const session = exports.createSchoolSearchSession((results) => { latest = results; }, storage);
+    session.find(() => '봄빛', async () => ({ schools: [{ id: '123', name: '봄빛', region: '서울' }], stale: false }), String);
+    await scheduled();
+    assert.equal(latest[0].id, '123');
+  }
+});
