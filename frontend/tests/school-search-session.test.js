@@ -145,3 +145,24 @@ test('unavailable or malformed storage does not prevent searching', async () => 
     assert.equal(latest[0].id, '123');
   }
 });
+
+test('a fresh empty search invalidates the saved result across sessions', async () => {
+  const values = new Map();
+  const storage = () => ({ getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) });
+  const school = { id: '123', name: '봄빛고등학교', region: '서울' };
+  let latest;
+  const session = exports.createSchoolSearchSession((results, message) => { latest = { results, message }; }, storage);
+  session.find(() => '봄빛', async () => ({ schools: [school], stale: false }), String);
+  await scheduled();
+  session.find(() => '봄빛', async () => ({ schools: [], stale: false }), String);
+  await scheduled();
+  session.find(() => '봄빛', async () => { throw new Error('offline'); }, String);
+  await scheduled();
+  assert.equal(latest.results.length, 0);
+  assert.match(latest.message, /저장된 결과가 없어요/);
+  const reloaded = exports.createSchoolSearchSession((results, message) => { latest = { results, message }; }, storage);
+  reloaded.find(() => '봄빛', async () => { throw new Error('offline'); }, String);
+  await scheduled();
+  assert.equal(latest.results.length, 0);
+  assert.match(latest.message, /저장된 결과가 없어요/);
+});
