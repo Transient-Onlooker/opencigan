@@ -8,6 +8,11 @@ from backend.cache import Cache
 
 
 class UpstreamRecoveryTests(unittest.TestCase):
+    def setUp(self):
+        patcher = patch('backend.app.shutter.check', return_value=(True, 0))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_timetable_search_failure_does_not_block_neis_meals_or_other_searches(self):
         for error in (RuntimeError('HTTP 403'), RuntimeError('HTTP 429'), TimeoutError('delay')):
             with self.subTest(error=str(error)):
