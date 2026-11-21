@@ -20,6 +20,8 @@ jobs:
       - run: python -B -m unittest discover -s clients/python/tests -v
       - run: python -m unittest test_worker test_d1_cache test_migration -v
         working-directory: experiments/workers-api
+        env:
+          PYTHONPATH: ${{ github.workspace }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
