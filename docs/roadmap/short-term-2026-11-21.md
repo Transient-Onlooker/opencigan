@@ -15,18 +15,29 @@
 
 ## 작업 의존 관계
 
-```text
-ST-00 자동 회귀 기준선
- ├─ ST-01 장애·타임아웃 보완 ─┐
- ├─ ST-02 IP/429 자동 검증 ───┤
- ├─ ST-03 캐시 미스 최적화 ───┤
- ├─ ST-04 UX 잔여 수정 ─────┤
- ├─ ST-05 기능 제안 백엔드 → ST-06 사용자 UI
- ├─ ST-07 Webhook 보안·관리 → ST-08 템플릿/개발자 메뉴 → ST-09 예약/체육 알리미
- ├─ ST-10 API 계약·진단
- └─ ST-11 분석·운영 이상 탐지
-         ↓ (기능 병합 후)
- ST-12 상태·저장 책임 분리 → ST-13 번들 경량화 → ST-14 최종 통합 QA
+```mermaid
+flowchart TB
+    Baseline["ST-00<br/>자동 회귀 기준선"]
+    Stable["ST-01 · 02<br/>503·타임아웃 / IP·429"]
+    Speed["ST-03 · 04<br/>캐시 최적화 / UX"]
+    Request["ST-05 → ST-06<br/>기능 제안 API·UI"]
+    Notify["ST-07 → ST-08 → ST-09<br/>Webhook·템플릿·예약"]
+    API["ST-10 · 11<br/>API 관측 / 통계"]
+    State["ST-12<br/>상태·저장 책임 정리"]
+    Bundle["ST-13<br/>번들 경량화"]
+    Final["ST-14<br/>통합 회귀·릴리스 후보"]
+
+    Baseline --> Stable
+    Baseline --> Speed
+    Baseline --> Request
+    Baseline --> Notify
+    Baseline --> API
+    Stable --> State
+    Speed --> State
+    Request --> State
+    Notify --> State
+    API --> State
+    State --> Bundle --> Final
 ```
 
 다른 책임 파일에서는 병렬 작업할 수 있으나, 같은 상태 관리·API 계약 파일을 고치는 브랜치는 순차 병합하고 후속 브랜치를 갱신한다. ST-12는 아래 **코드 경합·저장 책임 분리**이며 ST-13 전에 진행한다.
