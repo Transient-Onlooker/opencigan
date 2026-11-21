@@ -1,6 +1,7 @@
 import threading
 import unittest
 import json
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from http.server import ThreadingHTTPServer
@@ -21,6 +22,134 @@ class FakeLesson:
 
 
 class TimetableTests(unittest.TestCase):
+    def test_verified_school_and_cached_protocol_need_one_timetable_request(self):
+        from pycomcigan import TimeTable
+        from types import SimpleNamespace
+        protocol = SimpleNamespace(version='enc5', request_token=None, key=None)
+        lesson = FakeLesson(1, 'Math', 'Kim')
+        def initialize(table, data, local_code, school_name, school_code, codes):
+            self.assertEqual((local_code, school_name, school_code), (9999, 'Example', 76524))
+            table.timetable = [[], [[], [[], [lesson], [], [], [], []]]]
+            table.update_date = '2026-11-10 08:30'
+        fixed = type('FixedDateTime', (datetime,), {
+            'now': classmethod(lambda cls, tz=None: datetime(2026, 11, 10, tzinfo=tz))
+        })
+        with patch('backend.timetable.datetime', fixed), \
+             patch.object(timetable, '_protocol', protocol), \
+             patch.object(timetable, '_protocol_content', 'cached page'), \
+             patch.object(timetable, '_protocol_expires', float('inf')), \
+             patch.object(timetable, '_verified_schools', OrderedDict({'76524:Example': (9999, float('inf'))})), \
+             patch.object(TimeTable, '_get_comcigan_codes', return_value=('endpoint',) * 7), \
+             patch('pycomcigan.timetable.get_response_encoding', return_value=SimpleNamespace(text='data')) as fetch, \
+             patch('pycomcigan.timetable.decode_response', return_value={}), \
+             patch('pycomcigan.timetable.decode_timetable_fields', return_value={'학교명': 'Example'}), \
+             patch.object(TimeTable, '_initialize_from_data', new=initialize), \
+             patch('pycomcigan.timetable.school_search', side_effect=AssertionError('unexpected search')), \
+             patch('pycomcigan.timetable.get_comcigan_response_for_codes', side_effect=AssertionError('unexpected service page')):
+            result = timetable.fetch_timetable('76524:Example', '2026-11-09')
+        self.assertEqual(fetch.call_count, 1)
+        self.assertEqual(result['schoolId'], '76524:Example')
+        self.assertEqual(result['records'][0]['subject'], 'Math')
+        self.assertEqual(result['sourceUpdatedAt'], '2026-11-10T08:30:00+09:00')
+
+    def test_cached_and_uncached_paths_return_equivalent_data_with_fewer_requests(self):
+        from pycomcigan import TimeTable
+        from types import SimpleNamespace
+        protocol = SimpleNamespace(version='enc5', request_token=None, key=None)
+        def initialize(table, data, local_code, school_name, school_code, codes):
+            table.timetable = [[], [[], [[], [FakeLesson(1, 'Math', 'Kim', True)], [], [], [], []]]]
+            table.update_date = '2026-11-10 08:30'
+        fixed = type('FixedDateTime', (datetime,), {
+            'now': classmethod(lambda cls, tz=None: datetime(2026, 11, 10, tzinfo=tz))
+        })
+        with patch('backend.timetable.datetime', fixed), \
+             patch.object(timetable, '_protocol', None), \
+             patch.object(timetable, '_protocol_content', None), \
+             patch.object(timetable, '_protocol_expires', 0), \
+             patch.object(timetable, '_verified_schools', OrderedDict()), \
+             patch('pycomcigan.timetable.get_comcigan_response_for_codes', return_value=SimpleNamespace(text='page')) as page, \
+             patch('pycomcigan.timetable.decode_service_page', return_value='decoded'), \
+             patch('pycomcigan.timetable.parse_service_protocol', return_value=protocol), \
+             patch('pycomcigan.timetable.school_search', return_value=[[9999, 'region', 'Example', 76524]]) as search, \
+             patch.object(TimeTable, '_get_comcigan_codes', return_value=('endpoint',) * 7), \
+             patch('pycomcigan.timetable.get_response_encoding', return_value=SimpleNamespace(text='data')) as data_request, \
+             patch('pycomcigan.timetable.decode_response', return_value={}), \
+             patch('pycomcigan.timetable.decode_timetable_fields', return_value={'학교명': 'Example'}), \
+             patch.object(TimeTable, '_initialize_from_data', new=initialize):
+            original = timetable.fetch_timetable('76524:Example', '2026-11-09')
+            self.assertEqual((page.call_count, search.call_count, data_request.call_count), (1, 1, 1))
+            timetable._protocol = protocol
+            timetable._protocol_content = 'decoded'
+            timetable._protocol_expires = float('inf')
+            timetable._verified_schools['76524:Example'] = (9999, float('inf'))
+            optimized = timetable.fetch_timetable('76524:Example', '2026-11-09')
+            self.assertEqual((page.call_count, search.call_count, data_request.call_count), (1, 1, 2))
+            self.assertEqual(optimized, original)
+
+    def test_cached_protocol_rejection_invalidates_without_retrying_403_or_429(self):
+        from pycomcigan import TimeTable
+        fixed = type('FixedDateTime', (datetime,), {
+            'now': classmethod(lambda cls, tz=None: datetime(2026, 11, 10, tzinfo=tz))
+        })
+        for code in (403, 429):
+            protocol = object()
+            with self.subTest(code=code), patch('backend.timetable.datetime', fixed), \
+                 patch.object(timetable, '_protocol', protocol), \
+                 patch.object(timetable, '_protocol_content', 'cached page'), \
+                 patch.object(timetable, '_protocol_expires', float('inf')), \
+                 patch.object(timetable, '_verified_schools', OrderedDict({'76524:Example': (9999, float('inf'))})), \
+                 patch.object(TimeTable, '_get_comcigan_codes', return_value=('code',) * 7), \
+                 patch.object(TimeTable, '_fetch_timetable_data', side_effect=RuntimeError(f'HTTP {code}')) as fetch:
+                with self.assertRaisesRegex(RuntimeError, str(code)):
+                    timetable.fetch_timetable('76524:Example', '2026-11-09')
+                self.assertEqual(fetch.call_count, 1)
+                self.assertIs(timetable._protocol, None if code == 403 else protocol)
+
+    def test_authentication_failure_retries_once_with_a_new_protocol(self):
+        from pycomcigan import TimeTable
+        fixed = type('FixedDateTime', (datetime,), {
+            'now': classmethod(lambda cls, tz=None: datetime(2026, 11, 10, tzinfo=tz))
+        })
+        fallback_calls = []
+        def fallback(table, name, **kwargs):
+            fallback_calls.append((name, kwargs))
+            table.timetable, table.update_date = [], None
+        with patch('backend.timetable.datetime', fixed), \
+             patch.object(timetable, '_protocol', object()), \
+             patch.object(timetable, '_protocol_content', 'cached page'), \
+             patch.object(timetable, '_protocol_expires', float('inf')), \
+             patch.object(timetable, '_verified_schools', OrderedDict({'76524:Example': (9999, float('inf'))})), \
+             patch.object(TimeTable, '_get_comcigan_codes', return_value=('code',) * 7), \
+             patch.object(TimeTable, '_fetch_timetable_data', side_effect=RuntimeError('Encrypted response authentication failed')) as fetch, \
+             patch.object(TimeTable, '__init__', new=fallback):
+            result = timetable.fetch_timetable('76524:Example', '2026-11-09')
+            self.assertIsNone(timetable._protocol)
+        self.assertEqual(fetch.call_count, 1)
+        self.assertEqual(fallback_calls, [('Example', {'school_code': 76524, 'week_num': 0})])
+        self.assertEqual(result['records'], [])
+
+    def test_cached_school_does_not_accept_another_school_response(self):
+        from pycomcigan import TimeTable
+        fixed = type('FixedDateTime', (datetime,), {
+            'now': classmethod(lambda cls, tz=None: datetime(2026, 11, 10, tzinfo=tz))
+        })
+        with patch('backend.timetable.datetime', fixed), \
+             patch.object(timetable, '_protocol', object()), \
+             patch.object(timetable, '_protocol_content', 'cached page'), \
+             patch.object(timetable, '_protocol_expires', float('inf')), \
+             patch.object(timetable, '_verified_schools', OrderedDict({'76524:Example': (9999, float('inf'))})), \
+             patch.object(TimeTable, '_get_comcigan_codes', return_value=('code',) * 7), \
+             patch.object(TimeTable, '_fetch_timetable_data', return_value={'학교명': 'Other'}):
+            with self.assertRaisesRegex(RuntimeError, '일치하지 않습니다'):
+                timetable.fetch_timetable('76524:Example', '2026-11-09')
+
+    def test_duplicate_school_code_is_not_cached_as_verified(self):
+        duplicate = [[1, 'A', 'Example', 76524], [2, 'B', 'Example', 76524]]
+        with patch.object(timetable, '_verified_schools', OrderedDict({'76524:Example': (1, float('inf'))})), \
+             patch('backend.timetable._search_with_cached_protocol', return_value=duplicate):
+            timetable.search_schools('Example')
+            self.assertNotIn('76524:Example', timetable._verified_schools)
+
     def test_403_invalidates_without_immediate_retry(self):
         from types import SimpleNamespace
         timetable._protocol = None
