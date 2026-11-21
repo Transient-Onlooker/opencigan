@@ -1,5 +1,6 @@
 import json
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from backend.app import dispatch_request
@@ -7,6 +8,32 @@ from backend.cache import Cache
 
 
 class UpstreamRecoveryTests(unittest.TestCase):
+    def test_timetable_search_failure_does_not_block_neis_meals_or_other_searches(self):
+        for error in (RuntimeError('HTTP 403'), RuntimeError('HTTP 429'), TimeoutError('delay')):
+            with self.subTest(error=str(error)):
+                cache = Cache(ttl=0, retry_delay=10)
+                clock_value = [100]
+                down = [True]
+                def search(query):
+                    if query == 'bad' and down[0]:
+                        raise error
+                    return [{'id': '1:Example', 'name': 'Example', 'region': 'region'}]
+                meal = SimpleNamespace(date='2026-11-23', meal_type='중식', menu='밥', calories=None, nutrition=None, origin=None)
+                with patch.dict('os.environ', {'NEIS_API_KEY': 'synthetic'}), \
+                     patch('backend.cache.time.monotonic', side_effect=lambda: clock_value[0]), \
+                     patch('backend.app.search_schools', side_effect=search), \
+                     patch('backend.app.NEISClient.from_environment') as client:
+                    client.return_value.get_meals.return_value = [meal]
+                    status, headers, body = dispatch_request('GET', '/api/v1/schools', 'q=bad', cache)
+                    self.assertEqual((status, json.loads(body)['code']), (503, 'upstream_unavailable'))
+                    self.assertGreater(int(headers['Retry-After']), 0)
+                    self.assertEqual(dispatch_request('GET', '/api/v1/schools', 'q=other', cache)[0], 200)
+                    status, _, body = dispatch_request('GET', '/api/v1/meals', 'school=B10%3A1234567&from=2026-11-23&to=2026-11-23', cache)
+                    self.assertEqual(status, 200)
+                    self.assertEqual(json.loads(body)['meals'][0]['dishes'], ['밥'])
+                    down[0], clock_value[0] = False, 111
+                    self.assertEqual(dispatch_request('GET', '/api/v1/schools', 'q=bad', cache)[0], 200)
+
     def test_failed_school_week_does_not_poison_other_school_or_week_and_recovers(self):
         for failure in (RuntimeError('HTTP 403'), RuntimeError('HTTP 429'), TimeoutError('delayed')):
             with self.subTest(failure=type(failure).__name__, message=str(failure)):
