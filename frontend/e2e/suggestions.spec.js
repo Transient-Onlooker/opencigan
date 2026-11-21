@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+test.use({ serviceWorkers: 'block' });
+
 test('suggestion UI is hidden and makes no requests by default', async ({ page }) => {
   test.skip(process.env.VITE_SUGGESTIONS_ENABLED === '1', 'Only applies to the default build');
   let requests = 0;
