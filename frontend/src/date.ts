@@ -23,11 +23,11 @@ export function pasteDate(event: ClipboardEvent): void {
   const text = event.clipboardData?.getData('text/plain').trim() ?? '';
   const match = /^(\d{4})(?:-(\d{2})-(\d{2})|(\d{2})(\d{2}))$/.exec(text);
   if (!match) return;
+  event.preventDefault();
   const input = event.currentTarget as HTMLInputElement;
   const previous = input.value;
   input.value = `${match[1]}-${match[2] ?? match[4]}-${match[3] ?? match[5]}`;
   if (!input.value) { input.value = previous; return; }
-  event.preventDefault();
   input.dispatchEvent(new Event('input', { bubbles: true }));
   input.dispatchEvent(new Event('change', { bubbles: true }));
 }
