@@ -1,6 +1,6 @@
 # 프록시 환경 클라이언트 IP 식별 및 셔터 경계 정책
 
-이 문서는 OpenSigan API의 역방향 프록시(Reverse Proxy) 및 터널(Cloudflare Tunnel, Nginx, Caddy 등) 환경에서 클라이언트 IP 식별 방식, 요청 제한(Rate Limit) 연동, 그리고 서버 과부하 보호 셔터(Shutter)의 우회 경계 정책을 정의합니다. (참조: [알려진 문제 6, 7번](known-issues.md), [운영 가이드](operations.md))
+이 문서는 OpenSigan API의 역방향 프록시(Reverse Proxy) 및 터널(Cloudflare Tunnel, Nginx, Caddy 등) 환경에서 클라이언트 IP 식별 방식, 요청 제한(Rate Limit) 연동, 그리고 서버 과부하 보호 셔터(Shutter)의 우회 경계 정책을 정의합니다. (참조: [알려진 문제 6, 7번](../qa/known-issues.md), [운영 가이드](operations.md))
 
 ---
 

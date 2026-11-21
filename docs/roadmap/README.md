@@ -1,6 +1,6 @@
 # OpenCigan 개발 로드맵
 
-> **최신 실행 진입점:** [2026-11-21 단기 집중 개발 로드맵](roadmap/short-term-2026-11-21.md) · **전체 백로그:** 아래 P0~P4 상세 문서
+> **최신 실행 진입점:** [2026-11-21 단기 집중 개발 로드맵](short-term-2026-11-21.md) · **전체 백로그:** 아래 P0~P4 상세 문서
 >
 > 정리 기준: 2026-11-21. `[x]`는 **구현 또는 명시된 부분 검증의 완료**이고, 실제 운영 배포·실기기 QA·외부 허락을 의미하지 않습니다. 정확한 진행률이나 완료 예정일은 체크박스만으로 추정하지 않습니다.
 
@@ -15,7 +15,7 @@
 | **P4 · 장기 확장** | 급식 검색·알레르기 필터 구현 | 시간표 통계와 운영 대시보드, 나머지는 기능별 결정 필요 |
 | **품질·리팩터링** | UI 컴포넌트·CSS·백엔드 라우팅 일부 분리 | 비동기 상태/저장 책임 정리, 번들 최적화, 전체 자동·실기기 회귀 |
 
-[상세 P0](roadmap/core-quality.md) · [P1 UI/UX](roadmap/user-experience.md) · [P2 API/운영](roadmap/api-operations.md) · [P3/P4 자동화](roadmap/automation-and-future.md) · [리팩터링·릴리스](roadmap/refactoring-and-release.md)
+[상세 P0](core-quality.md) · [P1 UI/UX](user-experience.md) · [P2 API/운영](api-operations.md) · [P3/P4 자동화](automation-and-future.md) · [리팩터링·릴리스](refactoring-and-release.md)
 
 ## 구현 작업의 의존 관계
 
@@ -43,7 +43,7 @@ flowchart TB
     Device --> Decide
 ```
 
-개발과 검증은 병행할 수 있습니다. **코드 구현 완료**, **자동 테스트 합격**, **운영 배포**, **실기기·정책 승인**은 각각 다른 상태입니다. 현재 집중 작업은 [ST-00~ST-14](roadmap/short-term-2026-11-21.md) 순서를 사용합니다.
+개발과 검증은 병행할 수 있습니다. **코드 구현 완료**, **자동 테스트 합격**, **운영 배포**, **실기기·정책 승인**은 각각 다른 상태입니다. 현재 집중 작업은 [ST-00~ST-14](short-term-2026-11-21.md) 순서를 사용합니다.
 
 ## 공개 서비스의 남은 검증
 
@@ -52,7 +52,7 @@ flowchart TB
 - **미완료:** 반복 오류 원인·실제 요청 제한·장기 안정성·캘린더 갱신·모바일 실기기·원본 데이터 정책 검토.
 - 서비스 내부 네트워크·장비·접속·비밀 설정은 공개 문서에 기록하지 않습니다.
 
-[운영 요약](cloudflare-tunnel-rollout.md) · [API 문서](api-guide.md) · [알려진 문제](known-issues.md)
+[운영 요약](../operations/cloudflare-tunnel-rollout.md) · [API 문서](../api-guide.md) · [알려진 문제](../qa/known-issues.md)
 
 ## 결정 사항과 보류 항목
 
@@ -64,15 +64,15 @@ flowchart TB
 
 ## 라이선스·저작자 표시
 
-- [x] `AGPL-3.0-only` [LICENSE](../LICENSE) 및 저작권자 `Transient-Onlooker` 고지.
-- [x] [NOTICE](../NOTICE)와 [라이선스 안내](licensing.md)에 제7조(b) 출처 표시 조건·제3자 자료 이용 조건 기재.
+- [x] `AGPL-3.0-only` [LICENSE](../../LICENSE) 및 저작권자 `Transient-Onlooker` 고지.
+- [x] [NOTICE](../../NOTICE)와 [라이선스 안내](../licensing.md)에 제7조(b) 출처 표시 조건·제3자 자료 이용 조건 기재.
 - [ ] 추가 출처 표시 조건의 법적 적합성과 파생 서비스 노출 위치에 대한 최종 검토. 문서에 규칙을 적었다고 법률 검토나 제3자 원본 허락이 완료되는 것은 아닙니다.
 
 ## 문서 운영 원칙
 
 1. P0~P4의 **상세 체크리스트는 각각의 원본 파일**에서 관리하며, 이 페이지에는 진행 방향과 선행 조건만 유지합니다.
-2. 오늘 진행하는 PR은 [단기 실행 로드맵](roadmap/short-term-2026-11-21.md)에 근거를 남기고, 검증 완료된 항목만 해당 원본 로드맵에 반영합니다.
+2. 오늘 진행하는 PR은 [단기 실행 로드맵](short-term-2026-11-21.md)에 근거를 남기고, 검증 완료된 항목만 해당 원본 로드맵에 반영합니다.
 3. 과거 QA/이슈 보고서는 역사적 증거로 보존합니다. 후속 PR의 구현 완료 여부와 혼동하지 않습니다.
-4. API 계약의 기준은 [OpenAPI](openapi.yaml)와 테스트 및 실제 구현입니다. 원본 데이터 재제공 조건은 코드 라이선스와 별개입니다.
+4. API 계약의 기준은 [OpenAPI](../openapi.yaml)와 테스트 및 실제 구현입니다. 원본 데이터 재제공 조건은 코드 라이선스와 별개입니다.
 
-[문서 인덱스](README.md) · [기여 가이드](../CONTRIBUTING.md)
+[문서 인덱스](../README.md) · [기여 가이드](../../CONTRIBUTING.md)
