@@ -1,6 +1,6 @@
 # OpenCigan Cloudflare 비공개 API 게이트웨이
 
-> **현재 역할:** Cloudflare Pages의 `/api/v1/*` 요청을 Raspberry Pi Python API로 전달하는 **비공개 Worker** 소스입니다. 2026-11-18~19에 Worker/Pi 운영 배포가 기록돼 있으므로 이 디렉터리를 '아직 운영 전인 스테이징만의 스캐폴드'로 해석하지 마세요. 실제 실행 버전·남은 운영 QA는 [배포 기록](../docs/cloudflare-tunnel-rollout.md)을 확인하세요.
+> **현재 역할:** Cloudflare Pages의 `/api/v1/*` 요청을 Raspberry Pi Python API로 전달하는 **비공개 Worker** 소스입니다. 2026-11-18~19에 Worker/Pi 운영 배포가 기록돼 있으므로 이 디렉터리를 '아직 운영 전인 스테이징만의 스캐폴드'로 해석하지 마세요. 실제 실행 버전·남은 운영 QA는 [배포 기록](../docs/operations/cloudflare-tunnel-rollout.md)을 확인하세요.
 
 ## 요청 흐름
 
@@ -52,4 +52,4 @@ npm test
 
 **기존 사용자 경로 보존:** 공식 사이트 전환 기록이 있으므로 예전 문서의 'GitHub Pages + Funnel이 현재 프로덕션'이라는 설명은 적용되지 않습니다. GitHub Pages는 별도 배포, Funnel 공개 노출은 중지된 상태이며 Pi의 Tailscale 사설 연결은 유지합니다.
 
-[운영 절차](../docs/operations.md) · [IP 서명 계약](../docs/proxy-client-ip.md) · [P0 검증 게이트](../docs/roadmap/core-quality.md) · [Cloudflare Workers VPC](https://developers.cloudflare.com/workers-vpc/)
+[운영 절차](../docs/operations/operations.md) · [IP 서명 계약](../docs/operations/proxy-client-ip.md) · [P0 검증 게이트](../docs/roadmap/core-quality.md) · [Cloudflare Workers VPC](https://developers.cloudflare.com/workers-vpc/)

@@ -4,7 +4,7 @@
 
 - 공식 웹: [opencigan.mcv.kr](https://opencigan.mcv.kr/) · 보조 주소: [opencigan.pages.dev](https://opencigan.pages.dev/) — 동일한 Cloudflare Pages 및 API 백엔드 경로를 사용합니다.
 - 2026-11-19의 Worker/Pi 배포와 기능 확인은 [운영 기록](cloudflare-tunnel-rollout.md)에 남아 있습니다. 그 이후 변경 여부는 실제 버전·서비스 상태로 확인해야 합니다.
-- [서비스 토폴로지](architecture.md) · [Cloudflare 게이트웨이 구성](../cloudflare-gateway/README.md)
+- [서비스 토폴로지](../architecture.md) · [Cloudflare 게이트웨이 구성](../../cloudflare-gateway/README.md)
 
 ## 실행 경로 구분
 
@@ -15,7 +15,7 @@
 | **Pi Python API** | `backend.app` / Waitress, 데이터 조회·캐시 | `127.0.0.1:8000` 루프백 수신, Cloudflare Tunnel로 연결 |
 | **Pi LAN 미리보기** | 독립적인 개발/검수 화면 및 API | `LAN_HOST:8080/opensigan/`, 지정 내부망에서만 |
 | **기존 GitHub Pages** | 보존된 별도 정적 프런트엔드 배포 | 저장소 변수 `API_BASE_URL`로 별도 API 출처 지정 |
-| **과거 Workers/D1 실험** | `workers-api/`의 예전 실험 코드 | 현재 운영하는 `cloudflare-gateway/` Worker와 다름 |
+| **과거 Workers/D1 실험** | `experiments/workers-api/`의 예전 실험 코드 | 현재 운영하는 `cloudflare-gateway/` Worker와 다름 |
 
 운영 파일: `deploy/opensigan.service`, `deploy/opensigan-preview.service`, `deploy/opensigan-preview-p0.conf`, `deploy/rpi-guard-opensigan.conf`. 서비스는 `systemd --user`에서 실행하도록 설계되어 있습니다. 자동 시작 여부와 실제 설치 상태는 RPi에서 따로 확인해야 합니다.
 
@@ -39,7 +39,7 @@ curl --fail --silent --show-error http://127.0.0.1:8000/api/v1/status
 journalctl --user -u opensigan-preview -n 30 --no-pager
 ```
 
-`/api/v1/status`는 프로세스가 응답하는지만 확인하며 컴시간 또는 NEIS 상태를 보장하지 않습니다. 자세한 외부 API 점검은 [API 가이드](api-guide.md) 참조. 실제 학교 검색/시간표·급식 호출은 원본 서버에 트래픽을 발생시키므로 캐시/제한을 고려해 필요한 경우만 하세요.
+`/api/v1/status`는 프로세스가 응답하는지만 확인하며 컴시간 또는 NEIS 상태를 보장하지 않습니다. 자세한 외부 API 점검은 [API 가이드](../api-guide.md) 참조. 실제 학교 검색/시간표·급식 호출은 원본 서버에 트래픽을 발생시키므로 캐시/제한을 고려해 필요한 경우만 하세요.
 
 캐시가 원본 갱신에 실패하면 API 로그에 `cache refresh failed`가 기록됩니다. `resource`는 시간표·학교 검색·급식 중 작업 종류이고, `fallback=stale`은 기존 데이터를 반환했음을, `fallback=none`은 대체 데이터가 없음을 뜻합니다. `error_type`은 예외 종류이며 원인이 반드시 원본 서버라는 뜻은 아닙니다. 이 진단 항목에는 검색어·학교 식별자·예외 메시지를 기록하지 않습니다. 재시도 대기 중 같은 캐시 키가 다시 조회될 때는 중복 로그를 남기지 않습니다.
 
@@ -51,8 +51,8 @@ journalctl --user -u opensigan -n 100 --no-pager
 
 | 배지 | 대상 | 통과의 의미 | 통과해도 확인되지 않는 것 |
 | --- | --- | --- | --- |
-| [CI](../.github/workflows/ci.yml) | `main` 및 PR의 `Check and deploy` | Python·Svelte 검사, Chromium·WebKit 테스트 및 빌드. `main`에서는 Pages도 배포 | 원본 서비스 가용성, 운영 네트워크, 모바일 실기기 동작 |
-| [Parser health](../.github/workflows/parser-health.yml) | `main`의 스케줄/수동 실행 | `대전` 학교 검색 한 번의 결과 형식/파싱 정상 | 전체 시간표 데이터 정확성, 모든 학교, 공개 API 가용성 |
+| [CI](../../.github/workflows/ci.yml) | `main` 및 PR의 `Check and deploy` | Python·Svelte 검사, Chromium·WebKit 테스트 및 빌드. `main`에서는 Pages도 배포 | 원본 서비스 가용성, 운영 네트워크, 모바일 실기기 동작 |
+| [Parser health](../../.github/workflows/parser-health.yml) | `main`의 스케줄/수동 실행 | `대전` 학교 검색 한 번의 결과 형식/파싱 정상 | 전체 시간표 데이터 정확성, 모든 학교, 공개 API 가용성 |
 
 **Parser health 일정:** `17 0 * * 1` (UTC) = 매주 월요일 **09:17 KST**. GitHub Actions의 예약 실행은 지연되거나 실행되지 않을 수 있으며, 워크플로가 아직 실행된 적 없으면 배지가 미확정일 수 있습니다. 동작은 `backend/parser_health_probe.py`에 정의돼 있으며 **하나의 검색 작업이 내부적으로 여러 HTTP 교환을 사용할 수 있습니다**. 재시도나 전체 시간표 조회를 하지 않습니다.
 
@@ -125,4 +125,4 @@ Pages 배포가 끝나면 공개 페이지와 정적 파일이 열리는지 확�
 - [ ] CORS·보안 헤더·API 버전·오류 계약·비밀키 보호 확인
 - [ ] RPi Wi-Fi/정전·업데이트·백업·되돌리기 절차 확보
 
-[지연 계측 자료](latency-2026-11-13.md) · [개발 가이드](development.md)
+[지연 계측 자료](../qa/latency-2026-11-13.md) · [개발 가이드](../development.md)
