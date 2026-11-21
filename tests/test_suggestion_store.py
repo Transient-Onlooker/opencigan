@@ -30,6 +30,17 @@ class SuggestionStoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             SuggestionStore(":memory:")
 
+    def test_sqlite_backup_preserves_private_and_approved_state(self):
+        pending = self.store.create("대기 중", "비공개 제안")
+        approved = self.store.create("승인됨", "공개 제안")
+        self.store.admin_transition(approved["id"], "approved")
+        backup = Path(self.temp.name) / "backup.sqlite"
+        with closing(sqlite3.connect(self.path)) as source, closing(sqlite3.connect(backup)) as target:
+            source.backup(target)
+        restored = SuggestionStore(backup)
+        self.assertEqual(restored.get_own(pending["id"], pending["token"])["status"], "pending")
+        self.assertEqual([item["id"] for item in restored.search_approved()["suggestions"]], [approved["id"]])
+
     def test_create_returns_opaque_token_and_hashes_in_db_no_ip_stored(self):
         res = self.store.create(
             "선생님별 시간표 인쇄 기능",
