@@ -64,8 +64,9 @@ flowchart TB
 
 ### ST-02 · IP·Rate Limit·CORS 오류 계약 자동 검증
 
-- [ ] Worker의 경로별 제한/OPTIONS 처리, Pi의 서명 IP·무서명 버킷, 서로 다른 클라이언트 제한 분리, 위조 `X-Forwarded-For`/`Forwarded` 방어를 격리 테스트로 추가한다.
-- [ ] 테스트 전용 제한값에서 429 JSON·`Retry-After`·CORS, 관리자 API 제한, 정상 캘린더/API 요청과의 간섭 방지를 검사한다. **실서비스에 요청 폭주를 발생시키지 않는다.**
+- [x] Worker의 경로별 제한/OPTIONS 처리, Pi의 서명 IP·무서명 버킷, 서로 다른 클라이언트 제한 분리, 위조 `X-Forwarded-For`/`Forwarded` 방어를 격리 테스트로 추가한다.
+- [x] 테스트 전용 제한값에서 429 JSON·`Retry-After`·CORS, 관리자 API 제한, 정상 캘린더/API 요청과의 간섭 방지를 검사한다. **실서비스에 요청 폭주를 발생시키지 않는다.**
+- [PR #159](https://github.com/Transient-Onlooker/opencigan/pull/159)의 Worker 테스트 19개, Pi WSGI 테스트 22개와 [전체 CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/44916758406)가 통과했다. Worker에서 가상의 IP A의 시간표 제한이 IP B·캘린더·OPTIONS에 영향을 주지 않는지, 429의 CORS/재시도 및 위조 헤더 제거를 확인했다. 기존 Pi 격리 테스트는 서명된 IP별 제한·접속 로그, 무서명 버킷, 관리자 제한과 OPTIONS를 확인한다. 실제 운영 한도 초과 검증은 별도다.
 - **완료 조건:** 독립 IP A/B의 제한·로그 계약 검증. 실제 운영 레이트 리밋 한도 초과는 별도 P0 게이트로 보존.
 - 원본: [P0 보안 경계](core-quality.md), [운영 체크리스트](../cloudflare-tunnel-rollout.md).
 
@@ -189,6 +190,9 @@ flowchart TB
 
 | 작업 | 상태 | PR/커밋 | 통과한 검사 | 미배포·사용자 검증 등 잔여 |
 | --- | --- | --- | --- | --- |
-| ST-00 ~ ST-14 (ST-04A 포함) | 시작 전 | — | — | — |
+| ST-00 | 구현·자동검증 완료 | [#157](https://github.com/Transient-Onlooker/opencigan/pull/157) | 기준선 및 Chromium/WebKit CI | 실제 기기 QA는 별도 |
+| ST-01 | 관측·모의 재현 일부 완료 | [#158](https://github.com/Transient-Onlooker/opencigan/pull/158) | 프록시·프런트 회귀, CI | 운영 미배포, 503 원인·전체 시간 예산 미확정 |
+| ST-02 | 격리 자동검증 완료 | [#159](https://github.com/Transient-Onlooker/opencigan/pull/159) | Worker·WSGI 및 CI | 실제 운영 제한 초과는 미검증 |
+| ST-03 ~ ST-14 (ST-04A 포함) | 시작 전 | — | — | — |
 
 **끝내는 기준:** 오늘의 목표는 체크박스를 억지로 100%로 만드는 것이 아니라, 실제 구현과 자동 테스트를 가능한 한 많이 안전하게 병합하는 것이다. 원래 장기 로드맵은 보존한다.
