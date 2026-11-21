@@ -25,6 +25,23 @@ function setup({search = true, general = true, failFetch = false, blockedKey = '
   return { env, calls, limits };
 }
 
+test('gateway errors follow the API error contract and retain message compatibility', async () => {
+  const responses = [
+    await worker.fetch(req('/unknown'), setup().env),
+    await worker.fetch(req('/api/v1/status', {method: 'POST'}), setup().env),
+    await worker.fetch(req('/api/v1/schools'), setup({search: false}).env),
+    await worker.fetch(req('/api/v1/status'), {}),
+    await worker.fetch(req('/api/v1/status'), setup({failFetch: true}).env),
+  ];
+  for (const response of responses) {
+    const body = await response.json();
+    assert.equal(typeof body.error, 'string');
+    assert.equal(typeof body.code, 'string');
+    assert.equal(body.message, body.error);
+  }
+  assert.deepEqual(responses.map(response => response.status), [404, 405, 429, 503, 503]);
+});
+
 test('only /api/v1/ routes are forwarded; no open proxy', async () => {
   const { env, calls } = setup();
   assert.equal((await worker.fetch(req('/private?url=http://evil.test'), env)).status, 404);

@@ -21,7 +21,7 @@ function jsonError(code, status, request, allowedOrigins, extraHeaders = {}) {
     headers.set('Access-Control-Expose-Headers', 'Retry-After');
   }
   return new Response(
-    request.method === 'HEAD' ? null : JSON.stringify({ code, message: 'API 연결을 처리하지 못했어요.' }),
+    request.method === 'HEAD' ? null : JSON.stringify({ code, error: 'API 연결을 처리하지 못했어요.', message: 'API 연결을 처리하지 못했어요.' }),
     { status, headers },
   );
 }
