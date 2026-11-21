@@ -1,11 +1,14 @@
 from datetime import date, datetime, timedelta, timezone
+from collections import Counter, OrderedDict
 import threading
 import time
 from backend.comcigan_proxy import configure_comcigan_proxy
 
 _protocol = None
 _protocol_expires = 0.0
+_protocol_content = None
 _protocol_lock = threading.Lock()
+_verified_schools = OrderedDict()
 
 
 def _search_with_cached_protocol(query, *, retry=True):
@@ -14,12 +17,13 @@ def _search_with_cached_protocol(query, *, retry=True):
     from pycomcigan.service_page import decode_service_page
     from pycomcigan.service_protocol import parse_service_protocol
 
-    global _protocol, _protocol_expires
+    global _protocol, _protocol_expires, _protocol_content
     with _protocol_lock:
         now = time.monotonic()
         reused = _protocol is not None and now < _protocol_expires
         if not reused:
-            _protocol = parse_service_protocol(decode_service_page(get_comcigan_response_for_codes().text))
+            _protocol_content = decode_service_page(get_comcigan_response_for_codes().text)
+            _protocol = parse_service_protocol(_protocol_content)
             _protocol_expires = time.monotonic() + 300
         protocol = _protocol
     try:
@@ -36,6 +40,7 @@ def _search_with_cached_protocol(query, *, retry=True):
                 if _protocol is protocol:
                     _protocol = None
                     _protocol_expires = 0.0
+                    _protocol_content = None
         if invalid_protocol and reused and retry:
             return _search_with_cached_protocol(query, retry=False)
         raise
@@ -43,13 +48,24 @@ def _search_with_cached_protocol(query, *, retry=True):
 
 def search_schools(query):
     schools = []
-    for row in _search_with_cached_protocol(query):
+    rows = _search_with_cached_protocol(query)
+    for row in rows:
         if (not isinstance(row, (list, tuple)) or len(row) < 4
                 or not isinstance(row[3], int) or isinstance(row[3], bool) or row[3] <= 0
                 or not isinstance(row[2], str) or not row[2] or len(row[2]) > 50
                 or ":" in row[2] or not isinstance(row[1], str)):
             raise RuntimeError("학교 검색 응답 형식이 올바르지 않습니다")
         schools.append({"id": f"{row[3]}:{row[2]}", "name": row[2], "region": row[1]})
+    counts = Counter(school['id'] for school in schools)
+    with _protocol_lock:
+        for school, row in zip(schools, rows):
+            if counts[school['id']] != 1 or type(row[0]) is not int or row[0] < 0:
+                _verified_schools.pop(school['id'], None)
+                continue
+            _verified_schools.pop(school['id'], None)
+            _verified_schools[school['id']] = (row[0], time.monotonic() + 300)
+            if len(_verified_schools) > 256:
+                _verified_schools.popitem(last=False)
     return schools
 
 
@@ -71,6 +87,7 @@ def validate_timetable_week(week):
 
 
 def fetch_timetable(school_id, week):
+    global _protocol, _protocol_expires, _protocol_content
     configure_comcigan_proxy()
     from pycomcigan import TimeTable
 
@@ -86,7 +103,37 @@ def fetch_timetable(school_id, week):
     offset = validate_timetable_week(week)
     start = date.fromisoformat(week)
     try:
-        timetable = TimeTable(name, school_code=int(code), week_num=offset)
+        with _protocol_lock:
+            verified = _verified_schools.get(school_id)
+            reusable = verified and verified[1] > time.monotonic() and _protocol is not None and _protocol_content is not None and _protocol_expires > time.monotonic()
+            protocol, content = (_protocol, _protocol_content) if reusable else (None, None)
+        if protocol is None:
+            timetable = TimeTable(name, school_code=int(code), week_num=offset)
+        else:
+            codes = TimeTable._get_comcigan_codes(content)
+            try:
+                data = TimeTable._fetch_timetable_data(int(code), offset, codes, protocol)
+            except RuntimeError as exc:
+                message = str(exc)
+                invalid = message in ('Encrypted response protocol mismatch', 'Encrypted response authentication failed')
+                if invalid or 'HTTP 403' in message:
+                    with _protocol_lock:
+                        if _protocol is protocol:
+                            _protocol = None
+                            _protocol_expires = 0.0
+                            _protocol_content = None
+                if invalid:
+                    timetable = TimeTable(name, school_code=int(code), week_num=offset)
+                else:
+                    raise
+            else:
+                if data.get('학교명') and data['학교명'] != name:
+                    with _protocol_lock:
+                        _verified_schools.pop(school_id, None)
+                    timetable = TimeTable(name, school_code=int(code), week_num=offset)
+                else:
+                    timetable = TimeTable.__new__(TimeTable)
+                    timetable._initialize_from_data(data, verified[0], name, int(code), codes)
     except ValueError as exc:
         raise RuntimeError("시간표 제공자의 응답이 올바르지 않습니다") from exc
     records = []
