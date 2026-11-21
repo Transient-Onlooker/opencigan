@@ -101,8 +101,9 @@ flowchart TB
 
 ### ST-05 · ‘만들어주세요’ 서버 접수·관리
 
-- [ ] 익명 기능 요청의 제목·설명·이용 상황을 **별도 저장소**에 저장하는 API, 공개 승인 제안만 검색하는 API, 중복·길이·본문·HTML·스팸 제한을 구현한다.
-- [ ] 관리자 승인/거절/삭제/중복 병합, 권한 확인, 기존 접근 로그·설정·시간표 이력과의 데이터 경계 및 복구 테스트를 구현한다.
+- [x] 익명 기능 요청의 제목·설명·이용 상황을 **별도 저장소**에 저장하는 API, 공개 승인 제안만 검색하는 API, 중복·길이·본문·HTML·스팸 제한을 구현한다.
+- [x] 관리자 승인/거절/삭제/중복 병합, 권한 확인, 기존 접근 로그·설정·시간표 이력과의 데이터 경계 및 복구 테스트를 구현한다.
+- [PR #167](https://github.com/Transient-Onlooker/opencigan/pull/167): 별도 SQLite 저장소와 기본 OFF API, 승인된 내용만 공개하는 검색, 토큰 인증과 복원 회귀를 구현했다. 제안은 일반 텍스트로 저장하며 표시 계층은 HTML로 해석하지 않아야 한다. [통합 CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/44929089685)가 통과했고 운영 접수는 열지 않았다.
 - **완료 조건:** 미승인 내용 비공개, XSS/권한 우회/입력 오류·중복 검사, 관리자 상태 전이 테스트. **기능 플래그 OFF로 병합하고 공개 접수/보존 정책은 확정하지 않는다.**
 - 원본: [P2 익명 제안·관리](api-operations.md).
 
@@ -195,7 +196,7 @@ flowchart TB
 | ST-01 | 관측·모의 재현 일부 완료 | [#158](https://github.com/Transient-Onlooker/opencigan/pull/158), [#164](https://github.com/Transient-Onlooker/opencigan/pull/164), [#165](https://github.com/Transient-Onlooker/opencigan/pull/165), [#166](https://github.com/Transient-Onlooker/opencigan/pull/166) | 프록시·프런트 및 학교별 장애·급식·캘린더 복구 회귀, CI | 운영 미배포, 503 원인·전체 시간 예산 미확정 |
 | ST-02 | 격리 자동검증 완료 | [#159](https://github.com/Transient-Onlooker/opencigan/pull/159) | Worker·WSGI 및 CI | 실제 운영 제한 초과는 미검증 |
 | ST-03 | 검증 중 | [#162](https://github.com/Transient-Onlooker/opencigan/pull/162) 초안 | 단일 격리 비교에서 수업 데이터 일치 | 실측 요청 수·지연 개선 미달, 상류 학교 식별값 확인 필요 |
-| ST-05 | 격리 구현 검토 중 | [#167](https://github.com/Transient-Onlooker/opencigan/pull/167) 초안 | 별도 저장소·권한·백업 회귀 | 기본 OFF, 공개·운영 미적용 |
+| ST-05 | 격리 구현·자동검증 완료 | [#167](https://github.com/Transient-Onlooker/opencigan/pull/167) | 별도 저장소·권한·백업 회귀, 통합 CI | 기본 OFF, 공개·운영 미적용 |
 | ST-04, ST-04A, ST-06 ~ ST-14 | 진행 전 또는 부분 조사 | — | — | — |
 
 **끝내는 기준:** 오늘의 목표는 체크박스를 억지로 100%로 만드는 것이 아니라, 실제 구현과 자동 테스트를 가능한 한 많이 안전하게 병합하는 것이다. 원래 장기 로드맵은 보존한다.
