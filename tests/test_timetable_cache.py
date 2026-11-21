@@ -150,6 +150,32 @@ class TimetableTests(unittest.TestCase):
             timetable.search_schools('Example')
             self.assertNotIn('76524:Example', timetable._verified_schools)
 
+    def test_successful_search_populates_bounded_verification_cache(self):
+        rows = [[1, 'region', f'School{i}', i + 1] for i in range(257)]
+        with patch.object(timetable, '_verified_schools', OrderedDict()), \
+             patch('backend.timetable._search_with_cached_protocol', return_value=rows):
+            timetable.search_schools('School')
+            self.assertEqual(len(timetable._verified_schools), 256)
+            self.assertNotIn('1:School0', timetable._verified_schools)
+            self.assertIn('257:School256', timetable._verified_schools)
+
+    def test_expired_protocol_or_unverified_school_uses_existing_validation(self):
+        fixed = type('FixedDateTime', (datetime,), {
+            'now': classmethod(lambda cls, tz=None: datetime(2026, 11, 10, tzinfo=tz))
+        })
+        empty = type('Table', (), {'timetable': [], 'update_date': None})()
+        for expires, schools in [(0, {'76524:Example': (9999, float('inf'))}),
+                                 (float('inf'), {})]:
+            with self.subTest(expires=expires, schools=schools), \
+                 patch('backend.timetable.datetime', fixed), \
+                 patch.object(timetable, '_protocol', object()), \
+                 patch.object(timetable, '_protocol_content', 'cached page'), \
+                 patch.object(timetable, '_protocol_expires', expires), \
+                 patch.object(timetable, '_verified_schools', OrderedDict(schools)), \
+                 patch('pycomcigan.TimeTable', return_value=empty) as original:
+                timetable.fetch_timetable('76524:Example', '2026-11-09')
+                original.assert_called_once_with('Example', school_code=76524, week_num=0)
+
     def test_403_invalidates_without_immediate_retry(self):
         from types import SimpleNamespace
         timetable._protocol = None
