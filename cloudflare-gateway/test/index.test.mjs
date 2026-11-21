@@ -137,6 +137,36 @@ test('timetable and calendar use separate category budgets alongside the general
   ]);
 });
 
+test('per-client timetable exhaustion preserves another client, calendar and preflight', async () => {
+  const { env, calls } = setup();
+  const counts = new Map();
+  env.TIMETABLE_RATE.limit = async ({ key }) => {
+    const count = (counts.get(key) ?? 0) + 1;
+    counts.set(key, count);
+    return { success: count <= 1 };
+  };
+  const origin = 'https://opencigan.mcv.kr';
+  const headers = (ip) => ({ Origin: origin, 'CF-Connecting-IP': ip, 'X-Forwarded-For': '192.0.2.3', Forwarded: 'for=192.0.2.3' });
+  const a = headers('203.0.113.9');
+  const b = headers('198.51.100.10');
+  assert.equal((await worker.fetch(req('/api/v1/timetable', { headers: a }), env)).status, 200);
+  const limited = await worker.fetch(req('/api/v1/timetable', { headers: a }), env);
+  assert.equal(limited.status, 429);
+  assert.equal((await limited.json()).code, 'edge_rate_limited');
+  assert.equal(limited.headers.get('retry-after'), '60');
+  assert.equal(limited.headers.get('access-control-allow-origin'), origin);
+  assert.equal(limited.headers.get('access-control-expose-headers'), 'Retry-After');
+  assert.equal((await worker.fetch(req('/api/v1/timetable', { headers: b }), env)).status, 200);
+  assert.equal((await worker.fetch(req('/api/v1/timetable.ics', { headers: a }), env)).status, 200);
+  assert.equal((await worker.fetch(req('/api/v1/timetable', { method: 'OPTIONS', headers: a }), env)).status, 200);
+  assert.deepEqual([...counts.entries()], [['203.0.113.9', 2], ['198.51.100.10', 1]]);
+  assert.equal(calls.length, 4);
+  for (const request of calls) {
+    assert.equal(request.headers.get('x-forwarded-for'), null);
+    assert.equal(request.headers.get('forwarded'), null);
+  }
+});
+
 test('OPTIONS uses a separate preflight key and forwards allowed CORS requests', async () => {
   const { env, calls, limits } = setup({ search: false });
   const response = await worker.fetch(req('/api/v1/schools', { method: 'OPTIONS', headers: {Origin: 'https://opencigan.mcv.kr', 'CF-Connecting-IP': '203.0.113.9'} }), env);
