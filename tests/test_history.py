@@ -25,6 +25,23 @@ class HistoryTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def test_change_stats_distinguish_missing_baseline_and_retained_changes(self):
+        base = datetime.now(timezone.utc)
+        self.assertIsNone(self.store.change_stats('s', 'w')['totalChanges'])
+        self.store.observe('s', 'w', [lesson()], base)
+        baseline = self.store.change_stats('s', 'w')
+        self.assertTrue(baseline['observed'])
+        self.assertEqual(baseline['totalChanges'], 0)
+        self.store.observe('s', 'w', [lesson('Science'), lesson('Art', period=2)], base + timedelta(seconds=1))
+        stats = self.store.change_stats('s', 'w')
+        self.assertEqual(stats['byType'], {'added': 1, 'changed': 1, 'deleted': 0})
+        self.assertEqual(stats['affectedClasses'], 1)
+        with closing(sqlite3.connect(self.store.path)) as db:
+            expired = (base - timedelta(days=31)).isoformat()
+            db.execute('UPDATE observed_weeks SET observed_at=? WHERE school=? AND week=?', (expired, 's', 'w'))
+            db.commit()
+        self.assertIsNone(self.store.change_stats('s', 'w')['totalChanges'])
+
     def test_existing_snapshot_migrates_once_and_retains_baseline(self):
         path = Path(self.temp.name) / "legacy.sqlite"
         db = sqlite3.connect(path)

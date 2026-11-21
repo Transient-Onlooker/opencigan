@@ -155,6 +155,31 @@ class HistoryStore:
                 db.execute("ROLLBACK")
                 raise
 
+    def change_stats(self, school, week):
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        with closing(self._connect()) as db:
+            db.execute("BEGIN")
+            observed = db.execute(
+                "SELECT observed_at FROM observed_weeks WHERE school=? AND week=? AND observed_at>=?",
+                (school, week, cutoff),
+            ).fetchone()
+            if observed is None:
+                return {"observed": False, "totalChanges": None, "byType": None,
+                        "affectedClasses": None, "lastObservedAt": None, "retainedSince": cutoff}
+            rows = db.execute(
+                "SELECT type, COUNT(*) AS count FROM changes WHERE school=? AND week=? AND observed_at>=? GROUP BY type",
+                (school, week, cutoff),
+            ).fetchall()
+            count = db.execute(
+                "SELECT COUNT(*) FROM (SELECT DISTINCT grade, class_number FROM changes WHERE school=? AND week=? AND observed_at>=?)",
+                (school, week, cutoff),
+            ).fetchone()[0]
+            by_type = {key: 0 for key in ("added", "changed", "deleted")}
+            for row in rows:
+                by_type[row["type"]] = row["count"]
+            return {"observed": True, "totalChanges": sum(by_type.values()), "byType": by_type,
+                    "affectedClasses": count, "lastObservedAt": observed["observed_at"], "retainedSince": cutoff}
+
     def list(self, school, week, cursor=None, limit=50, grade=None, classroom=None, include_ids=False, filters=None):
         if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
             raise ValueError("limit must be a positive integer")

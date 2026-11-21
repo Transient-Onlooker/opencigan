@@ -29,6 +29,7 @@ from backend.webhook_routes import webhook_api
 from backend.suggestion_routes import suggestion_api
 from backend.calendar_routes import timetable_calendar
 from backend.history_routes import timetable_history
+from backend.history_stats_routes import history_stats
 from backend.analytics_routes import record_pageview, analytics_summary
 from backend.admin_routes import access_log_admin
 from backend.timetable import fetch_timetable, search_schools, validate_timetable_week
@@ -303,7 +304,7 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
     if method == "OPTIONS":
         return preflight_response(path, headers)
 
-    if client and path in ("/api/v1/admin/analytics", "/api/v1/admin/access-logs"):
+    if client and path in ("/api/v1/admin/analytics", "/api/v1/admin/access-logs", "/api/v1/admin/history-stats"):
         retry = _rate_allowed(("admin", client))
         if retry:
             headers["Retry-After"] = str(retry)
@@ -313,6 +314,9 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
         status, response_headers, body = _access_log_admin(method, query_string, request_headers, headers)
         response_headers['Content-Length'] = str(len(body))
         return status, response_headers, body
+
+    if path == '/api/v1/admin/history-stats':
+        return history_stats(method, query_string, request_headers, headers, _history_store)
 
     if path not in ("/api/v1/status", "/api/v1/admin/analytics"):
         allowed, retry_after = (shutter if shutter_instance is None else shutter_instance).check()
