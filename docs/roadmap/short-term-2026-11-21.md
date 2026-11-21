@@ -197,6 +197,8 @@ flowchart TB
 | ST-02 | 격리 자동검증 완료 | [#159](https://github.com/Transient-Onlooker/opencigan/pull/159) | Worker·WSGI 및 CI | 실제 운영 제한 초과는 미검증 |
 | ST-03 | 검증 중 | [#162](https://github.com/Transient-Onlooker/opencigan/pull/162) 초안 | 단일 격리 비교에서 수업 데이터 일치 | 실측 요청 수·지연 개선 미달, 상류 학교 식별값 확인 필요 |
 | ST-05 | 격리 구현·자동검증 완료 | [#167](https://github.com/Transient-Onlooker/opencigan/pull/167) | 별도 저장소·권한·백업 회귀, 통합 CI | 기본 OFF, 공개·운영 미적용 |
-| ST-04, ST-04A, ST-06 ~ ST-14 | 진행 전 또는 부분 조사 | — | — | — |
+| ST-07 | 일부 구현·검증 완료 | [#169](https://github.com/Transient-Onlooker/opencigan/pull/169) | 공식 도메인 같은 출처 API 연결 모의 브라우저 테스트, CI | 관리 링크 등 잔여 기능과 실제 발송 비활성 유지 |
+| ST-10 | 일부 구현·검증 완료 | [#168](https://github.com/Transient-Onlooker/opencigan/pull/168) | 게이트웨이 오류 응답 계약·하위 호환 회귀, CI | Worker 운영 배포 및 나머지 계약·관측 확인 별도 |
+| ST-04, ST-04A, ST-06, ST-08 ~ ST-09, ST-11 ~ ST-14 | 진행 전 또는 부분 조사 | — | — | — |
 
 **끝내는 기준:** 오늘의 목표는 체크박스를 억지로 100%로 만드는 것이 아니라, 실제 구현과 자동 테스트를 가능한 한 많이 안전하게 병합하는 것이다. 원래 장기 로드맵은 보존한다.
