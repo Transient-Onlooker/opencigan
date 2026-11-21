@@ -721,6 +721,23 @@ test('meal date accepts pasted ISO date', async ({ page, browserName, context })
   await expect(input).toHaveValue('2026-12-25');
 });
 
+test('invalid pasted date preserves the current date and cancels the default paste', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  const input = page.getByLabel('날짜 선택');
+  const before = await input.inputValue();
+  const cancelled = await input.evaluate((element) => {
+    const clipboard = new DataTransfer();
+    clipboard.setData('text/plain', '2026-02-30');
+    const event = new ClipboardEvent('paste', { clipboardData: clipboard, bubbles: true, cancelable: true });
+    element.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(cancelled).toBe(true);
+  await expect(input).toHaveValue(before);
+});
+
 test('meal date errors preserve the applied date and valid input fetches the matching week', async ({ page }) => {
   await mockApi(page);
   await page.goto('/' + sharedHash(1));

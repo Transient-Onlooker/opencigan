@@ -583,7 +583,7 @@
       input.value = mealDate;
       return;
     }
-    if (mealDate === value && !dateError) return;
+    if (mealDate === value) { dateError = ''; return; }
     mealDate = value; mealDateDraft = value; dateError = ''; loadMeals();
   }
   function setTheme(value: string) {
