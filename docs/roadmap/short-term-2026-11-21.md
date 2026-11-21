@@ -46,8 +46,9 @@ flowchart TB
 
 ### ST-00 · 테스트 가능한 기준선 및 자동 QA
 
-- [ ] 최신 `main`의 Python/Worker/프런트 테스트, Svelte 검사, 빌드, Chromium/WebKit 필수 플로우 실행 결과를 남긴다. 실행하지 못한 것은 실행했다고 쓰지 않는다.
+- [x] 최신 `main`의 Python/Worker/프런트 테스트, Svelte 검사, 빌드, Chromium/WebKit 필수 플로우 실행 결과를 남긴다. 실행하지 못한 것은 실행했다고 쓰지 않는다.
 - [ ] 누락된 자동 시나리오를 보강한다: 학교·학급·주차 변경 중 늦은 응답, 검색/캐시 장애와 복구, 급식 독립성, ICS 200/304, 공유 링크, 429/503 오류 표시. 모의 상류를 우선 사용한다.
+- 기준선: `9ce1a34`의 [CI 실행 44908297694](https://github.com/Transient-Onlooker/opencigan/actions/runs/44908297694)에서 Python·Worker·프런트 단위/통합 검사, Svelte 검사, Chromium/WebKit 및 빌드 통과. 기존 테스트는 선택 변경·공유 링크·저장본 복구·급식 독립성·ICS 304·503 안내를 포함한다. 429 응답의 대기 시간·급식 독립성·복구 브라우저 시나리오를 추가했고 로컬 Chromium 1건을 통과했다. 추가 시나리오의 원격 Chromium/WebKit 결과는 PR 검사로 확인한다.
 - **완료 조건:** 재실행 가능한 테스트 또는 CI 워크플로가 저장소에 있고 회귀 결과가 기록됨.
 - 원본: [P0](core-quality.md), [릴리스 기준선](refactoring-and-release.md).
 
