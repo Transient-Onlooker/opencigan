@@ -128,20 +128,27 @@ class TimetableTests(unittest.TestCase):
         self.assertEqual(fallback_calls, [('Example', {'school_code': 76524, 'week_num': 0})])
         self.assertEqual(result['records'], [])
 
-    def test_cached_school_does_not_accept_another_school_response(self):
+    def test_cached_school_mismatch_falls_back_to_original_validation(self):
         from pycomcigan import TimeTable
         fixed = type('FixedDateTime', (datetime,), {
             'now': classmethod(lambda cls, tz=None: datetime(2026, 11, 10, tzinfo=tz))
         })
+        calls = []
+        def fallback(table, name, **kwargs):
+            calls.append((name, kwargs))
+            table.timetable, table.update_date = [], None
         with patch('backend.timetable.datetime', fixed), \
              patch.object(timetable, '_protocol', object()), \
              patch.object(timetable, '_protocol_content', 'cached page'), \
              patch.object(timetable, '_protocol_expires', float('inf')), \
              patch.object(timetable, '_verified_schools', OrderedDict({'76524:Example': (9999, float('inf'))})), \
              patch.object(TimeTable, '_get_comcigan_codes', return_value=('code',) * 7), \
-             patch.object(TimeTable, '_fetch_timetable_data', return_value={'학교명': 'Other'}):
-            with self.assertRaisesRegex(RuntimeError, '일치하지 않습니다'):
-                timetable.fetch_timetable('76524:Example', '2026-11-09')
+             patch.object(TimeTable, '_fetch_timetable_data', return_value={'학교명': 'Other'}), \
+             patch.object(TimeTable, '__init__', new=fallback):
+            result = timetable.fetch_timetable('76524:Example', '2026-11-09')
+            self.assertNotIn('76524:Example', timetable._verified_schools)
+        self.assertEqual(calls, [('Example', {'school_code': 76524, 'week_num': 0})])
+        self.assertEqual(result['records'], [])
 
     def test_duplicate_school_code_is_not_cached_as_verified(self):
         duplicate = [[1, 'A', 'Example', 76524], [2, 'B', 'Example', 76524]]

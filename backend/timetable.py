@@ -128,9 +128,12 @@ def fetch_timetable(school_id, week):
                     raise
             else:
                 if data.get('학교명') and data['학교명'] != name:
-                    raise RuntimeError('시간표의 학교 정보가 일치하지 않습니다')
-                timetable = TimeTable.__new__(TimeTable)
-                timetable._initialize_from_data(data, verified[0], name, int(code), codes)
+                    with _protocol_lock:
+                        _verified_schools.pop(school_id, None)
+                    timetable = TimeTable(name, school_code=int(code), week_num=offset)
+                else:
+                    timetable = TimeTable.__new__(TimeTable)
+                    timetable._initialize_from_data(data, verified[0], name, int(code), codes)
     except ValueError as exc:
         raise RuntimeError("시간표 제공자의 응답이 올바르지 않습니다") from exc
     records = []
