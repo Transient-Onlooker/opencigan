@@ -5,7 +5,7 @@ Provides HTTP handler for feature suggestions:
 - Submitter self-service retrieval using opaque token
 - Unauthenticated search of approved suggestions only
 - Admin operations (list, transition, delete) protected by Bearer token
-  with minimum entropy requirements (>= 16 characters / >= 128 bits)
+  with a minimum length; the configured token must also be random
 - Strict input/body bounds and rate limiting
 - Safe error codes and no client IP logging/storage
 """
@@ -36,7 +36,7 @@ _MIN_ADMIN_TOKEN_LEN = 16
 
 
 def _check_admin_auth(request_headers, headers):
-    """Verify admin bearer token with minimum entropy requirement."""
+    """Verify the configured admin bearer token."""
     admin_token = os.environ.get("OPENCIGAN_SUGGESTION_ADMIN_TOKEN", "").strip()
     if not admin_token or len(admin_token) < _MIN_ADMIN_TOKEN_LEN:
         headers["WWW-Authenticate"] = 'Bearer realm="Suggestion admin"'
