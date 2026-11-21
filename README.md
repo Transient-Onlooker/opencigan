@@ -1,56 +1,74 @@
-# Opencigan
+# OpenCigan
 
-Opencigan은 학교 시간표와 급식을 한곳에서 보는 웹앱입니다. 시간표는 컴시간, 급식은 NEIS 데이터를 사용합니다. 로그인 없이 학교와 학급을 선택할 수 있습니다.
+학교 **시간표와 급식**을 한곳에서 확인하는 웹앱입니다. 학교·학년·반을 선택해 시간표를 조회하고, NEIS 급식 정보와 캘린더 구독 기능을 사용할 수 있습니다. 기본 조회에는 로그인이 필요하지 않습니다.
 
-[Opencigan 열기](https://opencigan.mcv.kr/) · [문제 제보](https://github.com/Transient-Onlooker/opencigan/issues) · [기여하기](CONTRIBUTING.md)
+## 서비스 접속
+
+| 주소 | 용도 |
+| --- | --- |
+| **[공식 웹사이트 · opencigan.mcv.kr](https://opencigan.mcv.kr/)** | 기본 접속 주소 (Cloudflare Pages 사용자 지정 도메인) |
+| **[보조 접속 주소 · opencigan.pages.dev](https://opencigan.pages.dev/)** | 동일한 웹앱의 Cloudflare Pages 기본 도메인 |
+
+두 주소는 **동일한 백엔드 경로를 공유**합니다. 보조 주소가 독립적인 API 서버나 완전한 장애 대비 경로를 의미하지는 않습니다.
+
+[문제 제보](https://github.com/Transient-Onlooker/opencigan/issues) · [개발 로드맵](docs/roadmap.md) · [오늘의 집중 개발](docs/roadmap/short-term-2026-11-21.md) · [기여 가이드](CONTRIBUTING.md)
+
+## 주요 기능
+
+- **시간표:** 오늘·주간·학년 비교·교사별 보기, 변경 표시와 수집 시각
+- **급식:** NEIS 기반 일간·주간 식단, 메뉴 검색, 알레르기 표시 설정
+- **개인화:** 과목 색상/표시 이름, 교사 별칭, 교시 시각, 테마 및 브라우저 설정 백업
+- **공유·내보내기:** 학급 링크, 시간표 PNG/PDF, iCalendar(ICS) 구독
+- **연동:** 읽기 API, OpenAPI 명세, API Playground, 웹사이트 삽입용 `iframe` 위젯
+
+알림·변경 이력 저장·일부 개발자 기능은 **서버 설정에 따라 비활성화**될 수 있습니다. 원본에 접근할 수 없는 경우 마지막으로 확인한 캐시 데이터가 표시될 수 있으며, 화면의 수집 시각과 오류 안내를 확인하세요.
 
 ## 사용 방법
 
-1. **학교 찾기**에서 학교 이름을 검색하고 학년과 반을 선택합니다. 현재 선택된 학교·학급을 확인한 뒤 시간표를 엽니다.
-2. **시간표**에서 이번 주, 오늘, 학년 비교, 교사별 시간표를 확인합니다. **급식** 탭에서는 같은 학교의 하루 또는 주간 식단을 볼 수 있습니다. 이름이 같은 학교가 있으면 급식 탭에서 주소를 확인해 선택합니다.
-3. **설정**에서 시간표 표시, 테마, 급식과 알레르기 항목을 바꿀 수 있습니다. 알레르기 설정은 브라우저에만 저장되며, NEIS에 알레르기가 표시되지 않았다고 해서 안전하다는 뜻은 아닙니다.
+1. **학교 찾기**에서 학교 이름을 검색한 다음 학년·반을 선택합니다.
+2. **시간표**와 **급식**을 확인합니다. 같은 이름의 학교가 여럿이면 급식용 NEIS 학교 선택 시 주소를 비교합니다.
+3. **설정**에서 개인화, 교시 시각, 알레르기 표시, 백업·복원을 관리합니다.
+4. 시간표의 **이미지 저장·공유**, **PDF 저장**, **학급 링크 복사** 또는 **캘린더 구독 링크**를 이용합니다.
 
-시간표는 PNG나 PDF로 저장할 수 있습니다. 화면 아래의 **학급 링크 복사**로 학급을 공유하거나, **캘린더 구독 링크**에서 하루 요약과 교시별 종일 일정 중 하나를 선택할 수 있습니다. 구독 주소는 캘린더 앱이 접근할 수 있어야 하며, 갱신 주기는 앱마다 다릅니다.
+**데이터 시각:** '마지막 확인'은 API 응답을 받은 시점, '마지막 수집'은 백엔드가 원본을 가져온 시점입니다. 캐시 응답의 수집 시각은 바뀌지 않을 수 있습니다. 오프라인에는 같은 학교·주차에서 미리 가져온 마지막 시간표만 복원합니다.
 
-새로고침 후 **마지막 확인**은 서버 응답을 받은 시각, **마지막 수집**은 서버가 원본을 가져온 시각입니다. 서버가 캐시를 보냈다면 수집 시각은 그대로일 수 있습니다. 오프라인 조회는 연결이 끊기기 전에 불러온 마지막 시간표를 같은 학교·주차에서 보여 줍니다.
+**알레르기 주의:** 필터는 화면 표시를 돕는 기능입니다. NEIS 식단에 알레르기 항목이 없다고 해서 안전하다는 뜻은 아닙니다. 알레르기 설정은 브라우저에 보관합니다.
 
-이전 개인 시간표·일정 편집 화면은 종료됐습니다. 기존 데이터는 이 브라우저에 남아 있으며, 데이터가 있다면 설정의 **기존 개인 데이터 내보내기**로 모든 학교·학급의 원본을 JSON 파일로 보관할 수 있습니다. 파일에는 개인 일정이 포함될 수 있으며, 현재 앱에서 파일을 다시 불러오는 기능은 없습니다.
+**이전 개인 일정:** 개인 시간표·시험 일정 편집 화면은 종료됐지만 기존 브라우저 데이터는 삭제하지 않았습니다. 해당 데이터가 있으면 설정에서 원본 JSON을 내보낼 수 있으며, 현재 앱에서 그 파일을 다시 불러오는 기능은 없습니다.
 
 ## 서비스 구조
 
 ```mermaid
 flowchart LR
-    Browser["Svelte 웹앱 · GitHub Pages"]
-    API["Python API · Raspberry Pi"]
-    Cache["프로세스별 캐시"]
-    Time["컴시간 시간표"]
-    Meal["NEIS 급식"]
-    Local["브라우저 개인 설정"]
-
-    Browser --> API
-    API --> Cache
-    Cache --> Time
-    Cache --> Meal
-    Browser -.-> Local
+    User["브라우저"] --> Pages["Cloudflare Pages<br/>공식·보조 주소"]
+    Pages --> Fn["Pages Functions"]
+    Fn --> Worker["비공개 API Worker"]
+    Worker --> VPC["Workers VPC<br/>Cloudflare Tunnel"]
+    VPC --> Pi["Raspberry Pi<br/>Python API"]
+    Pi --> Cache["시간표·급식 캐시"]
+    Cache --> Timetable["컴시간<br/>WARP 출구"]
+    Cache --> Meals["NEIS<br/>직접 연결"]
+    User -.-> Settings["브라우저 로컬 설정"]
 ```
 
-웹 화면과 API는 별도 배포 대상입니다. 알림·변경 이력 저장 등 일부 기능은 서버 설정에 따라 비활성일 수 있습니다. 자세한 내용은 [구조와 데이터 흐름](docs/architecture.md), 진행 방향은 [Mermaid 로드맵](docs/roadmap.md)을 참고하세요.
+API는 `/api/v1/*`에서 제공됩니다. 기존 GitHub Pages 배포는 별도로 유지되며, 현재 공식 주소의 API 경로는 위 구조를 사용합니다. Cloudflare Pages와 Raspberry Pi가 각각 정상 작동해야 데이터 조회가 가능합니다.
 
-## 개발과 기여
+[상세 아키텍처](docs/architecture.md) · [운영·복구](docs/operations.md) · [Cloudflare 게이트웨이](cloudflare-gateway/README.md)
 
-문서 수정, 모바일에서 발견한 문제 제보, 합성 데이터로 재현할 수 있는 테스트도 도움이 됩니다. [기여 가이드](CONTRIBUTING.md)에서 제보와 PR 작성 방법을 확인하고, [개발 가이드](docs/development.md)에서 로컬 실행을 시작하세요.
+## 문서 및 개발
 
-| 문서 | 내용 |
+| 목적 | 문서 |
 | --- | --- |
-| [로드맵·진행도](docs/roadmap.md) · [UI/UX 개선 목록](docs/roadmap/user-experience.md) · [알려진 문제](docs/known-issues.md) | 단계별 현황, 사용자 경험 개선, 잔여 검증 |
-| [API 사용 가이드](docs/api-guide.md) · [OpenAPI](docs/openapi.yaml) | 요청 예시, 응답 형식, 캐시와 오류 |
-| [구조와 데이터 흐름](docs/architecture.md) · [운영 가이드](docs/operations.md) | 서비스 구성과 배포 점검 |
-| [이용 통계](docs/analytics.md) | 집계 항목과 데이터 보관 기준 |
+| **문서 찾아보기** | [문서 안내](docs/README.md) |
+| **로드맵** | [전체 진행 방향](docs/roadmap.md) · [2026-11-21 단기 실행 목록](docs/roadmap/short-term-2026-11-21.md) |
+| **개발 시작** | [개발 가이드](docs/development.md) · [기여 가이드](CONTRIBUTING.md) |
+| **API 연동** | [API 사용법](docs/api-guide.md) · [OpenAPI 3.1](docs/openapi.yaml) · [클라이언트 예제](docs/client-examples.md) |
+| **서비스 품질** | [운영 절차](docs/operations.md) · [알려진 문제](docs/known-issues.md) · [접속 로그](docs/access-logs.md) |
 
-시간표 연동에는 [pycomcigan](https://github.com/hegelty/pycomcigan)을 사용합니다.
+시간표 연동에는 [pycomcigan](https://github.com/hegelty/pycomcigan)을 사용합니다. 원본 시간표·급식 데이터의 이용 조건은 코드 라이선스와 별개입니다.
 
 ## 라이선스
 
-Opencigan 코드는 [AGPL-3.0-only](LICENSE)로 배포합니다. Copyright (c) 2026 Transient-Onlooker. 제3자 구성요소는 각자의 라이선스와 고지를 따릅니다.
+코드는 [AGPL-3.0-only](LICENSE)로 배포합니다. Copyright (c) 2026 Transient-Onlooker.
 
-이 저작물·수정본의 웹 푸터나 앱 정보 화면에는 제7조(b)에 따른 원작자·[원본 저장소](https://github.com/Transient-Onlooker/opencigan) 표시 조건이 적용됩니다. 코드 라이선스는 컴시간·NEIS 데이터 이용 허락을 부여하지 않습니다. 범위와 고지는 [라이선스 안내](docs/licensing.md) 및 [NOTICE](NOTICE)를 확인하세요.
+제7조(b)의 원작자·[원본 저장소](https://github.com/Transient-Onlooker/opencigan) 출처 표시 조건 및 제3자 구성요소 고지는 [라이선스 안내](docs/licensing.md)와 [NOTICE](NOTICE)를 참고하세요. 이 라이선스만으로 컴시간·NEIS 원본 데이터 재제공 허락을 받는 것은 아닙니다.
