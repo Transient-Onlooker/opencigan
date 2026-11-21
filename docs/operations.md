@@ -1,15 +1,21 @@
 # 배포·운영·상태 모니터링
 
-정적 사이트와 Raspberry Pi API를 배포하거나 점검하는 운영자를 위한 문서입니다.
+정적 웹앱과 Raspberry Pi API를 배포하거나 점검하는 운영자를 위한 문서입니다. **구성 및 마지막 배포 기록**과 **현재 실측한 상태**를 구별하세요.
+
+- 공식 웹: [opencigan.mcv.kr](https://opencigan.mcv.kr/) · 보조 주소: [opencigan.pages.dev](https://opencigan.pages.dev/) — 동일한 Cloudflare Pages 및 API 백엔드 경로를 사용합니다.
+- 2026-11-19의 Worker/Pi 배포와 기능 확인은 [운영 기록](cloudflare-tunnel-rollout.md)에 남아 있습니다. 그 이후 변경 여부는 실제 버전·서비스 상태로 확인해야 합니다.
+- [서비스 토폴로지](architecture.md) · [Cloudflare 게이트웨이 구성](../cloudflare-gateway/README.md)
 
 ## 실행 경로 구분
 
 | 환경 | 제공 내용 | 접근 및 상태 |
 | --- | --- | --- |
-| GitHub Pages | Svelte 정적 프런트엔드와 API 문서 | 페이지 빌드/배포 후 접근 가능. API 주소가 없으면 데이터 조회 불가 |
-| RPi Python API | `backend.app` / Waitress | `127.0.0.1:8000` 로컬 바인딩 (원칙상 외부 포트 개방 없음) |
-| RPi LAN preview | 정적 프런트엔드와 API 검수 | `LAN_HOST:8080/opensigan/`, 지정한 내부망에서 접근 |
-| Cloudflare Workers/D1 | 초기 실험과 별도 코드 | `workers-api/`에 과거 배포 기록; 현재 Python API와 동일하다고 가정하지 않음 |
+| **Cloudflare Pages** | 공식/보조 웹 주소, Svelte 정적 프런트엔드, Pages Functions | `opencigan.mcv.kr` · `opencigan.pages.dev` |
+| **Cloudflare API Worker** | Service Binding `OPENCIGAN_GATEWAY`, VPC `PRIVATE_API` | 외부에 독립 `workers.dev` API 호스트를 열지 않는 비공개 연결 |
+| **Pi Python API** | `backend.app` / Waitress, 데이터 조회·캐시 | `127.0.0.1:8000` 루프백 수신, Cloudflare Tunnel로 연결 |
+| **Pi LAN 미리보기** | 독립적인 개발/검수 화면 및 API | `LAN_HOST:8080/opensigan/`, 지정 내부망에서만 |
+| **기존 GitHub Pages** | 보존된 별도 정적 프런트엔드 배포 | 저장소 변수 `API_BASE_URL`로 별도 API 출처 지정 |
+| **과거 Workers/D1 실험** | `workers-api/`의 예전 실험 코드 | 현재 운영하는 `cloudflare-gateway/` Worker와 다름 |
 
 운영 파일: `deploy/opensigan.service`, `deploy/opensigan-preview.service`, `deploy/opensigan-preview-p0.conf`, `deploy/rpi-guard-opensigan.conf`. 서비스는 `systemd --user`에서 실행하도록 설계되어 있습니다. 자동 시작 여부와 실제 설치 상태는 RPi에서 따로 확인해야 합니다.
 

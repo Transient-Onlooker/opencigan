@@ -1,114 +1,93 @@
 # OpenCigan 개발 로드맵
 
-> **한눈에 보는 진행 방향** · 2026-11-16 문서 재정리. 이 도표는 목표 순서와 남은 게이트를 나타내며 **일정·완료율을 추정하지 않습니다**. 실제 구현 완료와 운영 배포/QA 통과는 별도로 판단합니다.
+> **최신 실행 진입점:** [2026-11-21 단기 집중 개발 로드맵](roadmap/short-term-2026-11-21.md) · **전체 백로그:** 아래 P0~P4 상세 문서
+>
+> 정리 기준: 2026-11-21. `[x]`는 **구현 또는 명시된 부분 검증의 완료**이고, 실제 운영 배포·실기기 QA·외부 허락을 의미하지 않습니다. 정확한 진행률이나 완료 예정일은 체크박스만으로 추정하지 않습니다.
 
-## 개발 단계
+## 단계별 현황
+
+| 단계 | 이미 확인된 내용 | 다음 완료 조건 |
+| --- | --- | --- |
+| **P0 · 안정성·운영** | Cloudflare Pages/Worker/VPC/Pi 기본 경로 운영 반영, 주요 API·ICS HTTP와 일부 IP 전달 확인 | 반복 503 원인 분리, 실제 429/제한 분리, 캘린더·실기기, 복구 QA |
+| **P1 · 사용성·속도** | 시간표·급식·개인화, 공유·PNG/PDF, 다수 모바일 회귀 구현 | [#140 캐시 미스 최적화](https://github.com/Transient-Onlooker/opencigan/issues/140), 화면 정렬과 실제 기기·파일 확인 |
+| **P2 · API·연동** | 읽기 API·ICS·OpenAPI·클라이언트·관리자 관측 기반 | 하위 호환 정책, 설정 클라우드 저장 설계, 익명 제안 기능 |
+| **P3 · 알림·자동화** | 일부 Webhook/RSS 코드와 로컬 테스트 | 사용자 구독 보안, 발송 이력·템플릿, 예약 스케줄러, 비활성 상태 검증 |
+| **P4 · 장기 확장** | 급식 검색·알레르기 필터 구현 | 시간표 통계와 운영 대시보드, 나머지는 기능별 결정 필요 |
+| **품질·리팩터링** | UI 컴포넌트·CSS·백엔드 라우팅 일부 분리 | 비동기 상태/저장 책임 정리, 번들 최적화, 전체 자동·실기기 회귀 |
+
+[상세 P0](roadmap/core-quality.md) · [P1 UI/UX](roadmap/user-experience.md) · [P2 API/운영](roadmap/api-operations.md) · [P3/P4 자동화](roadmap/automation-and-future.md) · [리팩터링·릴리스](roadmap/refactoring-and-release.md)
+
+## 구현 작업의 의존 관계
 
 ```mermaid
-timeline
-    title OpenCigan 주요 단계 (확정 일정 아님)
-    기반 기능 : 시간표와 급식, 읽기 API 구현
-    개인화·확장 : 설정과 내보내기, 구독 기능 일부 구현
-    QA 기준선 : 리팩터링 전 자동 회귀와 배포 상태 기록
-    리팩터링 : 선택·데이터 세션과 UI·백엔드 경계 분리 : 최종 검증 진행
-    UX 개선 : 설정 화면과 기본 사용 흐름 개편 대기
-    운영 검증 : Pages와 Workers VPC Tunnel P0 : ICS 호스트와 실제 IP 검증
-    후속 기능 : 알림 안정화와 장기 확장
+flowchart TB
+    Base["자동 회귀 기준선<br/>실행 결과·배포 상태 기록"]
+    Stable["P0 안정성<br/>503 · 429 · 장애 복구"]
+    Speed["P1 성능·화면<br/>캐시 미스 · UX"]
+    Feature["P2 제안·API<br/>저장·권한 경계"]
+    Notify["P3 Webhook·예약<br/>기본 비활성"]
+    Refactor["코드 구조·번들 정리"]
+    Verify["통합 회귀·릴리스 후보"]
+    Device["실기기·실캘린더<br/>운영 검증 별도"]
+    Decide{"공개 운영 승인"}
+
+    Base --> Stable
+    Base --> Speed
+    Stable --> Feature
+    Feature --> Notify
+    Speed --> Refactor
+    Notify --> Refactor
+    Stable --> Verify
+    Refactor --> Verify
+    Verify --> Decide
+    Device --> Decide
 ```
 
-메인 개발과 QA는 일부 병행할 수 있습니다. '구현'이라고 표시된 기능에도 기기·운영 검증이 남아 있을 수 있습니다.
+개발과 검증은 병행할 수 있습니다. **코드 구현 완료**, **자동 테스트 합격**, **운영 배포**, **실기기·정책 승인**은 각각 다른 상태입니다. 현재 집중 작업은 [ST-00~ST-14](roadmap/short-term-2026-11-21.md) 순서를 사용합니다.
 
-## 지금의 작업 의존관계
+## 공개 서비스 구조와 남은 게이트
 
 ```mermaid
 flowchart LR
-    Base["안정 버전 및 QA 기준선"]
-    QA["1차 통합 QA와 결함 기록"]
-    FE["프런트 컴포넌트·설정 UX 정리"]
-    BE["백엔드 라우팅·운영 코드 정리"]
-    Verify["통합 회귀·실기기 QA"]
-    Gate{"공개 운영 게이트"}
-    Release["서비스 전환 판단"]
-    Fix["보완 후 재검증"]
+    Web["Cloudflare Pages<br/>공식·보조 도메인"]
+    Fn["Pages Functions"]
+    Worker["비공개 Worker<br/>요청 제한·서명 IP"]
+    Tunnel["Workers VPC<br/>Cloudflare Tunnel"]
+    Pi["Pi Python API"]
+    Timetable["컴시간<br/>WARP 출구"]
+    Meals["NEIS"]
 
-    Base --> QA
-    QA --> FE
-    QA --> BE
-    FE --> Verify
-    BE --> Verify
-    Verify --> Gate
-    Gate -->|통과| Release
-    Gate -->|미통과| Fix
-    Fix --> Verify
+    Web --> Fn --> Worker --> Tunnel --> Pi
+    Pi --> Timetable
+    Pi --> Meals
 ```
 
-## 우선순위별 상세 작업
+- **공식 주소:** [opencigan.mcv.kr](https://opencigan.mcv.kr/) · **보조 주소:** [opencigan.pages.dev](https://opencigan.pages.dev/) — 두 주소의 API 경로는 동일한 서버 측 구성에 의존합니다.
+- **이미 완료된 전환 기록:** 공식 Cloudflare Pages 전환, Worker/Pi 주요 배포, 공개 Tailscale Funnel 중지. 기존 GitHub Pages는 별도 유지합니다.
+- **아직 남은 증명:** 일부 네트워크 오류·원본 지연의 실제 원인, 운영 429, 장기 안정성, Apple/Google Calendar 실제 갱신, 모바일 PWA·PNG/PDF·공유 실기기 QA, 데이터·보관·원본 재제공 정책.
+- **운영 안정성 원칙:** WARP 출구와 Cloudflare Tunnel은 다른 경로입니다. 남은 P0를 통과하지 않은 상태에서 보안 정책을 임의 완화하거나 Funnel을 재개하지 않습니다.
 
-**2026-11-16 전면 통합 QA 결과: 조건부 보류.** 신규 사용자 학교 검색·다음 주 조회가 31분간 `503 upstream_unavailable`로 차단되었으나 실제 원인은 백엔드 로그 대조 전 미확정입니다. 릴리스 전에 **가용성 복구/안내, 날짜 입력 오류, 공개 ICS 도메인**과 실기기·파일 복원/PDF 검증을 끝내야 합니다. [QA 원문·NEW-01~09·재검증 계획](qa-2026-11-16.md)에서 상세 내용과 증거 한계를 확인하세요.
+[실제 배포 증거](cloudflare-tunnel-rollout.md) · [서비스 아키텍처](architecture.md) · [운영·롤백](operations.md) · [알려진 문제](known-issues.md)
 
+## 결정 사항과 보류 항목
 
-| 영역 | 현재 판단 | 세부 작업 |
-| --- | --- | --- |
-| **P0 · 핵심 기능·보안·공개 인프라** | **공식 Pages 사이트 이전 사용자 완료 보고**, 기본 비공개 Tunnel/Functions 연결 기록 있음. 요청 제한·원본 IP·공개 API/ICS·가용성 검증은 잔여 | [P0 공개 전 필수 작업](roadmap/core-quality.md) |
-| **P1 · 사용자 경험** | 기존 기능 구현, UI/UX 개선 다수 대기 | [학교·시간표·설정·급식 UX](roadmap/user-experience.md) |
-| **P2 · 외부 개발자 연동** | API·ICS·관리 도구 일부 구현, 외부 운영 검증 대기 | [API·캘린더·로그](roadmap/api-operations.md) |
-| **P3–P4 · 자동화와 확장** | 부분 구현 또는 아이디어·운영 검증 대기 | [알림·장기 확장·아이디어](roadmap/automation-and-future.md) |
-| **코드 품질·배포** | 상태·화면·백엔드 경계 분리, 최종 회귀·운영 검증 잔여 | [리팩터링·릴리스 검증](roadmap/refactoring-and-release.md) |
+- **학교 시간표 성능:** [Issue #140](https://github.com/Transient-Onlooker/opencigan/issues/140)의 상류 요청 3→1회 개선이 목표입니다. TTL 1,800초·캐시 용량 256개/16MB를 유지하고 stale-while-revalidate는 도입하지 않습니다.
+- **기능 제안 ‘만들어주세요’:** UI(P1), 접수·승인 API(P2), 공감/상태·GitHub 연동(P3)을 분리합니다. 백엔드 검증·운영 정책 전에는 제출 UI를 공개하지 않습니다.
+- **Webhook·체육 수업 알리미:** 구독 보안·스케줄러·멱등성 검증 전에는 운영 발송을 활성화하지 않습니다. 예약 시각과 실제 발송 성공 시각은 구별합니다.
+- **선택적 클라우드 설정:** 인증·복구 방식, 서버 보관 범위와 삭제·보존 정책은 별도 결정이 필요합니다. 기존 로컬 JSON 백업은 유지합니다.
+- **의도적 제외:** 개인 시간표·시험 오버레이의 신규 개발 중단, Jev 급식 개인화 아이디어 보관. 보류된 아이디어를 완료 대상에 자동 포함하지 않습니다.
 
-### 최근 사용자 제보와 UX 작업
+## 라이선스·저작자 표시
 
-**2026-11-18 신규 성능 이슈 — [#135 시간표 캐시 미스 지연 단축](https://github.com/Transient-Onlooker/opencigan/issues/135):** P1에 미스당 상류 요청 3회→1회와 0.3~0.5초 목표를 등록했다. stale-while-revalidate는 도입하지 않고 TTL 1,800초·캐시 용량 256개/16MB를 유지하며, 실측 전에는 완료 처리하지 않는다. 상세 분석·검증 조건은 [P1 시간표 성능 과제](roadmap/user-experience.md#2026-11-18-시간표-캐시-미스-지연-개선--issue-135)를 참고.
+- [x] `AGPL-3.0-only` [LICENSE](../LICENSE) 및 저작권자 `Transient-Onlooker` 고지.
+- [x] [NOTICE](../NOTICE)와 [라이선스 안내](licensing.md)에 제7조(b) 출처 표시 조건·제3자 자료 이용 조건 기재.
+- [ ] 추가 출처 표시 조건의 법적 적합성과 파생 서비스 노출 위치에 대한 최종 검토. 문서에 규칙을 적었다고 법률 검토나 제3자 원본 허락이 완료되는 것은 아닙니다.
 
-**2026-11-18 신규 요청 — ‘만들어주세요’ 기능 제안 접수**: 회원가입 없는 기능 제안·중복 검색 UI는 [P1](roadmap/user-experience.md), 접수/저장 및 관리자 승인·스팸 방어는 [P2](roadmap/api-operations.md), 공감 투표·개발 상태·승인 후 GitHub Issue 연동은 [P3](roadmap/automation-and-future.md)에 **미구현**으로 등록했다. **P0 공개 운영 안정화/QA보다 앞당기지 않으며** 백엔드·관리 기능이 준비될 때까지 작동하지 않는 제출 화면을 노출하지 않는다.
-**2026-11-17 체육 알리미·Webhook 예약 기능**: [P3 로드맵](roadmap/automation-and-future.md)에 **체육이 있는 날 아침 지정 시각(기본 예시 07:30 KST)에 알림**, 발송 모드/시각 설정, 사용자 방문 없이 실행하는 예약 작업과 중복 방지 요구를 미완료로 추가했다. 즉시 변경 알림·하루 요약과 사전 일정 알림은 서로 다른 발송 모드다.
+## 문서 운영 원칙
 
-**2026-11-17 사용자 제공 2차 QA**: [결과 요약](qa-2026-11-17.md)과 [P1 후속](roadmap/user-experience.md)에 QA2-001~010의 우선순위와 기존 과제 중복 여부를 기록. 특히 시각 폼 복원·무효 시각 오류·알레르기 필터 상태 표시 3건은 우선 확인하고, 2차 QA 중 미검증은 그대로 남겼다.
+1. P0~P4의 **상세 체크리스트는 각각의 원본 파일**에서 관리하며, 이 페이지에는 진행 방향과 선행 조건만 유지합니다.
+2. 오늘 진행하는 PR은 [단기 실행 로드맵](roadmap/short-term-2026-11-21.md)에 근거를 남기고, 검증 완료된 항목만 해당 원본 로드맵에 반영합니다.
+3. 과거 QA/이슈 보고서는 역사적 증거로 보존합니다. 후속 PR의 구현 완료 여부와 혼동하지 않습니다.
+4. API 계약의 기준은 [OpenAPI](openapi.yaml)와 테스트 및 실제 구현입니다. 원본 데이터 재제공 조건은 코드 라이선스와 별개입니다.
 
-
-
-**2026-11-17 태블릿 레이아웃 요청:** P1에서 기존 `오늘` 시간표 화면을 넓은 화면에 한해 **좌측 시간표 + 우측 해당 날짜 급식의 2열 보기**로 개선할 예정입니다. 스마트폰과 좁은 태블릿은 기존 탭/1열 구조를 유지하며, 주간·학년 비교·교사 보기는 자동 전환하지 않습니다. 기존 [한 화면 보기 아이디어](roadmap/user-experience.md)는 별도 메뉴 신설이 아닌 반응형 레이아웃 항목으로 구체화했고 아직 구현하지 않았습니다.
-
-**2026-11-17 이미지·탐색·연동 메뉴 후속 요청:** [P1 작업 목록](roadmap/user-experience.md)에 PNG 저장·이미지 공유를 단일 진입점으로 통합, `오늘로`/`이번 주로` 버튼의 보기·주차별 조건부 교체를 미완료 작업으로 추가. **임베드 위젯의 개발자 메뉴 이동은 지금 바로 하지 않고 향후 Webhook 관리 UI와 함께 진행**하는 것으로 변경. [P3 Webhook 작업](roadmap/automation-and-future.md)에는 구독별 메시지 템플릿·Discord/Google Chat 서식·미리보기를 구체화했으며 **현재 메시지 템플릿 편집은 미구현**.
-
-**2026-11-17 설정·공유 기능 추가 요청:** [P1 UI/UX 로드맵](roadmap/user-experience.md)에 **과목마다 다른 색과 별칭을 한 화면에서 관리**, 교사별 표시 이름 일괄 관리(기존 항목 보강), 선택적 설정 클라우드 저장·복원 UI, **웹 버전 SHA를 설정 맨 아래로 이동**, `시간표 위젯 만들기`를 **개발자용 iframe 임베드 도구**로 옮기고 정확하게 명명하기를 모두 **미완료**로 기록했습니다. 서버 측 [인증/저장 설계](roadmap/api-operations.md)는 별도 선행 과제입니다.
-
-**QA 판단:** PR #72까지 설정 재구성·검색·즐겨찾기 제거·교시 시각 규칙 입력 및 상세/요일별 지원이 병합되어 **지금 1차 사용자 플로우·모바일 QA를 시작할 시점**입니다. 변경되는 화면마다 선택적 회귀 테스트를 반복하고 P1 정리·P0 Tunnel/ICS 배포 후 최종 통합 QA를 별도로 수행합니다. `[x]` 개수나 CI 성공을 실제 출시 완료율로 환산하지 않습니다.
-
-**2026-11-17 UX 정리:** 급식 알레르기 필터의 설정 이동, 개인 시간표·일정 UI 제거와 원본 데이터 내보내기, 미제공 변경 이력 보기 메뉴 제거를 반영했습니다. ICS 구독 모드 설명·미리보기는 [P1 상세](roadmap/user-experience.md)의 미완료 작업입니다. 기존 브라우저 저장 정보와 수업 변경 배지·구독 호환성은 유지합니다.
-
-확정된 개선 방향은 [P1 UX 상세 목록](roadmap/user-experience.md)에 체크박스로 관리합니다. 즐겨찾기와 ‘이 반의 수업 찾기’ 제거, 학교/학년 변경, 설정 카테고리·항목 단위 검색, 교시 시각 규칙 입력과 예외 편집, 알레르기 설정 통합, 여러 교사 별칭 관리, 독립 알림 페이지 테마·복귀 UI, 학년 비교의 불필요한 반 선택 제거를 포함합니다. **아직 체크되지 않은 항목을 완료로 간주하지 않습니다.**
-
-### 배치 7 착수 조건과 리팩터링 순서
-
-[상세 배치와 검증 조건](roadmap/refactoring-and-release.md#배치-7-착수-조건과-리팩터링-순서) · [코드 수준 실행 설계](refactoring-plan.md) · [리팩터링 전 QA 기준선](refactoring-baseline-2026-11-15.md)
-
-### 2026-11-17 Cloudflare 이전 완료 보고 · 당일 QA 계획
-
-**공식 웹사이트 `opencigan.mcv.kr`의 Cloudflare Pages 이전을 사용자가 완료했다고 확인했다.** 이전 작업 자체는 완료로 분류하고 [실행 체크리스트](cloudflare-tunnel-rollout.md)에는 보안·장애 복구·ICS 구독 및 Funnel 종료 판단 등 **실제 남은 과제**를 유지한다. DNS/TLS·전체 API·PWA·실캘린더 앱 검증은 **오늘 시행 예정인 QA**로 분리하며 결과가 나오기 전까지 통과로 표시하지 않는다. `.ts.net` 구독 URL은 사이트 이전과 별개이므로 [Funnel 단계적 퇴역](operations.md#tailscale-funnel-단계적-퇴역) 조건이 충족되기 전에는 공개 경로를 없애지 않는다. Pi의 컴시간 전용 WARP 출구는 유지한다.
-
-### 공개 서비스 전 주요 검증 게이트
-
-- **실기기:** iOS Safari·Android Chrome, PWA, 모바일 캘린더 앱의 실제 동작
-- **네트워크·봇 방어(P0):** Pages + Workers VPC 비공개 Tunnel API/ICS 연결, Worker 레벨 봇·Rate Limiting, 외부 API/캘린더 구독 보호, 실제 IP·요청 제한과 접속 로그 검증
-- **데이터·정책:** 실측된 교시 시각과 캘린더 동기화, 원본 데이터 재제공·관측 이력 운영 정책
-- **회귀·운영:** 변경 영역별 테스트, Chromium/WebKit, RPi 배포 SHA/롤백 경로와 UI UX 검사
-
-[검증 기록](verification-2026-11-15.md) · [이전 브라우저 QA](browser-qa-2026-11-14.md) · [알려진 문제](known-issues.md) · [운영 가이드](operations.md)
-
-## 라이선스 및 원작자 표시 (적용 예정)
-
-- [x] 코드 라이선스로 `AGPL-3.0-only` 채택 및 정식 `LICENSE` 추가. 저작권자는 활동명 `Transient-Onlooker`로 표시.
-- [ ] AGPL-3.0 제7조(b)의 범위에서 합리적인 원작자 출처 표시 추가 조건 검토·명문화. 파생 웹서비스의 메인 랜딩 페이지 하단 등 이용자가 쉽게 확인할 수 있는 공개 위치에 원작자와 [원본 GitHub 저장소](https://github.com/Transient-Onlooker/opencigan)로 연결되는 클릭 가능한 링크를 유지하는 방안. 웹사이트가 아닌 앱은 동등한 확인 위치 고려.
-- [x] README에 라이선스·원작자·원본 저장소 안내, 주요 의존성 고지와 코드/원본 데이터 권한 구분. [근거 및 검증 범위](licensing.md).
-
-## 원칙
-
-1. **학생용 MVP 품질을 우선**하고, 공개 API/이력 저장/알림 기능은 허용 범위·운영 안전성 검증 뒤 확장한다.
-2. 기존 API 응답 계약을 유지하고 원본 서버 요청을 최소화한다.
-3. 공개 API와 웹 UI는 가능하면 같은 정규화·캐시 계층을 쓴다.
-4. 실제 데이터 재제공 허가·보안·변경 이력 저장과 운영 인프라 확대를 서로 독립적으로 판단한다.
-5. API 문서와 구현이 충돌할 때는 테스트·실제 코드를 확인하고 문서 또는 코드를 함께 수정한다.
-
-[API 가이드](api-guide.md) · [구조](architecture.md) · [기여](../CONTRIBUTING.md)
-
-> **문서 관리 규칙:** 세부 항목은 각 상세 문서의 체크박스에서 수정합니다. 여기서는 흐름·우선순위·게이트만 유지합니다. 체크 [x] = 구현 기록, [ ] = 미완료 또는 검증 대기. 상태가 바뀌면 도표와 요약도 함께 갱신합니다.
+[문서 인덱스](README.md) · [기여 가이드](../CONTRIBUTING.md)

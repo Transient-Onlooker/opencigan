@@ -1,35 +1,55 @@
-# OpenCigan private API gateway (staging scaffold)
+# OpenCigan Cloudflare 비공개 API 게이트웨이
 
-**No live Cloudflare, DNS or Pi resources are created by this directory.** The existing GitHub Pages + Tailscale Funnel stays the production path until all gates pass.
+> **현재 역할:** Cloudflare Pages의 `/api/v1/*` 요청을 Raspberry Pi Python API로 전달하는 **비공개 Worker** 소스입니다. 2026-11-18~19에 Worker/Pi 운영 배포가 기록돼 있으므로 이 디렉터리를 '아직 운영 전인 스테이징만의 스캐폴드'로 해석하지 마세요. 실제 실행 버전·남은 운영 QA는 [배포 기록](../docs/cloudflare-tunnel-rollout.md)을 확인하세요.
 
-### Topology
+## 요청 흐름
 
-`<project>.pages.dev/api/v1/*` → `frontend/functions/api/[[path]].js` → Pages **Service Binding** `OPENCIGAN_GATEWAY` → `opensigan-private-api` Worker → **Workers VPC Service** binding `PRIVATE_API` → Pi `127.0.0.1:8000`.
+```mermaid
+flowchart LR
+    Browser["Cloudflare Pages<br/>공식·보조 호스트"]
+    Function["Pages Functions<br/>/api/*"]
+    Worker["opensigan-private-api<br/>Service Binding only"]
+    VPC["Workers VPC Service<br/>PRIVATE_API"]
+    Tunnel["cloudflared<br/>비공개 Tunnel"]
+    Pi["Pi Python API<br/>127.0.0.1:8000"]
 
-The separate Pi → Comcigan WARP egress proxy is unchanged.
+    Browser --> Function
+    Function -->|"OPENCIGAN_GATEWAY"| Worker
+    Worker --> VPC --> Tunnel --> Pi
+```
 
-The gateway additionally requires `MEAL_RATE`, `ADMIN_RATE`, and `WEBHOOK_RATE` bindings. These share the normal general per-IP cap but have independent category budgets; OPTIONS uses its separate preflight key. The example values and namespace IDs are for staging only. Before deploying this version, add all three bindings to the actual Worker configuration and choose limits from observed traffic. A missing binding returns 503 for its category; deploy to staging and verify before replacing the active Worker. This does not enable the webhook backend.
+- 공식 주소: [`opencigan.mcv.kr`](https://opencigan.mcv.kr/) · 보조 주소: [`opencigan.pages.dev`](https://opencigan.pages.dev/). 두 주소는 **동일 API 구성**을 사용합니다.
+- Worker의 공개 `workers.dev` 엔드포인트는 비활성화합니다(`workers_dev: false`). Worker는 Pages Service Binding을 통해서만 호출합니다.
+- Pi의 컴시간 **WARP 출구 프록시**는 별개로 유지하며 Cloudflare Tunnel과 혼동하지 않습니다.
 
-### Cloudflare account setup (after confirming Workers VPC access)
+## Worker 동작과 보안 경계
 
-1. Create Cloudflare Pages from the existing GitHub repository with **Root directory: `frontend`**, build command `npm ci && npm run build`, output `dist`. **Set `VITE_API_BASE_URL` to an empty string** (same-origin API via Pages Functions), not the current Tailscale URL. Test only at the `pages.dev` hostname.
-2. Under **Workers VPC → Tunnels**, create a dedicated private Tunnel; install the dashboard-supplied `cloudflared` ARM64 package/service on the Raspberry Pi with operator approval. Workers VPC needs cloudflared >=2025.7.0, QUIC and outgoing UDP 7844. **No public hostname or port forward is needed.**
-3. Register a VPC Service for HTTP `127.0.0.1:8000` reachable through that tunnel. Replace `REPLACE_WITH_VPC_SERVICE_ID` in a **local copy** of `wrangler.example.jsonc` named `wrangler.jsonc` and run `npx wrangler deploy --config wrangler.jsonc` from this directory. Set `ALLOWED_ORIGINS` to the same comma-separated origins as the Pi's `ALLOWED_ORIGIN`; it controls CORS on errors returned directly by the Worker. The example's rate limits are *staging starting values*, not validated production thresholds.
-4. In **Pages → Settings → Bindings** add **Service binding** `OPENCIGAN_GATEWAY` → Worker `opensigan-private-api`; redeploy Pages. No direct public `workers.dev` endpoint is exposed for the API Worker (`workers_dev: false`).
-5. Verify `https://<project>.pages.dev/api/v1/status`, JSON, school lookup, meals, `.ics` 200/304, HEAD/OPTIONS, and frontend same-origin calls, plus admin authentication and distinct-IP rate limiting (including the Pi's reverse proxy behavior). Do not push a change to MCVKR CNAME before passing tests.
+| 항목 | 적용 방식 |
+| --- | --- |
+| 라우팅 | `cloudflare-gateway/src/index.mjs`의 허용된 API 경로와 메서드만 전달 |
+| 원본 IP | Cloudflare 제공 IP를 검증해 HMAC 서명 후 Pi에 전달. 사용자가 전송한 `X-Forwarded-For` 등은 신뢰하지 않음 |
+| 요청 제한 | 일반·검색·시간표·ICS·급식·관리자·Webhook의 **7개 Rate Limit binding**. `OPTIONS`는 별도 처리 |
+| 오류 응답 | Worker 연결/설정·429 등은 JSON 오류와 허용 출처 CORS 계약을 따름 |
+| 관리자·Webhook | 관리자 인증은 보존; **Webhook 백엔드는 운영 기본 비활성** |
 
-**Security gates:** the Worker strips visitor-supplied forwarding/IP headers before calling Pi and does not yet establish verified original-client-IP attribution on the Pi. The Edge rate limit is approximate per PoP, not a strict global quota. **Do not treat P0 as complete** until the trusted client-IP path and other release checks in [the rollout checklist](../docs/cloudflare-tunnel-rollout.md) are verified.
+Rate Limit binding은 PoP별로 제한을 근사하므로 전 세계 단일 IP에 대한 엄밀한 전역 쿼터가 아닙니다. 설정 코드/격리 테스트 통과가 실운영 429·`Retry-After`·공유 IP의 제한 분리 검증까지 뜻하지는 않습니다.
 
-### Tests
+## 배포 설정과 확인
 
-From repository root: `node --test cloudflare-gateway/test/*.test.mjs`
+1. Cloudflare Pages 프로젝트의 루트는 `frontend`이며 빌드 명령은 `npm ci && npm run build`, 결과는 `dist`입니다. 같은 출처의 Pages Functions를 사용하도록 `VITE_API_BASE_URL`을 비웁니다.
+2. Pages의 Service Binding `OPENCIGAN_GATEWAY`는 Worker `opensigan-private-api`를 가리킵니다. Worker의 VPC binding `PRIVATE_API`는 Pi의 `127.0.0.1:8000`으로 향하는 private service를 참조합니다.
+3. `wrangler.example.jsonc`는 **예시**입니다. 실제 `wrangler.jsonc`와 비밀값은 저장소에 올리지 않습니다. 운영 설정을 예시값으로 덮어쓰지 않고, 일곱 binding·VPC·허용 Origin·서명 키를 확인합니다.
+4. 서명 IP는 Worker secret `PROXY_IP_SIGNING_KEY`와 Pi 환경의 `OPENCIGAN_PROXY_IP_SIGNING_KEY`가 일치해야 합니다. 실비밀값·전체 토큰·사용자 IP를 로그/PR에 남기지 않습니다.
+5. 실행 전 로컬/격리 환경에서 연결 장애, API/ICS GET·HEAD·OPTIONS, ETag/304, 인증, 제한/`Retry-After`, 스푸핑, 변경된 기능을 검증합니다. 운영 환경의 의도적 요청 폭주나 실제 롤백은 별도 승인·절차를 따릅니다.
 
-From `frontend`: `npm test` includes the Pages Service Binding tests.
+```bash
+# 저장소 루트
+node --test cloudflare-gateway/test/*.test.mjs
 
-Reference: [Cloudflare Workers VPC](https://developers.cloudflare.com/workers-vpc/) · [Pages Service bindings](https://developers.cloudflare.com/pages/functions/bindings/) · [Worker Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/).
+# frontend 디렉터리
+npm test
+```
 
-### Optional signed visitor IP (code only; not enabled in production)
+**기존 사용자 경로 보존:** 공식 사이트 전환 기록이 있으므로 예전 문서의 'GitHub Pages + Funnel이 현재 프로덕션'이라는 설명은 적용되지 않습니다. GitHub Pages는 별도 배포, Funnel 공개 노출은 중지된 상태이며 Pi의 Tailscale 사설 연결은 유지합니다.
 
-Configure the same random secret of at least 32 UTF-8 bytes on Pi as OPENCIGAN_PROXY_IP_SIGNING_KEY, then set it on the Worker using wrangler secret put PROXY_IP_SIGNING_KEY --name opensigan-private-api. Do not commit a real secret or expose it through a VITE_ variable. The Worker signs the Cloudflare-reported client IP, original method, path and raw query; Pi verifies the HMAC with a 60-second time window and otherwise uses the direct peer address.
-
-When signing is enabled, Pi does not trust unsigned Forwarded or X-Forwarded-For, including the Waitress loopback proxy configuration. This is not authentication and does not persist logs on its own. Enable OPENCIGAN_ACCESS_LOG_DB and the separate admin token for durable log filtering. Real-client IP propagation and two-network verification remain deployment gates. See docs/proxy-client-ip.md.
+[운영 절차](../docs/operations.md) · [IP 서명 계약](../docs/proxy-client-ip.md) · [P0 검증 게이트](../docs/roadmap/core-quality.md) · [Cloudflare Workers VPC](https://developers.cloudflare.com/workers-vpc/)
