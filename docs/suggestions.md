@@ -4,6 +4,8 @@
 
 격리된 테스트 환경에서는 `OPENCIGAN_SUGGESTIONS_ENABLED=1`과 별도 SQLite 파일 경로인 `OPENCIGAN_SUGGESTION_DB`를 지정할 수 있다. 기존 시간표 이력·접속 로그·분석 DB와 같은 파일은 사용할 수 없다. 관리 작업에는 `OPENCIGAN_SUGGESTION_ADMIN_TOKEN`에 충분히 긴 무작위 토큰을 설정하고 `Authorization: Bearer <token>`을 사용한다. 길이 검사만으로 토큰의 무작위성이 보장되지는 않는다.
 
+프런트엔드는 별도의 `VITE_SUGGESTIONS_ENABLED=1` 시험 빌드에서만 설정 화면에 제안 기능을 준비한다. 이때도 API 조회가 성공할 때만 진입점이 나타난다. 기본 빌드는 요청을 보내거나 진입점을 표시하지 않는다. 현재 공개 게이트웨이에는 이 API 경로가 없으며, 빌드 플래그만 설정해도 공개 접수가 활성화되지 않는다.
+
 - `POST /api/v1/suggestions`: 제목과 설명, 선택적인 이용 상황을 제출하고 본인 조회용 토큰을 받는다.
 - `GET /api/v1/suggestions`: 승인된 제안만 검색한다.
 - `GET /api/v1/suggestions/{id}`: 제출 시 받은 토큰으로 자신의 제안을 확인한다.
