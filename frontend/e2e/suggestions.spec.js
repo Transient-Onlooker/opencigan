@@ -17,7 +17,7 @@ test('suggestion UI is hidden and makes no requests by default', async ({ page }
 
 test('enabled suggestions search and submit safely', async ({ page }) => {
   test.skip(process.env.VITE_SUGGESTIONS_ENABLED !== '1', 'Requires the opt-in build');
-  let submissions = 0;
+  let submissions = 0, searched = false;
   await page.route('**/api/v1/suggestions**', async (route) => {
     if (route.request().method() === 'POST') {
       submissions++;
@@ -25,6 +25,7 @@ test('enabled suggestions search and submit safely', async ({ page }) => {
         ? { status: 409, json: { code: 'duplicate_suggestion' } }
         : { status: 201, json: { id: 'a'.repeat(24), token: 'b'.repeat(43) } });
     }
+    if (new URL(route.request().url()).searchParams.get('q') === '검색어') searched = true;
     await route.fulfill({ json: { suggestions: [{ id: '1', title: '<img src=x onerror=alert(1)>', description: '공개 제안', context: null }], nextCursor: null } });
   });
   await page.setViewportSize({ width: 320, height: 844 });
@@ -32,6 +33,9 @@ test('enabled suggestions search and submit safely', async ({ page }) => {
   await page.getByText('만들어주세요', { exact: true }).click();
   await expect(page.getByText('<img src=x onerror=alert(1)>')).toBeVisible();
   await expect(page.locator('.suggestions img')).toHaveCount(0);
+  await page.getByLabel('공개 제안 검색').fill('검색어');
+  await page.getByRole('button', { name: '검색', exact: true }).click();
+  await expect.poll(() => searched).toBe(true);
   await page.getByLabel('제목', { exact: true }).fill('새 기능');
   await page.getByLabel('내용', { exact: true }).fill('설명');
   await page.getByRole('button', { name: '제안 보내기' }).click();
