@@ -33,6 +33,27 @@ class ComciganProxyTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 comcigan_proxy.configure_comcigan_proxy()
 
+    def test_header_timing_records_only_stage_and_duration_on_success_and_failure(self):
+        import pycomcigan.helpers as helpers
+        original = helpers.urlopen
+        self.addCleanup(setattr, helpers, "urlopen", original)
+        opener = Mock()
+        with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": "http://127.0.0.1:18084"}), \
+             patch.object(comcigan_proxy, "build_opener", return_value=opener), \
+             patch.object(comcigan_proxy.time, "monotonic", side_effect=[10.0, 10.25, 20.0, 20.5]):
+            comcigan_proxy.configure_comcigan_proxy()
+            with self.assertLogs("opensigan.comcigan_proxy", level="INFO") as logs:
+                helpers.urlopen(Request("http://comci.net:4082/st?private=secret"))
+                opener.open.side_effect = TimeoutError("private details")
+                with self.assertRaises(TimeoutError):
+                    helpers.urlopen(Request("http://comci.net:4082/private?school=secret"))
+            self.assertIn("stage=service_page duration_ms=250.0", logs.output[0])
+            self.assertIn("stage=data duration_ms=500.0", logs.output[1])
+            self.assertEqual(opener.open.call_args.kwargs['timeout'], 30)
+            for line in logs.output:
+                for private in ("secret", "school", "comci.net", "private details"):
+                    self.assertNotIn(private, line)
+
     def test_rejection_status_logged_without_request_details(self):
         import pycomcigan.helpers as helpers
         original = helpers.urlopen
