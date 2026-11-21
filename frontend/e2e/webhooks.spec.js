@@ -77,3 +77,21 @@ test('subscription management uses bearer token and keeps secrets out of storage
   await expect(page.getByRole('status')).toContainText('삭제');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
 });
+
+test('custom domain uses the same-origin gateway when no API base is configured', async ({ page, baseURL }) => {
+  await page.route('https://opencigan.mcv.kr/**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/v1/webhooks') {
+      return route.fulfill({ json: { id: 'a'.repeat(24), token: 'b'.repeat(43), provider: 'discord' } });
+    }
+    const response = await route.fetch({ url: new URL(url.pathname + url.search, baseURL).href });
+    return route.fulfill({ response });
+  });
+  await page.goto('https://opencigan.mcv.kr/webhooks.html');
+  await page.getByLabel('학교 ID').fill('2:예시학교');
+  await page.getByLabel('학년', { exact: true }).fill('2');
+  await page.getByLabel('반', { exact: true }).fill('3');
+  await page.getByLabel('Webhook 주소').fill('https://discord.com/api/webhooks/123/secret');
+  await page.getByRole('button', { name: '구독 만들기' }).click();
+  await expect(page.getByLabel('관리 토큰')).toHaveValue('b'.repeat(43));
+});

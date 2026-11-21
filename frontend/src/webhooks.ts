@@ -12,7 +12,7 @@ const buttons = [...document.querySelectorAll<HTMLButtonElement>('button')];
 let controller = new AbortController();
 
 async function call(path: string, method = 'GET', payload?: unknown, authenticated = true) {
-  if (!base && (location.hostname.endsWith('.github.io') || location.hostname === 'opencigan.mcv.kr')) throw new Error('API가 연결된 배포 주소에서 이용해 주세요.');
+  if (!base && location.hostname.endsWith('.github.io')) throw new Error('API가 연결된 배포 주소에서 이용해 주세요.');
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (authenticated) headers.Authorization = `Bearer ${input('token').value}`;
   if (payload !== undefined) headers['Content-Type'] = 'application/json';
