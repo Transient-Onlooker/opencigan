@@ -48,3 +48,24 @@ test('정규 API 경로, 매개변수와 오류를 처리한다', async (t) => {
     await assert.rejects(pending, /서버 응답이 늦어요/);
   } finally { await server.close(); }
 });
+
+test('client deadline can expire before an upstream response arrives', async (t) => {
+  globalThis.location = { hostname: 'localhost', origin: 'https://example.test' };
+  const deadline = new AbortController();
+  let budget;
+  t.mock.method(AbortSignal, 'timeout', (ms) => { budget = ms; return deadline.signal; });
+  let finishUpstream;
+  globalThis.fetch = (_url, { signal }) => new Promise((resolve, reject) => {
+    finishUpstream = () => resolve(Response.json({ schools: [], stale: false }));
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+  });
+  const server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom', optimizeDeps: { noDiscovery: true, include: [] } });
+  try {
+    const api = await server.ssrLoadModule('/src/api.ts');
+    const pending = api.searchSchools('서울');
+    assert.equal(budget, 15_000);
+    deadline.abort();
+    await assert.rejects(pending, /서버 응답이 늦어요/);
+    finishUpstream();
+  } finally { await server.close(); }
+});

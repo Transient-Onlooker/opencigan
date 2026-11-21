@@ -1,6 +1,7 @@
 import os
 import logging
 import threading
+import time
 from urllib.error import HTTPError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
@@ -37,12 +38,16 @@ def configure_comcigan_proxy():
             if target.scheme != "http" or target.hostname != "comci.net" or target.port != 4082:
                 raise ValueError("Unexpected Comcigan request target")
             request.set_proxy(parsed.netloc, "http")
+            stage = "service_page" if target.path == "/st" else "data"
+            started = time.monotonic()
             try:
                 return opener.open(request, timeout=timeout)
             except HTTPError as error:
                 if error.code in (403, 429):
                     logger.warning("comcigan request rejected upstream_http_status=%s", error.code)
                 raise
+            finally:
+                logger.info("comcigan response headers stage=%s duration_ms=%.1f", stage, (time.monotonic() - started) * 1000)
 
         helpers.urlopen = open_comcigan
         _configured = True
