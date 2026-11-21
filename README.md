@@ -40,20 +40,16 @@
 
 ```mermaid
 flowchart LR
-    User["브라우저"] --> Pages["Cloudflare Pages<br/>공식·보조 주소"]
-    Pages --> Fn["Pages Functions"]
-    Fn --> Worker["비공개 API Worker"]
-    Worker --> VPC["Workers VPC<br/>Cloudflare Tunnel"]
-    VPC --> Pi["Raspberry Pi<br/>Python API"]
-    Pi --> Cache["시간표·급식 캐시"]
-    Cache --> Timetable["컴시간<br/>WARP 출구"]
-    Cache --> Meals["NEIS<br/>직접 연결"]
-    User -.-> Settings["브라우저 로컬 설정"]
+    Client["웹 브라우저"] --> App["OpenCigan 웹앱"]
+    App --> API["읽기 API"]
+    API --> Timetable["시간표 데이터"]
+    API --> Meals["급식 데이터"]
+    Client -.-> Local["브라우저 설정"]
 ```
 
-API는 `/api/v1/*`에서 제공됩니다. 기존 GitHub Pages 배포는 별도로 유지되며, 현재 공식 주소의 API 경로는 위 구조를 사용합니다. Cloudflare Pages와 Raspberry Pi가 각각 정상 작동해야 데이터 조회가 가능합니다.
+API는 `/api/v1/*`에서 제공되며 시간표·급식 원본에 의존합니다. 서비스 운영 상세 구성은 공개 안내에 포함하지 않습니다.
 
-[상세 아키텍처](docs/architecture.md) · [운영·복구](docs/operations.md) · [Cloudflare 게이트웨이](cloudflare-gateway/README.md)
+[상세 아키텍처](docs/architecture.md) · [API 가이드](docs/api-guide.md)
 
 ## 문서 및 개발
 

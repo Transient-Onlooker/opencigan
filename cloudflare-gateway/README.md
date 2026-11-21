@@ -20,7 +20,7 @@ flowchart LR
 
 - 공식 주소: [`opencigan.mcv.kr`](https://opencigan.mcv.kr/) · 보조 주소: [`opencigan.pages.dev`](https://opencigan.pages.dev/). 두 주소는 **동일 API 구성**을 사용합니다.
 - Worker의 공개 `workers.dev` 엔드포인트는 비활성화합니다(`workers_dev: false`). Worker는 Pages Service Binding을 통해서만 호출합니다.
-- Pi의 컴시간 **WARP 출구 프록시**는 별개로 유지하며 Cloudflare Tunnel과 혼동하지 않습니다.
+- 백엔드의 데이터 제공처 연결 설정은 운영자 내부 구성으로 관리합니다.
 
 ## Worker 동작과 보안 경계
 

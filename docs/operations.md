@@ -19,11 +19,9 @@
 
 운영 파일: `deploy/opensigan.service`, `deploy/opensigan-preview.service`, `deploy/opensigan-preview-p0.conf`, `deploy/rpi-guard-opensigan.conf`. 서비스는 `systemd --user`에서 실행하도록 설계되어 있습니다. 자동 시작 여부와 실제 설치 상태는 RPi에서 따로 확인해야 합니다.
 
-## 컴시간 전용 프록시
+## 외부 데이터 연결
 
-컴시간에서 서버의 직접 연결이 거부되는 경우 `OPENCIGAN_COMCIGAN_PROXY=http://127.0.0.1:18084`처럼 루프백 HTTP 프록시를 지정할 수 있습니다. 이 설정은 pycomcigan 요청에만 적용되며 NEIS 요청에는 적용하지 않습니다. 프록시가 실패하면 직접 연결로 우회하지 않습니다. 프록시 상태는 Pi에서 `curl --proxy http://127.0.0.1:18084 --max-time 8 http://comci.net:4082/st`로 확인할 수 있습니다. 일반적인 `http_proxy` 환경변수로 서비스 전체 트래픽을 변경하지 마세요.
-
-2026-11-16 운영 긴급 적용은 기존 `release-54f89b9`를 보존한 `release-warp-20261116` 복사본과 `zzzz-opencigan-warp.conf` 사용자 서비스 drop-in을 사용했습니다. 이전 버전으로 되돌릴 때는 해당 drop-in을 다른 이름으로 옮긴 뒤 `systemctl --user daemon-reload`와 `systemctl --user restart opensigan.service`를 실행하고 로컬 상태 API를 확인합니다. 직접 연결이 차단된 동안 이전 버전의 컴시간 조회는 실패할 수 있습니다.
+데이터 제공처에 대한 연결 방식과 내부 네트워크 설정은 **운영자 전용 비공개 구성**으로 관리합니다. 공개 문서에서는 실제 주소·포트·접속 계정·서비스별 출구 경로를 제공하지 않습니다.
 
 ## 비밀키와 설정
 
@@ -60,7 +58,7 @@ journalctl --user -u opensigan -n 100 --no-pager
 
 수동 검증은 GitHub 저장소 → **Actions → Parser health → Run workflow**에서 할 수 있습니다. 파서 검사 실패 시 즉시 원본 프로토콜 변경이라고 단정하지 말고, 설치·DNS/네트워크·원본 403/429·응답 스키마를 순서대로 구분하세요. 불필요한 재시도는 원본에 부담을 줍니다.
 
-학교 시간표 파싱을 따로 확인해야 할 때는 백엔드 실행 환경에서 `python -m backend.parser_health_probe --timetable '학교코드:학교명'`을 사용합니다. 해당 학교의 이번 주 시간표 조회 작업을 한 번 실행하며, 검사 도구에서 학교 검색이나 재시도를 추가하지 않습니다. 한 번의 조회 작업이 내부적으로 여러 HTTP 교환을 사용할 수 있습니다. Pi에서는 기존 컴시간 전용 WARP 프록시 설정을 유지하세요. 수업이 한 건 이상이면 정규화 경로를 확인한 것이며 전체 데이터의 정확성을 보장하지 않습니다. 수업이 0건이면 방학·시험 등의 정상 상황일 수 있어 결과는 **판정 보류**(종료 코드 2)이며 학교 일정과 원본을 확인해야 합니다. 자동 주간 검사에는 이 추가 조회를 포함하지 않습니다.
+학교 시간표 파싱을 따로 확인해야 할 때는 백엔드 실행 환경에서 `python -m backend.parser_health_probe --timetable '학교코드:학교명'`을 사용합니다. 해당 학교의 이번 주 시간표 조회 작업을 한 번 실행하며, 검사 도구에서 학교 검색이나 재시도를 추가하지 않습니다. 한 번의 조회 작업이 내부적으로 여러 HTTP 교환을 사용할 수 있습니다. 수업이 한 건 이상이면 정규화 경로를 확인한 것이며 전체 데이터의 정확성을 보장하지 않습니다. 수업이 0건이면 방학·시험 등의 정상 상황일 수 있어 결과는 **판정 보류**(종료 코드 2)이며 학교 일정과 원본을 확인해야 합니다. 자동 주간 검사에는 이 추가 조회를 포함하지 않습니다.
 
 ## 내부망 검수 및 되돌리기
 
@@ -102,26 +100,12 @@ PY
 
 - 사이트 배포·기본 API 연결은 **완료 보고/기존 기록**, 기능별 검증은 [P0 체크리스트](cloudflare-tunnel-rollout.md)의 **2026-11-17 예정 QA**에 남겨 둔다.
 - GitHub Pages는 별도 복구 판단 전까지 유지한다. Tailscale Funnel은 아래 실행 기록과 같이 중지했다. Cloudflare Workers VPC는 베타 기능이므로 버전·가용성 변화를 관찰한다.
-- Pi의 컴시간 전용 WARP 출구 `OPENCIGAN_COMCIGAN_PROXY`는 **Funnel과 별개**이므로 중단하지 않는다.
 
 **클라이언트 IP·보안:** PR #96의 서명된 IP 전달 코드는 Worker에 배포했고 Pi의 서명 키를 Worker 비밀값에 등록했다. 서로 다른 외부망에서의 실제 서명 검증·IP·로그·429 실측은 미확인이다. 임의 X-Forwarded-For·Forwarded를 신뢰하지 않으며 자세한 조건은 [IP 보안 문서](proxy-client-ip.md)를 따른다. 관리자 인증·Webhook 기본 비활성·CORS/ICS 304·429/503 계약을 유지한다.
 
 ### Tailscale Funnel 단계적 퇴역
 
-**2026-11-17 23:14 KST 확인:** 사용자가 기존 `.ts.net` 캘린더 구독자가 없다고 확인하고 Pi에서 `sudo tailscale funnel --https=443 off`를 실행했다. `tailscale funnel status --json`은 `{}`이고 기존 공개 주소는 연결되지 않았다. 중지 전 HTTPS 443의 `/api`는 `http://127.0.0.1:8000/api`, `/api/v1/status`는 `http://127.0.0.1:8000/api/v1/status`를 가리켰다. 중지 전 설정은 작업 PC의 `AppData/Local/Temp/opencigan-funnel-before-20261117.json`에도 기록되어 있으나 임시 파일이므로 장기 보관을 보장하지 않는다. Tailscale 사설 연결은 활성이고 `opencigan-cloudflared.service`는 active였다. WARP 설정은 이 작업에서 변경하지 않았으며 별도 동작 검사는 하지 않았다.
-
-**같은 시각 검증·주의:** `opencigan.pages.dev`에서 상태·학교 검색·NEIS 학교 검색·시간표·급식·ICS가 각각 HTTP 200이었고 ICS는 `VCALENDAR`를 포함했다. `opencigan.mcv.kr`은 PC와 Pi에서 DNS 조회가 실패했고 Cloudflare·Google 공개 DNS도 `mcv.kr` 권한 DNS 관련 SERVFAIL을 반환했다. **23:16 KST 재확인에서는** Cloudflare DNS가 `opencigan.pages.dev` CNAME을 반환했고 공식 주소 상태 API도 HTTP 200으로 회복됐다. 장애 원인과 Funnel 중지와의 인과관계는 확인되지 않았다. 실제 캘린더 앱 자동 갱신, 외부망 복수 지점, 공식 주소의 전체 기능과 지속적인 DNS 안정성 검증은 남아 있다.
-
-Funnel은 `*.ts.net` 공개 HTTPS 주소를 제공하는 별도 진입점이다. 기존 외부 스크립트는 자동으로 새 URL을 사용하지 않는다. 아래는 향후 재활성화 또는 점검 시 참고할 절차다.
-
-1. 현재 Funnel 구성을 읽기 전용으로 확인해 공개 포트·경로와 복귀할 원래 명령을 기록한다. 기존 `.ts.net` ICS 링크가 앱/UI/문서·사용자의 캘린더 구독에 남아 있는지, 신규 링크가 Cloudflare URL인지 확인한다.
-2. 서로 다른 네트워크에서 새 Cloudflare 주소의 웹·API·ICS(TLS, VCALENDAR, ETag/304, 새 구독·갱신), 인증·오류·Rate Limit을 점검한다. 기존 구독자에게 URL 재등록을 안내하거나 병행 제공 방침을 결정한다.
-3. 대체 경로가 검증되고 기존 주소에 의존하는 구독자가 없거나 이전을 안내했다면, **Funnel만 중지**한다. 중지 전후 `tailscale funnel status --json`으로 상태를 확인하고 원래 포트/옵션의 명령에 `off`를 붙인다. 예를 들어 443 HTTPS 설정이라면 `tailscale funnel --https=443 off`다. 실제 설정이 다르면 그대로 복사해 사용한다. `tailscale funnel reset`, `tailscale down`, `tailscale up` 또는 클라이언트 제거를 종료 방법으로 사용하지 않는다.
-4. 중지 후 새 Cloudflare 주소에서 웹/API/ICS가 계속 동작하는지 확인하고 429/503·VPC 연결·사용자 오류를 관찰한다. 문제가 생기면 기록한 원래 Funnel 명령으로 공개 경로를 복구한다.
-
-**범위:** Funnel 외부 공개만 중지한다. Tailscale 사설 네트워크, Cloudflare `cloudflared` Tunnel, Pi의 컴시간 전용 WARP 출구는 서로 다른 구성 요소이므로 그대로 보존한다. 위 번호 목록은 향후 운영 절차이며 현재 실행 상태는 위 확인 기록을 따른다.
-
-공식 문서: [Cloudflare Pages Custom domains](https://developers.cloudflare.com/pages/configuration/custom-domains/) · [Workers VPC](https://developers.cloudflare.com/workers-vpc/) · [Pages Service bindings](https://developers.cloudflare.com/pages/functions/bindings/) · [Worker Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
+이전 공개 접근 경로는 종료됐습니다. 현재 사용자용 주소는 공식·보조 Cloudflare Pages 호스트이며, 과거 구독 주소를 다시 사용하거나 내부 네트워크를 변경하기 전에는 운영자 확인이 필요합니다. 내부 접속·중지·복구 명령과 장비 정보는 비공개 운영 기록에서 관리합니다.
 
 ## 자동 셔터와 통계
 
