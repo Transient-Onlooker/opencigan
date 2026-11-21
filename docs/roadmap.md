@@ -45,29 +45,14 @@ flowchart TB
 
 개발과 검증은 병행할 수 있습니다. **코드 구현 완료**, **자동 테스트 합격**, **운영 배포**, **실기기·정책 승인**은 각각 다른 상태입니다. 현재 집중 작업은 [ST-00~ST-14](roadmap/short-term-2026-11-21.md) 순서를 사용합니다.
 
-## 공개 서비스 구조와 남은 게이트
+## 공개 서비스의 남은 검증
 
-```mermaid
-flowchart LR
-    Web["Cloudflare Pages<br/>공식·보조 도메인"]
-    Fn["Pages Functions"]
-    Worker["비공개 Worker<br/>요청 제한·서명 IP"]
-    Tunnel["Workers VPC<br/>Cloudflare Tunnel"]
-    Pi["Pi Python API"]
-    Timetable["컴시간<br/>WARP 출구"]
-    Meals["NEIS"]
+- **공식 주소:** [opencigan.mcv.kr](https://opencigan.mcv.kr/) · **보조 주소:** [opencigan.pages.dev](https://opencigan.pages.dev/) — 동일한 읽기 API를 이용합니다.
+- **완료된 작업:** 웹·API 기본 배포 및 주요 HTTP 응답 점검, 외부 접속 경로 일부 검증.
+- **미완료:** 반복 오류 원인·실제 요청 제한·장기 안정성·캘린더 갱신·모바일 실기기·원본 데이터 정책 검토.
+- 서비스 내부 네트워크·장비·접속·비밀 설정은 공개 문서에 기록하지 않습니다.
 
-    Web --> Fn --> Worker --> Tunnel --> Pi
-    Pi --> Timetable
-    Pi --> Meals
-```
-
-- **공식 주소:** [opencigan.mcv.kr](https://opencigan.mcv.kr/) · **보조 주소:** [opencigan.pages.dev](https://opencigan.pages.dev/) — 두 주소의 API 경로는 동일한 서버 측 구성에 의존합니다.
-- **이미 완료된 전환 기록:** 공식 Cloudflare Pages 전환, Worker/Pi 주요 배포, 공개 Tailscale Funnel 중지. 기존 GitHub Pages는 별도 유지합니다.
-- **아직 남은 증명:** 일부 네트워크 오류·원본 지연의 실제 원인, 운영 429, 장기 안정성, Apple/Google Calendar 실제 갱신, 모바일 PWA·PNG/PDF·공유 실기기 QA, 데이터·보관·원본 재제공 정책.
-- **운영 안정성 원칙:** WARP 출구와 Cloudflare Tunnel은 다른 경로입니다. 남은 P0를 통과하지 않은 상태에서 보안 정책을 임의 완화하거나 Funnel을 재개하지 않습니다.
-
-[실제 배포 증거](cloudflare-tunnel-rollout.md) · [서비스 아키텍처](architecture.md) · [운영·롤백](operations.md) · [알려진 문제](known-issues.md)
+[운영 요약](cloudflare-tunnel-rollout.md) · [API 문서](api-guide.md) · [알려진 문제](known-issues.md)
 
 ## 결정 사항과 보류 항목
 
