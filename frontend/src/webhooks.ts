@@ -84,7 +84,14 @@ async function load() {
   manage.hidden = true; table.replaceChildren();
   const path = subscriptionPath();
   const result = await call(path);
-  await loadTemplate(path, result.provider);
+  const templateEditor = document.querySelector<HTMLElement>('#template-editor')!;
+  templateEditor.hidden = true;
+  try {
+    await loadTemplate(path, result.provider);
+    templateEditor.hidden = false;
+  } catch {
+    // Older servers may not provide template management yet.
+  }
   const f = result.filters ?? {};
   input('subject').value = f.subject ?? ''; input('teacher').value = f.teacher ?? '';
   select('weekday').value = String(f.weekday ?? ''); input('period').value = String(f.period ?? ''); select('kind').value = f.type ?? '';
