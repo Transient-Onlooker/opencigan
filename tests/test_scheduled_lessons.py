@@ -1,10 +1,28 @@
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
-from backend.scheduled_lessons import preparation_periods
+from backend.scheduled_lessons import preparation_periods, scheduled_event_id, scheduled_time
 
 
 class ScheduledLessonTests(unittest.TestCase):
+    def test_kst_schedule_and_cross_midnight_quiet_hours(self):
+        day = date(2026, 11, 23)
+        self.assertEqual(scheduled_time(day, "08:30").isoformat(), "2026-11-23T08:30:00+09:00")
+        self.assertEqual(scheduled_time(day, "23:30", {"start": "22:00", "end": "07:00"}).isoformat(), "2026-11-24T07:00:00+09:00")
+        self.assertEqual(scheduled_time(day, "06:30", {"start": "22:00", "end": "07:00"}).isoformat(), "2026-11-23T07:00:00+09:00")
+        with self.assertRaises(ValueError):
+            scheduled_time(day, "25:00")
+
+    def test_event_identity_is_stable_and_distinguishes_day_and_mode(self):
+        day = date(2026, 11, 23)
+        identifier = "a" * 24
+        first = scheduled_event_id(identifier, "morning", day)
+        self.assertEqual(first, scheduled_event_id(identifier, "morning", day))
+        self.assertNotEqual(first, scheduled_event_id(identifier, "summary", day))
+        self.assertNotEqual(first, scheduled_event_id(identifier, "morning", day + timedelta(days=1)))
+        with self.assertRaises(ValueError):
+            scheduled_event_id("bad", "morning", day)
+
     def setUp(self):
         self.now = datetime.fromisoformat("2026-11-22T15:05:00+00:00")
         self.data = {"schoolId": "123:예시학교", "weekStart": "2026-11-23", "stale": False,

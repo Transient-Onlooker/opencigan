@@ -1,9 +1,31 @@
 """Select lessons for an opt-in morning reminder without fetching or sending."""
 
 from datetime import date, datetime, timedelta, timezone
+import re
+
+from backend.webhook_store import quiet_until, validate_filters
 
 
 KST = timezone(timedelta(hours=9))
+
+
+def scheduled_time(day, clock, quiet_hours=None):
+    """Return the KST scheduled instant, deferred through quiet hours if needed."""
+    if type(day) is not date or not isinstance(clock, str) or not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", clock):
+        raise ValueError("invalid schedule time")
+    if quiet_hours is not None:
+        validate_filters({"quietHours": quiet_hours})
+    scheduled = datetime.combine(day, datetime.strptime(clock, "%H:%M").time(), KST)
+    deferred = quiet_until(scheduled.timestamp(), quiet_hours)
+    return datetime.fromtimestamp(deferred, KST) if deferred is not None else scheduled
+
+
+def scheduled_event_id(subscription_id, mode, day):
+    """Keep one stable event identity per subscription, mode and KST day."""
+    if (not isinstance(subscription_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{24}", subscription_id)
+            or mode not in ("summary", "morning") or type(day) is not date):
+        raise ValueError("invalid scheduled event identity")
+    return f"scheduled_{mode}_{subscription_id}_{day:%Y%m%d}"
 
 
 def preparation_periods(response, school, grade, classroom, subject, now, max_age):
