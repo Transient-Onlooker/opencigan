@@ -84,6 +84,47 @@ test('timetable session rejects mismatched responses and ignores cancelled reque
   assert.equal(accepted, 1);
 });
 
+test('a response for a selection that changed is ignored even without an abort', async () => {
+  const session = exports.createTimetableSession();
+  let resolve;
+  let selected = { schoolId: 'a', week: '2026-11-09' };
+  let accepted = 0;
+  const first = session.fetch('a', selected.week, () => selected,
+    () => new Promise(done => { resolve = done; }), () => { accepted++; });
+  selected = { schoolId: 'b', week: '2026-11-09' };
+  resolve({ schoolId: 'a', weekStart: '2026-11-09' });
+  await first.result;
+  assert.equal(accepted, 0);
+
+  selected = { schoolId: 'a', week: '2026-11-09' };
+  const second = session.fetch('a', selected.week, () => selected,
+    () => new Promise(done => { resolve = done; }), () => { accepted++; });
+  selected = { schoolId: 'b', week: '2026-11-16' };
+  resolve({ schoolId: 'b', weekStart: '2026-11-16' });
+  await second.result;
+  assert.equal(accepted, 0, 'a response for the new selection must not be accepted by an old request');
+});
+
+test('a failure from an old selection does not replace the current state', async () => {
+  let state, reject;
+  let failures = 0;
+  let selected = { schoolId: 'a', week: '2026-11-09' };
+  const session = exports.createTimetableSession(value => { state = value; });
+  session.load({
+    schoolId: selected.schoolId, week: selected.week, preserve: false, reuseCachedWeek: false, validateClass: false,
+    refreshInterval: 100, now: () => 10, storage: () => ({ getItem: () => null, setItem() {} }),
+    current: () => selected, fetch: () => new Promise((_, fail) => { reject = fail; }),
+    validate() {}, classError: () => false, errorText: error => error.message, onSuccess() {},
+    onFailure() { failures++; },
+  });
+  selected = { schoolId: 'b', week: '2026-11-16' };
+  reject(new Error('old request failed'));
+  await new Promise(setImmediate);
+  assert.equal(state.error, '');
+  assert.equal(state.data, null);
+  assert.equal(failures, 0);
+});
+
 test('offline data is restored only for the matching school and week and stale data is not saved', () => {
   const session = exports.createTimetableSession();
   const values = new Map();
