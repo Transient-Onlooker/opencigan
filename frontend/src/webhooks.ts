@@ -69,15 +69,55 @@ async function load() {
   state.textContent = '구독 정보를 불러왔어요.';
 }
 
+async function copyLink() {
+  const id = input('id').value.trim();
+  const token = input('token').value.trim();
+  if (!/^[A-Za-z0-9_-]{24}$/.test(id) || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
+    throw new Error('구독 ID와 관리 토큰을 확인해 주세요.');
+  }
+  const link = `${location.origin}${location.pathname}#id=${id}&token=${token}`;
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(link);
+    state.textContent = '관리 링크를 클립보드에 복사했어요. 링크나 토큰을 공유하거나 북마크하면 관리 권한이 노출될 수 있으니 주의하세요.';
+  } else {
+    throw new Error('클립보드를 사용할 수 없는 환경입니다.');
+  }
+}
+
+function initFromFragment() {
+  const hash = location.hash;
+  if (!hash) return;
+  try {
+    history.replaceState(null, '', location.pathname + location.search);
+  } catch {
+    reset(); input('token').type = 'password';
+    state.textContent = '주소에서 관리 정보를 지우지 못했어요. 주소를 직접 지우고 다시 시도해 주세요.';
+    return;
+  }
+  const raw = hash.replace(/^#/, '');
+  const params = new URLSearchParams(raw);
+  const id = params.get('id')?.trim() ?? '';
+  const token = params.get('token')?.trim() ?? '';
+  if (params.size === 2 && params.getAll('id').length === 1 && params.getAll('token').length === 1 &&
+      /^[A-Za-z0-9_-]{24}$/.test(id) && /^[A-Za-z0-9_-]{43}$/.test(token)) {
+    reset(); input('token').type = 'password';
+    input('id').value = id; input('token').value = token; void run(load);
+  } else {
+    reset(); input('token').type = 'password';
+    state.textContent = '관리 링크의 형식이 올바르지 않아요.';
+  }
+}
+
 document.querySelector('#create')!.addEventListener('submit', (event) => {
   event.preventDefault();
   void run(async () => {
     const result = await call('', 'POST', { school: input('school').value.trim(), grade: Number(input('grade').value), class: Number(input('classroom').value), destination: input('destination').value }, false);
     input('destination').value = ''; input('id').value = result.id; input('token').value = result.token; input('token').type = 'text';
-    state.textContent = '구독을 만들었어요. 아래 ID와 관리 토큰을 안전한 곳에 따로 저장하세요. 토큰은 다시 표시되지 않아요.';
+    state.textContent = '구독을 만들었어요. 관리 링크 복사 버튼을 누르거나 아래 ID와 관리 토큰을 안전한 곳에 보관하세요. 관리 링크나 토큰을 공유하거나 북마크하면 관리 권한이 노출될 수 있어요. 토큰은 다시 표시되지 않아요.';
   });
 });
 document.querySelector('#connect')!.addEventListener('submit', (event) => { event.preventDefault(); input('token').type = 'password'; void run(load); });
+document.querySelector('#copy-link')?.addEventListener('click', () => { void run(copyLink); });
 for (const id of ['id', 'token']) input(id).addEventListener('input', () => { manage.hidden = true; table.replaceChildren(); });
 document.querySelector('#filters')!.addEventListener('submit', (event) => {
   event.preventDefault(); void run(async () => {
@@ -95,3 +135,6 @@ document.querySelector('#test')!.addEventListener('click', () => { void run(asyn
 document.querySelector('#refresh')!.addEventListener('click', () => { void run(async () => { await loadDeliveries(subscriptionPath()); state.textContent = '전송 상태를 새로 불러왔어요.'; }); });
 document.querySelector('#delete')!.addEventListener('click', () => { if (!window.confirm('이 구독과 대기 중인 알림을 삭제할까요?')) return; void run(async () => { await call(subscriptionPath(), 'DELETE'); reset(); state.textContent = '구독을 삭제했어요.'; }); });
 document.querySelector('#lock')!.addEventListener('click', () => { reset(); input('token').type = 'password'; state.textContent = '관리 정보를 지웠어요.'; });
+
+window.addEventListener('hashchange', initFromFragment);
+initFromFragment();

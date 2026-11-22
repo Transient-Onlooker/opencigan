@@ -95,3 +95,53 @@ test('custom domain uses the same-origin gateway when no API base is configured'
   await page.getByRole('button', { name: '구독 만들기' }).click();
   await expect(page.getByLabel('관리 토큰')).toHaveValue('b'.repeat(43));
 });
+
+test('management link auto-authenticates via fragment, strips fragment immediately, and copies link', async ({ page }) => {
+  const id = 'a'.repeat(24), token = 'b'.repeat(43), calls = [];
+  await page.route('**/api/v1/webhooks**', async (route) => {
+    const request = route.request(), url = new URL(request.url());
+    calls.push({ path: url.pathname, method: request.method(), headers: request.headers() });
+    if (url.pathname.endsWith('/deliveries')) return route.fulfill({ json: { deliveries: [] } });
+    return route.fulfill({ json: { school: '2:예시학교', grade: 2, classroom: 3, provider: 'discord', dropped_events: 0, filters: {} } });
+  });
+
+  await page.goto('/webhooks.html#invalid-fragment');
+  expect(page.url()).not.toContain('invalid-fragment');
+  expect(page.url()).not.toContain('#');
+  await expect(page.getByRole('status')).toContainText('관리 링크의 형식');
+  expect(calls.length).toBe(0);
+
+  await page.goto(`/webhooks.html#id=${id}&token=${token}`);
+  await expect(page).toHaveURL(/\/webhooks\.html$/);
+  expect(page.url()).not.toContain(token);
+  expect(page.url()).not.toContain('#');
+  await expect(page.getByText('2:예시학교 · 2학년 3반')).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('구독 정보');
+
+  expect(calls.every((call) => !call.path.includes(token))).toBeTruthy();
+  expect(calls.every((call) => call.headers.authorization === `Bearer ${token}`)).toBeTruthy();
+  expect(await page.evaluate(() => JSON.stringify({ local: localStorage, session: sessionStorage, url: location.href }))).not.toContain(token);
+
+  await page.evaluate(() => {
+    window._copied = '';
+    const mock = { writeText: async (text) => { window._copied = text; } };
+    try {
+      Object.defineProperty(navigator, 'clipboard', { value: mock, configurable: true });
+    } catch {
+      navigator.clipboard.writeText = mock.writeText;
+    }
+  });
+  await page.getByRole('button', { name: '관리 링크 복사' }).click();
+  await expect(page.getByRole('status')).toContainText('복사');
+  await expect(page.getByRole('status')).toContainText('공유하거나 북마크');
+  expect(await page.evaluate(() => window._copied)).toContain(`#id=${id}&token=${token}`);
+});
+
+test('management link does not authenticate if the fragment cannot be removed', async ({ page }) => {
+  let requests = 0;
+  await page.route('**/api/v1/webhooks**', async (route) => { requests++; await route.abort(); });
+  await page.addInitScript(() => { history.replaceState = () => { throw new Error('blocked'); }; });
+  await page.goto(`/webhooks.html#id=${'a'.repeat(24)}&token=${'b'.repeat(43)}`);
+  await expect(page.getByRole('status')).toContainText('주소에서 관리 정보를 지우지 못했어요');
+  expect(requests).toBe(0);
+});
