@@ -71,7 +71,7 @@ flowchart TB
 - [x] 테스트 전용 제한값에서 429 JSON·`Retry-After`·CORS, 관리자 API 제한, 정상 캘린더/API 요청과의 간섭 방지를 검사한다. **실서비스에 요청 폭주를 발생시키지 않는다.**
 - [PR #159](https://github.com/Transient-Onlooker/opencigan/pull/159)의 Worker 테스트 19개, Pi WSGI 테스트 22개와 [전체 CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/44916758406)가 통과했다. Worker에서 가상의 IP A의 시간표 제한이 IP B·캘린더·OPTIONS에 영향을 주지 않는지, 429의 CORS/재시도 및 위조 헤더 제거를 확인했다. 기존 Pi 격리 테스트는 서명된 IP별 제한·접속 로그, 무서명 버킷, 관리자 제한과 OPTIONS를 확인한다. 실제 운영 한도 초과 검증은 별도다.
 - **완료 조건:** 독립 IP A/B의 제한·로그 계약 검증. 실제 운영 레이트 리밋 한도 초과는 별도 P0 게이트로 보존.
-- 원본: [P0 보안 경계](core-quality.md), [운영 체크리스트](../cloudflare-tunnel-rollout.md).
+- 원본: [P0 보안 경계](core-quality.md), [운영 체크리스트](../operations/cloudflare-tunnel-rollout.md).
 
 ## B. P1 — 성능과 사용자 화면
 
@@ -123,7 +123,7 @@ flowchart TB
 - [ ] 이미 있는 기본 비활성 API/큐/이력에서 빠진 구독 CRUD, 높은 엔트로피 관리 링크 인증·폐기, HMAC, 실패 재시도·멱등성·저장/큐 상한을 보강한다.
 - [ ] 학급/과목/교사/요일/교시/변경 유형 필터·방해 금지 시간, 테스트 발송, 최근 성공/실패/재시도 조회를 API·UI 양쪽에서 연결한다.
 - **완료 조건:** 타 구독 접근 불가·토큰 유출 방지·중복/재시도·필터 회귀. 실제 Discord/Google Chat 발송 백엔드는 계속 OFF.
-- 원본: [P3 Webhook](automation-and-future.md), [Webhook 문서](../webhooks.md).
+- 원본: [P3 Webhook](automation-and-future.md), [Webhook 문서](../operations/webhooks.md).
 
 ### ST-08 · Webhook 템플릿 + 개발자 메뉴 · ST-07 이후
 

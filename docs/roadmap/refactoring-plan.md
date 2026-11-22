@@ -1,6 +1,6 @@
 # OpenCigan 리팩터링 실행 설계
 
-> 이 문서는 [로드맵 배치 7](roadmap.md#배치-7-착수-조건과-리팩터링-순서)의 구체적인 구현 지침이다. **현재 수정 마무리 → RPi 적용 → QA 기준선 확정 후 착수**하며, 문서 작성 자체는 리팩터링 착수가 아니다.
+> 이 문서는 [로드맵 배치 7](README.md#배치-7-착수-조건과-리팩터링-순서)의 구체적인 구현 지침이다. **현재 수정 마무리 → RPi 적용 → QA 기준선 확정 후 착수**하며, 문서 작성 자체는 리팩터링 착수가 아니다.
 > 코드 분석 기준: 2026-11-15, `main` 커밋 `54f89b935491a404dc251713ca652ad048b0599e`. 별도 에이전트가 코드를 계속 변경 중이므로 실행 시에는 최신 코드와 비교한다. 경로와 모듈명은 제안안이며 사용자 동작·테스트 계약 보존을 우선한다.
 
 ## 0. 안정 버전과 브랜치 운영
@@ -132,14 +132,14 @@ backend/
 
 ### PR 8 — 과거 코드·바이너리·번들 (`refactor/repository-cleanup`)
 
-- `workers-api/`가 여전히 CI(`test_worker`, `test_d1_cache`, `test_migration`) 대상이므로 선행 참조 확인 없이 삭제하지 않는다. `phase0/`, `phase0-mvp/`와 wheelhouse는 재현·배포 의존성을 조사한 뒤 아카이브/삭제 여부 결정.
+- `../../experiments/workers-api/`가 여전히 CI(`test_worker`, `test_d1_cache`, `test_migration`) 대상이므로 선행 참조 확인 없이 삭제하지 않는다. `../../experiments/phase0/`, `../../experiments/phase0-mvp/`와 wheelhouse는 재현·배포 의존성을 조사한 뒤 아카이브/삭제 여부 결정.
 - Python/Workers 구현 차이는 공동 API 계약 테스트와 실제 배포 대상에 근거해 정리. 일괄 추상화나 무근거 통합을 하지 않는다.
 - 원본·gzip·brotli JS/CSS 청크, PDF의 동적 `pdf-lib`, 폰트 전송량·필요 시 지연 로딩을 **실측**한다. 저장소 파일 크기와 사용자 브라우저 전송량을 구분한다.
 
 #### 조사 기록 — 2026-11-16
 
-- `workers-api/`는 CI의 Worker·D1·마이그레이션 테스트 대상이며, 별도 배포 설정과 재현 스크립트가 남아 있다. `phase0-mvp/`는 해당 재현 절차에서 도구 경로로 참조된다. 동일한 SHA-256의 `pycomcigan` 1.4.4 wheel 두 개는 Workers wheelhouse 하나를 참조하도록 통합하고 오프라인 잠금 검사를 통과했다. Workers용 `pycryptodomex` wheel은 재현 스크립트와 잠금 파일에서 참조하므로 보존한다.
-- `phase0/`는 CI나 현재 Python API에서 호출하지 않는 import 전용 로컬 스파이크다. `pycomcigan` 1.4.2의 당시 실패·측정 기록과 잠금 파일이 `phase0/REPORT.md`와 함께 재현 근거를 이루므로 경로를 유지한다. `phase0-mvp/`는 별도 버전 실험과 Workers 로컬 재현 도구의 참조 경로이므로 유지한다. Workers 설정에 과거 원격 배포 기록이 있지만 현재 원격 리소스의 가동 여부는 이 조사에서 확인하지 않았다.
+- `../../experiments/workers-api/`는 CI의 Worker·D1·마이그레이션 테스트 대상이며, 별도 배포 설정과 재현 스크립트가 남아 있다. `../../experiments/phase0-mvp/`는 해당 재현 절차에서 도구 경로로 참조된다. 동일한 SHA-256의 `pycomcigan` 1.4.4 wheel 두 개는 Workers wheelhouse 하나를 참조하도록 통합하고 오프라인 잠금 검사를 통과했다. Workers용 `pycryptodomex` wheel은 재현 스크립트와 잠금 파일에서 참조하므로 보존한다.
+- `../../experiments/phase0/`는 CI나 현재 Python API에서 호출하지 않는 import 전용 로컬 스파이크다. `pycomcigan` 1.4.2의 당시 실패·측정 기록과 잠금 파일이 `phase0/REPORT.md`와 함께 재현 근거를 이루므로 경로를 유지한다. `../../experiments/phase0-mvp/`는 별도 버전 실험과 Workers 로컬 재현 도구의 참조 경로이므로 유지한다. Workers 설정에 과거 원격 배포 기록이 있지만 현재 원격 리소스의 가동 여부는 이 조사에서 확인하지 않았다.
 - 프런트엔드 로컬 프로덕션 빌드 기준 주요 파일 크기(바이트, 원본 / gzip 기본값 / Brotli 품질 4)는 main JS 195,362 / 67,421 / 67,592, main CSS 88,870 / 22,906 / 21,715, 별도 `es` JS 청크 440,122 / 181,744 / 181,140이다. PDF 생성은 `export-png.ts`에서 `pdf-lib`를 동적 import한다.
 - 빌드 디렉터리의 WOFF2는 92개 합계 2,957,724바이트다. 이는 저장된 산출물 총량이며, 사용자의 브라우저가 모두 내려받는다는 뜻은 아니다.
 - 로컬 Chromium의 빈 캐시·서비스 워커 차단 상태에서 시간표 API를 고정 응답으로 대체해 실제 요청을 계측했다. 초기 화면에서 JS 4개 71,056바이트, CSS 1개 23,416바이트, WOFF2 13개 337,796바이트가 전송됐고, PDF 저장 시 별도의 JS 청크 1개 182,246바이트가 추가됐다. 값은 HTTP 헤더가 포함된 Chromium 네트워크 전송량이며 로컬 Vite 미리보기와 해당 화면·문자 집합에 한정된다. 운영 CDN의 압축과 실제 사용자 요청량은 확인하지 않았다.

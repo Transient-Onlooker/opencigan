@@ -1,6 +1,6 @@
 # OpenCigan 아키텍처와 데이터 흐름
 
-> **구분:** 이 문서는 공개할 수 있는 일반화된 구성을 설명합니다. 실제 운영 상태·배포 버전·미검증 항목은 [운영 배포 기록](cloudflare-tunnel-rollout.md)과 [P0 로드맵](roadmap/core-quality.md)을 기준으로 확인합니다. 마지막 문서 정리: 2026-11-21.
+> **구분:** 이 문서는 공개할 수 있는 일반화된 구성을 설명합니다. 실제 운영 상태·배포 버전·미검증 항목은 [운영 배포 기록](operations/cloudflare-tunnel-rollout.md)과 [P0 로드맵](roadmap/core-quality.md)을 기준으로 확인합니다. 마지막 문서 정리: 2026-11-21.
 
 ## 공개 서비스 구성
 
@@ -43,4 +43,4 @@ flowchart LR
 - **이력:** `isChanged`는 컴시간 원본의 변경 표시입니다. `/api/v1/timetable/history`의 SQLite 비교 이력은 서비스가 *관측한 시점 사이*의 차이이며 모든 실제 변경을 뜻하지 않습니다. 이력 DB가 설정되지 않으면 기록하지 않습니다. 사용자용 과거 이력 보기 UI는 제거됐습니다.
 - **접속 로그·운영 통계:** 별도의 관리자 인증과 보관·비활성 설정을 사용합니다. 개인정보 처리·원본 재제공 허락 판단은 운영자가 별도로 수행해야 합니다.
 
-[운영 가이드](operations.md) · [클라우드 배포 기록](cloudflare-tunnel-rollout.md) · [API 문서](api-guide.md) · [현재 단기 로드맵](roadmap/short-term-2026-11-21.md)
+[운영 가이드](operations/operations.md) · [클라우드 배포 기록](operations/cloudflare-tunnel-rollout.md) · [API 문서](api-guide.md) · [현재 단기 로드맵](roadmap/short-term-2026-11-21.md)

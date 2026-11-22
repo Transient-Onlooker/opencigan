@@ -29,7 +29,7 @@
 
 | 항목 | 근거·결과 |
 |---|---|
-| 기획서 | `school-timetable-development-plan-v01.md`를 UTF-8로 읽었다. 요구사항은 수정 없는 upstream, 4082 통신, 변경 표시, 실환경 CPU·메모리·지연 및 장애 검사다. |
+| 기획서 | `docs/archive/initial-development-plan-v0.1.md`를 UTF-8로 읽었다. 요구사항은 수정 없는 upstream, 4082 통신, 변경 표시, 실환경 CPU·메모리·지연 및 장애 검사다. |
 | 로컬 도구 | Windows, Python 3.13.14, Node v26.13.0, uv 0.12.7. 기본 환경에 pywrangler 실행 파일과 pycomcigan 패키지는 없다. |
 | 패키지 | [upstream master의 메타데이터](https://raw.githubusercontent.com/hegelty/pycomcigan/master/pyproject.toml)는 1.4.2, requests, beautifulsoup4, urllib3를 명시한다. [PyPI](https://pypi.org/project/pycomcigan/) 최신 배포는 1.4.3이며 master와 동일하다고 가정하지 않는다. 이 실험은 소스 근거와 비교하기 위해 1.4.2를 지정했다. 배포 wheel과 master 소스의 동일성은 확인하지 않았다. |
 | 통신 | 조사한 [upstream master helpers](https://raw.githubusercontent.com/hegelty/pycomcigan/master/pycomcigan/helpers.py)는 `http://comci.net:4082`와 동기 `requests.get`을 사용하며 해당 호출에 timeout 인수를 지정하지 않는다. 이 관찰을 1.4.2 wheel의 실측으로 취급하지 않는다. 원본은 평문 HTTP다. |
