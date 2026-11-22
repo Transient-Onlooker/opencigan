@@ -26,7 +26,7 @@ def history_stats(method, query_string, request_headers, headers, history_store)
         if set(query) != {"school", "week"} or any(len(value) != 1 for value in query.values()):
             raise ValueError("invalid query")
         school, week = query["school"][0], query["week"][0]
-        if not re.fullmatch(r"[0-9]+:[^:]{1,50}", school):
+        if len(school) > 100 or not re.fullmatch(r"[0-9]+:[^:\x00-\x1f\x7f]{1,50}", school):
             raise ValueError("invalid school")
         parsed = date.fromisoformat(week)
         if parsed.isoformat() != week or parsed.weekday() != 0:

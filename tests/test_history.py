@@ -32,6 +32,7 @@ class HistoryTests(unittest.TestCase):
         baseline = self.store.change_stats('s', 'w')
         self.assertTrue(baseline['observed'])
         self.assertEqual(baseline['totalChanges'], 0)
+        self.assertEqual(baseline['comparisonCoverage'], 'unknown')
         self.store.observe('s', 'w', [lesson('Science'), lesson('Art', period=2)], base + timedelta(seconds=1))
         stats = self.store.change_stats('s', 'w')
         self.assertEqual(stats['byType'], {'added': 1, 'changed': 1, 'deleted': 0})

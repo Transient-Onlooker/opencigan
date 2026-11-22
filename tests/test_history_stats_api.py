@@ -40,6 +40,7 @@ class HistoryStatsApiTests(unittest.TestCase):
             self.assertIsNone(json.loads(body)['totalChanges'])
             self.store.change_stats.assert_called_once_with('1:Example', '2026-11-16')
             for query in ('school=1%3AExample&week=2026-11-17', 'school=bad&week=2026-11-16',
+                          'school=1%3AExample%0Ainvalid&week=2026-11-16',
                           self.query + '&week=2026-11-16', self.query + '&other=x'):
                 self.assertEqual(self.request(query, self.token)[0], 400)
 

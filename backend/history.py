@@ -165,7 +165,8 @@ class HistoryStore:
             ).fetchone()
             if observed is None:
                 return {"observed": False, "totalChanges": None, "byType": None,
-                        "affectedClasses": None, "lastObservedAt": None, "retainedSince": cutoff}
+                        "affectedClasses": None, "lastObservedAt": None, "retainedSince": cutoff,
+                        "comparisonCoverage": "unknown"}
             rows = db.execute(
                 "SELECT type, COUNT(*) AS count FROM changes WHERE school=? AND week=? AND observed_at>=? GROUP BY type",
                 (school, week, cutoff),
@@ -178,7 +179,8 @@ class HistoryStore:
             for row in rows:
                 by_type[row["type"]] = row["count"]
             return {"observed": True, "totalChanges": sum(by_type.values()), "byType": by_type,
-                    "affectedClasses": count, "lastObservedAt": observed["observed_at"], "retainedSince": cutoff}
+                    "affectedClasses": count, "lastObservedAt": observed["observed_at"], "retainedSince": cutoff,
+                    "comparisonCoverage": "unknown"}
 
     def list(self, school, week, cursor=None, limit=50, grade=None, classroom=None, include_ids=False, filters=None):
         if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
