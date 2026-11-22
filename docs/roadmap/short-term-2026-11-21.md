@@ -125,8 +125,9 @@ flowchart TB
 
 ### ST-08 · Webhook 템플릿 + 개발자 메뉴 · ST-07 이후
 
-- [ ] 구독별 허용 변수 기반 커스텀 메시지, Discord Embed·Google Chat 포맷, 샘플 미리보기·초기화·템플릿 검증을 구현한다. 멘션·HTML/URL·이스케이프·길이·미정 변수 방어.
-- [ ] Webhook 관리 화면이 준비되면 `설정 → 개발자용/연동`에 Webhook·API 문서·웹사이트 삽입용 iframe 생성기를 통합한다. 기존 `embed-builder.html` 접근과 iframe 호환성을 보존한다.
+- [x] 구독별 허용 변수 기반 커스텀 메시지, Discord Embed·Google Chat 포맷, 샘플 미리보기·초기화·템플릿 검증을 구현한다. 멘션·HTML/URL·이스케이프·길이·미정 변수 방어.
+- [x] Webhook 관리 화면이 준비되면 `설정 → 개발자용/연동`에 Webhook·API 문서·웹사이트 삽입용 iframe 생성기를 통합한다. 기존 `embed-builder.html` 접근과 iframe 호환성을 보존한다.
+- [PR #180](https://github.com/Transient-Onlooker/opencigan/pull/180): 모의 API와 합성 데이터로 템플릿·기존 관리 링크·모바일 화면을 검증했다. 운영 배포와 실제 Webhook 발송은 수행하지 않았다.
 - **완료 조건:** 실전 발송 없는 템플릿 테스트, 기존 링크 회귀, 화면·모바일 검증. 메뉴 단독 선행 이전 금지.
 - 원본: [P3 템플릿](automation-and-future.md), [P1 개발자 메뉴](user-experience.md).
 
