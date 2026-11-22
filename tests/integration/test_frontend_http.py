@@ -50,6 +50,33 @@ const assert = require('node:assert/strict');
 
     const deadlines = [];
     const originalTimeout = AbortSignal.timeout;
+    const originalFetch = globalThis.fetch;
+    const { pathToFileURL } = require('node:url');
+    const gateway = (await import(pathToFileURL(`${process.cwd()}/../cloudflare-gateway/src/index.mjs`))).default;
+    const limiter = { limit: async () => ({ success: true }) };
+    const forwarded = [];
+    const gatewayEnv = {
+      SEARCH_RATE: limiter, GENERAL_RATE: limiter, TIMETABLE_RATE: limiter, CALENDAR_RATE: limiter,
+      PRIVATE_API: { fetch: request => {
+        forwarded.push(request);
+        const url = new URL(request.url);
+        return originalFetch(`${process.env.VITE_API_BASE_URL}${url.pathname}${url.search}`, {
+          method: request.method, headers: request.headers, signal: request.signal,
+        });
+      } },
+    };
+    globalThis.fetch = (url, options) => {
+      if (!String(url).startsWith(`${process.env.VITE_API_BASE_URL}/api/v1/timetable?`)) return originalFetch(url, options);
+      const request = new Request(url, options);
+      const work = gateway.fetch(request, gatewayEnv);
+      return new Promise((resolve, reject) => {
+        const abort = () => reject(request.signal.reason);
+        if (request.signal.aborted) return abort();
+        request.signal.addEventListener('abort', abort, { once: true });
+        work.then(value => { request.signal.removeEventListener('abort', abort); resolve(value); },
+                  error => { request.signal.removeEventListener('abort', abort); reject(error); });
+      });
+    };
     AbortSignal.timeout = (milliseconds) => {
       assert.equal(milliseconds, 15_000);
       const deadline = new AbortController();
@@ -71,6 +98,8 @@ const assert = require('node:assert/strict');
 
       deadlines[0].abort(new DOMException('Synthetic client deadline', 'TimeoutError'));
       await assert.rejects(slowRequest, /서버 응답이 늦어요/);
+      assert.equal(forwarded.length, 1, 'the slow request should pass through the gateway');
+      assert.equal(forwarded[0].signal.aborted, false, 'the mocked gateway should not abort the private request');
       const afterCancel = await fetch(`${process.env.VITE_API_BASE_URL}/__test__/state`).then(response => response.json());
       assert.equal(afterCancel.slowCompleted, false, 'client cancellation must not cancel backend work');
 
@@ -86,6 +115,7 @@ const assert = require('node:assert/strict');
       assert.equal(recovered.cacheStatus, 'hit', 'the completed server fetch should populate cache after client cancellation');
     } finally {
       AbortSignal.timeout = originalTimeout;
+      globalThis.fetch = originalFetch;
       await fetch(`${process.env.VITE_API_BASE_URL}/__test__/release`);
     }
   } finally {
