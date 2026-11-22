@@ -132,6 +132,62 @@ paths:
         '401': { description: Invalid subscription or token. }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { description: Feature disabled or storage unavailable. }
+  /api/v1/webhooks/{id}/template:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
+    get:
+      tags: [System]
+      summary: Get a subscription message template
+      security: [{ WebhookManagement: [] }]
+      responses:
+        '200': { description: Template, format and provider; a null template uses the default. }
+        '401': { description: Invalid subscription or token. }
+        '503': { description: Feature disabled or storage unavailable. }
+    put:
+      tags: [System]
+      summary: Save a subscription message template
+      security: [{ WebhookManagement: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: &webhookTemplateInput
+              type: object
+              required: [template, discordEmbed]
+              additionalProperties: false
+              properties:
+                template: { type: string, minLength: 1, maxLength: 1200 }
+                discordEmbed: { type: boolean }
+      responses:
+        '200': { description: Saved template and provider. }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { description: Invalid subscription or token. }
+        '503': { description: Feature disabled or storage unavailable. }
+    delete:
+      tags: [System]
+      summary: Restore the default subscription template
+      security: [{ WebhookManagement: [] }]
+      responses:
+        '200': { description: Template reset. }
+        '401': { description: Invalid subscription or token. }
+        '503': { description: Feature disabled or storage unavailable. }
+  /api/v1/webhooks/{id}/template/preview:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
+    post:
+      tags: [System]
+      summary: Preview a template without creating a delivery
+      security: [{ WebhookManagement: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: *webhookTemplateInput
+      responses:
+        '200': { description: Sample provider payload; nothing is sent or queued. }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { description: Invalid subscription or token. }
+        '503': { description: Feature disabled or storage unavailable. }
   /api/v1/webhooks/{id}/test:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
