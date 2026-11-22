@@ -147,10 +147,16 @@ document.querySelector('#rotate-token')!.addEventListener('click', () => {
   void run(async () => {
     const newToken = rotationToken;
     const active = controller;
+    const originalId = input('id').value;
+    const originalToken = input('token').value;
     try {
       const result = await call(`${subscriptionPath()}/rotate`, 'POST', { newToken });
       if (active.signal.aborted) return;
       if (result?.rotated !== true) throw new Error('invalid rotation response');
+      if (input('id').value !== originalId || input('token').value !== originalToken) {
+        state.textContent = '이전 구독의 관리 링크가 교체됐어요. 보관한 새 링크를 사용해 주세요.';
+        return;
+      }
       input('token').value = newToken; input('token').type = 'password'; clearRotation();
       state.textContent = '관리 링크를 교체했어요. 이전 링크는 작동하지 않습니다.';
     } catch {

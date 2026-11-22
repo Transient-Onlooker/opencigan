@@ -186,3 +186,30 @@ test('rotation requires saving the new link before revoking the old token', asyn
   await expect(page.getByLabel('관리 토큰')).toHaveValue(newToken);
   expect(await page.evaluate(() => JSON.stringify({ local: localStorage, session: sessionStorage, url: location.href }))).not.toContain(newToken);
 });
+
+test('rotation does not replace credentials edited while the request is in flight', async ({ page }) => {
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  let started;
+  const requestStarted = new Promise((resolve) => { started = resolve; });
+  await page.route('**/api/v1/webhooks**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/rotate')) { started(); await pending; return route.fulfill({ json: { rotated: true } }); }
+    if (path.endsWith('/deliveries')) return route.fulfill({ json: { deliveries: [] } });
+    return route.fulfill({ json: { school: '2:예시학교', grade: 2, classroom: 3, provider: 'discord', dropped_events: 0, filters: {} } });
+  });
+  await page.goto('/webhooks.html');
+  await page.getByLabel('구독 ID').fill('a'.repeat(24));
+  await page.getByLabel('관리 토큰').fill('b'.repeat(43));
+  await page.getByRole('button', { name: '구독 불러오기' }).click();
+  await page.getByRole('button', { name: '새 관리 링크 준비' }).click();
+  await page.getByLabel('새 링크를 안전하게 보관했어요').check();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: '기존 링크 폐기하고 교체' }).click();
+  await requestStarted;
+  await page.getByLabel('구독 ID').fill('c'.repeat(24));
+  release();
+  await expect(page.getByRole('status')).toContainText('이전 구독의 관리 링크가 교체');
+  await expect(page.getByLabel('구독 ID')).toHaveValue('c'.repeat(24));
+  await expect(page.getByLabel('관리 토큰')).toHaveValue('b'.repeat(43));
+});
