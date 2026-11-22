@@ -151,17 +151,21 @@ select('schedule-mode').addEventListener('change', updateScheduleFields);
 document.querySelector('#schedule-form')!.addEventListener('submit', (event) => {
   event.preventDefault();
   void run(async () => {
+    const path = subscriptionPath(), token = input('token').value, active = controller;
     const mode = select('schedule-mode').value;
-    await call(`${subscriptionPath()}/schedule`, 'PUT', {
+    await call(`${path}/schedule`, 'PUT', {
       mode, time: input('schedule-time').value || '07:30',
       subject: mode === 'subject_prep' ? input('schedule-subject').value.trim() : null,
     });
+    if (active !== controller || active.signal.aborted || input('token').value !== token || `/${input('id').value.trim()}` !== path) return;
     state.textContent = '알림 일정을 저장했어요.';
   });
 });
 document.querySelector('#schedule-reset')!.addEventListener('click', () => {
   void run(async () => {
-    await call(`${subscriptionPath()}/schedule`, 'DELETE');
+    const path = subscriptionPath(), token = input('token').value, active = controller;
+    await call(`${path}/schedule`, 'DELETE');
+    if (active !== controller || active.signal.aborted || input('token').value !== token || `/${input('id').value.trim()}` !== path) return;
     select('schedule-mode').value = 'immediate'; input('schedule-time').value = '07:30';
     input('schedule-subject').value = '체육'; updateScheduleFields();
     state.textContent = '예약 알림을 껐어요.';

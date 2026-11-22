@@ -71,3 +71,37 @@ test('late schedule response is not shown after changing subscriptions', async (
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await expect(page.locator('#schedule-editor')).toBeHidden();
 });
+
+test('late cancellation does not reset a different subscription form', async ({ page }) => {
+  let release, started;
+  const waiting = new Promise(resolve => { release = resolve; });
+  const requested = new Promise(resolve => { started = resolve; });
+  await page.route('**/api/v1/webhooks/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith('/schedule')) {
+      if (request.method() === 'DELETE') {
+        started();
+        await waiting;
+        return route.fulfill({ json: { deleted: true } });
+      }
+      return route.fulfill({ json: { schedule: null } });
+    }
+    if (path.endsWith('/deliveries')) return route.fulfill({ json: { deliveries: [] } });
+    if (path.endsWith('/template')) return route.fulfill({ status: 503 });
+    return route.fulfill({ json: { school: '2:예시학교', grade: 2, classroom: 3, provider: 'discord', dropped_events: 0, filters: {} } });
+  });
+  await page.goto(`/webhooks.html#id=${id}&token=${token}`);
+  await expect(page.locator('#schedule-editor')).toBeVisible();
+  await page.getByRole('button', { name: '일정 사용 안 함' }).click();
+  await requested;
+  await page.getByLabel('구독 ID').fill('c'.repeat(24));
+  await page.getByLabel('알림 방식').selectOption('daily_summary');
+  await page.getByLabel('예약 시각').fill('18:20');
+  const response = page.waitForResponse(result => result.url().endsWith('/schedule') && result.request().method() === 'DELETE');
+  release();
+  await response;
+  await page.waitForFunction(() => !document.querySelector('#schedule-reset').disabled);
+  await expect(page.getByLabel('알림 방식')).toHaveValue('daily_summary');
+  await expect(page.getByLabel('예약 시각')).toHaveValue('18:20');
+});
