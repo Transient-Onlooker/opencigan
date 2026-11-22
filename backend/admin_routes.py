@@ -5,15 +5,17 @@ import sqlite3
 from datetime import date
 from urllib.parse import parse_qs
 
+from backend.http_core import json_response
+
 
 def access_log_admin(method, query_string, request_headers, headers, access_log_store, recorder):
     if method not in ('GET', 'HEAD'):
-        return 405, headers, b'{"code":"method_not_allowed"}'
+        return json_response(405, headers, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
     token = os.environ.get('OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN', '')
     supplied = (request_headers or {}).get('Authorization', '')
     if not token or not hmac.compare_digest(supplied.encode(), ('Bearer ' + token).encode()):
         headers['WWW-Authenticate'] = 'Bearer realm="Opencigan access logs"'
-        return 401, headers, b'{"code":"unauthorized"}'
+        return json_response(401, headers, {"error": "인증이 필요합니다", "code": "unauthorized"})
     try:
         values = parse_qs(query_string, keep_blank_values=True, max_num_fields=20)
         allowed = {'client_ip', 'school_id', 'grade', 'class', 'start_day', 'end_day', 'route', 'status', 'origin_class', 'cache_status', 'cursor', 'limit', 'format'}
@@ -41,7 +43,7 @@ def access_log_admin(method, query_string, request_headers, headers, access_log_
             raise ValueError('형식을 확인하세요')
         store = access_log_store()
         if store is None:
-            return 503, headers, b'{"code":"access_logs_disabled"}'
+            return json_response(503, headers, {"error": "접속 로그가 비활성화되어 있습니다", "code": "access_logs_disabled"})
         if output == 'csv':
             headers['Content-Type'] = 'text/csv; charset=utf-8'
             headers['Content-Disposition'] = 'attachment; filename="opencigan-access.csv"'
@@ -50,6 +52,6 @@ def access_log_admin(method, query_string, request_headers, headers, access_log_
         result['dropped'] = recorder.dropped
         return 200, headers, json.dumps(result, ensure_ascii=False).encode()
     except (ValueError, TypeError):
-        return 400, headers, b'{"code":"invalid_request"}'
+        return json_response(400, headers, {"error": "조회 조건이 올바르지 않습니다", "code": "invalid_request"})
     except (OSError, sqlite3.Error):
-        return 503, headers, b'{"code":"access_logs_unavailable"}'
+        return json_response(503, headers, {"error": "접속 로그를 불러오지 못했습니다", "code": "access_logs_unavailable"})
