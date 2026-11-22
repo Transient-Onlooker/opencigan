@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import sqlite3
 from backend.http_core import json_response
@@ -29,7 +30,7 @@ def webhook_api(method, path, body, request_headers, client, headers, rate_allow
                 raise ValueError("invalid payload")
             result = store.create(payload["school"], payload["grade"], payload["class"], payload["destination"])
             return respond(200, result)
-        match = re.fullmatch(r"/api/v1/webhooks/([A-Za-z0-9_-]{24})(/deliveries|/test|/rotate|/template(?:/preview)?)?", path)
+        match = re.fullmatch(r"/api/v1/webhooks/([A-Za-z0-9_-]{24})(/deliveries|/test|/rotate|/schedule|/template(?:/preview)?)?", path)
         if not match:
             return respond(404, {"error": "요청한 경로가 없습니다", "code": "not_found"})
         if method not in ("GET", "HEAD", "DELETE", "POST", "PUT"):
@@ -37,7 +38,27 @@ def webhook_api(method, path, body, request_headers, client, headers, rate_allow
         authorization = (request_headers or {}).get("Authorization", "")
         token = authorization[7:] if authorization.startswith("Bearer ") else ""
         identifier = match.group(1)
-        if match.group(2) == "/template/preview":
+        if match.group(2) == "/schedule":
+            if os.environ.get("OPENCIGAN_SCHEDULER_ENABLED") != "1":
+                return respond(503, {"error": "예약 알림 기능이 활성화되지 않았습니다", "code": "scheduler_disabled"})
+            if method not in ("GET", "HEAD", "PUT", "DELETE"):
+                return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
+            if store.get(identifier, token) is None:
+                return respond(401, {"error": "인증이 필요합니다", "code": "unauthorized"})
+            from backend.scheduled_store import ScheduledStore
+            schedules = ScheduledStore(store.path)
+            if method in ("GET", "HEAD"):
+                saved = schedules.get_schedule(identifier, token)
+                result = {"schedule": {"mode": saved["mode"], "time": saved["time_kst"], "subject": saved["subject"]} if saved else None}
+            elif method == "PUT":
+                payload = json.loads(body or b"{}")
+                if not isinstance(payload, dict) or set(payload) != {"mode", "time", "subject"}:
+                    raise ValueError("invalid schedule payload")
+                saved = schedules.set_schedule(identifier, token, payload["mode"], payload["time"], payload["subject"])
+                result = {"schedule": {"mode": saved["mode"], "time": saved["time_kst"], "subject": saved["subject"]}} if saved else None
+            else:
+                result = {"deleted": schedules.cancel_schedule(identifier, token)}
+        elif match.group(2) == "/template/preview":
             if method != "POST":
                 return respond(405, {"error": "method not allowed", "code": "method_not_allowed"})
             payload = json.loads(body or b"{}")

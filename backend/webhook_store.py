@@ -78,7 +78,14 @@ def enqueue_observed_change(db, school, grade, classroom, date, period, kind, be
     text = f"{values['school']} {grade}학년 {classroom}반 · {date} {period}교시 ({kind})\n{lesson(before)} → {lesson(after)}"
     # Google Chat interprets angle-bracket tokens as mentions; Discord disables all mentions explicitly.
     safe_text = text.replace("<", "＜").replace(">", "＞")[:1800]
+    scheduled = (os.environ.get("OPENCIGAN_SCHEDULER_ENABLED") == "1" and
+                 db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='scheduled_settings'").fetchone() is not None)
     for subscription in subscriptions:
+        if scheduled:
+            setting = db.execute("SELECT mode FROM scheduled_settings WHERE subscription_id=? AND active=1",
+                                 (subscription["id"],)).fetchone()
+            if setting and setting["mode"] != "immediate":
+                continue
         filters = json.loads(subscription["filters_json"])
         if any(filters.get(key) is not None and filters[key] != value for key, value in
                (("period", period), ("type", kind), ("weekday", date_type.fromisoformat(date).isoweekday()))):

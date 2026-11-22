@@ -1,14 +1,16 @@
 import sqlite3
+import os
 import tempfile
 import unittest
 from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 from backend.scheduled_store import ScheduledStore
 from backend.scheduled_lessons import scheduled_event_id
+from backend.history import HistoryStore
 from backend.webhook_store import WebhookStore
 
 
@@ -110,6 +112,23 @@ class ScheduledStoreTests(unittest.TestCase):
         self.assertIsNone(self.webhooks.claim(now=200))
         updated = self.store.set_schedule(identifier, token, "daily_summary", "08:00")
         self.assertFalse(self.store.enqueue_due(identifier, updated["revision"], "2026-11-23", b"{}", 200))
+
+    def test_summary_mode_suppresses_immediate_changes_only_when_enabled(self):
+        identifier, token = self.subscription["id"], self.subscription["token"]
+        self.store.set_schedule(identifier, token, "daily_summary", "07:30")
+        history = HistoryStore(self.path)
+        now = datetime.now(timezone.utc)
+        lesson = {"date": "2026-11-23", "grade": 2, "class": 3, "period": 1, "subject": "Math", "teacher": "Kim"}
+        with patch.dict(os.environ, {"OPENCIGAN_SCHEDULER_ENABLED": ""}):
+            history.observe("2:Example School", "2026-11-23", [lesson], now)
+            history.observe("2:Example School", "2026-11-23", [{**lesson, "subject": "Science"}], now + timedelta(seconds=1))
+        self.assertEqual(len(self.webhooks.deliveries(identifier, token)), 1)
+        with patch.dict(os.environ, {"OPENCIGAN_SCHEDULER_ENABLED": "1"}):
+            history.observe("2:Example School", "2026-11-23", [{**lesson, "subject": "Art"}], now + timedelta(seconds=2))
+            self.assertEqual(len(self.webhooks.deliveries(identifier, token)), 1)
+            self.store.set_schedule(identifier, token, "immediate", "07:30")
+            history.observe("2:Example School", "2026-11-23", [{**lesson, "subject": "Music"}], now + timedelta(seconds=3))
+        self.assertEqual(len(self.webhooks.deliveries(identifier, token)), 2)
 
     def test_cancel_and_change_keep_tombstones_and_cancel_pending_delivery(self):
         identifier, token = self.subscription["id"], self.subscription["token"]

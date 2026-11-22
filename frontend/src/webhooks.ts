@@ -59,6 +59,9 @@ function reset() {
   templateFormat.disabled = false; templateSave.disabled = true; templateErrors.textContent = '';
   templateBody.removeAttribute('aria-invalid'); templatePreview.textContent = '';
   templatePreview.dataset.format = 'text'; templatePreview.dataset.invalid = 'false'; templatePreviewFormat.textContent = '';
+  document.querySelector<HTMLElement>('#schedule-editor')!.hidden = true;
+  document.querySelector<HTMLFormElement>('#schedule-form')!.reset();
+  updateScheduleFields();
   buttons.forEach((button) => { button.disabled = false; });
 }
 
@@ -105,6 +108,9 @@ async function load() {
   } catch {
     // Older servers may not provide template management yet.
   }
+  const scheduleEditor = document.querySelector<HTMLElement>('#schedule-editor')!;
+  scheduleEditor.hidden = true;
+  void loadSchedule(path, input('token').value, controller);
   const f = result.filters ?? {};
   input('subject').value = f.subject ?? ''; input('teacher').value = f.teacher ?? '';
   select('weekday').value = String(f.weekday ?? ''); input('period').value = String(f.period ?? ''); select('kind').value = f.type ?? '';
@@ -113,6 +119,54 @@ async function load() {
   await loadDeliveries(path); manage.hidden = false;
   state.textContent = '구독 정보를 불러왔어요.';
 }
+
+async function loadSchedule(path: string, token: string, active: AbortController) {
+  try {
+    const response = await call(`${path}/schedule`);
+    if (active !== controller || active.signal.aborted || input('token').value !== token || `/${input('id').value.trim()}` !== path) return;
+    if (response.schedule !== null && (typeof response.schedule !== 'object' ||
+        !['immediate', 'daily_summary', 'subject_prep'].includes(response.schedule.mode) ||
+        typeof response.schedule.time !== 'string' || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(response.schedule.time) ||
+        (response.schedule.subject !== null && typeof response.schedule.subject !== 'string'))) throw new Error('invalid schedule');
+    select('schedule-mode').value = response.schedule?.mode ?? 'immediate';
+    input('schedule-time').value = response.schedule?.time ?? '07:30';
+    input('schedule-subject').value = response.schedule?.subject ?? '체육';
+    updateScheduleFields();
+    document.querySelector<HTMLElement>('#schedule-editor')!.hidden = false;
+  } catch {
+    // The optional scheduler is disabled on older or unconfigured servers.
+  }
+}
+
+function updateScheduleFields() {
+  const mode = select('schedule-mode').value;
+  const subject = mode === 'subject_prep';
+  document.querySelector<HTMLElement>('#schedule-time-label')!.hidden = mode === 'immediate';
+  input('schedule-time').required = mode !== 'immediate';
+  document.querySelector<HTMLElement>('#schedule-subject-label')!.hidden = !subject;
+  input('schedule-subject').required = subject;
+}
+
+select('schedule-mode').addEventListener('change', updateScheduleFields);
+document.querySelector('#schedule-form')!.addEventListener('submit', (event) => {
+  event.preventDefault();
+  void run(async () => {
+    const mode = select('schedule-mode').value;
+    await call(`${subscriptionPath()}/schedule`, 'PUT', {
+      mode, time: input('schedule-time').value || '07:30',
+      subject: mode === 'subject_prep' ? input('schedule-subject').value.trim() : null,
+    });
+    state.textContent = '알림 일정을 저장했어요.';
+  });
+});
+document.querySelector('#schedule-reset')!.addEventListener('click', () => {
+  void run(async () => {
+    await call(`${subscriptionPath()}/schedule`, 'DELETE');
+    select('schedule-mode').value = 'immediate'; input('schedule-time').value = '07:30';
+    input('schedule-subject').value = '체육'; updateScheduleFields();
+    state.textContent = '예약 알림을 껐어요.';
+  });
+});
 
 async function copyLink() {
   const id = input('id').value.trim();

@@ -64,13 +64,13 @@ export default {
     const error = (code, status, headers) => jsonError(code, status, request, allowedOrigins, headers);
     const url = new URL(request.url);
     const path = url.pathname;
-    const webhook = path.match(/^\/api\/v1\/webhooks\/([A-Za-z0-9_-]{24})(\/deliveries|\/test|\/rotate|\/template(?:\/preview)?)?$/);
+    const webhook = path.match(/^\/api\/v1\/webhooks\/([A-Za-z0-9_-]{24})(\/deliveries|\/test|\/rotate|\/schedule|\/template(?:\/preview)?)?$/);
     let methods;
     if (READ_PATHS.has(path)) methods = ['GET', 'HEAD'];
     else if (path === '/api/v1/analytics/pageview' || path === '/api/v1/webhooks') methods = ['POST'];
     else if (webhook?.[2] === '/deliveries') methods = ['GET', 'HEAD'];
     else if (webhook?.[2] === '/test' || webhook?.[2] === '/rotate' || webhook?.[2] === '/template/preview') methods = ['POST'];
-    else if (webhook?.[2] === '/template') methods = ['GET', 'HEAD', 'PUT', 'DELETE'];
+    else if (webhook?.[2] === '/template' || webhook?.[2] === '/schedule') methods = ['GET', 'HEAD', 'PUT', 'DELETE'];
     else if (webhook) methods = ['GET', 'HEAD', 'PUT', 'DELETE'];
     else return error('not_found', 404);
     if (request.method !== 'OPTIONS' && !methods.includes(request.method)) {
