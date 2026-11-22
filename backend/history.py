@@ -166,7 +166,7 @@ class HistoryStore:
             if observed is None:
                 return {"observed": False, "totalChanges": None, "byType": None,
                         "affectedClasses": None, "lastObservedAt": None, "retainedSince": cutoff,
-                        "comparisonCoverage": "unknown"}
+                        "comparisonCoverage": "unknown", "subjectPeriods": None}
             rows = db.execute(
                 "SELECT type, COUNT(*) AS count FROM changes WHERE school=? AND week=? AND observed_at>=? GROUP BY type",
                 (school, week, cutoff),
@@ -178,9 +178,17 @@ class HistoryStore:
             by_type = {key: 0 for key in ("added", "changed", "deleted")}
             for row in rows:
                 by_type[row["type"]] = row["count"]
+            subject_periods = db.execute("""
+                SELECT subject, COUNT(*) AS periods FROM (
+                    SELECT DISTINCT grade, class_number, date, period, TRIM(subject) AS subject
+                    FROM snapshot_lessons WHERE school=? AND week=? AND TRIM(subject) != ''
+                ) GROUP BY subject ORDER BY periods DESC, subject ASC
+            """, (school, week)).fetchall()
             return {"observed": True, "totalChanges": sum(by_type.values()), "byType": by_type,
                     "affectedClasses": count, "lastObservedAt": observed["observed_at"], "retainedSince": cutoff,
-                    "comparisonCoverage": "unknown"}
+                    "comparisonCoverage": "unknown",
+                    "subjectPeriods": [{"subject": row["subject"], "classPeriods": row["periods"]}
+                                       for row in subject_periods]}
 
     def list(self, school, week, cursor=None, limit=50, grade=None, classroom=None, include_ids=False, filters=None):
         if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:

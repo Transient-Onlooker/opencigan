@@ -19,6 +19,7 @@ interface HistoryStatsResponse {
   lastObservedAt?: string | null;
   retainedSince?: string | null;
   comparisonCoverage?: string | null;
+  subjectPeriods?: { subject: string; classPeriods: number }[] | null;
 }
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
@@ -273,6 +274,31 @@ if (historyStatsEnabled && historyForm && historySchool && historyWeek && histor
         infoDiv.append(noteP);
 
         historyResults.append(metricsContainer, infoDiv);
+        if (data.subjectPeriods !== undefined && data.subjectPeriods !== null) {
+          if (!Array.isArray(data.subjectPeriods) || data.subjectPeriods.some(item => !item || typeof item.subject !== 'string' || !item.subject.trim() || !Number.isInteger(item.classPeriods) || item.classPeriods < 1)) {
+            throw new Error('서버의 과목별 통계 응답이 올바르지 않습니다.');
+          }
+          const section = document.createElement('section');
+          const heading = document.createElement('h3');
+          heading.textContent = '최근 관측 시간표의 과목별 학급 교시';
+          const description = document.createElement('p');
+          description.textContent = '학급·날짜·교시별 과목을 한 번씩 집계합니다. 한 교시에 여러 과목이 있으면 각각 포함하며, 제공되지 않은 수업은 포함되지 않습니다.';
+          section.append(heading, description);
+          if (data.subjectPeriods.length === 0) {
+            const empty = document.createElement('p');
+            empty.textContent = '관측된 과목이 없습니다.';
+            section.append(empty);
+          } else {
+            const list = document.createElement('ul');
+            for (const item of data.subjectPeriods) {
+              const row = document.createElement('li');
+              row.textContent = `${item.subject}: ${item.classPeriods.toLocaleString('ko-KR')}학급 교시`;
+              list.append(row);
+            }
+            section.append(list);
+          }
+          historyResults.append(section);
+        }
         historyResults.hidden = false;
         historyState.textContent = `조회 완료 · ${new Date().toLocaleTimeString('ko-KR')}`;
       }
