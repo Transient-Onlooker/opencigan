@@ -43,6 +43,22 @@ class HistoryTests(unittest.TestCase):
             db.commit()
         self.assertIsNone(self.store.change_stats('s', 'w')['totalChanges'])
 
+    def test_change_stats_filters_old_events_and_other_schools(self):
+        base = datetime.now(timezone.utc)
+        self.store.observe('s', 'w', [lesson()], base)
+        self.store.observe('s', 'w', [lesson('Science')], base + timedelta(seconds=1))
+        self.store.observe('other', 'w', [lesson()], base)
+        self.store.observe('other', 'w', [lesson('Art')], base + timedelta(seconds=1))
+        self.assertEqual(self.store.change_stats('s', 'w')['totalChanges'], 1)
+        with closing(sqlite3.connect(self.store.path)) as db:
+            expired = (base - timedelta(days=31)).isoformat()
+            db.execute('UPDATE changes SET observed_at=? WHERE school=? AND week=?', (expired, 's', 'w'))
+            db.commit()
+        stats = self.store.change_stats('s', 'w')
+        self.assertTrue(stats['observed'])
+        self.assertEqual(stats['totalChanges'], 0)
+        self.assertEqual(stats['comparisonCoverage'], 'unknown')
+
     def test_existing_snapshot_migrates_once_and_retains_baseline(self):
         path = Path(self.temp.name) / "legacy.sqlite"
         db = sqlite3.connect(path)
