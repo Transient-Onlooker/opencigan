@@ -60,7 +60,8 @@ export function createTimetableSession(onChange: (state: TimetableSessionState) 
       const result = load(schoolId, week, controller.signal).then((data) => {
         if (controller.signal.aborted) return;
         const selected = current();
-        if (data.schoolId !== selected.schoolId || data.weekStart !== selected.week) throw new Error('선택한 학교·주차와 다른 시간표가 도착했어요.');
+        if (selected.schoolId !== schoolId || selected.week !== week) return;
+        if (data.schoolId !== schoolId || data.weekStart !== week) throw new Error('선택한 학교·주차와 다른 시간표가 도착했어요.');
         accept(data);
       });
       return { controller, result };
@@ -92,8 +93,9 @@ export function createTimetableSession(onChange: (state: TimetableSessionState) 
       session.update({ loading: true });
       void result.catch((error) => {
         if (controller.signal.aborted) return;
-        cache.invalidate(key);
         const selected = options.current();
+        if (selected.schoolId !== options.schoolId || selected.week !== options.week) return;
+        cache.invalidate(key);
         if (state.data && state.data.schoolId === selected.schoolId && state.data.weekStart === selected.week) {
           session.update({ data: { ...state.data, stale: true } });
         } else {
