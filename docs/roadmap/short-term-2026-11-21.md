@@ -136,9 +136,10 @@ flowchart TB
 
 ### ST-09 · 자동 예약/체육 수업 오전 알림 · ST-07/08 이후
 
-- [ ] 사용자 방문 없이 실행되는 **서버 측 예약 작업자**를 구현한다. 즉시 변경/지정 시각 하루 요약/아침 수업 준비 모드, KST HH:MM, 취소·재예약·방해 금지·재시작과 중복 발송 멱등 키를 적용한다.
-- [ ] 당일 정규 시간표에 체육(또는 사용자가 명시한 과목)이 있는 경우에만 교시를 묶어 알리며, 빈/오래된/조회 실패 데이터로 잘못 발송하지 않는다. 학급별 중복 상류 요청 억제와 backoff 유지.
-- [ ] 변경이 여러 번 발생한 날의 한 번 요약 알림과 기존 RSS/Atom·Webhook 필터를 연계한다.
+- [x] 사용자 방문 없이 실행되는 **서버 측 예약 작업자**를 구현한다. 즉시 변경/지정 시각 하루 요약/아침 수업 준비 모드, KST HH:MM, 취소·재예약·방해 금지·재시작과 중복 발송 멱등 키를 적용한다.
+- [x] 당일 정규 시간표에 체육(또는 사용자가 명시한 과목)이 있는 경우에만 교시를 묶어 알리며, 빈/오래된/조회 실패 데이터로 잘못 발송하지 않는다. 학급별 중복 상류 요청 억제와 backoff 유지.
+- [x] 변경이 여러 번 발생한 날의 한 번 요약 알림과 기존 RSS/Atom·Webhook 필터를 연계한다.
+- [PR #182](https://github.com/Transient-Onlooker/opencigan/pull/182): 관리 API·UI와 별도 예약 작업자, KST 및 중복 방지·장애 복구를 격리 구현했다. 지정 시각 이전의 실제 관측 이력만 요약하며 이미 전송 중인 요청은 회수할 수 없다. [CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/45038483134)의 Python·Worker·Chromium/WebKit 검사가 통과했다. 운영 배포 및 실제 발송은 수행하지 않았다.
 - **완료 조건:** 가짜 시계·모의 전송으로 시간대, 중복, 예약 변경, 장애·복구 검증. 실제 스케줄러/외부 발송 활성화는 별도 승인 전 OFF.
 - 원본: [P3 스케줄러·체육 알리미·요약](automation-and-future.md).
 
@@ -209,6 +210,7 @@ flowchart TB
 | ST-08 | 격리 구현·자동검증 완료 | [#180](https://github.com/Transient-Onlooker/opencigan/pull/180) | 템플릿 인증·안전 출력·이전 DB·게이트웨이·Chromium/WebKit CI | 운영 미배포, 실제 발송 비활성 유지 |
 | ST-10 | 일부 구현·검증 완료 | [#168](https://github.com/Transient-Onlooker/opencigan/pull/168) | 게이트웨이 오류 응답 계약·하위 호환 회귀, CI | Worker 운영 배포 및 나머지 계약·관측 확인 별도 |
 | ST-11 | 일부 구현·검증 완료 | [#175](https://github.com/Transient-Onlooker/opencigan/pull/175) | 기본 OFF 관측 변경 통계·인증·미관측·보존 기간·관리 화면 회귀, [CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/44965076624) | 관측 횟수·공백은 확인 불가; 이상 트래픽 등 나머지 기능 및 운영 적용 별도 |
-| ST-04, ST-04A, ST-09, ST-12 ~ ST-14 | 진행 전 또는 부분 조사 | — | — | — |
+| ST-09 | 격리 구현·자동검증 완료 | [#182](https://github.com/Transient-Onlooker/opencigan/pull/182) | 예약 시각·방해 금지·중복·장애 복구 및 Chromium/WebKit CI | 기본 OFF, 실제 작업자·발송 미활성 |
+| ST-04, ST-04A, ST-12 ~ ST-14 | 진행 전 또는 부분 조사 | — | — | — |
 
 **끝내는 기준:** 오늘의 목표는 체크박스를 억지로 100%로 만드는 것이 아니라, 실제 구현과 자동 테스트를 가능한 한 많이 안전하게 병합하는 것이다. 원래 장기 로드맵은 보존한다.
