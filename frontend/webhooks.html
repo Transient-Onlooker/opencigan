@@ -3,14 +3,14 @@
 <body><main>
 <a class="settings-return" href="./?view=settings">← 설정으로 돌아가기</a>
 <header><a class="brand" href="./"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4M6 8l-4 4 4 4M14.5 4l-5 16"/></svg></span><span>Opencigan</span></a><h1>시간표 변경 알림</h1><p>관측된 시간표 변경을 Discord 또는 Google Chat으로 받습니다. 관측 사이의 변경은 누락될 수 있습니다.</p></header>
-<p>알림 기능은 서버에서 활성화한 경우 사용할 수 있습니다. 관리 정보는 자동 저장되지 않으므로 안전한 곳에 보관하세요.</p>
+<p>알림 기능은 서버에서 활성화한 경우 사용할 수 있습니다. 관리 정보는 브라우저에 저장되지 않으며, 관리 링크나 토큰을 다른 사람과 공유하거나 브라우저 북마크에 저장하면 관리 권한이 노출될 수 있으므로 안전한 곳에만 보관하세요.</p>
 <h2>새 구독</h2><form id="create">
 <label>학교 ID<input id="school" required maxlength="100" placeholder="학교코드:학교명"></label>
 <label>학년<input id="grade" type="number" required min="1" max="6" value="1"></label>
 <label>반<input id="classroom" type="number" required min="1" max="99" value="1"></label>
 <label>Webhook 주소<input id="destination" type="password" required maxlength="2048" autocomplete="off" placeholder="Discord 또는 Google Chat 주소"></label>
 <button type="submit">구독 만들기</button></form>
-<h2>구독 관리</h2><form id="connect"><label>구독 ID<input id="id" required autocomplete="off"></label><label>관리 토큰<input id="token" type="password" required autocomplete="off"></label><button type="submit">구독 불러오기</button><button id="lock" type="button">잠금</button></form>
+<h2>구독 관리</h2><form id="connect"><label>구독 ID<input id="id" required autocomplete="off"></label><label>관리 토큰<input id="token" type="password" required autocomplete="off"></label><button type="submit">구독 불러오기</button><button id="copy-link" type="button">관리 링크 복사</button><button id="lock" type="button">잠금</button></form>
 <p id="state" role="status" aria-live="polite"></p>
 <section id="manage" hidden aria-label="구독 설정"><h2>알림 조건</h2><p id="scope"></p><form id="filters">
 <label>과목 포함<input id="subject" maxlength="50"></label><label>교사 포함<input id="teacher" maxlength="50"></label>
