@@ -145,3 +145,34 @@ test('management link does not authenticate if the fragment cannot be removed', 
   await expect(page.getByRole('status')).toContainText('주소에서 관리 정보를 지우지 못했어요');
   expect(requests).toBe(0);
 });
+
+test('rotation requires saving the new link before revoking the old token', async ({ page }) => {
+  const id = 'a'.repeat(24), oldToken = 'b'.repeat(43), rotations = [];
+  await page.route('**/api/v1/webhooks**', async (route) => {
+    const request = route.request(), url = new URL(request.url());
+    if (url.pathname.endsWith('/rotate')) {
+      rotations.push({ body: request.postDataJSON(), authorization: request.headers().authorization });
+      return route.fulfill({ json: { rotated: true } });
+    }
+    if (url.pathname.endsWith('/deliveries')) return route.fulfill({ json: { deliveries: [] } });
+    return route.fulfill({ json: { school: '2:예시학교', grade: 2, classroom: 3, provider: 'discord', dropped_events: 0, filters: {} } });
+  });
+  await page.goto('/webhooks.html');
+  await page.getByLabel('구독 ID').fill(id);
+  await page.getByLabel('관리 토큰').fill(oldToken);
+  await page.getByRole('button', { name: '구독 불러오기' }).click();
+  await page.getByRole('button', { name: '새 관리 링크 준비' }).click();
+  const link = await page.getByLabel('새 관리 링크', { exact: true }).inputValue();
+  const newToken = new URLSearchParams(new URL(link).hash.slice(1)).get('token');
+  expect(newToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  expect(newToken).not.toBe(oldToken);
+  await page.getByRole('button', { name: '기존 링크 폐기하고 교체' }).click();
+  expect(rotations).toHaveLength(0);
+  await page.getByLabel('새 링크를 안전하게 보관했어요').check();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: '기존 링크 폐기하고 교체' }).click();
+  await expect(page.getByRole('status')).toContainText('교체했어요');
+  expect(rotations).toEqual([{ body: { newToken }, authorization: `Bearer ${oldToken}` }]);
+  await expect(page.getByLabel('관리 토큰')).toHaveValue(newToken);
+  expect(await page.evaluate(() => JSON.stringify({ local: localStorage, session: sessionStorage, url: location.href }))).not.toContain(newToken);
+});

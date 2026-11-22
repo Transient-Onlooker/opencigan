@@ -228,6 +228,26 @@ test('webhook PUT preserves authorization and JSON body', async () => {
   assert.equal(await calls[0].text(), '{"filters":{}}');
 });
 
+test('webhook token rotation forwards the authenticated JSON body and rejects GET', async () => {
+  const { env, calls } = setup();
+  const allowed = await worker.fetch(req('/api/v1/webhooks/abcdefghijklmnopqrstuvwx/rotate', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer example', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ newToken: 'b'.repeat(43) }),
+  }), env);
+  assert.equal(allowed.status, 200);
+  assert.equal(calls[0].method, 'POST');
+  assert.equal(calls[0].headers.get('authorization'), 'Bearer example');
+  assert.deepEqual(await calls[0].json(), { newToken: 'b'.repeat(43) });
+  assert.equal(calls[0].url, 'http://127.0.0.1:8000/api/v1/webhooks/abcdefghijklmnopqrstuvwx/rotate');
+
+  const getBlocked = await worker.fetch(req('/api/v1/webhooks/abcdefghijklmnopqrstuvwx/rotate', {
+    method: 'GET',
+    headers: { 'Authorization': 'Bearer example' },
+  }), env);
+  assert.equal(getBlocked.status, 405);
+});
+
 test('limits streamed request bodies to the backend 4096 byte limit', async () => {
   const { env, calls } = setup();
   const path = '/api/v1/analytics/pageview';
