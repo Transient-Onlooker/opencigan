@@ -49,6 +49,11 @@
       "name": "WEBHOOK_RATE",
       "namespace_id": "961307",
       "simple": { "limit": 10, "period": 60 }
+    },
+    {
+      "name": "SUGGESTION_RATE",
+      "namespace_id": "961308",
+      "simple": { "limit": 10, "period": 60 }
     }
   ]
 }
