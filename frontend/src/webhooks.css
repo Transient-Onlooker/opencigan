@@ -15,5 +15,24 @@ form label{flex:1 1 180px}
 input,select,button{border-color:var(--line)}
 input:focus-visible,select:focus-visible,button:focus-visible,.brand:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .actions{display:flex;flex-wrap:wrap;gap:8px}
+.template-editor{margin-top:32px;border-top:1px solid var(--line);padding-top:4px}
+.template-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,.8fr);gap:20px;align-items:start}
+.template-controls{min-width:0}
+.template-controls label{display:grid;gap:4px;margin:10px 0;font-weight:650}
+.template-controls select,.template-controls textarea{box-sizing:border-box;width:100%;min-width:0;font:inherit;border:1px solid var(--line);border-radius:0;background:var(--surface);color:var(--ink);padding:9px 12px}
+.template-controls textarea{min-height:180px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;line-height:1.5}
+.template-controls textarea[aria-invalid="true"]{border-color:#b42318}
+.template-help{margin:6px 0;color:var(--muted);font-size:13px}
+.template-variables,.template-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.template-variables button{min-height:40px;padding:6px 10px}
+.template-errors{min-height:20px;margin:8px 0;color:#b42318;font-size:14px}
+.template-actions button{min-height:44px}
+.template-preview-wrap{min-width:0;border:1px solid var(--line);padding:14px}
+.template-preview-wrap h3{margin:0 0 10px;font-size:16px}
+.template-preview{display:block;min-height:110px;padding:12px;border:1px solid var(--line);background:var(--soft);color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
+.template-preview[data-format="embed"]{border-left:4px solid var(--ink)}
+.template-preview[data-invalid="true"]{color:var(--muted)}
+.template-variables button:focus-visible,.template-controls textarea:focus-visible,.template-controls select:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+@media(max-width:680px){.template-layout{grid-template-columns:minmax(0,1fr)}.template-preview-wrap{order:1}.template-controls{order:0}}
 .rotation-confirm{display:flex;align-items:center;gap:8px;min-height:44px}.rotation-confirm input{width:24px;min-height:24px}
 @media(max-width:440px){main{margin-top:20px}h1{font-size:24px}h2{font-size:18px}.actions button{flex:1 1 100%}}

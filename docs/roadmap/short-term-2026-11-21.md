@@ -117,6 +117,7 @@ flowchart TB
 
 ### ST-07 · Webhook 기반·비밀 관리 링크·관리 UI
 
+- [PR #179](https://github.com/Transient-Onlooker/opencigan/pull/179): 관리 링크 교체와 응답 유실 시 복구 안내를 추가하고 자동 검사를 통과했다. 운영 Webhook API와 발송 작업자는 별도 활성화하지 않았다.
 - [ ] 이미 있는 기본 비활성 API/큐/이력에서 빠진 구독 CRUD, 높은 엔트로피 관리 링크 인증·폐기, HMAC, 실패 재시도·멱등성·저장/큐 상한을 보강한다.
 - [ ] 학급/과목/교사/요일/교시/변경 유형 필터·방해 금지 시간, 테스트 발송, 최근 성공/실패/재시도 조회를 API·UI 양쪽에서 연결한다.
 - **완료 조건:** 타 구독 접근 불가·토큰 유출 방지·중복/재시도·필터 회귀. 실제 Discord/Google Chat 발송 백엔드는 계속 OFF.
@@ -124,8 +125,9 @@ flowchart TB
 
 ### ST-08 · Webhook 템플릿 + 개발자 메뉴 · ST-07 이후
 
-- [ ] 구독별 허용 변수 기반 커스텀 메시지, Discord Embed·Google Chat 포맷, 샘플 미리보기·초기화·템플릿 검증을 구현한다. 멘션·HTML/URL·이스케이프·길이·미정 변수 방어.
-- [ ] Webhook 관리 화면이 준비되면 `설정 → 개발자용/연동`에 Webhook·API 문서·웹사이트 삽입용 iframe 생성기를 통합한다. 기존 `embed-builder.html` 접근과 iframe 호환성을 보존한다.
+- [x] 구독별 허용 변수 기반 커스텀 메시지, Discord Embed·Google Chat 포맷, 샘플 미리보기·초기화·템플릿 검증을 구현한다. 멘션·HTML/URL·이스케이프·길이·미정 변수 방어.
+- [x] Webhook 관리 화면이 준비되면 `설정 → 개발자용/연동`에 Webhook·API 문서·웹사이트 삽입용 iframe 생성기를 통합한다. 기존 `embed-builder.html` 접근과 iframe 호환성을 보존한다.
+- [PR #180](https://github.com/Transient-Onlooker/opencigan/pull/180): 모의 API와 합성 데이터로 템플릿·기존 관리 링크·모바일 화면을 검증했다. 운영 배포와 실제 Webhook 발송은 수행하지 않았다.
 - **완료 조건:** 실전 발송 없는 템플릿 테스트, 기존 링크 회귀, 화면·모바일 검증. 메뉴 단독 선행 이전 금지.
 - 원본: [P3 템플릿](automation-and-future.md), [P1 개발자 메뉴](user-experience.md).
 
@@ -199,9 +201,10 @@ flowchart TB
 | ST-03 | 검증 중 | [#162](https://github.com/Transient-Onlooker/opencigan/pull/162) 초안 | 단일 격리 비교에서 수업 데이터 일치 | 실측 요청 수·지연 개선 미달, 상류 학교 식별값 확인 필요 |
 | ST-05 | 격리 구현·자동검증 완료 | [#167](https://github.com/Transient-Onlooker/opencigan/pull/167) | 별도 저장소·권한·백업 회귀, 통합 CI | 기본 OFF, 공개·운영 미적용 |
 | ST-06 | 격리 구현·자동검증 완료 | [#172](https://github.com/Transient-Onlooker/opencigan/pull/172) | 모의 API·Chromium/WebKit CI | 기본 OFF, 공개·실기기 검증 별도 |
-| ST-07 | 일부 구현·검증 완료 | [#169](https://github.com/Transient-Onlooker/opencigan/pull/169) | 공식 도메인 같은 출처 API 연결 모의 브라우저 테스트, CI | 관리 링크 등 잔여 기능과 실제 발송 비활성 유지 |
+| ST-07 | 일부 구현·검증 완료 | [#169](https://github.com/Transient-Onlooker/opencigan/pull/169), [#179](https://github.com/Transient-Onlooker/opencigan/pull/179) | 공식 도메인 연결 및 관리 링크 교체·복구 회귀, CI | 나머지 요구사항 확인 및 실제 발송 비활성 유지 |
+| ST-08 | 격리 구현·자동검증 완료 | [#180](https://github.com/Transient-Onlooker/opencigan/pull/180) | 템플릿 인증·안전 출력·이전 DB·게이트웨이·Chromium/WebKit CI | 운영 미배포, 실제 발송 비활성 유지 |
 | ST-10 | 일부 구현·검증 완료 | [#168](https://github.com/Transient-Onlooker/opencigan/pull/168) | 게이트웨이 오류 응답 계약·하위 호환 회귀, CI | Worker 운영 배포 및 나머지 계약·관측 확인 별도 |
 | ST-11 | 일부 구현·검증 완료 | [#175](https://github.com/Transient-Onlooker/opencigan/pull/175) | 기본 OFF 관측 변경 통계·인증·미관측·보존 기간·관리 화면 회귀, [CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/44965076624) | 관측 횟수·공백은 확인 불가; 이상 트래픽 등 나머지 기능 및 운영 적용 별도 |
-| ST-04, ST-04A, ST-08 ~ ST-09, ST-12 ~ ST-14 | 진행 전 또는 부분 조사 | — | — | — |
+| ST-04, ST-04A, ST-09, ST-12 ~ ST-14 | 진행 전 또는 부분 조사 | — | — | — |
 
 **끝내는 기준:** 오늘의 목표는 체크박스를 억지로 100%로 만드는 것이 아니라, 실제 구현과 자동 테스트를 가능한 한 많이 안전하게 병합하는 것이다. 원래 장기 로드맵은 보존한다.

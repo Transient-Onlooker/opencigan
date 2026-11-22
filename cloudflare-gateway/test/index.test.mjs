@@ -248,6 +248,21 @@ test('webhook token rotation forwards the authenticated JSON body and rejects GE
   assert.equal(getBlocked.status, 405);
 });
 
+test('webhook templates forward only the supported methods', async () => {
+  const { env, calls } = setup();
+  const path = '/api/v1/webhooks/abcdefghijklmnopqrstuvwx/template';
+  const headers = { Authorization: 'Bearer example', 'Content-Type': 'application/json' };
+  for (const method of ['GET', 'PUT', 'DELETE']) {
+    const response = await worker.fetch(req(path, { method, headers, ...(method === 'PUT' ? { body: '{}' } : {}) }), env);
+    assert.equal(response.status, 200);
+  }
+  assert.equal((await worker.fetch(req(path, { method: 'POST', headers }), env)).status, 405);
+  assert.equal((await worker.fetch(req(`${path}/preview`, { method: 'POST', headers, body: '{}' }), env)).status, 200);
+  assert.equal((await worker.fetch(req(`${path}/preview`, { method: 'GET', headers }), env)).status, 405);
+  assert.equal(calls.length, 4);
+  assert.equal(calls[3].headers.get('authorization'), 'Bearer example');
+});
+
 test('limits streamed request bodies to the backend 4096 byte limit', async () => {
   const { env, calls } = setup();
   const path = '/api/v1/analytics/pageview';

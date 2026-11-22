@@ -11,6 +11,7 @@ from contextlib import closing
 from datetime import date as date_type, datetime, timedelta, timezone
 
 from backend.webhook_delivery import validate_destination
+from backend.webhook_templates import render_template
 
 
 class SubscriptionLimitError(Exception):
@@ -58,8 +59,11 @@ def quiet_until(now, quiet_hours):
 
 
 def enqueue_observed_change(db, school, grade, classroom, date, period, kind, before, after, change_id, now):
-    subscriptions = db.execute("SELECT id, provider, filters_json FROM webhook_subscriptions WHERE school=? AND grade=? AND classroom=?",
-                               (school, grade, classroom)).fetchall()
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(webhook_subscriptions)")}
+    template_column = "template_json" if "template_json" in columns else "NULL"
+    subscriptions = db.execute(f"SELECT id, provider, filters_json, {template_column} AS template_json "
+                               "FROM webhook_subscriptions WHERE school=? AND grade=? AND classroom=?",
+                              (school, grade, classroom)).fetchall()
     if not subscriptions:
         return
 
@@ -68,7 +72,10 @@ def enqueue_observed_change(db, school, grade, classroom, date, period, kind, be
             return "없음"
         return " · ".join(part for part in (value.get("subject"), value.get("teacher")) if part) or "정보 없음"
 
-    text = f"{school.split(':', 1)[-1]} {grade}학년 {classroom}반 · {date} {period}교시 ({kind})\n{lesson(before)} → {lesson(after)}"
+    values = {"school": school.split(":", 1)[-1], "grade": grade, "classroom": classroom,
+              "date": date, "period": period, "type": kind,
+              "before": lesson(before), "after": lesson(after)}
+    text = f"{values['school']} {grade}학년 {classroom}반 · {date} {period}교시 ({kind})\n{lesson(before)} → {lesson(after)}"
     # Google Chat interprets angle-bracket tokens as mentions; Discord disables all mentions explicitly.
     safe_text = text.replace("<", "＜").replace(">", "＞")[:1800]
     for subscription in subscriptions:
@@ -82,7 +89,16 @@ def enqueue_observed_change(db, school, grade, classroom, date, period, kind, be
         if db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')", (subscription["id"],)).fetchone()[0] >= MAX_PENDING_PER_SUBSCRIPTION:
             db.execute("UPDATE webhook_subscriptions SET dropped_events=dropped_events+1 WHERE id=?", (subscription["id"],))
             continue
-        payload = {"content": safe_text, "allowed_mentions": {"parse": []}} if subscription["provider"] == "discord" else {"text": safe_text}
+        raw_template = subscription["template_json"]
+        template = json.loads(raw_template) if isinstance(raw_template, str) and raw_template else None
+        if template:
+            try:
+                payload = render_template(subscription["provider"], template["template"], values,
+                                          discord_embed=template["discordEmbed"])
+            except ValueError:
+                payload = {"content": safe_text, "allowed_mentions": {"parse": []}} if subscription["provider"] == "discord" else {"text": safe_text}
+        else:
+            payload = {"content": safe_text, "allowed_mentions": {"parse": []}} if subscription["provider"] == "discord" else {"text": safe_text}
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         db.execute("INSERT OR IGNORE INTO webhook_deliveries(subscription_id, event_id, body, next_at) VALUES (?, ?, ?, ?)",
                    (subscription["id"], f"change_{change_id}", body, now))
@@ -125,6 +141,8 @@ class WebhookStore:
                     db.execute("ALTER TABLE webhook_subscriptions ADD COLUMN last_test_at REAL")
                 if "filters_json" not in columns:
                     db.execute("ALTER TABLE webhook_subscriptions ADD COLUMN filters_json TEXT NOT NULL DEFAULT '{}' ")
+                if "template_json" not in columns:
+                    db.execute("ALTER TABLE webhook_subscriptions ADD COLUMN template_json TEXT")
                 db.execute("COMMIT")
             except BaseException:
                 db.execute("ROLLBACK")
@@ -192,6 +210,52 @@ class WebhookStore:
         with closing(self._connect()) as db:
             return db.execute("UPDATE webhook_subscriptions SET filters_json=? WHERE id=? AND token_hash=?",
                               (json.dumps(filters, ensure_ascii=False), identifier, self._token_hash(token))).rowcount == 1
+
+    def get_template(self, identifier, token):
+        with closing(self._connect()) as db:
+            row = db.execute("SELECT provider, template_json FROM webhook_subscriptions WHERE id=? AND token_hash=?",
+                             (identifier, self._token_hash(token))).fetchone()
+        if row is None:
+            return None
+        if row["template_json"] is None:
+            return {"template": None, "discordEmbed": False, "provider": row["provider"]}
+        return {**json.loads(row["template_json"]), "provider": row["provider"]}
+
+    def update_template(self, identifier, token, template, discord_embed=False):
+        if type(discord_embed) is not bool:
+            raise ValueError("invalid format")
+        stored = {"template": template, "discordEmbed": discord_embed}
+        with closing(self._connect()) as db:
+            row = db.execute("SELECT provider FROM webhook_subscriptions WHERE id=? AND token_hash=?",
+                             (identifier, self._token_hash(token))).fetchone()
+            if row is None:
+                return None
+            render_template(row["provider"], template,
+                            {key: "sample" for key in ("school", "grade", "classroom", "date", "period", "type", "before", "after")},
+                            discord_embed=discord_embed)
+            updated = db.execute("UPDATE webhook_subscriptions SET template_json=? WHERE id=? AND token_hash=?",
+                                 (json.dumps(stored, ensure_ascii=False), identifier, self._token_hash(token))).rowcount
+            if updated != 1:
+                return None
+        return {**stored, "provider": row["provider"]}
+
+    def reset_template(self, identifier, token):
+        with closing(self._connect()) as db:
+            return db.execute("UPDATE webhook_subscriptions SET template_json=NULL WHERE id=? AND token_hash=?",
+                              (identifier, self._token_hash(token))).rowcount == 1
+
+    def preview_template(self, identifier, token, template, discord_embed=False):
+        if type(discord_embed) is not bool:
+            raise ValueError("invalid format")
+        with closing(self._connect()) as db:
+            row = db.execute("SELECT provider, school, grade, classroom FROM webhook_subscriptions WHERE id=? AND token_hash=?",
+                             (identifier, self._token_hash(token))).fetchone()
+        if row is None:
+            return None
+        values = {"school": row["school"].split(":", 1)[-1], "grade": row["grade"],
+                  "classroom": row["classroom"], "date": "2026-01-15", "period": 1,
+                  "type": "changed", "before": "수학 · 김교사", "after": "과학 · 이교사"}
+        return render_template(row["provider"], template, values, discord_embed=discord_embed)
 
     def delete(self, identifier, token):
         with closing(self._connect()) as db:
