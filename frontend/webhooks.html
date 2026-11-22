@@ -40,5 +40,5 @@
 </section>
 <h2>관리 링크 교체</h2><button id="prepare-rotation" type="button">새 관리 링크 준비</button>
 <div id="rotation" hidden><p>새 링크를 먼저 안전하게 보관하세요. 교체하면 기존 링크가 작동하지 않습니다. 응답이 끊기면 보관한 새 링크와 기존 링크로 각각 확인해 주세요.</p><label>새 관리 링크<input id="rotation-link" readonly autocomplete="off"></label><button id="copy-rotation" type="button">새 링크 복사</button><label class="rotation-confirm"><input id="rotation-saved" type="checkbox"> 새 링크를 안전하게 보관했어요</label><button id="rotate-token" type="button">기존 링크 폐기하고 교체</button></div>
-<h2>최근 전송 상태</h2><div class="scroll" tabindex="0" role="region" aria-label="전송 상태"><table><thead><tr><th scope="col">이벤트</th><th scope="col">상태</th><th scope="col">시도</th><th scope="col">응답</th></tr></thead><tbody id="deliveries"></tbody></table></div></section>
+<h2>최근 전송 상태</h2><div class="scroll" tabindex="0" role="region" aria-label="전송 상태"><table><thead><tr><th scope="col">이벤트</th><th scope="col">상태</th><th scope="col">시도</th><th scope="col">응답</th><th scope="col">다음 처리 시각</th></tr></thead><tbody id="deliveries"></tbody></table></div></section>
 </main><script type="module" src="/src/webhooks.ts"></script></body></html>
