@@ -38,7 +38,7 @@ class WebhookTemplateContractTests(unittest.TestCase):
                         self.assertEqual(status, 200)
                         schema = spec["paths"][documented][method.lower()]["responses"]["200"]["content"]["application/json"]["schema"]
                         Draft202012Validator(schema).validate(json.loads(result))
-            self.assertEqual(store.deliveries(subscription["id"], subscription["token"]), [])
+                self.assertEqual(store.deliveries(subscription["id"], subscription["token"]), [])
 
 
 if __name__ == "__main__":
