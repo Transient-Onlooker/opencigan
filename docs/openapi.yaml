@@ -360,7 +360,7 @@ paths:
                       required: [event_id, state, attempts, next_at, last_status]
                       properties:
                         event_id: { type: string }
-                        state: { type: string, enum: [pending, leased, delivered, failed] }
+                        state: { type: string, enum: [pending, leased, delivered, failed, canceled] }
                         attempts: { type: integer, minimum: 0 }
                         next_at: { type: number, description: Unix timestamp in seconds. }
                         last_status: { type: [integer, 'null'] }
