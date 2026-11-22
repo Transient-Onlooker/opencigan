@@ -100,7 +100,7 @@ test('management link auto-authenticates via fragment, strips fragment immediate
   const id = 'a'.repeat(24), token = 'b'.repeat(43), calls = [];
   await page.route('**/api/v1/webhooks**', async (route) => {
     const request = route.request(), url = new URL(request.url());
-    calls.push({ path: url.pathname, method: request.method(), headers: request.headers() });
+    calls.push({ path: url.pathname, url: request.url(), method: request.method(), headers: request.headers() });
     if (url.pathname.endsWith('/deliveries')) return route.fulfill({ json: { deliveries: [] } });
     return route.fulfill({ json: { school: '2:예시학교', grade: 2, classroom: 3, provider: 'discord', dropped_events: 0, filters: {} } });
   });
@@ -118,7 +118,7 @@ test('management link auto-authenticates via fragment, strips fragment immediate
   await expect(page.getByText('2:예시학교 · 2학년 3반')).toBeVisible();
   await expect(page.getByRole('status')).toContainText('구독 정보');
 
-  expect(calls.every((call) => !call.path.includes(token))).toBeTruthy();
+  expect(calls.every((call) => !call.url.includes(token) && !(call.headers.referer ?? '').includes(token))).toBeTruthy();
   expect(calls.every((call) => call.headers.authorization === `Bearer ${token}`)).toBeTruthy();
   expect(await page.evaluate(() => JSON.stringify({ local: localStorage, session: sessionStorage, url: location.href }))).not.toContain(token);
 
