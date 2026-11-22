@@ -75,6 +75,7 @@ test('notification settings link follows theme, keyboard and mobile layout', asy
   await expect(page.getByRole('heading', { name: '알림 관리' })).toBeVisible();
   await page.goBack();
   await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('개발자용 · 연동', { exact: true }).click();
   await expect(link).toHaveCSS('color', 'rgb(245, 245, 245)');
 });
 

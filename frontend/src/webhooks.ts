@@ -11,7 +11,7 @@ const table = document.querySelector<HTMLElement>('#deliveries')!;
 const templateBody = document.querySelector<HTMLTextAreaElement>('#template-body')!;
 const templateFormat = select('template-format');
 const templateErrors = document.querySelector<HTMLElement>('#template-errors')!;
-const templatePreview = document.querySelector<HTMLOutputElement>('#template-preview')!;
+const templatePreview = document.querySelector<HTMLElement>('#template-preview')!;
 const templatePreviewFormat = document.querySelector<HTMLElement>('#template-preview-format')!;
 const templateSave = document.querySelector<HTMLButtonElement>('#template-save')!;
 const templateDefaults = '{school} {grade}학년 {classroom}반 · {date} {period}교시 ({type})\n{before} → {after}';
@@ -57,7 +57,7 @@ function reset() {
   document.querySelector<HTMLFormElement>('#filters')!.reset(); document.querySelector('#scope')!.textContent = '';
   templateProvider = ''; templateBody.value = templateDefaults; templateFormat.value = 'text';
   templateFormat.disabled = false; templateSave.disabled = true; templateErrors.textContent = '';
-  templateBody.removeAttribute('aria-invalid'); templatePreview.value = '';
+  templateBody.removeAttribute('aria-invalid'); templatePreview.textContent = '';
   templatePreview.dataset.format = 'text'; templatePreview.dataset.invalid = 'false'; templatePreviewFormat.textContent = '';
   buttons.forEach((button) => { button.disabled = false; });
 }
@@ -143,7 +143,7 @@ function setPreview(payload: Record<string, unknown>) {
   const content = payload.content ?? payload.text ?? (Array.isArray(payload.embeds)
     ? (payload.embeds[0] as Record<string, unknown> | undefined)?.description
     : '');
-  templatePreview.value = typeof content === 'string' ? content : '';
+  templatePreview.textContent = typeof content === 'string' ? content : '';
   templatePreview.dataset.format = embed ? 'embed' : 'text';
   templatePreview.dataset.invalid = 'false';
   templatePreviewFormat.textContent = embed ? 'Discord 임베드 미리보기' : templateProvider === 'google-chat' ? 'Google Chat 메시지 미리보기' : 'Discord 메시지 미리보기';
@@ -155,7 +155,7 @@ async function previewTemplate() {
   templateErrors.textContent = invalid;
   templateBody.setAttribute('aria-invalid', String(Boolean(invalid)));
   if (invalid) {
-    templatePreview.value = '입력한 템플릿을 확인해 주세요.';
+    templatePreview.textContent = '입력한 템플릿을 확인해 주세요.';
     templatePreview.dataset.invalid = 'true';
     return;
   }
@@ -164,7 +164,7 @@ async function previewTemplate() {
     if (revision === previewRevision) setPreview(result.payload);
   } catch (error) {
     if (!controller.signal.aborted && revision === previewRevision) {
-      templatePreview.value = error instanceof Error ? error.message : '미리보기를 불러오지 못했어요.';
+      templatePreview.textContent = error instanceof Error ? error.message : '미리보기를 불러오지 못했어요.';
       templatePreview.dataset.invalid = 'true';
     }
   }
@@ -177,6 +177,9 @@ function queuePreview() {
 
 async function loadTemplate(path: string, provider: string) {
   const result = await call(`${path}/template`);
+  if ((result.template !== null && typeof result.template !== 'string') || typeof result.discordEmbed !== 'boolean') {
+    throw new Error('템플릿 응답을 확인하지 못했어요.');
+  }
   templateProvider = result.provider ?? provider ?? '';
   templateBody.value = result.template ?? templateDefaults;
   templateFormat.value = result.discordEmbed === true ? 'embed' : 'text';
