@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test';
 
 test.use({ serviceWorkers: 'block' });
 
-test('suggestion UI is hidden and makes no requests by default', async ({ page }) => {
-  test.skip(process.env.VITE_SUGGESTIONS_ENABLED === '1', 'Only applies to the default build');
+test('suggestion UI is hidden when the API is disabled', async ({ page }) => {
+  test.skip(process.env.VITE_SUGGESTIONS_ENABLED === '0', 'Explicitly disabled build does not probe');
   let requests = 0;
   await page.route('**/api/v1/suggestions**', async (route) => {
     requests++;
@@ -12,11 +12,11 @@ test('suggestion UI is hidden and makes no requests by default', async ({ page }
   await page.goto('/?view=settings');
   await expect(page.locator('#settings-panel')).toBeVisible();
   await expect(page.getByText('만들어주세요', { exact: true })).toHaveCount(0);
-  expect(requests).toBe(0);
+  await expect.poll(() => requests).toBeGreaterThan(0);
 });
 
 test('enabled suggestions search and submit safely', async ({ page }) => {
-  test.skip(process.env.VITE_SUGGESTIONS_ENABLED !== '1', 'Requires the opt-in build');
+  test.skip(process.env.VITE_SUGGESTIONS_ENABLED === '0', 'Explicitly disabled build does not probe');
   let submissions = 0, searched = false;
   await page.route('**/api/v1/suggestions**', async (route) => {
     if (route.request().method() === 'POST') {
@@ -46,7 +46,7 @@ test('enabled suggestions search and submit safely', async ({ page }) => {
 });
 
 test('enabled build hides the entry when the API is unavailable', async ({ page }) => {
-  test.skip(process.env.VITE_SUGGESTIONS_ENABLED !== '1', 'Requires the opt-in build');
+  test.skip(process.env.VITE_SUGGESTIONS_ENABLED === '0', 'Explicitly disabled build does not probe');
   await page.route('**/api/v1/suggestions**', (route) => route.fulfill({ status: 503, json: { code: 'suggestions_disabled' } }));
   const response = page.waitForResponse((res) => res.url().includes('/api/v1/suggestions'));
   await page.goto('/?view=settings');

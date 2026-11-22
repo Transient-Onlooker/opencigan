@@ -21,6 +21,7 @@ function setup({search = true, general = true, failFetch = false, blockedKey = '
     MEAL_RATE: { limit: async ({key}) => { limits.push(['meal', key]); return { success: blockedKey !== `meal:${key}` }; } },
     ADMIN_RATE: { limit: async ({key}) => { limits.push(['admin', key]); return { success: blockedKey !== `admin:${key}` }; } },
     WEBHOOK_RATE: { limit: async ({key}) => { limits.push(['webhook', key]); return { success: blockedKey !== `webhook:${key}` }; } },
+    SUGGESTION_RATE: { limit: async ({key}) => { limits.push(['suggestion', key]); return { success: blockedKey !== `suggestion:${key}` }; } },
   };
   return { env, calls, limits };
 }
@@ -340,4 +341,44 @@ test('invalid configured signing key fails closed', async () => {
   assert.equal(response.status, 503);
   assert.equal(calls.length, 0);
   assert.equal((await response.json()).code, 'gateway_unavailable');
+});
+
+test('suggestion gateway forwards only supported collection, author and admin methods', async () => {
+  const { env, calls } = setup();
+  const id = 'a'.repeat(24);
+  for (const [path, method] of [
+    ['/api/v1/suggestions', 'GET'], ['/api/v1/suggestions', 'POST'],
+    [`/api/v1/suggestions/${id}`, 'GET'],
+    ['/api/v1/admin/suggestions', 'GET'],
+    [`/api/v1/admin/suggestions/${id}`, 'PATCH'],
+    [`/api/v1/admin/suggestions/${id}`, 'DELETE'],
+  ]) assert.equal((await worker.fetch(req(path, { method }), env)).status, 200, `${method} ${path}`);
+  for (const [path, method, code] of [
+    ['/api/v1/suggestions', 'DELETE', 405],
+    [`/api/v1/suggestions/${id}`, 'POST', 405],
+    ['/api/v1/admin/suggestions', 'POST', 405],
+    [`/api/v1/admin/suggestions/${id}`, 'GET', 405],
+    ['/api/v1/admin/suggestions/invalid', 'PATCH', 404],
+    ['/api/v1/suggestions/invalid', 'GET', 404],
+  ]) assert.equal((await worker.fetch(req(path, { method }), env)).status, code, `${method} ${path}`);
+  assert.equal(calls.length, 6);
+});
+
+test('suggestion writes use a separate edge budget and require a configured binding', async () => {
+  const ip = '203.0.113.9';
+  const headers = { 'CF-Connecting-IP': ip };
+  const blocked = setup({ blockedKey: `suggestion:write:${ip}` });
+  const limited = await worker.fetch(req('/api/v1/suggestions', { method: 'POST', headers }), blocked.env);
+  assert.equal(limited.status, 429);
+  assert.equal(limited.headers.get('Retry-After'), '60');
+  assert.equal(blocked.calls.length, 0);
+  assert.deepEqual(blocked.limits, [['general', ip], ['suggestion', `write:${ip}`]]);
+  assert.equal((await worker.fetch(req('/api/v1/suggestions', { headers }), blocked.env)).status, 200);
+  const missing = setup();
+  delete missing.env.SUGGESTION_RATE;
+  const response = await worker.fetch(req('/api/v1/suggestions', { headers }), missing.env);
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).code, 'gateway_unconfigured');
+  assert.equal(missing.calls.length, 0);
+  assert.equal((await worker.fetch(req('/api/v1/status', { headers }), missing.env)).status, 200);
 });
