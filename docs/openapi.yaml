@@ -108,6 +108,30 @@ paths:
         '200': { description: Subscription and queued deliveries deleted. }
         '401': { description: Invalid subscription or token. }
         '503': { description: Feature disabled or storage unavailable. }
+  /api/v1/webhooks/{id}/rotate:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
+    post:
+      tags: [System]
+      summary: Replace a webhook subscription management token
+      description: Generate and safely retain a random 32-byte Base64url token before sending it. If the response is lost, try the saved new and previous tokens to determine which is valid. The old token is revoked when the transaction succeeds.
+      security: [{ WebhookManagement: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newToken]
+              additionalProperties: false
+              properties:
+                newToken: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+      responses:
+        '200': { description: Token replaced; existing subscription and queued deliveries are preserved. }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { description: Invalid subscription or token. }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { description: Feature disabled or storage unavailable. }
   /api/v1/webhooks/{id}/test:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }

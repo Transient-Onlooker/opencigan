@@ -116,6 +116,58 @@ class WebhookStoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.store.enqueue(self.subscription["id"], "evt", b'not json')
 
+    def test_rotate_management_token_revokes_old_preserves_subscription_and_queue(self):
+        identifier, old_token = self.subscription["id"], self.subscription["token"]
+        other = self.store.create("2:예시학교", 2, 4, "https://discord.com/api/webhooks/456/other")
+        other_id, other_token = other["id"], other["token"]
+
+        # Set filters and enqueue delivery on original subscription
+        filters = {"period": 2, "subject": "수학"}
+        self.assertTrue(self.store.update_filters(identifier, old_token, filters))
+        self.assertTrue(self.store.enqueue(identifier, "evt_pending_1", b'{"msg":"hello"}', now=100))
+
+        # Wrong token rotation rejected
+        new_token = 'b' * 43
+        self.assertIsNone(self.store.rotate(identifier, "wrong_token_value_that_has_43_chars_abcdef", new_token))
+        self.assertIsNone(self.store.rotate("non_existent_sub_1234567", old_token, new_token))
+        with self.assertRaises(ValueError):
+            self.store.rotate(identifier, old_token, old_token)
+
+        # Rotate token
+        rotated = self.store.rotate(identifier, old_token, new_token)
+        self.assertEqual(rotated, {"rotated": True})
+        self.assertNotEqual(old_token, new_token)
+        self.assertEqual(len(new_token), 43)
+        with closing(sqlite3.connect(self.path)) as db:
+            stored = db.execute("SELECT token_hash FROM webhook_subscriptions WHERE id=?", (identifier,)).fetchone()[0]
+        self.assertNotEqual(stored, new_token)
+
+        # Old token immediately revoked
+        self.assertIsNone(self.store.get(identifier, old_token))
+        self.assertFalse(self.store.update_filters(identifier, old_token, {"period": 3}))
+        self.assertIsNone(self.store.deliveries(identifier, old_token))
+        self.assertIsNone(self.store.rotate(identifier, old_token, 'c' * 43))
+
+        # New token accepted, filters preserved
+        sub = self.store.get(identifier, new_token)
+        self.assertIsNotNone(sub)
+        self.assertEqual(sub["filters"], filters)
+        self.assertEqual(sub["classroom"], 3)
+
+        # Queued deliveries preserved and deliverable
+        deliveries = self.store.deliveries(identifier, new_token)
+        self.assertEqual(len(deliveries), 1)
+        self.assertEqual(deliveries[0]["event_id"], "evt_pending_1")
+        claim = self.store.claim(now=100)
+        self.assertIsNotNone(claim)
+        self.assertEqual(claim["event_id"], "evt_pending_1")
+        self.assertTrue(self.store.finish(claim["id"], claim["leaseToken"], {"delivered": True, "retryable": False}, now=101))
+
+        # Other subscription completely unaffected
+        other_sub = self.store.get(other_id, other_token)
+        self.assertIsNotNone(other_sub)
+        self.assertEqual(other_sub["classroom"], 4)
+
     def test_worker_retries_then_delivers_without_changing_event_id(self):
         self.store.enqueue(self.subscription["id"], "stable_event", b'{"text":"example"}', now=100)
         calls = []
