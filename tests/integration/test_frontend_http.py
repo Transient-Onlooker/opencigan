@@ -78,7 +78,7 @@ const assert = require('node:assert/strict');
       const fast = await api.getTimetable(fastSchool, '2026-11-09');
       assert.equal(fast.schoolId, fastSchool);
       const whileSlowIsBlocked = await fetch(`${process.env.VITE_API_BASE_URL}/__test__/state`).then(response => response.json());
-      assert.equal(whileSlowIsBlocked.slowCompleted, false, 'a different cache key should finish independently');
+      assert.equal(whileSlowIsBlocked.slowCompleted, false, 'a different cache key in the same stripe should finish independently');
 
       await fetch(`${process.env.VITE_API_BASE_URL}/__test__/release`);
       const recovered = await api.getTimetable('2:ST01-slow', '2026-11-09');
@@ -118,10 +118,9 @@ class FrontendHttpTests(unittest.TestCase):
                      "sourceUpdatedAt": None, "fetchedAt": "2026-11-10T00:00:00Z", "stale": False}
         test_cache = Cache()
         slow_school = "2:ST01-slow"
-        fast_school = "2:ST01-fast"
         slow_lock = hash(("timetable", slow_school, "2026-11-09")) % len(test_cache.locks)
-        while hash(("timetable", fast_school, "2026-11-09")) % len(test_cache.locks) == slow_lock:
-            fast_school += "-x"
+        fast_school = next(f"2:ST01-fast-{number}" for number in range(4096)
+                           if hash(("timetable", f"2:ST01-fast-{number}", "2026-11-09")) % len(test_cache.locks) == slow_lock)
         temp_root = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "Temp" if os.name == "nt" else None
         with tempfile.TemporaryDirectory(prefix="opensigan-http-", dir=temp_root) as temp_dir, \
                 patch("backend.app.cache", test_cache), \
