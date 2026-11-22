@@ -52,6 +52,9 @@ test('notification settings link follows theme, keyboard and mobile layout', asy
   await page.route('**/webhooks.html', (route) => route.fulfill({ contentType: 'text/html; charset=utf-8', body: '<h1>알림 관리</h1>' }));
   await page.goto('/');
   await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('개발자용 · 연동', { exact: true }).click();
+  await expect(page.locator('#settings-panel').getByRole('link', { name: 'API 문서' })).toHaveAttribute('href', './api-docs.html');
+  await expect(page.locator('#settings-panel').getByRole('link', { name: '시간표 위젯 만들기' })).toHaveAttribute('href', './embed-builder.html');
   const link = page.getByRole('link', { name: '시간표 변경 알림 관리' });
   await expect(link).toHaveAttribute('href', './webhooks.html');
   for (const width of [320, 390, 800, 1366]) {
@@ -72,6 +75,7 @@ test('notification settings link follows theme, keyboard and mobile layout', asy
   await expect(page.getByRole('heading', { name: '알림 관리' })).toBeVisible();
   await page.goBack();
   await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('개발자용 · 연동', { exact: true }).click();
   await expect(link).toHaveCSS('color', 'rgb(245, 245, 245)');
 });
 
@@ -719,6 +723,23 @@ test('meal date accepts pasted ISO date', async ({ page, browserName, context })
   await input.press('Control+V');
   await input.blur();
   await expect(input).toHaveValue('2026-12-25');
+});
+
+test('invalid pasted date preserves the current date and cancels the default paste', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  const input = page.getByLabel('날짜 선택');
+  const before = await input.inputValue();
+  const cancelled = await input.evaluate((element) => {
+    const clipboard = new DataTransfer();
+    clipboard.setData('text/plain', '2026-02-30');
+    const event = new ClipboardEvent('paste', { clipboardData: clipboard, bubbles: true, cancelable: true });
+    element.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(cancelled).toBe(true);
+  await expect(input).toHaveValue(before);
 });
 
 test('meal date errors preserve the applied date and valid input fetches the matching week', async ({ page }) => {

@@ -7,6 +7,24 @@ from backend.access_logs import AccessLogRecorder, AccessLogStore
 
 
 class AccessLogApiTests(unittest.TestCase):
+    def test_admin_errors_include_standard_error_and_code(self):
+        with patch.dict('os.environ', {'OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN': 'test-secret'}), \
+             patch('backend.app._access_log_store', return_value=None):
+            for method, query, auth, expected in (
+                ('GET', '', '', 401),
+                ('POST', '', 'Bearer test-secret', 405),
+                ('GET', 'limit=invalid', 'Bearer test-secret', 400),
+                ('GET', '', 'Bearer test-secret', 503),
+            ):
+                with self.subTest(status=expected):
+                    status, headers, body = dispatch_request(method, '/api/v1/admin/access-logs', query,
+                                                             request_headers={'Authorization': auth})
+                    self.assertEqual(status, expected)
+                    self.assertEqual(int(headers['Content-Length']), len(body))
+                    payload = json.loads(body)
+                    self.assertIsInstance(payload['error'], str)
+                    self.assertIsInstance(payload['code'], str)
+
     def test_recorded_request_round_trips_through_authenticated_query(self):
         store = AccessLogStore(':memory:')
         recorder = AccessLogRecorder(lambda: store)

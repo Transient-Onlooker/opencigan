@@ -2,6 +2,7 @@
   import { onMount, tick } from 'svelte';
   import Icon from './Icon.svelte';
   import BuildInfo from './BuildInfo.svelte';
+  import Suggestions from './Suggestions.svelte';
   import { allergens } from './allergens';
   import { calculateLessonTimes, validateLessonTimeDrafts, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
   import type { School } from './api';
@@ -174,7 +175,7 @@
 
 <section id="settings-panel" hidden={view !== 'settings'} aria-labelledby="settings-title">
           <h2 id="settings-title">설정</h2>
-          <a class="notification-link" href="./webhooks.html">시간표 변경 알림 관리 <span aria-hidden="true">↗</span></a>
+          {#if view === 'settings' && import.meta.env.VITE_SUGGESTIONS_ENABLED === '1'}<Suggestions />{/if}
           <label class="settings-search">설정 검색<input type="search" value={settingsQuery} oninput={(event) => updateSettingsSearch(event.currentTarget.value)} maxlength="60" placeholder="예: 교시, 알레르기, 백업" /></label>
           {#if settingsQuery.trim()}
             {#if searchResults.length}
@@ -182,6 +183,14 @@
             {:else}<p role="status">일치하는 설정이 없어요.</p>{/if}
           {/if}
           <div class="settings-cards" bind:this={settingsContent} hidden={!!settingsQuery.trim()}>
+          <details class="display-settings" hidden={!settingsMatch('개발자 연동 알림 API 위젯', settingsQuery)}>
+            <summary>개발자용 · 연동</summary>
+            <div class="display-settings-grid">
+              <a class="notification-link" href="./webhooks.html">시간표 변경 알림 관리 <span aria-hidden="true">↗</span></a>
+              <a class="notification-link" href="./api-docs.html">API 문서 <span aria-hidden="true">↗</span></a>
+              <a class="notification-link" href="./embed-builder.html">시간표 위젯 만들기 <span aria-hidden="true">↗</span></a>
+            </div>
+          </details>
           <details class="display-settings" hidden={!settingsMatch('일반 테마 애니메이션', settingsQuery)} bind:open={settingsOpen.general}>
             <summary>일반 설정</summary>
             <div class="display-settings-grid">

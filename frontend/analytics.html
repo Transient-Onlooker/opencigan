@@ -19,5 +19,16 @@
 <h2>API 경로별 이용</h2><p>조회 실패는 원본 장애로 확정된 것이 아닙니다. 미분류 서버 오류에는 분류 정보가 없는 이전 기록도 포함됩니다.</p><div class="scroll" tabindex="0" role="region" aria-label="경로별 통계 표"><table><thead><tr><th scope="col">경로</th><th scope="col">요청</th><th scope="col">오류</th><th scope="col">조회 실패</th><th scope="col">과부하 차단</th><th scope="col">미분류 서버 오류</th><th scope="col">평균 (ms)</th></tr></thead><tbody id="routes"></tbody></table></div>
 <p>API 수치는 비동기 기록으로 잠시 늦게 반영됩니다. 상태 확인·분석 요청 자체는 제외합니다. 수집을 거부한 방문은 방문자 집계에 포함되지 않습니다.</p>
 </section>
+<section id="history-stats-section" hidden aria-label="시간표 관측 변경 이력 통계">
+<h2>관측 변경 통계</h2>
+<p id="history-stats-notice">최근 30일 보존 기간에 수집된 관측 변경만 집계하며, 컴시간 원본의 변경 여부 표시와는 별개입니다.</p>
+<form id="history-stats-form">
+<label>학교 ID<input id="history-school" type="text" autocomplete="off" required maxlength="100" placeholder="예: 1:Example"></label>
+<label>주 시작일 (월요일)<input id="history-week" type="date" required placeholder="YYYY-MM-DD"></label>
+<button id="history-stats-load" type="submit">이력 통계 조회</button>
+</form>
+<p id="history-stats-state" role="status" aria-live="polite"></p>
+<div id="history-stats-results" hidden aria-label="이력 통계 결과"></div>
+</section>
 </main><script type="module" src="/src/admin.ts"></script>
 </body></html>

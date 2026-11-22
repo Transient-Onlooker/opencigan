@@ -40,6 +40,14 @@ jobs:
         working-directory: frontend
       - run: npx playwright test
         working-directory: frontend
+      - run: npx playwright test e2e/suggestions.spec.js
+        working-directory: frontend
+        env:
+          VITE_SUGGESTIONS_ENABLED: '1'
+      - run: npx playwright test e2e/history-stats.spec.js
+        working-directory: frontend
+        env:
+          VITE_HISTORY_STATS_ENABLED: '1'
       - run: npm run build
         working-directory: frontend
         env:

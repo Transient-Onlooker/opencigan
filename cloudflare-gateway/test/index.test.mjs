@@ -25,6 +25,23 @@ function setup({search = true, general = true, failFetch = false, blockedKey = '
   return { env, calls, limits };
 }
 
+test('gateway errors follow the API error contract and retain message compatibility', async () => {
+  const responses = [
+    await worker.fetch(req('/unknown'), setup().env),
+    await worker.fetch(req('/api/v1/status', {method: 'POST'}), setup().env),
+    await worker.fetch(req('/api/v1/schools'), setup({search: false}).env),
+    await worker.fetch(req('/api/v1/status'), {}),
+    await worker.fetch(req('/api/v1/status'), setup({failFetch: true}).env),
+  ];
+  for (const response of responses) {
+    const body = await response.json();
+    assert.equal(typeof body.error, 'string');
+    assert.equal(typeof body.code, 'string');
+    assert.equal(body.message, body.error);
+  }
+  assert.deepEqual(responses.map(response => response.status), [404, 405, 429, 503, 503]);
+});
+
 test('only /api/v1/ routes are forwarded; no open proxy', async () => {
   const { env, calls } = setup();
   assert.equal((await worker.fetch(req('/private?url=http://evil.test'), env)).status, 404);
@@ -209,6 +226,41 @@ test('webhook PUT preserves authorization and JSON body', async () => {
   assert.equal(calls[0].method, 'PUT');
   assert.equal(calls[0].headers.get('authorization'), 'Bearer example');
   assert.equal(await calls[0].text(), '{"filters":{}}');
+});
+
+test('webhook token rotation forwards the authenticated JSON body and rejects GET', async () => {
+  const { env, calls } = setup();
+  const allowed = await worker.fetch(req('/api/v1/webhooks/abcdefghijklmnopqrstuvwx/rotate', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer example', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ newToken: 'b'.repeat(43) }),
+  }), env);
+  assert.equal(allowed.status, 200);
+  assert.equal(calls[0].method, 'POST');
+  assert.equal(calls[0].headers.get('authorization'), 'Bearer example');
+  assert.deepEqual(await calls[0].json(), { newToken: 'b'.repeat(43) });
+  assert.equal(calls[0].url, 'http://127.0.0.1:8000/api/v1/webhooks/abcdefghijklmnopqrstuvwx/rotate');
+
+  const getBlocked = await worker.fetch(req('/api/v1/webhooks/abcdefghijklmnopqrstuvwx/rotate', {
+    method: 'GET',
+    headers: { 'Authorization': 'Bearer example' },
+  }), env);
+  assert.equal(getBlocked.status, 405);
+});
+
+test('webhook templates forward only the supported methods', async () => {
+  const { env, calls } = setup();
+  const path = '/api/v1/webhooks/abcdefghijklmnopqrstuvwx/template';
+  const headers = { Authorization: 'Bearer example', 'Content-Type': 'application/json' };
+  for (const method of ['GET', 'PUT', 'DELETE']) {
+    const response = await worker.fetch(req(path, { method, headers, ...(method === 'PUT' ? { body: '{}' } : {}) }), env);
+    assert.equal(response.status, 200);
+  }
+  assert.equal((await worker.fetch(req(path, { method: 'POST', headers }), env)).status, 405);
+  assert.equal((await worker.fetch(req(`${path}/preview`, { method: 'POST', headers, body: '{}' }), env)).status, 200);
+  assert.equal((await worker.fetch(req(`${path}/preview`, { method: 'GET', headers }), env)).status, 405);
+  assert.equal(calls.length, 4);
+  assert.equal(calls[3].headers.get('authorization'), 'Bearer example');
 });
 
 test('limits streamed request bodies to the backend 4096 byte limit', async () => {

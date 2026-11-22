@@ -29,7 +29,7 @@ def webhook_api(method, path, body, request_headers, client, headers, rate_allow
                 raise ValueError("invalid payload")
             result = store.create(payload["school"], payload["grade"], payload["class"], payload["destination"])
             return respond(200, result)
-        match = re.fullmatch(r"/api/v1/webhooks/([A-Za-z0-9_-]{24})(/deliveries|/test)?", path)
+        match = re.fullmatch(r"/api/v1/webhooks/([A-Za-z0-9_-]{24})(/deliveries|/test|/rotate|/template(?:/preview)?)?", path)
         if not match:
             return respond(404, {"error": "요청한 경로가 없습니다", "code": "not_found"})
         if method not in ("GET", "HEAD", "DELETE", "POST", "PUT"):
@@ -37,7 +37,34 @@ def webhook_api(method, path, body, request_headers, client, headers, rate_allow
         authorization = (request_headers or {}).get("Authorization", "")
         token = authorization[7:] if authorization.startswith("Bearer ") else ""
         identifier = match.group(1)
-        if match.group(2) == "/test":
+        if match.group(2) == "/template/preview":
+            if method != "POST":
+                return respond(405, {"error": "method not allowed", "code": "method_not_allowed"})
+            payload = json.loads(body or b"{}")
+            if not isinstance(payload, dict) or set(payload) != {"template", "discordEmbed"}:
+                raise ValueError("invalid payload")
+            result = store.preview_template(identifier, token, payload["template"], payload["discordEmbed"])
+            result = {"payload": result} if result is not None else None
+        elif match.group(2) == "/template":
+            if method == "GET" or method == "HEAD":
+                result = store.get_template(identifier, token)
+            elif method == "PUT":
+                payload = json.loads(body or b"{}")
+                if not isinstance(payload, dict) or set(payload) != {"template", "discordEmbed"}:
+                    raise ValueError("invalid payload")
+                result = store.update_template(identifier, token, payload["template"], payload["discordEmbed"])
+            elif method == "DELETE":
+                result = {"reset": True} if store.reset_template(identifier, token) else None
+            else:
+                return respond(405, {"error": "method not allowed", "code": "method_not_allowed"})
+        elif match.group(2) == "/rotate":
+            if method != "POST":
+                return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
+            payload = json.loads(body or b"{}")
+            if not isinstance(payload, dict) or set(payload) != {"newToken"}:
+                raise ValueError("invalid payload")
+            result = store.rotate(identifier, token, payload["newToken"])
+        elif match.group(2) == "/test":
             if method != "POST":
                 return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
             event = store.enqueue_test(identifier, token)

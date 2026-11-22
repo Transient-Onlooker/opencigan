@@ -21,7 +21,7 @@ function jsonError(code, status, request, allowedOrigins, extraHeaders = {}) {
     headers.set('Access-Control-Expose-Headers', 'Retry-After');
   }
   return new Response(
-    request.method === 'HEAD' ? null : JSON.stringify({ code, message: 'API 연결을 처리하지 못했어요.' }),
+    request.method === 'HEAD' ? null : JSON.stringify({ code, error: 'API 연결을 처리하지 못했어요.', message: 'API 연결을 처리하지 못했어요.' }),
     { status, headers },
   );
 }
@@ -64,12 +64,13 @@ export default {
     const error = (code, status, headers) => jsonError(code, status, request, allowedOrigins, headers);
     const url = new URL(request.url);
     const path = url.pathname;
-    const webhook = path.match(/^\/api\/v1\/webhooks\/([A-Za-z0-9_-]{24})(\/deliveries|\/test)?$/);
+    const webhook = path.match(/^\/api\/v1\/webhooks\/([A-Za-z0-9_-]{24})(\/deliveries|\/test|\/rotate|\/template(?:\/preview)?)?$/);
     let methods;
     if (READ_PATHS.has(path)) methods = ['GET', 'HEAD'];
     else if (path === '/api/v1/analytics/pageview' || path === '/api/v1/webhooks') methods = ['POST'];
     else if (webhook?.[2] === '/deliveries') methods = ['GET', 'HEAD'];
-    else if (webhook?.[2] === '/test') methods = ['POST'];
+    else if (webhook?.[2] === '/test' || webhook?.[2] === '/rotate' || webhook?.[2] === '/template/preview') methods = ['POST'];
+    else if (webhook?.[2] === '/template') methods = ['GET', 'HEAD', 'PUT', 'DELETE'];
     else if (webhook) methods = ['GET', 'HEAD', 'PUT', 'DELETE'];
     else return error('not_found', 404);
     if (request.method !== 'OPTIONS' && !methods.includes(request.method)) {
