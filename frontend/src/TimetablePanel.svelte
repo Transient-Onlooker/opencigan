@@ -105,7 +105,7 @@
               {:else}
                 {#if todayMeal.mealState}<div class="notice" role="alert">급식을 불러오지 못했어요. {todayMeal.hasMeals ? '이전 급식 정보를 표시하고 있어요. ' : ''}{todayMeal.mealState} <button class="text-button" onclick={() => todayMeal.loadMeals(true)}>다시 시도</button></div>{/if}
                 {#if todayMeal.mealLoading}<p role="status">{todayMeal.hasMeals ? '이전 식단을 표시하며 확인하고 있어요.' : '식단을 불러오고 있어요.'}</p>{/if}
-                {#if todayMeal.mealsStale && todayMeal.hasMeals}<p class="notice">저장된 급식 정보예요. 최신 정보가 아닐 수 있습니다.</p>{/if}
+                {#if todayMeal.mealsStale && todayMeal.hasMeals && !todayMeal.mealState}<p class="notice">저장된 급식 정보예요. 최신 정보가 아닐 수 있습니다.</p>{/if}
                 {#if todayMeal.hasMeals}<MealMenu meals={todayMeal.meals} dates={[selectedDay]} {today} visibleTypes={todayMeal.visibleMealTypes} allergySelection={todayMeal.allergySelection} allergyFilter={todayMeal.mealAllergyFilter} showAllergenNumbers={todayMeal.showAllergenNumbers} timetableFrom={current} timetableTo={addDays(current, 13)} formatDate={(date) => dateText(date, { month: 'numeric', day: 'numeric', weekday: 'long' })} />{/if}
               {/if}
             </aside>

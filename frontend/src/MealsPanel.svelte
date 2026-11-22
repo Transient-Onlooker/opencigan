@@ -54,7 +54,7 @@
            {:else}
             {#if mealState}<div class="notice" role="alert"><strong>급식을 불러오지 못했어요.</strong> {hasMeals ? '이전 급식 정보를 표시하고 있어요. ' : '표시할 급식 정보가 없어요. '}{mealState} <button class="text-button" onclick={() => loadMeals(true)}>다시 시도</button></div>{/if}
             {#if mealLoading && hasMeals}<p class="state-inline" role="status">새 식단을 확인하는 동안 이전 식단을 표시하고 있어요.</p>{/if}
-            {#if mealsStale && hasMeals}<p class="notice" role="status">저장된 급식 정보예요. 최신 정보가 아닐 수 있습니다.</p>{/if}
+            {#if mealsStale && hasMeals && !mealState}<p class="notice" role="status">저장된 급식 정보예요. 최신 정보가 아닐 수 있습니다.</p>{/if}
             {#if mealLoading && !hasMeals}<div class="state-message" role="status">식단을 불러오고 있어요.</div>
             {:else if hasMeals}
                <MealMenu
