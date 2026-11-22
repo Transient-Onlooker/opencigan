@@ -68,6 +68,29 @@ class ScheduledWorkerTests(unittest.TestCase):
         self.assertEqual(self.webhooks.deliveries(sub["id"], sub["token"]), [])
         self.assertEqual(run_once(self.schedules, Cache(), lambda *_: self.timetable(), self.now, enabled=True), 1)
 
+    def test_failed_fetch_respects_backoff_before_recovery(self):
+        sub = self.subscribe("subject_prep", subject="Math")
+        timetable = self.timetable()
+        for record in timetable["records"]:
+            record["subject"] = "Math"
+        calls = []
+
+        def fetch(*_):
+            calls.append(1)
+            if len(calls) == 1:
+                raise TimeoutError()
+            return timetable
+
+        cache = Cache(retry_delay=60)
+        with patch("backend.cache.time.monotonic", return_value=100):
+            self.assertEqual(run_once(self.schedules, cache, fetch, self.now, enabled=True), 0)
+            self.assertEqual(run_once(self.schedules, cache, fetch, self.now, enabled=True), 0)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(self.webhooks.deliveries(sub["id"], sub["token"]), [])
+        with patch("backend.cache.time.monotonic", return_value=161):
+            self.assertEqual(run_once(self.schedules, cache, fetch, self.now, enabled=True), 1)
+        self.assertEqual(len(calls), 2)
+
     def test_reconfiguration_during_fetch_does_not_queue_old_revision(self):
         sub = self.subscribe("subject_prep", subject="체육")
         def fetch(*_):
