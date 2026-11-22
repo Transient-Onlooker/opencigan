@@ -18,5 +18,25 @@
 <label>교시<input id="period" type="number" min="1" max="20"></label><label>변경 유형<select id="kind"><option value="">모든 변경</option><option value="added">추가</option><option value="changed">변경</option><option value="deleted">삭제</option></select></label>
 <label>방해 금지 시작<input id="quiet-start" type="time"></label><label>방해 금지 종료<input id="quiet-end" type="time"></label><button type="submit">조건 저장</button></form>
 <p>방해 금지 시간은 한국 시간 기준입니다. 테스트 알림은 시간 설정을 무시합니다.</p><div class="actions"><button id="test" type="button">테스트 알림</button><button id="refresh" type="button">전송 상태 새로고침</button><button id="delete" type="button">구독 삭제</button></div>
+<section id="template-editor" class="template-editor" aria-labelledby="template-title">
+<h2 id="template-title">알림 템플릿</h2>
+<p>템플릿은 이 화면의 미리보기용 초안입니다. 저장 및 실제 알림 적용은 API 계약 연결 후 사용할 수 있습니다.</p>
+<div class="template-layout">
+<div class="template-controls">
+<label for="template-format">메시지 형식<select id="template-format" aria-describedby="template-format-help"><option value="text">일반 메시지</option><option value="embed">Discord 임베드</option></select></label>
+<p id="template-format-help" class="template-help">Google Chat은 일반 메시지 형식만 지원합니다.</p>
+<label for="template-body">템플릿 내용</label>
+<textarea id="template-body" rows="7" maxlength="1200" aria-describedby="template-help template-errors"></textarea>
+<p id="template-help" class="template-help">사용할 변수를 선택하거나 중괄호 형식으로 입력하세요. 최대 1,200자입니다.</p>
+<div class="template-variables" role="group" aria-label="템플릿 변수">
+<button type="button" data-template-variable="school">학교</button><button type="button" data-template-variable="grade">학년</button><button type="button" data-template-variable="classroom">반</button><button type="button" data-template-variable="date">날짜</button><button type="button" data-template-variable="period">교시</button><button type="button" data-template-variable="type">변경 유형</button><button type="button" data-template-variable="before">변경 전</button><button type="button" data-template-variable="after">변경 후</button>
+</div>
+<p id="template-errors" class="template-errors" role="alert" aria-live="polite"></p>
+<div class="template-actions"><button id="template-reset" type="button">초기화</button><button id="template-save" type="button" disabled aria-describedby="template-save-help">템플릿 저장</button></div>
+<p id="template-save-help" class="template-help">API 계약 연결 전까지 저장할 수 없습니다.</p>
+</div>
+<div class="template-preview-wrap"><h3>샘플 미리보기</h3><output id="template-preview" class="template-preview" aria-live="polite"></output><p id="template-preview-format" class="template-help"></p></div>
+</div>
+</section>
 <h2>최근 전송 상태</h2><div class="scroll" tabindex="0" role="region" aria-label="전송 상태"><table><thead><tr><th scope="col">이벤트</th><th scope="col">상태</th><th scope="col">시도</th><th scope="col">응답</th></tr></thead><tbody id="deliveries"></tbody></table></div></section>
 </main><script type="module" src="/src/webhooks.ts"></script></body></html>

@@ -8,7 +8,18 @@ const select = (id: string) => document.querySelector<HTMLSelectElement>(`#${id}
 const state = document.querySelector<HTMLElement>('#state')!;
 const manage = document.querySelector<HTMLElement>('#manage')!;
 const table = document.querySelector<HTMLElement>('#deliveries')!;
+const templateBody = document.querySelector<HTMLTextAreaElement>('#template-body')!;
+const templateFormat = select('template-format');
+const templateErrors = document.querySelector<HTMLElement>('#template-errors')!;
+const templatePreview = document.querySelector<HTMLOutputElement>('#template-preview')!;
+const templatePreviewFormat = document.querySelector<HTMLElement>('#template-preview-format')!;
+const templateSave = document.querySelector<HTMLButtonElement>('#template-save')!;
+const templateDefaults = '{school} {grade}학년 {classroom}반 · {date} {period}교시 ({type})\n{before} → {after}';
+const templateVariables = new Set(['school', 'grade', 'classroom', 'date', 'period', 'type', 'before', 'after']);
 const buttons = [...document.querySelectorAll<HTMLButtonElement>('button')];
+let templateProvider = '';
+let previewTimer = 0;
+let previewRevision = 0;
 let controller = new AbortController();
 
 async function call(path: string, method = 'GET', payload?: unknown, authenticated = true) {
@@ -37,9 +48,15 @@ async function run(action: () => Promise<void>) {
 
 function reset() {
   controller.abort(); controller = new AbortController();
+  window.clearTimeout(previewTimer);
+  previewRevision += 1;
   input('id').value = ''; input('token').value = ''; input('destination').value = '';
   manage.hidden = true; table.replaceChildren();
   document.querySelector<HTMLFormElement>('#filters')!.reset(); document.querySelector('#scope')!.textContent = '';
+  templateProvider = ''; templateBody.value = templateDefaults; templateFormat.value = 'text';
+  templateFormat.disabled = false; templateSave.disabled = true; templateErrors.textContent = '';
+  templateBody.removeAttribute('aria-invalid'); templatePreview.value = '';
+  templatePreview.dataset.format = 'text'; templatePreview.dataset.invalid = 'false'; templatePreviewFormat.textContent = '';
   buttons.forEach((button) => { button.disabled = false; });
 }
 
@@ -60,6 +77,7 @@ async function load() {
   manage.hidden = true; table.replaceChildren();
   const path = subscriptionPath();
   const result = await call(path);
+  await loadTemplate(path, result.provider);
   const f = result.filters ?? {};
   input('subject').value = f.subject ?? ''; input('teacher').value = f.teacher ?? '';
   select('weekday').value = String(f.weekday ?? ''); input('period').value = String(f.period ?? ''); select('kind').value = f.type ?? '';
@@ -83,6 +101,106 @@ async function copyLink() {
     throw new Error('클립보드를 사용할 수 없는 환경입니다.');
   }
 }
+
+function validateTemplate(value: string) {
+  if (!value.trim()) return '템플릿 내용을 입력해 주세요.';
+  if (value.length > 1200) return '템플릿은 1,200자 이내로 입력해 주세요.';
+  for (let index = 0; index < value.length;) {
+    if (value[index] === '{') {
+      if (value[index + 1] === '{') { index += 2; continue; }
+      const end = value.indexOf('}', index + 1);
+      if (end < 0) return '닫는 중괄호가 없는 변수가 있어요.';
+      if (!templateVariables.has(value.slice(index + 1, end))) return `지원하지 않는 변수예요: ${value.slice(index, end + 1)}`;
+      index = end + 1;
+    } else if (value[index] === '}') {
+      if (value[index + 1] !== '}') return '짝이 맞지 않는 중괄호가 있어요.';
+      index += 2;
+    } else index += 1;
+  }
+  return '';
+}
+
+function templatePayload() {
+  return { template: templateBody.value, discordEmbed: templateProvider === 'discord' && templateFormat.value === 'embed' };
+}
+
+function setPreview(payload: Record<string, unknown>) {
+  const embed = Array.isArray(payload.embeds);
+  const content = payload.content ?? payload.text ?? (embed
+    ? (payload.embeds[0] as Record<string, unknown> | undefined)?.description
+    : '');
+  templatePreview.value = typeof content === 'string' ? content : '';
+  templatePreview.dataset.format = embed ? 'embed' : 'text';
+  templatePreview.dataset.invalid = 'false';
+  templatePreviewFormat.textContent = embed ? 'Discord 임베드 미리보기' : templateProvider === 'google-chat' ? 'Google Chat 메시지 미리보기' : 'Discord 메시지 미리보기';
+}
+
+async function previewTemplate() {
+  const revision = ++previewRevision;
+  const invalid = validateTemplate(templateBody.value);
+  templateErrors.textContent = invalid;
+  templateBody.setAttribute('aria-invalid', String(Boolean(invalid)));
+  if (invalid) {
+    templatePreview.value = '입력한 템플릿을 확인해 주세요.';
+    templatePreview.dataset.invalid = 'true';
+    return;
+  }
+  try {
+    const result = await call(`${subscriptionPath()}/template/preview`, 'POST', templatePayload());
+    if (revision === previewRevision) setPreview(result.payload);
+  } catch (error) {
+    if (!controller.signal.aborted && revision === previewRevision) {
+      templatePreview.value = error instanceof Error ? error.message : '미리보기를 불러오지 못했어요.';
+      templatePreview.dataset.invalid = 'true';
+    }
+  }
+}
+
+function queuePreview() {
+  window.clearTimeout(previewTimer);
+  previewTimer = window.setTimeout(() => { void previewTemplate(); }, 250);
+}
+
+async function loadTemplate(path: string, provider: string) {
+  const result = await call(`${path}/template`);
+  templateProvider = result.provider ?? provider ?? '';
+  templateBody.value = result.template ?? templateDefaults;
+  templateFormat.value = result.discordEmbed === true ? 'embed' : 'text';
+  templateFormat.disabled = templateProvider !== 'discord';
+  templateSave.disabled = false;
+  await previewTemplate();
+}
+
+templateBody.addEventListener('input', queuePreview);
+templateFormat.addEventListener('change', queuePreview);
+document.querySelectorAll<HTMLButtonElement>('[data-template-variable]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const variable = `{${button.dataset.templateVariable}}`;
+    templateBody.setRangeText(variable, templateBody.selectionStart, templateBody.selectionEnd, 'end');
+    templateBody.focus();
+    queuePreview();
+  });
+});
+document.querySelector('#template-reset')!.addEventListener('click', () => {
+  void run(async () => {
+    const path = subscriptionPath();
+    await call(`${path}/template`, 'DELETE');
+    templateBody.value = templateDefaults; templateFormat.value = 'text';
+    await previewTemplate();
+    state.textContent = '기본 템플릿으로 초기화했어요.';
+  });
+});
+templateSave.addEventListener('click', () => {
+  void run(async () => {
+    const invalid = validateTemplate(templateBody.value);
+    templateErrors.textContent = invalid;
+    templateBody.setAttribute('aria-invalid', String(Boolean(invalid)));
+    if (invalid) return;
+    await call(`${subscriptionPath()}/template`, 'PUT', templatePayload());
+    await previewTemplate();
+    state.textContent = '알림 템플릿을 저장했어요.';
+  });
+});
 
 function initFromFragment() {
   const hash = location.hash;
