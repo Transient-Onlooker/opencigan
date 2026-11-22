@@ -55,6 +55,9 @@ flowchart TB
 ### ST-01 · 503 / 요청 타임아웃 경계 개선
 
 - 프런트의 15초 제한이 상류 응답보다 먼저 끝나는 상황을 모의 재현했다. 컴시간 프록시에 서비스 페이지/기타 데이터 요청의 응답 헤더까지 소요 시간을 추가한다. 응답 본문 수신·파싱·잠금 대기는 포함하지 않으며, 학교명·URL·검색어는 기록하지 않는다. 실제 운영 지연의 원인과 전체 요청 예산은 아직 확인되지 않았다.
+- [PR #164](https://github.com/Transient-Onlooker/opencigan/pull/164)에서 모의 403·429·지연에 대해 캐시 미보유 503과 재시도 안내, 다른 학교·주차 격리, 오래된 시간표 보존 후 복구 및 상태 API를 검증한다. 실제 장애의 근본 원인이나 시간 예산 조정은 확인하지 못해 ST-01은 계속 미완료다.
+- 로컬 프런트 API 클라이언트와 백엔드를 연결한 모의 테스트에서 15초 제한값과 클라이언트 취소 후 서버 작업의 지속·같은 잠금 슬롯의 다른 캐시 키 처리·완료 결과의 캐시 재사용을 확인한다. 제한 신호는 시간을 기다리지 않고 직접 발생시키며, 실제 Worker 경계·상류 30초 소요 및 운영 503의 원인은 여전히 미확인이다.
+- [PR #184](https://github.com/Transient-Onlooker/opencigan/pull/184): 모의 캐시에서 다른 키가 같은 잠금 슬롯에 배정되면 느린 요청에 막히는 상황을 재현하고, 키별 갱신 잠금으로 격리했다. 동일 키의 단일 갱신과 기존 TTL·백오프·캐시 상한도 검증한다. 운영 장애와의 인과관계는 확인되지 않았다.
 
 - [ ] 프런트 요청 제한(15초), 컴시간 프록시 단일 연결 기본값(30초), Worker/Pi의 실제 요청 경계를 비교하는 재현 테스트와 경로별 계측을 구현한다.
 - [ ] 오류가 **재현된 경우에만** 전체 요청 시간 예산·취소·재시도·캐시 대체와 `Retry-After`, 502/503/504 안내를 수정한다. 단순히 타임아웃 숫자를 바꾸지 않는다.
@@ -68,7 +71,7 @@ flowchart TB
 - [x] 테스트 전용 제한값에서 429 JSON·`Retry-After`·CORS, 관리자 API 제한, 정상 캘린더/API 요청과의 간섭 방지를 검사한다. **실서비스에 요청 폭주를 발생시키지 않는다.**
 - [PR #159](https://github.com/Transient-Onlooker/opencigan/pull/159)의 Worker 테스트 19개, Pi WSGI 테스트 22개와 [전체 CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/44916758406)가 통과했다. Worker에서 가상의 IP A의 시간표 제한이 IP B·캘린더·OPTIONS에 영향을 주지 않는지, 429의 CORS/재시도 및 위조 헤더 제거를 확인했다. 기존 Pi 격리 테스트는 서명된 IP별 제한·접속 로그, 무서명 버킷, 관리자 제한과 OPTIONS를 확인한다. 실제 운영 한도 초과 검증은 별도다.
 - **완료 조건:** 독립 IP A/B의 제한·로그 계약 검증. 실제 운영 레이트 리밋 한도 초과는 별도 P0 게이트로 보존.
-- 원본: [P0 보안 경계](core-quality.md), [운영 체크리스트](../cloudflare-tunnel-rollout.md).
+- 원본: [P0 보안 경계](core-quality.md), [운영 체크리스트](../operations/cloudflare-tunnel-rollout.md).
 
 ## B. P1 — 성능과 사용자 화면
 
@@ -100,29 +103,33 @@ flowchart TB
 
 ### ST-05 · ‘만들어주세요’ 서버 접수·관리
 
-- [ ] 익명 기능 요청의 제목·설명·이용 상황을 **별도 저장소**에 저장하는 API, 공개 승인 제안만 검색하는 API, 중복·길이·본문·HTML·스팸 제한을 구현한다.
-- [ ] 관리자 승인/거절/삭제/중복 병합, 권한 확인, 기존 접근 로그·설정·시간표 이력과의 데이터 경계 및 복구 테스트를 구현한다.
+- [x] 익명 기능 요청의 제목·설명·이용 상황을 **별도 저장소**에 저장하는 API, 공개 승인 제안만 검색하는 API, 중복·길이·본문·HTML·스팸 제한을 구현한다.
+- [x] 관리자 승인/거절/삭제/중복 병합, 권한 확인, 기존 접근 로그·설정·시간표 이력과의 데이터 경계 및 복구 테스트를 구현한다.
+- [PR #167](https://github.com/Transient-Onlooker/opencigan/pull/167): 별도 SQLite 저장소와 기본 OFF API, 승인된 내용만 공개하는 검색, 토큰 인증과 복원 회귀를 구현했다. 제안은 일반 텍스트로 저장하며 표시 계층은 HTML로 해석하지 않아야 한다. [통합 CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/44929089685)가 통과했고 운영 접수는 열지 않았다.
 - **완료 조건:** 미승인 내용 비공개, XSS/권한 우회/입력 오류·중복 검사, 관리자 상태 전이 테스트. **기능 플래그 OFF로 병합하고 공개 접수/보존 정책은 확정하지 않는다.**
 - 원본: [P2 익명 제안·관리](api-operations.md).
 
 ### ST-06 · ‘만들어주세요’ 제출 UI · ST-05 이후
 
-- [ ] 별도 진입점에서 제안 작성, 공개 제안 검색, 중복 안내, 제출/오류/완료 상태, 접근성·모바일 동작 구현. 기존 시간표·급식 기본 경로는 변경하지 않는다.
-- [ ] ST-05 API와 연결하되 플래그가 OFF이거나 백엔드가 없을 때 **동작하지 않는 제출 폼을 사용자에게 노출하지 않는다**.
+- [x] 별도 진입점에서 제안 작성, 공개 제안 검색, 중복 안내, 제출/오류/완료 상태, 접근성·모바일 동작 구현. 기존 시간표·급식 기본 경로는 변경하지 않는다.
+- [x] ST-05 API와 연결하되 플래그가 OFF이거나 백엔드가 없을 때 **동작하지 않는 제출 폼을 사용자에게 노출하지 않는다**.
+- [PR #172](https://github.com/Transient-Onlooker/opencigan/pull/172): 설정 화면 진입점은 별도 빌드 플래그와 API 가용성을 모두 확인한다. [통합 CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/44931921238)에서 모의 API로 검색·중복·제출·비활성·모바일 동작을 Chromium/WebKit으로 확인했다. 공개 접수와 실기기 검증은 별도다.
 - **완료 조건:** 모의/격리 API를 사용하는 E2E·입력 검증, 미승인 제안 비노출, 실패 안내 검증. 공개 활성화는 사용자 결정 후.
 - 원본: [P1 기능 제안 UI](user-experience.md).
 
 ### ST-07 · Webhook 기반·비밀 관리 링크·관리 UI
 
+- [PR #179](https://github.com/Transient-Onlooker/opencigan/pull/179): 관리 링크 교체와 응답 유실 시 복구 안내를 추가하고 자동 검사를 통과했다. 운영 Webhook API와 발송 작업자는 별도 활성화하지 않았다.
 - [ ] 이미 있는 기본 비활성 API/큐/이력에서 빠진 구독 CRUD, 높은 엔트로피 관리 링크 인증·폐기, HMAC, 실패 재시도·멱등성·저장/큐 상한을 보강한다.
 - [ ] 학급/과목/교사/요일/교시/변경 유형 필터·방해 금지 시간, 테스트 발송, 최근 성공/실패/재시도 조회를 API·UI 양쪽에서 연결한다.
 - **완료 조건:** 타 구독 접근 불가·토큰 유출 방지·중복/재시도·필터 회귀. 실제 Discord/Google Chat 발송 백엔드는 계속 OFF.
-- 원본: [P3 Webhook](automation-and-future.md), [Webhook 문서](../webhooks.md).
+- 원본: [P3 Webhook](automation-and-future.md), [Webhook 문서](../operations/webhooks.md).
 
 ### ST-08 · Webhook 템플릿 + 개발자 메뉴 · ST-07 이후
 
-- [ ] 구독별 허용 변수 기반 커스텀 메시지, Discord Embed·Google Chat 포맷, 샘플 미리보기·초기화·템플릿 검증을 구현한다. 멘션·HTML/URL·이스케이프·길이·미정 변수 방어.
-- [ ] Webhook 관리 화면이 준비되면 `설정 → 개발자용/연동`에 Webhook·API 문서·웹사이트 삽입용 iframe 생성기를 통합한다. 기존 `embed-builder.html` 접근과 iframe 호환성을 보존한다.
+- [x] 구독별 허용 변수 기반 커스텀 메시지, Discord Embed·Google Chat 포맷, 샘플 미리보기·초기화·템플릿 검증을 구현한다. 멘션·HTML/URL·이스케이프·길이·미정 변수 방어.
+- [x] Webhook 관리 화면이 준비되면 `설정 → 개발자용/연동`에 Webhook·API 문서·웹사이트 삽입용 iframe 생성기를 통합한다. 기존 `embed-builder.html` 접근과 iframe 호환성을 보존한다.
+- [PR #180](https://github.com/Transient-Onlooker/opencigan/pull/180): 모의 API와 합성 데이터로 템플릿·기존 관리 링크·모바일 화면을 검증했다. 운영 배포와 실제 Webhook 발송은 수행하지 않았다.
 - **완료 조건:** 실전 발송 없는 템플릿 테스트, 기존 링크 회귀, 화면·모바일 검증. 메뉴 단독 선행 이전 금지.
 - 원본: [P3 템플릿](automation-and-future.md), [P1 개발자 메뉴](user-experience.md).
 
@@ -136,6 +143,7 @@ flowchart TB
 
 ### ST-10 · API 호환성·가용성 계측 정리
 
+- [PR #185](https://github.com/Transient-Onlooker/opencigan/pull/185): Webhook 템플릿 조회·저장·초기화와 두 제공자의 미리보기 성공 응답을 OpenAPI에 명시하고 격리 라우트 응답과 대조했다. 나머지 계약과 운영 관측은 미완료다.
 - [ ] 기존 OpenAPI 3.1과 Worker/Pi/TypeScript/Python 클라이언트의 오류·응답 계약을 대조하고 버전 변경·하위 호환 정책과 계약 회귀 테스트를 추가한다.
 - [ ] 관리자 관측에서 경로별 지연/오류/캐시·상류 실패를 구분하는 코드의 누락 부분만 보완한다. `status` 프로세스 생존과 상류 readiness를 섞지 않는다.
 - **완료 조건:** 문서-테스트-실제 응답 일치, 민감한 요청 내용·토큰·IP 노출 추가 금지.
@@ -191,8 +199,15 @@ flowchart TB
 | 작업 | 상태 | PR/커밋 | 통과한 검사 | 미배포·사용자 검증 등 잔여 |
 | --- | --- | --- | --- | --- |
 | ST-00 | 구현·자동검증 완료 | [#157](https://github.com/Transient-Onlooker/opencigan/pull/157) | 기준선 및 Chromium/WebKit CI | 실제 기기 QA는 별도 |
-| ST-01 | 관측·모의 재현 일부 완료 | [#158](https://github.com/Transient-Onlooker/opencigan/pull/158) | 프록시·프런트 회귀, CI | 운영 미배포, 503 원인·전체 시간 예산 미확정 |
+| ST-01 | 관측·모의 재현 일부 완료 | [#158](https://github.com/Transient-Onlooker/opencigan/pull/158), [#164](https://github.com/Transient-Onlooker/opencigan/pull/164), [#165](https://github.com/Transient-Onlooker/opencigan/pull/165), [#166](https://github.com/Transient-Onlooker/opencigan/pull/166) | 프록시·프런트 및 학교별 장애·급식·캘린더 복구 회귀, CI | 운영 미배포, 503 원인·전체 시간 예산 미확정 |
 | ST-02 | 격리 자동검증 완료 | [#159](https://github.com/Transient-Onlooker/opencigan/pull/159) | Worker·WSGI 및 CI | 실제 운영 제한 초과는 미검증 |
-| ST-03 ~ ST-14 (ST-04A 포함) | 시작 전 | — | — | — |
+| ST-03 | 검증 중 | [#162](https://github.com/Transient-Onlooker/opencigan/pull/162) 초안 | 단일 격리 비교에서 수업 데이터 일치 | 실측 요청 수·지연 개선 미달, 상류 학교 식별값 확인 필요 |
+| ST-05 | 격리 구현·자동검증 완료 | [#167](https://github.com/Transient-Onlooker/opencigan/pull/167) | 별도 저장소·권한·백업 회귀, 통합 CI | 기본 OFF, 공개·운영 미적용 |
+| ST-06 | 격리 구현·자동검증 완료 | [#172](https://github.com/Transient-Onlooker/opencigan/pull/172) | 모의 API·Chromium/WebKit CI | 기본 OFF, 공개·실기기 검증 별도 |
+| ST-07 | 일부 구현·검증 완료 | [#169](https://github.com/Transient-Onlooker/opencigan/pull/169), [#179](https://github.com/Transient-Onlooker/opencigan/pull/179) | 공식 도메인 연결 및 관리 링크 교체·복구 회귀, CI | 나머지 요구사항 확인 및 실제 발송 비활성 유지 |
+| ST-08 | 격리 구현·자동검증 완료 | [#180](https://github.com/Transient-Onlooker/opencigan/pull/180) | 템플릿 인증·안전 출력·이전 DB·게이트웨이·Chromium/WebKit CI | 운영 미배포, 실제 발송 비활성 유지 |
+| ST-10 | 일부 구현·검증 완료 | [#168](https://github.com/Transient-Onlooker/opencigan/pull/168) | 게이트웨이 오류 응답 계약·하위 호환 회귀, CI | Worker 운영 배포 및 나머지 계약·관측 확인 별도 |
+| ST-11 | 일부 구현·검증 완료 | [#175](https://github.com/Transient-Onlooker/opencigan/pull/175) | 기본 OFF 관측 변경 통계·인증·미관측·보존 기간·관리 화면 회귀, [CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/44965076624) | 관측 횟수·공백은 확인 불가; 이상 트래픽 등 나머지 기능 및 운영 적용 별도 |
+| ST-04, ST-04A, ST-09, ST-12 ~ ST-14 | 진행 전 또는 부분 조사 | — | — | — |
 
 **끝내는 기준:** 오늘의 목표는 체크박스를 억지로 100%로 만드는 것이 아니라, 실제 구현과 자동 테스트를 가능한 한 많이 안전하게 병합하는 것이다. 원래 장기 로드맵은 보존한다.

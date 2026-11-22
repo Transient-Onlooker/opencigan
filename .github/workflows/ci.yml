@@ -19,7 +19,9 @@ jobs:
       - run: python -m unittest discover -s tests -v
       - run: python -B -m unittest discover -s clients/python/tests -v
       - run: python -m unittest test_worker test_d1_cache test_migration -v
-        working-directory: workers-api
+        working-directory: experiments/workers-api
+        env:
+          PYTHONPATH: ${{ github.workspace }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -38,6 +40,14 @@ jobs:
         working-directory: frontend
       - run: npx playwright test
         working-directory: frontend
+      - run: npx playwright test e2e/suggestions.spec.js
+        working-directory: frontend
+        env:
+          VITE_SUGGESTIONS_ENABLED: '1'
+      - run: npx playwright test e2e/history-stats.spec.js
+        working-directory: frontend
+        env:
+          VITE_HISTORY_STATS_ENABLED: '1'
       - run: npm run build
         working-directory: frontend
         env:

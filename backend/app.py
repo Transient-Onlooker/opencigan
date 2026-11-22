@@ -26,8 +26,10 @@ from backend.neis import NEISClient, School
 from backend.meal_routes import get_meals, search_meal_schools
 from backend.timetable_routes import get_timetable, search_timetable_schools
 from backend.webhook_routes import webhook_api
+from backend.suggestion_routes import suggestion_api
 from backend.calendar_routes import timetable_calendar
 from backend.history_routes import timetable_history
+from backend.history_stats_routes import history_stats
 from backend.analytics_routes import record_pageview, analytics_summary
 from backend.admin_routes import access_log_admin
 from backend.timetable import fetch_timetable, search_schools, validate_timetable_week
@@ -41,6 +43,8 @@ _analytics_lock = threading.Lock()
 _analytics_instance = None
 _access_log_instance = None
 _access_log_lock = threading.Lock()
+_suggestion_lock = threading.Lock()
+_suggestion_instance = None
 _MAX_FORWARDED_HEADER_LEN = 1024
 _MAX_FORWARDED_HOPS = 16
 
@@ -242,6 +246,24 @@ def _webhook_api(method, path, body, request_headers, client, headers):
     return webhook_api(method, path, body, request_headers, client, headers, _rate_allowed, _webhook_store)
 
 
+def _suggestion_store():
+    global _suggestion_instance
+    path = os.environ.get("OPENCIGAN_SUGGESTION_DB", "").strip()
+    if os.environ.get("OPENCIGAN_SUGGESTIONS_ENABLED") != "1" or not path:
+        return None
+    real_path = os.path.normcase(os.path.realpath(path))
+    for key in ("OPENCIGAN_HISTORY_DB", "OPENCIGAN_ACCESS_LOG_DB", "OPENCIGAN_ANALYTICS_DB"):
+        other = os.environ.get(key, "").strip()
+        if other and (real_path == os.path.normcase(os.path.realpath(other)) or
+                      (os.path.exists(path) and os.path.exists(other) and os.path.samefile(path, other))):
+            return None
+    with _suggestion_lock:
+        if _suggestion_instance is None or _suggestion_instance.path != path:
+            from backend.suggestion_store import SuggestionStore
+            _suggestion_instance = SuggestionStore(path)
+        return _suggestion_instance
+
+
 def _timetable_filters(query, require_class=False):
     return timetable_filters(query, require_class, _query_param)
 
@@ -282,7 +304,7 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
     if method == "OPTIONS":
         return preflight_response(path, headers)
 
-    if client and path in ("/api/v1/admin/analytics", "/api/v1/admin/access-logs"):
+    if client and path in ("/api/v1/admin/analytics", "/api/v1/admin/access-logs", "/api/v1/admin/history-stats"):
         retry = _rate_allowed(("admin", client))
         if retry:
             headers["Retry-After"] = str(retry)
@@ -293,6 +315,9 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
         response_headers['Content-Length'] = str(len(body))
         return status, response_headers, body
 
+    if path == '/api/v1/admin/history-stats':
+        return history_stats(method, query_string, request_headers, headers, _history_store)
+
     if path not in ("/api/v1/status", "/api/v1/admin/analytics"):
         allowed, retry_after = (shutter if shutter_instance is None else shutter_instance).check()
         if not allowed:
@@ -301,6 +326,9 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
 
     if path == "/api/v1/webhooks" or path.startswith("/api/v1/webhooks/"):
         return _webhook_api(method, path, request_body, request_headers, client, headers)
+
+    if path in ("/api/v1/suggestions", "/api/v1/admin/suggestions") or path.startswith(("/api/v1/suggestions/", "/api/v1/admin/suggestions/")):
+        return suggestion_api(method, path, query_string, request_body, request_headers, client, headers, _rate_allowed, _suggestion_store)
 
     if path == "/api/v1/analytics/pageview":
         return record_pageview(method, request_body, client, headers, _analytics_store, _rate_allowed)
@@ -423,7 +451,7 @@ class SafeRequestLogging:
 class Handler(SafeRequestLogging, BaseHTTPRequestHandler):
     def _unsupported(self):
         parts = urlsplit(self.path)
-        request_body = _read_request_body(self.rfile, self.headers.get("Content-Length")) if (self.command == "POST" and parts.path == "/api/v1/analytics/pageview") or (self.command in ("POST", "PUT") and parts.path.startswith("/api/v1/webhooks")) else None
+        request_body = _read_request_body(self.rfile, self.headers.get("Content-Length")) if (self.command == "POST" and parts.path == "/api/v1/analytics/pageview") or (self.command in ("POST", "PUT", "PATCH") and parts.path.startswith(("/api/v1/webhooks", "/api/v1/suggestions", "/api/v1/admin/suggestions"))) else None
         status_code, headers, body = dispatch_request(self.command, parts.path, parts.query, cache, self.client_address[0], self.headers.get("Origin"), request_body, {"Authorization": self.headers.get("Authorization", ""), "Referer": self.headers.get("Referer", ""), "User-Agent": self.headers.get("User-Agent", "")})
         self.send_response(status_code)
         for key, val in headers.items():
@@ -477,6 +505,7 @@ class Handler(SafeRequestLogging, BaseHTTPRequestHandler):
 
 _STATUS_PHRASES = {
     200: "200 OK",
+    201: "201 Created",
     202: "202 Accepted",
     204: "204 No Content",
     304: "304 Not Modified",
@@ -484,6 +513,7 @@ _STATUS_PHRASES = {
     401: "401 Unauthorized",
     404: "404 Not Found",
     405: "405 Method Not Allowed",
+    409: "409 Conflict",
     429: "429 Too Many Requests",
     413: "413 Payload Too Large",
     500: "500 Internal Server Error",
@@ -510,7 +540,7 @@ def make_app(cache_instance=None, trusted_proxies=None):
             client=client,
             rate_client=verified_client,
             request_origin=environ.get("HTTP_ORIGIN"),
-            request_body=_read_request_body(environ.get("wsgi.input"), environ.get("CONTENT_LENGTH")) if (method == "POST" and path == "/api/v1/analytics/pageview") or (method in ("POST", "PUT") and path.startswith("/api/v1/webhooks")) else None,
+            request_body=_read_request_body(environ.get("wsgi.input"), environ.get("CONTENT_LENGTH")) if (method == "POST" and path == "/api/v1/analytics/pageview") or (method in ("POST", "PUT", "PATCH") and path.startswith(("/api/v1/webhooks", "/api/v1/suggestions", "/api/v1/admin/suggestions"))) else None,
             request_headers={"Authorization": environ.get("HTTP_AUTHORIZATION", ""), "If-None-Match": environ.get("HTTP_IF_NONE_MATCH", ""), "Referer": environ.get("HTTP_REFERER", ""), "User-Agent": environ.get("HTTP_USER_AGENT", "")},
         )
 

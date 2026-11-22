@@ -31,4 +31,4 @@
 4. 모바일 PWA·내보내기·공유 실기기 QA
 5. 운영 DB 백업·롤백 및 원본 데이터 재제공·보존 정책 결정
 
-[전체 로드맵](roadmap.md) · [P0 상세](roadmap/core-quality.md) · [아키텍처](architecture.md)
+[전체 로드맵](../roadmap/README.md) · [P0 상세](../roadmap/core-quality.md) · [아키텍처](../architecture.md)

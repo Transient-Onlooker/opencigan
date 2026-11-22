@@ -3,14 +3,14 @@
 <body><main>
 <a class="settings-return" href="./?view=settings">← 설정으로 돌아가기</a>
 <header><a class="brand" href="./"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4M6 8l-4 4 4 4M14.5 4l-5 16"/></svg></span><span>Opencigan</span></a><h1>시간표 변경 알림</h1><p>관측된 시간표 변경을 Discord 또는 Google Chat으로 받습니다. 관측 사이의 변경은 누락될 수 있습니다.</p></header>
-<p>알림 기능은 서버에서 활성화한 경우 사용할 수 있습니다. 관리 정보는 자동 저장되지 않으므로 안전한 곳에 보관하세요.</p>
+<p>알림 기능은 서버에서 활성화한 경우 사용할 수 있습니다. 관리 정보는 브라우저에 저장되지 않으며, 관리 링크나 토큰을 다른 사람과 공유하거나 브라우저 북마크에 저장하면 관리 권한이 노출될 수 있으므로 안전한 곳에만 보관하세요.</p>
 <h2>새 구독</h2><form id="create">
 <label>학교 ID<input id="school" required maxlength="100" placeholder="학교코드:학교명"></label>
 <label>학년<input id="grade" type="number" required min="1" max="6" value="1"></label>
 <label>반<input id="classroom" type="number" required min="1" max="99" value="1"></label>
 <label>Webhook 주소<input id="destination" type="password" required maxlength="2048" autocomplete="off" placeholder="Discord 또는 Google Chat 주소"></label>
 <button type="submit">구독 만들기</button></form>
-<h2>구독 관리</h2><form id="connect"><label>구독 ID<input id="id" required autocomplete="off"></label><label>관리 토큰<input id="token" type="password" required autocomplete="off"></label><button type="submit">구독 불러오기</button><button id="lock" type="button">잠금</button></form>
+<h2>구독 관리</h2><form id="connect"><label>구독 ID<input id="id" required autocomplete="off"></label><label>관리 토큰<input id="token" type="password" required autocomplete="off"></label><button type="submit">구독 불러오기</button><button id="copy-link" type="button">관리 링크 복사</button><button id="lock" type="button">잠금</button></form>
 <p id="state" role="status" aria-live="polite"></p>
 <section id="manage" hidden aria-label="구독 설정"><h2>알림 조건</h2><p id="scope"></p><form id="filters">
 <label>과목 포함<input id="subject" maxlength="50"></label><label>교사 포함<input id="teacher" maxlength="50"></label>
@@ -18,5 +18,27 @@
 <label>교시<input id="period" type="number" min="1" max="20"></label><label>변경 유형<select id="kind"><option value="">모든 변경</option><option value="added">추가</option><option value="changed">변경</option><option value="deleted">삭제</option></select></label>
 <label>방해 금지 시작<input id="quiet-start" type="time"></label><label>방해 금지 종료<input id="quiet-end" type="time"></label><button type="submit">조건 저장</button></form>
 <p>방해 금지 시간은 한국 시간 기준입니다. 테스트 알림은 시간 설정을 무시합니다.</p><div class="actions"><button id="test" type="button">테스트 알림</button><button id="refresh" type="button">전송 상태 새로고침</button><button id="delete" type="button">구독 삭제</button></div>
-<h2>최근 전송 상태</h2><div class="scroll" tabindex="0" role="region" aria-label="전송 상태"><table><thead><tr><th scope="col">이벤트</th><th scope="col">상태</th><th scope="col">시도</th><th scope="col">응답</th></tr></thead><tbody id="deliveries"></tbody></table></div></section>
+<section id="template-editor" class="template-editor" aria-labelledby="template-title" hidden>
+<h2 id="template-title">알림 템플릿</h2>
+<p>변경 알림에 사용할 메시지를 작성하고 저장 전에 미리 볼 수 있습니다.</p>
+<div class="template-layout">
+<div class="template-controls">
+<label for="template-format">메시지 형식<select id="template-format" aria-describedby="template-format-help"><option value="text">일반 메시지</option><option value="embed">Discord 임베드</option></select></label>
+<p id="template-format-help" class="template-help">Google Chat은 일반 메시지 형식만 지원합니다.</p>
+<label for="template-body">템플릿 내용</label>
+<textarea id="template-body" rows="7" maxlength="1200" aria-describedby="template-help template-errors"></textarea>
+<p id="template-help" class="template-help">사용할 변수를 선택하거나 중괄호 형식으로 입력하세요. 최대 1,200자입니다.</p>
+<div class="template-variables" role="group" aria-label="템플릿 변수">
+<button type="button" data-template-variable="school">학교</button><button type="button" data-template-variable="grade">학년</button><button type="button" data-template-variable="classroom">반</button><button type="button" data-template-variable="date">날짜</button><button type="button" data-template-variable="period">교시</button><button type="button" data-template-variable="type">변경 유형</button><button type="button" data-template-variable="before">변경 전</button><button type="button" data-template-variable="after">변경 후</button>
+</div>
+<p id="template-errors" class="template-errors" role="alert" aria-live="polite"></p>
+<div class="template-actions"><button id="template-reset" type="button">초기화</button><button id="template-save" type="button" disabled aria-describedby="template-save-help">템플릿 저장</button></div>
+<p id="template-save-help" class="template-help">저장한 템플릿은 이후 변경 알림에 적용됩니다.</p>
+</div>
+<div class="template-preview-wrap"><h3>샘플 미리보기</h3><div id="template-preview" class="template-preview" aria-live="polite"></div><p id="template-preview-format" class="template-help"></p></div>
+</div>
+</section>
+<h2>관리 링크 교체</h2><button id="prepare-rotation" type="button">새 관리 링크 준비</button>
+<div id="rotation" hidden><p>새 링크를 먼저 안전하게 보관하세요. 교체하면 기존 링크가 작동하지 않습니다. 응답이 끊기면 보관한 새 링크와 기존 링크로 각각 확인해 주세요.</p><label>새 관리 링크<input id="rotation-link" readonly autocomplete="off"></label><button id="copy-rotation" type="button">새 링크 복사</button><label class="rotation-confirm"><input id="rotation-saved" type="checkbox"> 새 링크를 안전하게 보관했어요</label><button id="rotate-token" type="button">기존 링크 폐기하고 교체</button></div>
+<h2>최근 전송 상태</h2><div class="scroll" tabindex="0" role="region" aria-label="전송 상태"><table><thead><tr><th scope="col">이벤트</th><th scope="col">상태</th><th scope="col">시도</th><th scope="col">응답</th><th scope="col">다음 처리 시각</th></tr></thead><tbody id="deliveries"></tbody></table></div></section>
 </main><script type="module" src="/src/webhooks.ts"></script></body></html>

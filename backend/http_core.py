@@ -13,7 +13,10 @@ def make_response_headers(path, origin, request_origin):
 
 
 def preflight_response(path, headers):
-    headers["Access-Control-Allow-Methods"] = "GET, HEAD, POST, PUT, DELETE, OPTIONS" if path.startswith("/api/v1/webhooks") else "GET, HEAD, POST, OPTIONS"
+    if path == "/api/v1/admin/suggestions" or path.startswith("/api/v1/admin/suggestions/"):
+        headers["Access-Control-Allow-Methods"] = "GET, HEAD, PATCH, DELETE, OPTIONS"
+    else:
+        headers["Access-Control-Allow-Methods"] = "GET, HEAD, POST, PUT, DELETE, OPTIONS" if path.startswith("/api/v1/webhooks") else "GET, HEAD, POST, OPTIONS"
     headers["Access-Control-Allow-Headers"] = (
         "Content-Type, Authorization, If-None-Match" if path in ("/api/v1/timetable.ics", "/api/v1/timetable/history.rss")
         else "Content-Type, Authorization"
