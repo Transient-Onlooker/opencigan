@@ -11,6 +11,16 @@ interface Summary {
   routes: { route: string; requests: number; errors: number; avg_ms: number; data_failures?: number; overload_errors?: number; unclassified_server_errors?: number }[];
 }
 
+interface HistoryStatsResponse {
+  observed: boolean;
+  totalChanges: number | null;
+  byType?: { added: number; changed: number; deleted: number } | null;
+  affectedClasses?: number | null;
+  lastObservedAt?: string | null;
+  retainedSince?: string | null;
+  comparisonCoverage?: string | null;
+}
+
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const token = document.querySelector<HTMLInputElement>('#token')!;
 const days = document.querySelector<HTMLSelectElement>('#days')!;
@@ -22,6 +32,20 @@ const hourlyTable = document.querySelector<HTMLElement>('#hourly-table')!;
 const refreshState = document.querySelector<HTMLElement>('#refresh-state')!;
 const refreshTable = document.querySelector<HTMLElement>('#refresh-table')!;
 let request: AbortController | undefined;
+
+const historyStatsEnabled = import.meta.env.VITE_HISTORY_STATS_ENABLED === '1';
+const historySection = document.querySelector<HTMLElement>('#history-stats-section');
+const historyForm = document.querySelector<HTMLFormElement>('#history-stats-form');
+const historySchool = document.querySelector<HTMLInputElement>('#history-school');
+const historyWeek = document.querySelector<HTMLInputElement>('#history-week');
+const historyButton = document.querySelector<HTMLButtonElement>('#history-stats-load');
+const historyState = document.querySelector<HTMLElement>('#history-stats-state');
+const historyResults = document.querySelector<HTMLElement>('#history-stats-results');
+let historyRequest: AbortController | undefined;
+
+if (historySection && historyStatsEnabled) {
+  historySection.hidden = false;
+}
 
 function rows(selector: string, values: (string | number)[][]) {
   const body = document.querySelector(selector)!;
@@ -95,9 +119,169 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
 
 document.querySelector('#clear')!.addEventListener('click', () => {
   request?.abort(); request = undefined; button.disabled = false;
+  historyRequest?.abort(); historyRequest = undefined;
+  if (historyButton) historyButton.disabled = false;
+  if (historyResults) { historyResults.hidden = true; historyResults.replaceChildren(); }
+  if (historyState) historyState.textContent = '';
   token.value = ''; results.hidden = true;
   document.querySelector('#metrics')!.replaceChildren(); rows('#daily', []); rows('#routes', []); rows('#hourly', []);
   hourlyTable.hidden = true; hourlyState.textContent = '';
   rows('#refresh-observations', []); refreshTable.hidden = true; refreshState.textContent = '';
   state.textContent = '잠겼습니다. 다시 조회하려면 토큰을 입력하세요.'; token.focus();
 });
+
+if (historyStatsEnabled && historyForm && historySchool && historyWeek && historyButton && historyState && historyResults) {
+  historyForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const adminToken = token.value.trim();
+    if (!adminToken) {
+      historyState.textContent = '상단의 관리자 토큰을 먼저 입력해 주세요.';
+      token.focus();
+      return;
+    }
+    const school = historySchool.value.trim();
+    const week = historyWeek.value.trim();
+    if (!school) {
+      historyState.textContent = '학교 ID를 입력해 주세요.';
+      historySchool.focus();
+      return;
+    }
+    if (!week) {
+      historyState.textContent = '주 시작일을 입력해 주세요.';
+      historyWeek.focus();
+      return;
+    }
+    historyRequest?.abort();
+    const controller = new AbortController();
+    historyRequest = controller;
+    historyButton.disabled = true;
+    historyResults.hidden = true;
+    historyResults.replaceChildren();
+    historyState.textContent = '이력 통계를 불러오는 중…';
+
+    try {
+      if (!base && location.hostname.endsWith('.github.io')) throw new Error('API가 연결된 배포 주소에서 이용해 주세요.');
+      const query = new URLSearchParams({ school, week }).toString();
+      const response = await fetch(`${base}/api/v1/admin/history-stats?${query}`, {
+        headers: { Authorization: `Bearer ${adminToken}`, Accept: 'application/json' },
+        credentials: 'omit',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]),
+      });
+      if (!response.ok) {
+        throw new Error(
+          response.status === 401
+            ? '관리자 토큰을 확인해 주세요.'
+            : response.status === 400
+            ? '조회 조건이 올바르지 않습니다. 학교 ID 및 월요일 날짜(YYYY-MM-DD)를 확인해 주세요.'
+            : response.status === 503
+            ? '서버의 이력 통계 설정이나 저장소 상태를 확인해 주세요.'
+            : `조회에 실패했습니다. (${response.status})`
+        );
+      }
+      const data: HistoryStatsResponse = await response.json();
+      if (controller.signal.aborted) return;
+
+      historyResults.replaceChildren();
+      if (!data.observed) {
+        const unobservedCard = document.createElement('div');
+        const noticeHeading = document.createElement('strong');
+        noticeHeading.textContent = '미관측 (유효한 최근 관측 기록 없음)';
+        const noticeDesc = document.createElement('p');
+        noticeDesc.textContent = '선택한 학교 및 주차에 대한 최근 30일 이내 관측 기록이 존재하지 않거나 보존 기한이 만료되었습니다.';
+        unobservedCard.append(noticeHeading, noticeDesc);
+        if (data.retainedSince) {
+          const limitInfo = document.createElement('p');
+          limitInfo.textContent = `30일 보존 한계: ${new Date(data.retainedSince).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} 이후 기록만 반영`;
+          unobservedCard.append(limitInfo);
+        }
+        historyResults.append(unobservedCard);
+        historyResults.hidden = false;
+        historyState.textContent = '조회 완료 (미관측)';
+      } else {
+        const metricsContainer = document.createElement('div');
+        metricsContainer.className = 'metrics';
+
+        if (!Number.isInteger(data.totalChanges) || data.totalChanges === null || data.totalChanges < 0) {
+          throw new Error('서버의 통계 응답이 올바르지 않습니다.');
+        }
+        const total = data.totalChanges;
+        const changeCard = document.createElement('div');
+        const changeLabel = document.createElement('span');
+        changeLabel.textContent = '보존된 관측 변경';
+        const changeVal = document.createElement('strong');
+        changeVal.textContent = `${total.toLocaleString('ko-KR')}건`;
+        changeCard.append(changeLabel, changeVal);
+        metricsContainer.append(changeCard);
+
+        const classCard = document.createElement('div');
+        const classLabel = document.createElement('span');
+        classLabel.textContent = '영향 학급 수';
+        const classVal = document.createElement('strong');
+        classVal.textContent = typeof data.affectedClasses === 'number' ? `${data.affectedClasses.toLocaleString('ko-KR')}개 학급` : '—';
+        classCard.append(classLabel, classVal);
+        metricsContainer.append(classCard);
+
+        if (data.byType) {
+          const addedCard = document.createElement('div');
+          const addedLabel = document.createElement('span');
+          addedLabel.textContent = '추가';
+          const addedVal = document.createElement('strong');
+          addedVal.textContent = `${(data.byType.added ?? 0).toLocaleString('ko-KR')}건`;
+          addedCard.append(addedLabel, addedVal);
+          metricsContainer.append(addedCard);
+
+          const modCard = document.createElement('div');
+          const modLabel = document.createElement('span');
+          modLabel.textContent = '변경';
+          const modVal = document.createElement('strong');
+          modVal.textContent = `${(data.byType.changed ?? 0).toLocaleString('ko-KR')}건`;
+          modCard.append(modLabel, modVal);
+          metricsContainer.append(modCard);
+
+          const delCard = document.createElement('div');
+          const delLabel = document.createElement('span');
+          delLabel.textContent = '삭제';
+          const delVal = document.createElement('strong');
+          delVal.textContent = `${(data.byType.deleted ?? 0).toLocaleString('ko-KR')}건`;
+          delCard.append(delLabel, delVal);
+          metricsContainer.append(delCard);
+        }
+
+        const infoDiv = document.createElement('div');
+        infoDiv.style.marginTop = '12px';
+
+        if (total === 0) {
+          const zeroNotice = document.createElement('p');
+          zeroNotice.textContent = '저장된 변경 기록 0건 · 비교 횟수와 관측 공백은 알 수 없음';
+          infoDiv.append(zeroNotice);
+        }
+
+        if (data.lastObservedAt) {
+          const obsP = document.createElement('p');
+          obsP.textContent = `마지막 관측 시각 (한국): ${new Date(data.lastObservedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`;
+          infoDiv.append(obsP);
+        }
+        if (data.retainedSince) {
+          const retainP = document.createElement('p');
+          retainP.textContent = `30일 보존 한계: ${new Date(data.retainedSince).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} 이후 관측된 변경만 포함`;
+          infoDiv.append(retainP);
+        }
+        const noteP = document.createElement('p');
+        noteP.textContent = '최근 30일 이내에 저장된 관측 변경만 집계하며 수집 사이 변경이나 보존 기한이 지난 변경은 포함되지 않습니다.';
+        infoDiv.append(noteP);
+
+        historyResults.append(metricsContainer, infoDiv);
+        historyResults.hidden = false;
+        historyState.textContent = `조회 완료 · ${new Date().toLocaleTimeString('ko-KR')}`;
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        historyState.textContent = error instanceof Error ? error.message : '이력 통계를 불러오지 못했습니다.';
+      }
+    } finally {
+      if (historyRequest === controller) historyButton.disabled = false;
+    }
+  });
+}
