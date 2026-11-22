@@ -52,6 +52,9 @@ test('notification settings link follows theme, keyboard and mobile layout', asy
   await page.route('**/webhooks.html', (route) => route.fulfill({ contentType: 'text/html; charset=utf-8', body: '<h1>알림 관리</h1>' }));
   await page.goto('/');
   await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('개발자용 · 연동', { exact: true }).click();
+  await expect(page.locator('#settings-panel').getByRole('link', { name: 'API 문서' })).toHaveAttribute('href', './api-docs.html');
+  await expect(page.locator('#settings-panel').getByRole('link', { name: '시간표 위젯 만들기' })).toHaveAttribute('href', './embed-builder.html');
   const link = page.getByRole('link', { name: '시간표 변경 알림 관리' });
   await expect(link).toHaveAttribute('href', './webhooks.html');
   for (const width of [320, 390, 800, 1366]) {

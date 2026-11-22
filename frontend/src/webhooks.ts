@@ -140,7 +140,7 @@ function templatePayload() {
 
 function setPreview(payload: Record<string, unknown>) {
   const embed = Array.isArray(payload.embeds);
-  const content = payload.content ?? payload.text ?? (embed
+  const content = payload.content ?? payload.text ?? (Array.isArray(payload.embeds)
     ? (payload.embeds[0] as Record<string, unknown> | undefined)?.description
     : '');
   templatePreview.value = typeof content === 'string' ? content : '';
