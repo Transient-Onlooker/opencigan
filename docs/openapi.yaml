@@ -394,9 +394,17 @@ paths:
                 properties:
                   accepted: { const: true }
         '400': { $ref: '#/components/responses/BadRequest' }
-        '413': { description: Body exceeds 4096 bytes. }
+        '413':
+          description: Body exceeds 4096 bytes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Analytics disabled or storage temporarily unavailable. }
+        '503':
+          description: Analytics disabled or storage temporarily unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /api/v1/admin/analytics:
     get:
       tags: [System]
