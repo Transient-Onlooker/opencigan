@@ -6,6 +6,9 @@ const READ_PATHS = new Set([
   '/api/v1/timetable/history.rss', '/api/v1/meals',
   '/api/v1/admin/analytics', '/api/v1/admin/access-logs',
 ]);
+// Suggestion intake stays OFF unless Pi persistence and edge budget are configured.
+const SUGGESTION_ITEM = /^\/api\/v1\/suggestions\/[A-Za-z0-9_-]{24}$/;
+const SUGGESTION_ADMIN_ITEM = /^\/api\/v1\/admin\/suggestions\/[A-Za-z0-9_-]{24}$/;
 const MAX_BODY_BYTES = 4096;
 const FORWARD_HEADERS = [
   'accept', 'accept-language', 'authorization', 'content-type', 'origin',
@@ -67,6 +70,10 @@ export default {
     const webhook = path.match(/^\/api\/v1\/webhooks\/([A-Za-z0-9_-]{24})(\/deliveries|\/test|\/rotate|\/template(?:\/preview)?)?$/);
     let methods;
     if (READ_PATHS.has(path)) methods = ['GET', 'HEAD'];
+    else if (path === '/api/v1/suggestions') methods = ['GET', 'HEAD', 'POST'];
+    else if (SUGGESTION_ITEM.test(path)) methods = ['GET', 'HEAD'];
+    else if (path === '/api/v1/admin/suggestions') methods = ['GET', 'HEAD'];
+    else if (SUGGESTION_ADMIN_ITEM.test(path)) methods = ['PATCH', 'DELETE'];
     else if (path === '/api/v1/analytics/pageview' || path === '/api/v1/webhooks') methods = ['POST'];
     else if (webhook?.[2] === '/deliveries') methods = ['GET', 'HEAD'];
     else if (webhook?.[2] === '/test' || webhook?.[2] === '/rotate' || webhook?.[2] === '/template/preview') methods = ['POST'];
@@ -99,13 +106,16 @@ export default {
         ? 'CALENDAR_RATE' : path === '/api/v1/timetable' ? 'TIMETABLE_RATE'
         : path === '/api/v1/meals' ? 'MEAL_RATE'
         : path.startsWith('/api/v1/admin/') ? 'ADMIN_RATE'
+        : path === '/api/v1/suggestions' || SUGGESTION_ITEM.test(path) ? 'SUGGESTION_RATE'
         : path === '/api/v1/webhooks' || webhook ? 'WEBHOOK_RATE' : null;
       const categoryLimiter = category ? env[category] : null;
       if (category && !categoryLimiter) return error('gateway_unconfigured', 503);
       try {
         const { success } = await (search ? env.SEARCH_RATE : env.GENERAL_RATE).limit({ key: clientKey });
+        const categoryKey = category === 'SUGGESTION_RATE'
+          ? `${request.method === 'POST' ? 'write' : 'read'}:${clientKey}` : clientKey;
         const categoryAllowed = success && categoryLimiter
-          ? (await categoryLimiter.limit({ key: clientKey })).success : true;
+          ? (await categoryLimiter.limit({ key: categoryKey })).success : true;
         if (!success || !categoryAllowed) {
           return error('edge_rate_limited', 429, { 'Retry-After': '60' });
         }
