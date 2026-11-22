@@ -8,8 +8,9 @@
 | --- | --- |
 | **[공식 웹사이트 · opencigan.mcv.kr](https://opencigan.mcv.kr/)** | 기본 접속 주소 (Cloudflare Pages 사용자 지정 도메인) |
 | **[보조 접속 주소 · opencigan.pages.dev](https://opencigan.pages.dev/)** | 동일한 웹앱의 Cloudflare Pages 기본 도메인 |
+| **[API 서버 · 오픈시간.서버.한국](https://xn--s39a564b8jcxrw.xn--hk3b17f.xn--3e0b707e/)** | OpenCigan API 서버 도메인 |
 
-두 주소는 **동일한 백엔드 경로를 공유**합니다. 보조 주소가 독립적인 API 서버나 완전한 장애 대비 경로를 의미하지는 않습니다.
+두 Pages 주소는 **동일한 웹앱과 백엔드 경로를 공유**합니다. 보조 주소가 독립적인 API 서버나 완전한 장애 대비 경로를 의미하지는 않습니다. 별도 API 서버 도메인은 위 표의 주소를 참고하세요.
 
 [문제 제보](https://github.com/Transient-Onlooker/opencigan/issues) · [개발 로드맵](docs/roadmap/README.md) · [오늘의 집중 개발](docs/roadmap/short-term-2026-11-21.md) · [기여 가이드](CONTRIBUTING.md)
 
