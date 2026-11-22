@@ -161,3 +161,72 @@ class WebhookApiTests(unittest.TestCase):
             self.assertEqual(len(WebhookStore(self.path).deliveries(created["id"], created["token"])), 1)
             history.observe(self.payload["school"], "2026-11-16", [{**lesson, "subject": "영어", "teacher": "박"}], now + timedelta(seconds=2))
             self.assertEqual(len(WebhookStore(self.path).deliveries(created["id"], created["token"])), 1)
+
+    def test_rotate_management_token_via_api(self):
+        with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
+            _, _, body = self.request("POST", "/api/v1/webhooks", self.payload)
+            created1 = json.loads(body)
+            id1, old_token1 = created1["id"], created1["token"]
+
+            # Create second subscription to verify it remains unaffected
+            payload2 = {**self.payload, "class": 4}
+            _, _, body2 = self.request("POST", "/api/v1/webhooks", payload2)
+            created2 = json.loads(body2)
+            id2, token2 = created2["id"], created2["token"]
+
+            path1 = f"/api/v1/webhooks/{id1}/rotate"
+            new_token1 = 'b' * 43
+            rotation = {"newToken": new_token1}
+
+            # Non-POST methods rejected
+            for method in ("GET", "PUT", "DELETE"):
+                self.assertEqual(self.request(method, path1, token=old_token1)[0], 405)
+
+            # Unauthorized requests rejected
+            self.assertEqual(self.request("POST", path1, payload=rotation, token=None)[0], 401)
+            self.assertEqual(self.request("POST", path1, payload=rotation, token="invalid_token_value_not_matching_hex_or_hash")[0], 401)
+
+            # Reject non-empty payload
+            self.assertEqual(self.request("POST", path1, payload={"extra": 1}, token=old_token1)[0], 400)
+
+            # Successful rotation
+            status, headers, rotate_body = self.request("POST", path1, payload=rotation, token=old_token1)
+            self.assertEqual(status, 200)
+            self.assertEqual(headers["Cache-Control"], "no-store")
+            rotated = json.loads(rotate_body)
+            self.assertEqual(rotated, {"rotated": True})
+            self.assertNotEqual(old_token1, new_token1)
+            self.assertNotIn(old_token1.encode(), rotate_body)
+            self.assertNotIn(new_token1.encode(), rotate_body)
+
+            # Even if the response is lost, the caller already knows the new token.
+            self.assertEqual(self.request("GET", f"/api/v1/webhooks/{id1}", token=new_token1)[0], 200)
+
+            # Old token immediately rejected across all endpoints
+            self.assertEqual(self.request("GET", f"/api/v1/webhooks/{id1}", token=old_token1)[0], 401)
+            self.assertEqual(self.request("POST", path1, payload={"newToken": 'c' * 43}, token=old_token1)[0], 401)
+            self.assertEqual(self.request("DELETE", f"/api/v1/webhooks/{id1}", token=old_token1)[0], 401)
+
+            # New token accepted
+            status_get, _, body_get = self.request("GET", f"/api/v1/webhooks/{id1}", token=new_token1)
+            self.assertEqual(status_get, 200)
+            self.assertEqual(json.loads(body_get)["classroom"], 3)
+
+            # Second subscription completely unaffected
+            status2, _, body2_check = self.request("GET", f"/api/v1/webhooks/{id2}", token=token2)
+            self.assertEqual(status2, 200)
+            self.assertEqual(json.loads(body2_check)["classroom"], 4)
+
+    def test_rotation_wsgi_forwards_candidate_and_auth(self):
+        with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
+            _, _, body = self.request("POST", "/api/v1/webhooks", self.payload)
+            created = json.loads(body)
+            payload = json.dumps({"newToken": "c" * 43}).encode()
+            environ = {"REQUEST_METHOD": "POST", "PATH_INFO": f"/api/v1/webhooks/{created['id']}/rotate",
+                       "QUERY_STRING": "", "REMOTE_ADDR": "127.0.0.1", "CONTENT_LENGTH": str(len(payload)),
+                       "HTTP_AUTHORIZATION": "Bearer " + created['token'], "wsgi.input": io.BytesIO(payload)}
+            statuses = []
+            result = b''.join(make_app()(environ, lambda status, headers: statuses.append(status)))
+            self.assertEqual(statuses, ['200 OK'])
+            self.assertEqual(json.loads(result), {"rotated": True})
+            self.assertEqual(self.request("GET", f"/api/v1/webhooks/{created['id']}", token="c" * 43)[0], 200)

@@ -190,6 +190,21 @@ class WebhookStore:
         result["filters"] = json.loads(result.pop("filters_json"))
         return result
 
+    def rotate(self, identifier, token, new_token):
+        new_hash = self._token_hash(new_token)
+        if not new_hash or new_hash == self._token_hash(token):
+            raise ValueError("invalid new token")
+        with closing(self._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                updated = db.execute("UPDATE webhook_subscriptions SET token_hash=? WHERE id=? AND token_hash=?",
+                                     (new_hash, identifier, self._token_hash(token))).rowcount == 1
+                db.execute("COMMIT")
+                return {"rotated": True} if updated else None
+            except BaseException:
+                db.execute("ROLLBACK")
+                raise
+
     def update_filters(self, identifier, token, filters):
         validate_filters(filters)
         with closing(self._connect()) as db:

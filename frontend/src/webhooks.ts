@@ -21,6 +21,7 @@ let templateProvider = '';
 let previewTimer = 0;
 let previewRevision = 0;
 let controller = new AbortController();
+let rotationToken = '';
 
 async function call(path: string, method = 'GET', payload?: unknown, authenticated = true) {
   if (!base && location.hostname.endsWith('.github.io')) throw new Error('API가 연결된 배포 주소에서 이용해 주세요.');
@@ -51,6 +52,7 @@ function reset() {
   window.clearTimeout(previewTimer);
   previewRevision += 1;
   input('id').value = ''; input('token').value = ''; input('destination').value = '';
+  clearRotation();
   manage.hidden = true; table.replaceChildren();
   document.querySelector<HTMLFormElement>('#filters')!.reset(); document.querySelector('#scope')!.textContent = '';
   templateProvider = ''; templateBody.value = templateDefaults; templateFormat.value = 'text';
@@ -58,6 +60,11 @@ function reset() {
   templateBody.removeAttribute('aria-invalid'); templatePreview.value = '';
   templatePreview.dataset.format = 'text'; templatePreview.dataset.invalid = 'false'; templatePreviewFormat.textContent = '';
   buttons.forEach((button) => { button.disabled = false; });
+}
+
+function clearRotation() {
+  rotationToken = ''; input('rotation-link').value = ''; input('rotation-saved').checked = false;
+  document.querySelector<HTMLElement>('#rotation')!.hidden = true;
 }
 
 async function loadDeliveries(path: string) {
@@ -236,7 +243,45 @@ document.querySelector('#create')!.addEventListener('submit', (event) => {
 });
 document.querySelector('#connect')!.addEventListener('submit', (event) => { event.preventDefault(); input('token').type = 'password'; void run(load); });
 document.querySelector('#copy-link')?.addEventListener('click', () => { void run(copyLink); });
-for (const id of ['id', 'token']) input(id).addEventListener('input', () => { manage.hidden = true; table.replaceChildren(); });
+for (const id of ['id', 'token']) input(id).addEventListener('input', () => { manage.hidden = true; table.replaceChildren(); clearRotation(); });
+document.querySelector('#prepare-rotation')!.addEventListener('click', () => {
+  try {
+    subscriptionPath();
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    rotationToken = btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    input('rotation-link').value = `${location.origin}${location.pathname}#id=${input('id').value.trim()}&token=${rotationToken}`;
+    input('rotation-saved').checked = false;
+    document.querySelector<HTMLElement>('#rotation')!.hidden = false;
+    state.textContent = '새 링크를 안전하게 보관한 다음 교체하세요.';
+  } catch { state.textContent = '새 관리 링크를 준비하지 못했어요.'; }
+});
+document.querySelector('#copy-rotation')!.addEventListener('click', () => { void run(async () => {
+  await navigator.clipboard.writeText(input('rotation-link').value);
+  state.textContent = '새 링크를 복사했어요. 다른 사람과 공유하지 마세요.';
+}); });
+document.querySelector('#rotate-token')!.addEventListener('click', () => {
+  if (!rotationToken || !input('rotation-saved').checked) { state.textContent = '새 링크를 먼저 안전하게 보관해 주세요.'; return; }
+  if (!window.confirm('기존 관리 링크가 작동하지 않게 됩니다. 교체할까요?')) return;
+  void run(async () => {
+    const newToken = rotationToken;
+    const active = controller;
+    const originalId = input('id').value;
+    const originalToken = input('token').value;
+    try {
+      const result = await call(`${subscriptionPath()}/rotate`, 'POST', { newToken });
+      if (active.signal.aborted) return;
+      if (result?.rotated !== true) throw new Error('invalid rotation response');
+      if (input('id').value !== originalId || input('token').value !== originalToken) {
+        state.textContent = '이전 구독의 관리 링크가 교체됐어요. 보관한 새 링크를 사용해 주세요.';
+        return;
+      }
+      input('token').value = newToken; input('token').type = 'password'; clearRotation();
+      state.textContent = '관리 링크를 교체했어요. 이전 링크는 작동하지 않습니다.';
+    } catch {
+      if (!active.signal.aborted) state.textContent = '교체 결과를 확인하지 못했어요. 보관한 새 링크와 기존 링크로 각각 확인해 주세요.';
+    }
+  });
+});
 document.querySelector('#filters')!.addEventListener('submit', (event) => {
   event.preventDefault(); void run(async () => {
     const filters: Record<string, unknown> = {};
