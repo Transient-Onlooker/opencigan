@@ -138,6 +138,9 @@ class WebhookStoreTests(unittest.TestCase):
         self.assertEqual(rotated, {"rotated": True})
         self.assertNotEqual(old_token, new_token)
         self.assertEqual(len(new_token), 43)
+        with closing(sqlite3.connect(self.path)) as db:
+            stored = db.execute("SELECT token_hash FROM webhook_subscriptions WHERE id=?", (identifier,)).fetchone()[0]
+        self.assertNotEqual(stored, new_token)
 
         # Old token immediately revoked
         self.assertIsNone(self.store.get(identifier, old_token))
