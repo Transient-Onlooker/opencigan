@@ -152,7 +152,7 @@ test('rotation requires saving the new link before revoking the old token', asyn
     const request = route.request(), url = new URL(request.url());
     if (url.pathname.endsWith('/rotate')) {
       rotations.push({ body: request.postDataJSON(), authorization: request.headers().authorization });
-      return route.fulfill({ json: { rotated: true } });
+      return route.fulfill({ json: rotations.length === 1 ? {} : { rotated: true } });
     }
     if (url.pathname.endsWith('/deliveries')) return route.fulfill({ json: { deliveries: [] } });
     return route.fulfill({ json: { school: '2:예시학교', grade: 2, classroom: 3, provider: 'discord', dropped_events: 0, filters: {} } });
@@ -171,8 +171,13 @@ test('rotation requires saving the new link before revoking the old token', asyn
   await page.getByLabel('새 링크를 안전하게 보관했어요').check();
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: '기존 링크 폐기하고 교체' }).click();
+  await expect(page.getByRole('status')).toContainText('결과를 확인하지 못했어요');
+  await expect(page.getByLabel('관리 토큰')).toHaveValue(oldToken);
+  await expect(page.getByLabel('새 관리 링크', { exact: true })).toHaveValue(link);
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: '기존 링크 폐기하고 교체' }).click();
   await expect(page.getByRole('status')).toContainText('교체했어요');
-  expect(rotations).toEqual([{ body: { newToken }, authorization: `Bearer ${oldToken}` }]);
+  expect(rotations).toEqual(Array(2).fill({ body: { newToken }, authorization: `Bearer ${oldToken}` }));
   await expect(page.getByLabel('관리 토큰')).toHaveValue(newToken);
   expect(await page.evaluate(() => JSON.stringify({ local: localStorage, session: sessionStorage, url: location.href }))).not.toContain(newToken);
 });
