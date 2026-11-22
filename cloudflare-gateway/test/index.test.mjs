@@ -249,6 +249,25 @@ test('gateway failure diagnostics distinguish stages without logging request dat
   }
 });
 
+test('injected private fetch continues after the incoming request is aborted', async () => {
+  const { env } = setup();
+  const incoming = new AbortController();
+  let started, release;
+  const startedPromise = new Promise(resolve => { started = resolve; });
+  const pendingResponse = new Promise(resolve => { release = resolve; });
+  env.PRIVATE_API.fetch = async (outbound) => {
+    started(outbound);
+    return pendingResponse;
+  };
+  const pending = worker.fetch(req('/api/v1/status', { signal: incoming.signal }), env);
+  const outbound = await startedPromise;
+  incoming.abort();
+  assert.equal(incoming.signal.aborted, true);
+  assert.equal(outbound.signal.aborted, false);
+  release(new Response('ok'));
+  assert.equal((await pending).status, 200);
+});
+
 test('webhook PUT preserves authorization and JSON body', async () => {
   const { env, calls } = setup();
   const response = await worker.fetch(req('/api/v1/webhooks/abcdefghijklmnopqrstuvwx', {
