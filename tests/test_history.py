@@ -59,6 +59,29 @@ class HistoryTests(unittest.TestCase):
         self.assertEqual(stats['totalChanges'], 0)
         self.assertEqual(stats['comparisonCoverage'], 'unknown')
 
+    def test_subject_periods_count_observed_class_slots_not_duplicate_teachers(self):
+        base = datetime.now(timezone.utc)
+        self.assertIsNone(self.store.change_stats('s', 'w')['subjectPeriods'])
+        records = [lesson('Math', 'A'), lesson('Math', 'B'), lesson('Art', 'C'),
+                   {**lesson('Math', 'D'), 'class': 3}, lesson('Science', 'A', period=2),
+                   lesson('', 'A', period=3)]
+        self.store.observe('s', 'w', records, base)
+        self.store.observe('other', 'w', [lesson('Math', 'A')], base)
+        self.assertEqual(self.store.change_stats('s', 'w')['subjectPeriods'], [
+            {'subject': 'Math', 'classPeriods': 2},
+            {'subject': 'Art', 'classPeriods': 1},
+            {'subject': 'Science', 'classPeriods': 1},
+        ])
+        self.store.observe('s', 'w', [lesson('Music')], base + timedelta(seconds=1))
+        self.assertEqual(self.store.change_stats('s', 'w')['subjectPeriods'], [
+            {'subject': 'Music', 'classPeriods': 1},
+        ])
+        with closing(sqlite3.connect(self.store.path)) as db:
+            db.execute('UPDATE observed_weeks SET observed_at=? WHERE school=? AND week=?',
+                       ((base - timedelta(days=31)).isoformat(), 's', 'w'))
+            db.commit()
+        self.assertIsNone(self.store.change_stats('s', 'w')['subjectPeriods'])
+
     def test_existing_snapshot_migrates_once_and_retains_baseline(self):
         path = Path(self.temp.name) / "legacy.sqlite"
         db = sqlite3.connect(path)

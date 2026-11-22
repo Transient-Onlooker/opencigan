@@ -110,9 +110,13 @@ test('enabled history stats: fetches stats, handles observed=false and observed=
     lastObservedAt: '2026-11-16T10:00:00+00:00',
     retainedSince: '2026-10-23T00:00:00+00:00',
     comparisonCoverage: 'unknown',
+    subjectPeriods: [{ subject: '<img src=x onerror=alert(1)>', classPeriods: 2 }, { subject: '수학', classPeriods: 3 }],
   };
   await page.locator('#history-stats-load').click();
   await expect(resultsContainer).toContainText('12건');
+  await expect(resultsContainer).toContainText('수학: 3학급 교시');
+  await expect(resultsContainer).toContainText('<img src=x onerror=alert(1)>: 2학급 교시');
+  await expect(resultsContainer.locator('img')).toHaveCount(0);
   await expect(resultsContainer).toContainText('보존된 관측 변경');
   await expect(resultsContainer).toContainText('3개 학급');
   await expect(resultsContainer).toContainText('5건');
