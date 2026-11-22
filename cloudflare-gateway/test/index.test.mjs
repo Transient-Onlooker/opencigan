@@ -216,6 +216,39 @@ test('preflight limiter failure returns 503 and never forwards to Pi', async () 
   assert.equal(calls.length, 0);
 });
 
+test('gateway failure diagnostics distinguish stages without logging request data', async () => {
+  const warnings = [];
+  const original = console.warn;
+  console.warn = (...args) => warnings.push(args);
+  try {
+    const request = () => req('/api/v1/timetable?school=private-school', {
+      headers: { 'CF-Connecting-IP': '203.0.113.9', Authorization: 'Bearer private-token' },
+    });
+    const limiter = setup().env;
+    limiter.GENERAL_RATE.limit = async () => { throw new Error('private-limiter-error'); };
+    assert.equal((await worker.fetch(request(), limiter)).status, 503);
+    const preflight = setup().env;
+    preflight.GENERAL_RATE.limit = limiter.GENERAL_RATE.limit;
+    assert.equal((await worker.fetch(req('/api/v1/timetable', { method: 'OPTIONS' }), preflight)).status, 503);
+    const signing = setup().env;
+    signing.PROXY_IP_SIGNING_KEY = 'short';
+    assert.equal((await worker.fetch(request(), signing)).status, 503);
+    const upstream = setup({ failFetch: true }).env;
+    assert.equal((await worker.fetch(request(), upstream)).status, 503);
+    assert.deepEqual(warnings.slice(0, 2), [
+      ['gateway_failure stage=request_limit'], ['gateway_failure stage=preflight_limit'],
+    ]);
+    assert.deepEqual(warnings.slice(2).map(args => args.slice(0, 2)), [
+      ['gateway_failure stage=%s elapsed_ms=%d', 'signing'],
+      ['gateway_failure stage=%s elapsed_ms=%d', 'private_fetch'],
+    ]);
+    for (const args of warnings.slice(2)) assert.ok(Number.isInteger(args[2]) && args[2] >= 0);
+    assert.doesNotMatch(JSON.stringify(warnings), /private-school|private-token|203\.0\.113\.9|private-limiter-error/);
+  } finally {
+    console.warn = original;
+  }
+});
+
 test('webhook PUT preserves authorization and JSON body', async () => {
   const { env, calls } = setup();
   const response = await worker.fetch(req('/api/v1/webhooks/abcdefghijklmnopqrstuvwx', {

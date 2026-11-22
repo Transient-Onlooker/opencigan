@@ -98,6 +98,7 @@ export default {
         const { success } = await env.GENERAL_RATE.limit({ key: `preflight:${clientKey}` });
         if (!success) return error('edge_rate_limited', 429, { 'Retry-After': '60' });
       } catch {
+        console.warn('gateway_failure stage=preflight_limit');
         return error('gateway_unavailable', 503);
       }
     } else {
@@ -120,6 +121,7 @@ export default {
           return error('edge_rate_limited', 429, { 'Retry-After': '60' });
         }
       } catch {
+        console.warn('gateway_failure stage=request_limit');
         return error('gateway_unavailable', 503);
       }
     }
@@ -159,8 +161,11 @@ export default {
     // Never forward untrusted visitor-supplied IP headers to Pi.
     // Only this Worker may create authenticated client IP headers.
     const destination = new URL(url.pathname + url.search, ORIGIN);
+    let stage = 'signing';
+    const started = performance.now();
     try {
       await attachSignedClientIp(headers, request, env, url, clientKey);
+      stage = 'private_fetch';
       const outbound = new Request(destination, {
         method: request.method,
         headers,
@@ -170,6 +175,7 @@ export default {
       });
       return await env.PRIVATE_API.fetch(outbound);
     } catch {
+      console.warn('gateway_failure stage=%s elapsed_ms=%d', stage, Math.max(0, Math.round(performance.now() - started)));
       return error('gateway_unavailable', 503);
     }
   },
