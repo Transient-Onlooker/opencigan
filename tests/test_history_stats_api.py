@@ -63,6 +63,7 @@ class HistoryStatsApiTests(unittest.TestCase):
             self.assertEqual(result['totalChanges'], 1)
             self.assertEqual(result['byType']['changed'], 1)
             self.assertEqual(result['subjectPeriods'], [{'subject': 'Science', 'classPeriods': 1}])
+            self.assertEqual(result['teacherOverlaps'], [])
 
     def test_wsgi_forwards_admin_authentication(self):
         environ = {'REQUEST_METHOD': 'GET', 'PATH_INFO': self.path, 'QUERY_STRING': self.query,

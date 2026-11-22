@@ -166,7 +166,7 @@ class HistoryStore:
             if observed is None:
                 return {"observed": False, "totalChanges": None, "byType": None,
                         "affectedClasses": None, "lastObservedAt": None, "retainedSince": cutoff,
-                        "comparisonCoverage": "unknown", "subjectPeriods": None}
+                        "comparisonCoverage": "unknown", "subjectPeriods": None, "teacherOverlaps": None}
             rows = db.execute(
                 "SELECT type, COUNT(*) AS count FROM changes WHERE school=? AND week=? AND observed_at>=? GROUP BY type",
                 (school, week, cutoff),
@@ -184,11 +184,30 @@ class HistoryStore:
                     FROM snapshot_lessons WHERE school=? AND week=? AND TRIM(subject) != ''
                 ) GROUP BY subject ORDER BY periods DESC, subject ASC
             """, (school, week)).fetchall()
+            overlap_rows = db.execute("""
+                WITH slots AS (
+                    SELECT DISTINCT date, period, TRIM(teacher) AS teacher, grade, class_number
+                    FROM snapshot_lessons WHERE school=? AND week=? AND TRIM(teacher) != ''
+                ), overlaps AS (
+                    SELECT date, period, teacher FROM slots
+                    GROUP BY date, period, teacher HAVING COUNT(*) > 1
+                )
+                SELECT slots.date, slots.period, slots.teacher, slots.grade, slots.class_number
+                FROM slots JOIN overlaps USING (date, period, teacher)
+                ORDER BY slots.date, slots.period, slots.teacher, slots.grade, slots.class_number
+            """, (school, week)).fetchall()
+            teacher_overlaps = []
+            for row in overlap_rows:
+                if not teacher_overlaps or (row["date"], row["period"], row["teacher"]) != (
+                        teacher_overlaps[-1]["date"], teacher_overlaps[-1]["period"], teacher_overlaps[-1]["teacher"]):
+                    teacher_overlaps.append({"date": row["date"], "period": row["period"],
+                                             "teacher": row["teacher"], "classes": []})
+                teacher_overlaps[-1]["classes"].append({"grade": row["grade"], "class": row["class_number"]})
             return {"observed": True, "totalChanges": sum(by_type.values()), "byType": by_type,
                     "affectedClasses": count, "lastObservedAt": observed["observed_at"], "retainedSince": cutoff,
                     "comparisonCoverage": "unknown",
                     "subjectPeriods": [{"subject": row["subject"], "classPeriods": row["periods"]}
-                                       for row in subject_periods]}
+                                       for row in subject_periods], "teacherOverlaps": teacher_overlaps}
 
     def list(self, school, week, cursor=None, limit=50, grade=None, classroom=None, include_ids=False, filters=None):
         if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:

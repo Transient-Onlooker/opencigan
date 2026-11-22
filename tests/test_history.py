@@ -62,6 +62,7 @@ class HistoryTests(unittest.TestCase):
     def test_subject_periods_count_observed_class_slots_not_duplicate_teachers(self):
         base = datetime.now(timezone.utc)
         self.assertIsNone(self.store.change_stats('s', 'w')['subjectPeriods'])
+
         records = [lesson('Math', 'A'), lesson('Math', 'B'), lesson('Art', 'C'),
                    {**lesson('Math', 'D'), 'class': 3}, lesson('Science', 'A', period=2),
                    lesson('', 'A', period=3)]
@@ -81,6 +82,21 @@ class HistoryTests(unittest.TestCase):
                        ((base - timedelta(days=31)).isoformat(), 's', 'w'))
             db.commit()
         self.assertIsNone(self.store.change_stats('s', 'w')['subjectPeriods'])
+
+    def test_teacher_overlaps_distinguish_unknown_and_distinct_classes(self):
+        base = datetime.now(timezone.utc)
+        self.assertIsNone(self.store.change_stats('s', 'w')['teacherOverlaps'])
+        first = lesson('Math', 'Kim')
+        records = [first, {**first, 'subject': 'Art'}, {**first, 'class': 3},
+                   {**first, 'class': 4, 'teacher': ''}, {**first, 'class': 5, 'period': 2}]
+        self.store.observe('s', 'w', records, base)
+        self.store.observe('other', 'w', [{**first, 'class': 6}], base)
+        self.assertEqual(self.store.change_stats('s', 'w')['teacherOverlaps'], [{
+            'date': first['date'], 'period': 1, 'teacher': 'Kim',
+            'classes': [{'grade': 1, 'class': 2}, {'grade': 1, 'class': 3}],
+        }])
+        self.store.observe('s', 'w', [first], base + timedelta(seconds=1))
+        self.assertEqual(self.store.change_stats('s', 'w')['teacherOverlaps'], [])
 
     def test_existing_snapshot_migrates_once_and_retains_baseline(self):
         path = Path(self.temp.name) / "legacy.sqlite"

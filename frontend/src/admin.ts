@@ -20,6 +20,7 @@ interface HistoryStatsResponse {
   retainedSince?: string | null;
   comparisonCoverage?: string | null;
   subjectPeriods?: { subject: string; classPeriods: number }[] | null;
+  teacherOverlaps?: { date: string; period: number; teacher: string; classes: { grade: number; class: number }[] }[] | null;
 }
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
@@ -293,6 +294,36 @@ if (historyStatsEnabled && historyForm && historySchool && historyWeek && histor
             for (const item of data.subjectPeriods) {
               const row = document.createElement('li');
               row.textContent = `${item.subject}: ${item.classPeriods.toLocaleString('ko-KR')}학급 교시`;
+              list.append(row);
+            }
+            section.append(list);
+          }
+          historyResults.append(section);
+        }
+        if (data.teacherOverlaps !== undefined && data.teacherOverlaps !== null) {
+          if (!Array.isArray(data.teacherOverlaps) || data.teacherOverlaps.some(item =>
+            !item || typeof item.teacher !== 'string' || !item.teacher.trim() || typeof item.date !== 'string' ||
+            !/^\d{4}-\d{2}-\d{2}$/.test(item.date) || !Number.isInteger(item.period) || item.period < 1 ||
+            !Array.isArray(item.classes) || item.classes.length < 2 || item.classes.some(room =>
+              !room || !Number.isInteger(room.grade) || room.grade < 1 || !Number.isInteger(room.class) || room.class < 1))) {
+            throw new Error('서버의 교사 일정 응답이 올바르지 않습니다.');
+          }
+          const section = document.createElement('section');
+          const heading = document.createElement('h3');
+          heading.textContent = '확인이 필요한 교사 일정 겹침';
+          const description = document.createElement('p');
+          description.textContent = '같은 이름이 같은 날짜·교시에 여러 학급에 표시된 관측입니다. 합반 수업이나 동명이인일 수 있어 실제 충돌로 확정할 수 없습니다.';
+          section.append(heading, description);
+          if (data.teacherOverlaps.length === 0) {
+            const empty = document.createElement('p');
+            empty.textContent = '관측된 일정 겹침이 없습니다.';
+            section.append(empty);
+          } else {
+            const list = document.createElement('ul');
+            for (const item of data.teacherOverlaps) {
+              const row = document.createElement('li');
+              const classes = item.classes.map(room => `${room.grade}학년 ${room.class}반`).join(', ');
+              row.textContent = `${item.date} ${item.period}교시 · ${item.teacher} · ${classes}`;
               list.append(row);
             }
             section.append(list);
