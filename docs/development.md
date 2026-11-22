@@ -7,7 +7,7 @@
 - Python **3.13**, Node.js **22+**, Git
 - Python 백엔드: `backend/`
 - Svelte/Vite 프런트엔드: `frontend/`
-- 독립적인 과거 Cloudflare 실험: `workers-api/`, `phase0/`, `phase0-mvp/`
+- 독립적인 과거 Cloudflare 실험: `experiments/workers-api/`, `experiments/phase0/`, `experiments/phase0-mvp/`
 
 ### Windows PowerShell
 
@@ -76,7 +76,7 @@ npm run dev
 과거 Worker 모듈 테스트:
 
 ```powershell
-cd workers-api
+cd experiments/workers-api
 ..\.venv\Scripts\python -m unittest test_worker test_d1_cache test_migration -v
 cd ..
 ```
@@ -108,4 +108,4 @@ Linux/macOS라면 Python 실행 경로를 `.venv/bin/python`으로 바꾸세요.
 - 오류 코드는 `error`, `code` 필드를 사용하며, 클라이언트에 내부 네트워크 정보·비밀키·예외 스택을 전달하지 않습니다.
 - 네트워크·캐시 실패 시 빈 데이터로 덮어쓰지 않도록 기존 사용자 경험을 유지합니다.
 
-이슈 작성과 PR 제출 방법은 [기여 가이드](../CONTRIBUTING.md)를 참고하세요. 배포 절차는 [운영 가이드](operations.md)에 있습니다.
+이슈 작성과 PR 제출 방법은 [기여 가이드](../CONTRIBUTING.md)를 참고하세요. 배포 절차는 [운영 가이드](operations/operations.md)에 있습니다.

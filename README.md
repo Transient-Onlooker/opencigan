@@ -11,7 +11,7 @@
 
 두 주소는 **동일한 백엔드 경로를 공유**합니다. 보조 주소가 독립적인 API 서버나 완전한 장애 대비 경로를 의미하지는 않습니다.
 
-[문제 제보](https://github.com/Transient-Onlooker/opencigan/issues) · [개발 로드맵](docs/roadmap.md) · [오늘의 집중 개발](docs/roadmap/short-term-2026-11-21.md) · [기여 가이드](CONTRIBUTING.md)
+[문제 제보](https://github.com/Transient-Onlooker/opencigan/issues) · [개발 로드맵](docs/roadmap/README.md) · [오늘의 집중 개발](docs/roadmap/short-term-2026-11-21.md) · [기여 가이드](CONTRIBUTING.md)
 
 ## 주요 기능
 
@@ -56,10 +56,10 @@ API는 `/api/v1/*`에서 제공되며 시간표·급식 원본에 의존합니�
 | 목적 | 문서 |
 | --- | --- |
 | **문서 찾아보기** | [문서 안내](docs/README.md) |
-| **로드맵** | [전체 진행 방향](docs/roadmap.md) · [2026-11-21 단기 실행 목록](docs/roadmap/short-term-2026-11-21.md) |
+| **로드맵** | [전체 진행 방향](docs/roadmap/README.md) · [2026-11-21 단기 실행 목록](docs/roadmap/short-term-2026-11-21.md) |
 | **개발 시작** | [개발 가이드](docs/development.md) · [기여 가이드](CONTRIBUTING.md) |
 | **API 연동** | [API 사용법](docs/api-guide.md) · [OpenAPI 3.1](docs/openapi.yaml) · [클라이언트 예제](docs/client-examples.md) |
-| **서비스 품질** | [운영 절차](docs/operations.md) · [알려진 문제](docs/known-issues.md) · [접속 로그](docs/access-logs.md) |
+| **서비스 품질** | [운영 절차](docs/operations/operations.md) · [알려진 문제](docs/qa/known-issues.md) · [접속 로그](docs/operations/access-logs.md) |
 
 시간표 연동에는 [pycomcigan](https://github.com/hegelty/pycomcigan)을 사용합니다. 원본 시간표·급식 데이터의 이용 조건은 코드 라이선스와 별개입니다.
 

@@ -140,7 +140,18 @@ paths:
       summary: Get a subscription message template
       security: [{ WebhookManagement: [] }]
       responses:
-        '200': { description: Template, format and provider; a null template uses the default. }
+        '200':
+          description: Template, format and provider; a null template uses the default.
+          content:
+            application/json:
+              schema: &webhookTemplateResult
+                type: object
+                required: [template, discordEmbed, provider]
+                additionalProperties: false
+                properties:
+                  template: { type: [string, 'null'], maxLength: 1200 }
+                  discordEmbed: { type: boolean }
+                  provider: { type: string, enum: [discord, google-chat] }
         '401': { description: Invalid subscription or token. }
         '503': { description: Feature disabled or storage unavailable. }
     put:
@@ -159,7 +170,11 @@ paths:
                 template: { type: string, minLength: 1, maxLength: 1200 }
                 discordEmbed: { type: boolean }
       responses:
-        '200': { description: Saved template and provider. }
+        '200':
+          description: Saved template and provider.
+          content:
+            application/json:
+              schema: *webhookTemplateResult
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { description: Invalid subscription or token. }
         '503': { description: Feature disabled or storage unavailable. }
@@ -168,7 +183,15 @@ paths:
       summary: Restore the default subscription template
       security: [{ WebhookManagement: [] }]
       responses:
-        '200': { description: Template reset. }
+        '200':
+          description: Template reset.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reset]
+                additionalProperties: false
+                properties: { reset: { const: true } }
         '401': { description: Invalid subscription or token. }
         '503': { description: Feature disabled or storage unavailable. }
   /api/v1/webhooks/{id}/template/preview:
@@ -184,7 +207,45 @@ paths:
           application/json:
             schema: *webhookTemplateInput
       responses:
-        '200': { description: Sample provider payload; nothing is sent or queued. }
+        '200':
+          description: Sample provider payload; nothing is sent or queued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [payload]
+                additionalProperties: false
+                properties:
+                  payload:
+                    oneOf:
+                      - type: object
+                        required: [content, allowed_mentions]
+                        additionalProperties: false
+                        properties:
+                          content: { type: string, maxLength: 1800 }
+                          allowed_mentions: &webhookNoMentions
+                            type: object
+                            required: [parse]
+                            additionalProperties: false
+                            properties: { parse: { type: array, maxItems: 0 } }
+                      - type: object
+                        required: [embeds, allowed_mentions]
+                        additionalProperties: false
+                        properties:
+                          embeds:
+                            type: array
+                            minItems: 1
+                            maxItems: 1
+                            items:
+                              type: object
+                              required: [description]
+                              additionalProperties: false
+                              properties: { description: { type: string, maxLength: 1800 } }
+                          allowed_mentions: *webhookNoMentions
+                      - type: object
+                        required: [text]
+                        additionalProperties: false
+                        properties: { text: { type: string, maxLength: 1800 } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { description: Invalid subscription or token. }
         '503': { description: Feature disabled or storage unavailable. }

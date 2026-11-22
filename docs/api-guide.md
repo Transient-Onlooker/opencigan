@@ -126,4 +126,4 @@ RSS는 `/api/v1/timetable/history.rss?school=1234%3A예시학교&grade=2&class=3
 
 **공개 API 정책:** CORS 허용은 브라우저의 출처 제한일 뿐 인증이나 원본 데이터 재배포 권한의 대체가 아닙니다. 이용 약관·데이터 권리·악용 방지·프록시 뒤 IP 식별을 검토한 후 별도로 활성화해야 합니다.
 
-[구현 구조](architecture.md) · [운영 가이드](operations.md)
+[구현 구조](architecture.md) · [운영 가이드](operations/operations.md)
