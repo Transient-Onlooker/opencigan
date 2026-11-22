@@ -189,7 +189,8 @@ class WsGITests(unittest.TestCase):
 
     @patch.dict(os.environ, {"OPENCIGAN_ACCESS_LOG_DB": "fixture"})
     @patch("backend.app._access_log_recorder")
-    def test_opt_in_trusted_proxies_separates_clients_and_logs_same_identity(self, recorder: Mock):
+    @patch("backend.app.shutter.check", return_value=(True, 0))
+    def test_opt_in_trusted_proxies_separates_clients_and_logs_same_identity(self, _shutter, recorder: Mock):
         app = make_app(cache_instance=self.cache, trusted_proxies="127.0.0.1, 10.0.0.0/8")
         # Exhaust Client A rate limit through trusted proxy
         for _ in range(60):
@@ -216,7 +217,8 @@ class WsGITests(unittest.TestCase):
         events = [(call.args[0]["client_ip"], call.args[0]["status"]) for call in recorder.submit.call_args_list]
         self.assertEqual(events, [("203.0.113.1", 404)] * 60 + [("203.0.113.1", 429), ("203.0.113.2", 404)])
 
-    def test_untrusted_immediate_peer_ignores_forwarded_headers(self):
+    @patch("backend.app.shutter.check", return_value=(True, 0))
+    def test_untrusted_immediate_peer_ignores_forwarded_headers(self, _shutter):
         app = make_app(cache_instance=self.cache, trusted_proxies="127.0.0.1")
         # Untrusted remote_addr cannot spoof client IP
         for _ in range(60):

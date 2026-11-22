@@ -132,6 +132,74 @@ paths:
         '401': { description: Invalid subscription or token. }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { description: Feature disabled or storage unavailable. }
+  /api/v1/webhooks/{id}/schedule:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
+    get:
+      tags: [System]
+      summary: Get the subscription notification schedule
+      security: [{ WebhookManagement: [] }]
+      responses:
+        '200':
+          description: The active schedule, or null when using immediate notifications.
+          content:
+            application/json:
+              schema: &scheduleResponse
+                type: object
+                required: [schedule]
+                additionalProperties: false
+                properties:
+                  schedule:
+                    oneOf:
+                      - { type: 'null' }
+                      - &scheduleInput
+                        type: object
+                        required: [mode, time, subject]
+                        additionalProperties: false
+                        properties:
+                          mode: { type: string, enum: [immediate, daily_summary, subject_prep] }
+                          time: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$' }
+                          subject: { type: [string, 'null'], maxLength: 50 }
+                        allOf:
+                          - if: { properties: { mode: { const: subject_prep } } }
+                            then: { properties: { subject: { type: string, minLength: 1, pattern: '\S' } } }
+                            else: { properties: { subject: { type: 'null' } } }
+        '401': { description: Invalid subscription or token. }
+        '503': { description: Scheduler disabled or storage unavailable. }
+    put:
+      tags: [System]
+      summary: Replace the subscription notification schedule
+      security: [{ WebhookManagement: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: *scheduleInput
+      responses:
+        '200':
+          description: The saved schedule.
+          content:
+            application/json:
+              schema: *scheduleResponse
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { description: Invalid subscription or token. }
+        '503': { description: Scheduler disabled or storage unavailable. }
+    delete:
+      tags: [System]
+      summary: Cancel the schedule and return to immediate notifications
+      security: [{ WebhookManagement: [] }]
+      responses:
+        '200':
+          description: Whether an active schedule was canceled.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                additionalProperties: false
+                properties: { deleted: { type: boolean } }
+        '401': { description: Invalid subscription or token. }
+        '503': { description: Scheduler disabled or storage unavailable. }
   /api/v1/webhooks/{id}/template:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
@@ -292,7 +360,7 @@ paths:
                       required: [event_id, state, attempts, next_at, last_status]
                       properties:
                         event_id: { type: string }
-                        state: { type: string, enum: [pending, leased, delivered, failed] }
+                        state: { type: string, enum: [pending, leased, delivered, failed, canceled] }
                         attempts: { type: integer, minimum: 0 }
                         next_at: { type: number, description: Unix timestamp in seconds. }
                         last_status: { type: [integer, 'null'] }
@@ -326,9 +394,17 @@ paths:
                 properties:
                   accepted: { const: true }
         '400': { $ref: '#/components/responses/BadRequest' }
-        '413': { description: Body exceeds 4096 bytes. }
+        '413':
+          description: Body exceeds 4096 bytes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Analytics disabled or storage temporarily unavailable. }
+        '503':
+          description: Analytics disabled or storage temporarily unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /api/v1/admin/analytics:
     get:
       tags: [System]
