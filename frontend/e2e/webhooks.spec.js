@@ -138,6 +138,27 @@ test('management link auto-authenticates via fragment, strips fragment immediate
   expect(await page.evaluate(() => window._copied)).toContain(`#id=${id}&token=${token}`);
 });
 
+test('shows next_at in local time only for pending deliveries', async ({ page }) => {
+  const nextAt = Date.UTC(2026, 10, 22, 3, 4) / 1000;
+  await page.route('**/api/v1/webhooks**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/deliveries')) return route.fulfill({ json: { deliveries: [
+      { event_id: 'pending', state: 'pending', attempts: 2, next_at: nextAt },
+      { event_id: 'leased', state: 'leased', attempts: 3, next_at: nextAt },
+      { event_id: 'delivered', state: 'delivered', attempts: 1, next_at: nextAt },
+      { event_id: 'failed', state: 'failed', attempts: 4, next_at: nextAt },
+    ] } });
+    return route.fulfill({ json: { school: '2:예시학교', grade: 2, classroom: 3, provider: 'discord', dropped_events: 0, filters: {} } });
+  });
+  await page.goto(`/webhooks.html#id=${'a'.repeat(24)}&token=${'b'.repeat(43)}`);
+  const expected = await page.evaluate((value) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value * 1000)), nextAt);
+  const rows = page.locator('#deliveries tr');
+  await expect(rows.nth(0).locator('time')).toHaveText(expected);
+  await expect(rows.nth(0).locator('time')).toHaveAttribute('aria-label', `다음 처리 시각: ${expected}`);
+  await expect(rows.nth(0).locator('time')).toHaveAttribute('datetime', new Date(nextAt * 1000).toISOString());
+  for (const index of [1, 2, 3]) await expect(rows.nth(index).locator('td').nth(4)).toBeEmpty();
+});
+
 test('management link does not authenticate if the fragment cannot be removed', async ({ page }) => {
   let requests = 0;
   await page.route('**/api/v1/webhooks**', async (route) => { requests++; await route.abort(); });
