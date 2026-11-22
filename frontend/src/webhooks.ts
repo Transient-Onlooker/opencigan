@@ -90,6 +90,7 @@ function initFromFragment() {
   try {
     history.replaceState(null, '', location.pathname + location.search);
   } catch {
+    reset(); input('token').type = 'password';
     state.textContent = '주소에서 관리 정보를 지우지 못했어요. 주소를 직접 지우고 다시 시도해 주세요.';
     return;
   }
@@ -99,8 +100,10 @@ function initFromFragment() {
   const token = params.get('token')?.trim() ?? '';
   if (params.size === 2 && params.getAll('id').length === 1 && params.getAll('token').length === 1 &&
       /^[A-Za-z0-9_-]{24}$/.test(id) && /^[A-Za-z0-9_-]{43}$/.test(token)) {
+    reset(); input('token').type = 'password';
     input('id').value = id; input('token').value = token; void run(load);
   } else {
+    reset(); input('token').type = 'password';
     state.textContent = '관리 링크의 형식이 올바르지 않아요.';
   }
 }
@@ -133,4 +136,5 @@ document.querySelector('#refresh')!.addEventListener('click', () => { void run(a
 document.querySelector('#delete')!.addEventListener('click', () => { if (!window.confirm('이 구독과 대기 중인 알림을 삭제할까요?')) return; void run(async () => { await call(subscriptionPath(), 'DELETE'); reset(); state.textContent = '구독을 삭제했어요.'; }); });
 document.querySelector('#lock')!.addEventListener('click', () => { reset(); input('token').type = 'password'; state.textContent = '관리 정보를 지웠어요.'; });
 
+window.addEventListener('hashchange', initFromFragment);
 initFromFragment();

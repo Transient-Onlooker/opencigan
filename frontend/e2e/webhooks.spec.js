@@ -112,6 +112,7 @@ test('management link auto-authenticates via fragment, strips fragment immediate
   expect(calls.length).toBe(0);
 
   await page.goto(`/webhooks.html#id=${id}&token=${token}`);
+  await expect(page).toHaveURL(/\/webhooks\.html$/);
   expect(page.url()).not.toContain(token);
   expect(page.url()).not.toContain('#');
   await expect(page.getByText('2:예시학교 · 2학년 3반')).toBeVisible();
