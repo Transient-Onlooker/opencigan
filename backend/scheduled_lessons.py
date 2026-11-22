@@ -28,7 +28,7 @@ def scheduled_event_id(subscription_id, mode, day):
     return f"scheduled_{mode}_{subscription_id}_{day:%Y%m%d}"
 
 
-def preparation_periods(response, school, grade, classroom, subject, now, max_age):
+def preparation_periods(response, school, grade, classroom, subject, now, max_age, filters=None):
     """Return today's matching periods, or None when the source is not usable."""
     if not isinstance(response, dict) or response.get("schoolId") != school or response.get("stale") is not False:
         return None
@@ -36,6 +36,7 @@ def preparation_periods(response, school, grade, classroom, subject, now, max_ag
         raise ValueError("an aware clock and positive freshness limit are required")
     if type(grade) is not int or type(classroom) is not int or not isinstance(subject, str) or not subject.strip():
         raise ValueError("invalid lesson selection")
+    filters = validate_filters(filters or {})
     try:
         fetched = datetime.fromisoformat(response["fetchedAt"].replace("Z", "+00:00"))
         if fetched.tzinfo is None:
@@ -63,7 +64,11 @@ def preparation_periods(response, school, grade, classroom, subject, now, max_ag
             if parsed_date.isoformat() != lesson_date or parsed_date < monday or parsed_date > monday + timedelta(days=6):
                 return None
             if (lesson_grade == grade and int(lesson_class) == classroom and lesson_date == today.isoformat()
-                    and lesson_subject.strip() == subject.strip()):
+                    and lesson_subject.strip() == subject.strip()
+                    and (filters.get("weekday") is None or filters["weekday"] == today.isoweekday())
+                    and (filters.get("period") is None or filters["period"] == period)
+                    and (not filters.get("subject") or filters["subject"] in lesson_subject)
+                    and (not filters.get("teacher") or filters["teacher"] in (lesson.get("teacher") or ""))):
                 periods.add(period)
         return sorted(periods)
     except (KeyError, TypeError, ValueError, OverflowError):

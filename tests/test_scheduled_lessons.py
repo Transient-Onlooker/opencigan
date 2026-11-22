@@ -40,6 +40,8 @@ class ScheduledLessonTests(unittest.TestCase):
     def test_kst_day_class_exact_subject_and_multiple_periods(self):
         self.assertEqual(self.select(), [1, 3])
         self.assertEqual(preparation_periods(self.data, "123:예시학교", 2, 1, "수학", self.now, timedelta(minutes=30)), [])
+        self.assertEqual(preparation_periods(self.data, "123:예시학교", 2, 1, "체육", self.now, timedelta(minutes=30), {"period": 3}), [3])
+        self.assertEqual(preparation_periods(self.data, "123:예시학교", 2, 1, "체육", self.now, timedelta(minutes=30), {"weekday": 2}), [])
 
     def test_unusable_data_never_becomes_a_no_lesson_result(self):
         for key, value in (("stale", True), ("schoolId", "456:다른학교"), ("weekStart", "2026-11-16"),

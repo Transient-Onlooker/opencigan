@@ -7,7 +7,7 @@ import re
 import sqlite3
 import time
 from contextlib import closing
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from backend.scheduled_lessons import scheduled_event_id
@@ -76,6 +76,7 @@ class ScheduledStore:
         """)
         db.execute("CREATE INDEX IF NOT EXISTS scheduled_occurrences_subscription_state "
                    "ON scheduled_occurrences(subscription_id, state)")
+        db.execute("CREATE INDEX IF NOT EXISTS scheduled_occurrences_date ON scheduled_occurrences(scheduled_date)")
 
     @staticmethod
     def _authorized(db, subscription_id, token_hash):
@@ -170,7 +171,65 @@ class ScheduledStore:
                 db.execute("ROLLBACK")
                 raise
 
-    def enqueue_due(self, subscription_id, expected_revision, scheduled_date, body, due_at):
+    def active_schedules(self):
+        """Read scheduler inputs without retaining management tokens."""
+        with closing(self._connect()) as db:
+            if not db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='scheduled_settings'").fetchone():
+                return []
+            rows = db.execute("""SELECT s.subscription_id, s.mode, s.time_kst, s.subject, s.revision,
+                                  w.school, w.grade, w.classroom, w.provider, w.filters_json
+                                  FROM scheduled_settings s JOIN webhook_subscriptions w ON w.id=s.subscription_id
+                                  WHERE s.active=1 AND s.mode!='immediate'""").fetchall()
+        return [dict(row) for row in rows]
+
+    def prune_occurrences(self, today):
+        """Expire old deduplication records without removing active deliveries."""
+        if type(today) is not date:
+            raise ValueError("invalid cleanup date")
+        cutoff = (today - timedelta(days=31)).isoformat()
+        with closing(self._connect()) as db:
+            if not db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='scheduled_occurrences'").fetchone():
+                return 0
+            return db.execute("""DELETE FROM scheduled_occurrences WHERE scheduled_date<? AND NOT EXISTS (
+                SELECT 1 FROM webhook_deliveries d WHERE d.subscription_id=scheduled_occurrences.subscription_id
+                AND d.event_id=scheduled_occurrences.event_id AND d.state IN ('pending', 'leased'))""", (cutoff,)).rowcount
+
+    def mark_noop(self, subscription_id, expected_revision, scheduled_date, *, expected_filters="{}"):
+        """Record an observed empty result without reserving a delivery."""
+        try:
+            parsed_date = date.fromisoformat(scheduled_date)
+        except (TypeError, ValueError):
+            raise ValueError("invalid scheduled_date") from None
+        if parsed_date.isoformat() != scheduled_date or type(expected_revision) is not int or expected_revision < 1:
+            raise ValueError("invalid occurrence")
+        with closing(self._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                self._ensure_schema(db)
+                setting = db.execute("SELECT s.mode FROM scheduled_settings s JOIN webhook_subscriptions w ON w.id=s.subscription_id "
+                                     "WHERE s.subscription_id=? AND s.revision=? AND s.active=1 AND w.filters_json=?",
+                                     (subscription_id, expected_revision, expected_filters)).fetchone()
+                if not setting or setting["mode"] == "immediate":
+                    db.execute("COMMIT")
+                    return False
+                event_id = scheduled_event_id(subscription_id, setting["mode"], parsed_date)
+                inserted = db.execute("INSERT INTO scheduled_occurrences(subscription_id, scheduled_date, mode, revision, event_id, state) "
+                                      "VALUES (?, ?, ?, ?, ?, 'retired') ON CONFLICT(subscription_id, scheduled_date, mode) "
+                                      "DO UPDATE SET revision=excluded.revision, state='retired' WHERE scheduled_occurrences.state='canceled'",
+                                      (subscription_id, scheduled_date, setting["mode"], expected_revision, event_id)).rowcount == 1
+                db.execute("COMMIT")
+                return inserted
+            except BaseException:
+                db.execute("ROLLBACK")
+                raise
+
+    def already_handled(self, subscription_id, mode, scheduled_date):
+        with closing(self._connect()) as db:
+            row = db.execute("SELECT state FROM scheduled_occurrences WHERE subscription_id=? AND mode=? AND scheduled_date=?",
+                             (subscription_id, mode, scheduled_date)).fetchone()
+        return bool(row and row["state"] != "canceled")
+
+    def enqueue_due(self, subscription_id, expected_revision, scheduled_date, body, due_at, *, expected_filters="{}"):
         """Atomically enqueue a prepared occurrence from the trusted scheduler."""
         try:
             parsed_date = date.fromisoformat(scheduled_date)
@@ -194,10 +253,10 @@ class ScheduledStore:
             db.execute("BEGIN IMMEDIATE")
             try:
                 self._ensure_schema(db)
-                setting = db.execute(
-                    "SELECT revision, mode FROM scheduled_settings WHERE subscription_id=? AND active=1 AND revision=?",
-                    (subscription_id, expected_revision),
-                ).fetchone()
+                setting = db.execute("SELECT s.revision, s.mode FROM scheduled_settings s "
+                                     "JOIN webhook_subscriptions w ON w.id=s.subscription_id "
+                                     "WHERE s.subscription_id=? AND s.active=1 AND s.revision=? AND w.filters_json=?",
+                                     (subscription_id, expected_revision, expected_filters)).fetchone()
                 if setting is None or setting["mode"] == "immediate":
                     db.execute("COMMIT")
                     return False

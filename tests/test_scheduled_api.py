@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from contextlib import closing
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from backend.app import dispatch_request
 from backend.webhook_store import WebhookStore
@@ -24,7 +24,8 @@ class ScheduledApiTests(unittest.TestCase):
         body = json.dumps(payload).encode() if payload is not None else None
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         with patch("backend.app._webhook_store", return_value=self.store):
-            return dispatch_request(method, self.path, "", request_body=body, request_headers=headers)
+            return dispatch_request(method, self.path, "", request_body=body, request_headers=headers,
+                                    shutter_instance=Mock(check=Mock(return_value=(True, 0))))
 
     def test_feature_is_disabled_by_default_without_creating_schedule_tables(self):
         with patch.dict(os.environ, {"OPENCIGAN_SCHEDULER_ENABLED": ""}):

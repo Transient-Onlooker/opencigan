@@ -16,7 +16,8 @@ from backend.webhook_store import WebhookStore
 
 class ScheduledStoreTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
+        root = Path.home() / "AppData" / "Local" / "Temp" if os.name == "nt" else None
+        self.temp = tempfile.TemporaryDirectory(dir=root)
         self.addCleanup(self.temp.cleanup)
         self.path = Path(self.temp.name) / "scheduled.sqlite"
         self.webhooks = WebhookStore(self.path)
@@ -111,6 +112,34 @@ class ScheduledStoreTests(unittest.TestCase):
                                               {"delivered": False, "retryable": True, "status": 500}, now=101))
         self.assertIsNone(self.webhooks.claim(now=200))
         updated = self.store.set_schedule(identifier, token, "daily_summary", "08:00")
+        self.assertFalse(self.store.enqueue_due(identifier, updated["revision"], "2026-11-23", b"{}", 200))
+
+    def test_canceled_queue_records_expire_under_existing_retention_policy(self):
+        identifier, token = self.subscription["id"], self.subscription["token"]
+        revision = self.store.set_schedule(identifier, token, "daily_summary", "07:30")["revision"]
+        self.store.enqueue_due(identifier, revision, "2026-11-23", b"{}", 100)
+        self.webhooks.claim(now=100)
+        with patch("backend.scheduled_store.time.time", return_value=100):
+            self.store.cancel_schedule(identifier, token)
+        self.assertIsNone(self.webhooks.claim(now=100 + 30 * 24 * 60 * 60 + 1))
+        self.assertEqual(self.webhooks.deliveries(identifier, token), [])
+
+    def test_cleanup_keeps_active_delivery_and_expires_old_terminal_occurrences(self):
+        identifier, token = self.subscription["id"], self.subscription["token"]
+        revision = self.store.set_schedule(identifier, token, "daily_summary", "07:30")["revision"]
+        self.assertTrue(self.store.enqueue_due(identifier, revision, "2026-09-01", b"{}", 100))
+        self.assertEqual(self.store.prune_occurrences(date(2026, 11, 23)), 0)
+        delivery = self.webhooks.claim(now=100)
+        self.assertTrue(self.webhooks.finish(delivery["id"], delivery["leaseToken"], {"delivered": True}, now=101))
+        self.assertEqual(self.store.prune_occurrences(date(2026, 11, 23)), 1)
+
+    def test_noop_after_reschedule_replaces_canceled_occurrence(self):
+        identifier, token = self.subscription["id"], self.subscription["token"]
+        first = self.store.set_schedule(identifier, token, "subject_prep", "07:30", "체육")
+        self.assertTrue(self.store.enqueue_due(identifier, first["revision"], "2026-11-23", b"{}", 100))
+        updated = self.store.set_schedule(identifier, token, "subject_prep", "08:00", "수학")
+        self.assertTrue(self.store.mark_noop(identifier, updated["revision"], "2026-11-23"))
+        self.assertTrue(self.store.already_handled(identifier, "subject_prep", "2026-11-23"))
         self.assertFalse(self.store.enqueue_due(identifier, updated["revision"], "2026-11-23", b"{}", 200))
 
     def test_summary_mode_suppresses_immediate_changes_only_when_enabled(self):
