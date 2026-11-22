@@ -896,6 +896,7 @@ test('meal loading, failure and an empty successful response are distinct', asyn
 });
 
 test('failed meal refresh marks retained meals stale until a retry succeeds', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 844 });
   await mockApi(page);
   let calls = 0;
   await page.route('**/api/v1/meals?*', (route) => {
@@ -910,8 +911,14 @@ test('failed meal refresh marks retained meals stale until a retry succeeds', as
   await page.clock.setFixedTime(new Date('2026-11-09T02:31:00Z'));
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(panel.getByRole('alert')).toContainText('이전 급식 정보를 표시');
-  await expect(panel.getByRole('status').filter({ hasText: '저장된 급식 정보' })).toBeVisible();
+  await expect(panel.getByRole('status').filter({ hasText: '저장된 급식 정보' })).toHaveCount(0);
   await expect(panel).toContainText('이전 식단');
+  await page.getByRole('button', { name: '시간표', exact: true }).click();
+  await page.locator('#timetable-panel').getByRole('button', { name: '오늘', exact: true }).click();
+  const todayMeals = page.locator('.today-meals');
+  await expect(todayMeals.getByRole('alert')).toContainText('이전 급식 정보를 표시');
+  await expect(todayMeals.getByText('저장된 급식 정보예요. 최신 정보가 아닐 수 있습니다.')).toHaveCount(0);
+  await page.getByRole('button', { name: '급식', exact: true }).click();
   await panel.getByRole('button', { name: '다시 시도' }).click();
   await expect(panel).toContainText('갱신 식단');
   await expect(panel.getByRole('status').filter({ hasText: '저장된 급식 정보' })).toHaveCount(0);
