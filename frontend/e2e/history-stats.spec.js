@@ -112,6 +112,7 @@ test('enabled history stats: fetches stats, handles observed=false and observed=
     comparisonCoverage: 'unknown',
     subjectPeriods: [{ subject: '<img src=x onerror=alert(1)>', classPeriods: 2 }, { subject: '수학', classPeriods: 3 }],
     teacherOverlaps: [{ date: '2026-11-16', period: 1, teacher: '<script>alert(1)</script>', classes: [{ grade: 1, class: 1 }, { grade: 1, class: 2 }] }],
+    sourceUpdateObservations: { distinctTimestamps: 2, intervalCount: 1, meanIntervalSeconds: 3600, firstSourceAt: '2026-11-16T08:00:00Z', lastSourceAt: '2026-11-16T09:00:00Z' },
   };
   await page.locator('#history-stats-load').click();
   await expect(resultsContainer).toContainText('12건');
@@ -121,6 +122,8 @@ test('enabled history stats: fetches stats, handles observed=false and observed=
   await expect(resultsContainer).toContainText('합반 수업이나 동명이인일 수 있어');
   await expect(resultsContainer).toContainText('<script>alert(1)</script>');
   await expect(resultsContainer).toContainText('1학년 1반, 1학년 2반');
+  await expect(resultsContainer).toContainText('관측된 시각 사이 평균 1시간');
+  await expect(resultsContainer).toContainText('수집 사이의 갱신이나 원본의 실제 갱신 주기는 알 수 없습니다.');
   await expect(resultsContainer.locator('script')).toHaveCount(0);
   await expect(resultsContainer).toContainText('보존된 관측 변경');
   await expect(resultsContainer).toContainText('3개 학급');

@@ -207,6 +207,20 @@ class PublicApiTests(unittest.TestCase):
             self.assertEqual((first['cacheStatus'], second['cacheStatus']), ('miss', 'stale'))
             store.observe.assert_called_once()
 
+    def test_source_update_tracking_requires_explicit_stats_flag(self):
+        from unittest.mock import Mock
+        from backend.app import _cached_timetable
+        response = {'schoolId': '1:Example', 'weekStart': '2026-11-09', 'records': [],
+                    'fetchedAt': '2026-11-09T00:00:00+00:00', 'sourceUpdatedAt': '2026-11-08T12:00:00+00:00', 'stale': False}
+        for enabled in ('', '1'):
+            with self.subTest(enabled=enabled), patch.dict('os.environ', {'OPENCIGAN_HISTORY_STATS_ENABLED': enabled}), \
+                    patch('backend.app._history_store', return_value=Mock()) as get_store, \
+                    patch('backend.app.fetch_timetable', return_value=response):
+                _cached_timetable('1:Example', '2026-11-09', Cache())
+                kwargs = get_store.return_value.observe.call_args.kwargs
+                self.assertEqual(kwargs['source_updated_at'], response['sourceUpdatedAt'])
+                self.assertEqual(kwargs['track_source_updates'], enabled == '1')
+
     def test_history_endpoint_with_synthetic_data(self):
         import tempfile
         from pathlib import Path

@@ -21,6 +21,7 @@ interface HistoryStatsResponse {
   comparisonCoverage?: string | null;
   subjectPeriods?: { subject: string; classPeriods: number }[] | null;
   teacherOverlaps?: { date: string; period: number; teacher: string; classes: { grade: number; class: number }[] }[] | null;
+  sourceUpdateObservations?: { distinctTimestamps: number; intervalCount: number; meanIntervalSeconds: number | null; firstSourceAt: string; lastSourceAt: string } | null;
 }
 
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
@@ -298,6 +299,36 @@ if (historyStatsEnabled && historyForm && historySchool && historyWeek && histor
             }
             section.append(list);
           }
+          historyResults.append(section);
+        }
+        if (data.sourceUpdateObservations !== undefined) {
+          const section = document.createElement('section');
+          const heading = document.createElement('h3');
+          heading.textContent = '원본 갱신 시각 관측';
+          section.append(heading);
+          const stats = data.sourceUpdateObservations;
+          if (stats === null) {
+            const empty = document.createElement('p');
+            empty.textContent = '기록된 원본 갱신 시각이 없어 간격을 알 수 없습니다.';
+            section.append(empty);
+          } else {
+            if (!stats || !Number.isInteger(stats.distinctTimestamps) || stats.distinctTimestamps < 1 ||
+                !Number.isInteger(stats.intervalCount) || stats.intervalCount !== stats.distinctTimestamps - 1 ||
+                (stats.intervalCount === 0 ? stats.meanIntervalSeconds !== null :
+                  typeof stats.meanIntervalSeconds !== 'number' || !Number.isFinite(stats.meanIntervalSeconds) || stats.meanIntervalSeconds <= 0) ||
+                typeof stats.firstSourceAt !== 'string' || Number.isNaN(Date.parse(stats.firstSourceAt)) ||
+                typeof stats.lastSourceAt !== 'string' || Number.isNaN(Date.parse(stats.lastSourceAt))) {
+              throw new Error('서버의 원본 갱신 관측 응답이 올바르지 않습니다.');
+            }
+            const summary = document.createElement('p');
+            summary.textContent = stats.meanIntervalSeconds === null
+              ? `서로 다른 원본 시각 ${stats.distinctTimestamps}개 · 간격을 계산하려면 2개 이상 필요합니다.`
+              : `서로 다른 원본 시각 ${stats.distinctTimestamps}개 · 관측된 시각 사이 평균 ${(stats.meanIntervalSeconds / 3600).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}시간`;
+            section.append(summary);
+          }
+          const note = document.createElement('p');
+          note.textContent = '최근 30일에 관측된 원본 표시 시각만 사용합니다. 수집 사이의 갱신이나 원본의 실제 갱신 주기는 알 수 없습니다.';
+          section.append(note);
           historyResults.append(section);
         }
         if (data.teacherOverlaps !== undefined && data.teacherOverlaps !== null) {
