@@ -76,6 +76,19 @@ async function loadDeliveries(path: string) {
     for (const value of [item.event_id, states[item.state] ?? item.state, item.attempts, item.last_status ?? '—']) {
       const cell = document.createElement('td'); cell.textContent = String(value); row.append(cell);
     }
+    const nextAt = document.createElement('td');
+    if (item.state === 'pending' && typeof item.next_at === 'number') {
+      const timestamp = new Date(item.next_at * 1000);
+      if (!Number.isNaN(timestamp.getTime())) {
+        const time = document.createElement('time');
+        time.dateTime = timestamp.toISOString();
+        const localTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(timestamp);
+        time.textContent = localTime;
+        time.setAttribute('aria-label', `다음 처리 시각: ${localTime}`);
+        nextAt.append(time);
+      }
+    }
+    row.append(nextAt);
     table.append(row);
   }
 }
