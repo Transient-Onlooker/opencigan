@@ -4,6 +4,7 @@ import math
 import threading
 import time
 from collections import OrderedDict
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from urllib.error import HTTPError
 
@@ -33,6 +34,25 @@ class Cache:
         self.refresh_observations = {}
         self.guard = threading.Lock()
         self.locks = tuple(threading.Lock() for _ in range(lock_stripes))
+        self._flights = tuple({} for _ in range(lock_stripes))
+
+    @contextmanager
+    def _singleflight(self, key):
+        stripe = hash(key) % len(self.locks)
+        with self.locks[stripe]:
+            flight = self._flights[stripe].get(key)
+            if flight is None:
+                flight = [threading.Lock(), 0]
+                self._flights[stripe][key] = flight
+            flight[1] += 1
+        try:
+            with flight[0]:
+                yield
+        finally:
+            with self.locks[stripe]:
+                flight[1] -= 1
+                if flight[1] == 0:
+                    del self._flights[stripe][key]
 
     def get(self, key, fetch, *, with_status=False):
         def output(value, status):
@@ -53,8 +73,7 @@ class Cache:
                         return output(self._stale(value), "stale")
                     raise CacheBackoffError(retry_after - now)
 
-        lock = self.locks[hash(key) % len(self.locks)]
-        with lock:
+        with self._singleflight(key):
             now = time.monotonic()
             previous_value = None
             previous_fetched_at = 0
