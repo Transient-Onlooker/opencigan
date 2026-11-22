@@ -70,7 +70,7 @@ function clearRotation() {
 async function loadDeliveries(path: string) {
   const result = await call(`${path}/deliveries`);
   table.replaceChildren();
-  const states: Record<string, string> = { pending: '대기', leased: '전송 중', delivered: '성공', failed: '실패' };
+  const states: Record<string, string> = { pending: '대기', leased: '전송 중', delivered: '성공', failed: '실패', canceled: '취소' };
   for (const item of result.deliveries) {
     const row = document.createElement('tr');
     for (const value of [item.event_id, states[item.state] ?? item.state, item.attempts, item.last_status ?? '—']) {

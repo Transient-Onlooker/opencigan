@@ -16,12 +16,12 @@ class ScheduledLessonTests(unittest.TestCase):
     def test_event_identity_is_stable_and_distinguishes_day_and_mode(self):
         day = date(2026, 11, 23)
         identifier = "a" * 24
-        first = scheduled_event_id(identifier, "morning", day)
-        self.assertEqual(first, scheduled_event_id(identifier, "morning", day))
-        self.assertNotEqual(first, scheduled_event_id(identifier, "summary", day))
-        self.assertNotEqual(first, scheduled_event_id(identifier, "morning", day + timedelta(days=1)))
+        first = scheduled_event_id(identifier, "subject_prep", day)
+        self.assertEqual(first, scheduled_event_id(identifier, "subject_prep", day))
+        self.assertNotEqual(first, scheduled_event_id(identifier, "daily_summary", day))
+        self.assertNotEqual(first, scheduled_event_id(identifier, "subject_prep", day + timedelta(days=1)))
         with self.assertRaises(ValueError):
-            scheduled_event_id("bad", "morning", day)
+            scheduled_event_id("bad", "subject_prep", day)
 
     def setUp(self):
         self.now = datetime.fromisoformat("2026-11-22T15:05:00+00:00")

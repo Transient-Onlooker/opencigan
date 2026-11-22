@@ -325,7 +325,7 @@ class WebhookStore:
         with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
             try:
-                db.execute("DELETE FROM webhook_deliveries WHERE state IN ('delivered', 'failed') AND next_at<?", (now - DELIVERY_RETENTION_SECONDS,))
+                db.execute("DELETE FROM webhook_deliveries WHERE state IN ('delivered', 'failed', 'canceled') AND next_at<?", (now - DELIVERY_RETENTION_SECONDS,))
                 db.execute("UPDATE webhook_deliveries SET state='failed', next_at=?, lease_token=NULL, lease_until=NULL WHERE state='leased' AND lease_until<=? AND attempts>=?", (now, now, MAX_DELIVERY_ATTEMPTS))
                 while True:
                     row = db.execute("""SELECT d.id, d.event_id, d.body, d.attempts, s.destination, s.signing_secret, s.filters_json

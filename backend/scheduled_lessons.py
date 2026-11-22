@@ -23,7 +23,7 @@ def scheduled_time(day, clock, quiet_hours=None):
 def scheduled_event_id(subscription_id, mode, day):
     """Keep one stable event identity per subscription, mode and KST day."""
     if (not isinstance(subscription_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{24}", subscription_id)
-            or mode not in ("summary", "morning") or type(day) is not date):
+            or mode not in ("daily_summary", "subject_prep") or type(day) is not date):
         raise ValueError("invalid scheduled event identity")
     return f"scheduled_{mode}_{subscription_id}_{day:%Y%m%d}"
 
