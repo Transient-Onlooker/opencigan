@@ -8,6 +8,39 @@ from backend.cache import Cache
 
 
 class CacheIntegrityTests(unittest.TestCase):
+    def test_distinct_keys_do_not_block_when_lock_stripes_collide(self):
+        cache = Cache(lock_stripes=1)
+        started, release, fast_done = threading.Event(), threading.Event(), threading.Event()
+
+        def slow_fetch():
+            started.set()
+            if not release.wait(3):
+                raise TimeoutError("fixture was not released")
+            return {"value": "slow"}
+
+        def fast_fetch():
+            fast_done.set()
+            return {"value": "fast"}
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            slow = pool.submit(cache.get, ("timetable", "slow"), slow_fetch)
+            self.assertTrue(started.wait(2))
+            fast = pool.submit(cache.get, ("timetable", "fast"), fast_fetch)
+            try:
+                self.assertTrue(fast_done.wait(1), "a different key should not wait for the slow fetch")
+                self.assertEqual(fast.result(timeout=2), {"value": "fast"})
+            finally:
+                release.set()
+            self.assertEqual(slow.result(timeout=2), {"value": "slow"})
+        self.assertTrue(all(not flights for flights in cache._flights))
+
+    def test_singleflight_entries_are_removed_after_errors(self):
+        cache = Cache(retry_delay=0, lock_stripes=1)
+        with self.assertLogs("opensigan.cache", level="WARNING"):
+            with self.assertRaises(RuntimeError):
+                cache.get(("timetable", "failure"), lambda: (_ for _ in ()).throw(RuntimeError("fixture")))
+        self.assertTrue(all(not flights for flights in cache._flights))
+
     def test_refresh_duration_records_completed_attempts_not_hits_or_backoff(self):
         cache = Cache(ttl=60, retry_delay=60)
         clock = [100.0]
