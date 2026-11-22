@@ -116,11 +116,9 @@ class FrontendHttpTests(unittest.TestCase):
 
         timetable = {"schoolId": "2:서울 학교", "weekStart": "2026-11-09", "records": [],
                      "sourceUpdatedAt": None, "fetchedAt": "2026-11-10T00:00:00Z", "stale": False}
-        test_cache = Cache()
+        test_cache = Cache(lock_stripes=1)
         slow_school = "2:ST01-slow"
-        slow_lock = hash(("timetable", slow_school, "2026-11-09")) % len(test_cache.locks)
-        fast_school = next(f"2:ST01-fast-{number}" for number in range(4096)
-                           if hash(("timetable", f"2:ST01-fast-{number}", "2026-11-09")) % len(test_cache.locks) == slow_lock)
+        fast_school = "2:ST01-fast"
         temp_root = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "Temp" if os.name == "nt" else None
         with tempfile.TemporaryDirectory(prefix="opensigan-http-", dir=temp_root) as temp_dir, \
                 patch("backend.app.cache", test_cache), \
