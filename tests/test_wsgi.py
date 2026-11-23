@@ -158,7 +158,7 @@ class WsGITests(unittest.TestCase):
                             "OPENCIGAN_PROXY_IP_SIGNING_KEY": ""})
     @patch("backend.app.shutter.check", return_value=(True, 0))
     def test_admin_auth_attempts_are_rate_limited_separately_per_client(self, _shutter):
-        paths = ("/api/v1/admin/analytics", "/api/v1/admin/access-logs")
+        paths = ("/api/v1/admin/analytics", "/api/v1/admin/access-logs", "/api/v1/admin/access-anomalies")
         for i in range(60):
             status, _, _ = self._call_app("GET", paths[i % 2], remote_addr="203.0.113.9")
             self.assertEqual(status, "401 Unauthorized")

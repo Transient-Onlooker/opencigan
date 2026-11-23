@@ -213,11 +213,11 @@ flowchart TB
 | ST-03 | 검증 중 | [#162](https://github.com/Transient-Onlooker/opencigan/pull/162) 초안 | 단일 격리 비교에서 수업 데이터 일치 | 실측 요청 수·지연 개선 미달, 상류 학교 식별값 확인 필요 |
 | ST-05 | 격리 구현·자동검증 완료 | [#167](https://github.com/Transient-Onlooker/opencigan/pull/167) | 별도 저장소·권한·백업 회귀, 통합 CI | 기본 OFF, 공개·운영 미적용 |
 | ST-06 | 격리 구현·자동검증 완료 | [#172](https://github.com/Transient-Onlooker/opencigan/pull/172) | 모의 API·Chromium/WebKit CI | 기본 OFF, 공개·실기기 검증 별도 |
-| ST-07 | 일부 구현·검증 완료 | [#169](https://github.com/Transient-Onlooker/opencigan/pull/169), [#179](https://github.com/Transient-Onlooker/opencigan/pull/179) | 공식 도메인 연결 및 관리 링크 교체·복구 회귀, CI | 나머지 요구사항 확인 및 실제 발송 비활성 유지 |
+- ST-07 | 일부 구현·검증 완료 | [#169](https://github.com/Transient-Onlooker/opencigan/pull/169), [#179](https://github.com/Transient-Onlooker/opencigan/pull/179) | 공식 도메인 연결 및 관리 링크 교체·복구 회귀, CI · 로컬 웹훅 모듈 테스트 38개 통과(2026-11-24, 이 세션) | 나머지 요구사항 확인 및 실제 발송 비활성 유지 |
 | ST-08 | 격리 구현·자동검증 완료 | [#180](https://github.com/Transient-Onlooker/opencigan/pull/180) | 템플릿 인증·안전 출력·이전 DB·게이트웨이·Chromium/WebKit CI | 운영 미배포, 실제 발송 비활성 유지 |
 | ST-10 | 일부 구현·검증 완료 | [#168](https://github.com/Transient-Onlooker/opencigan/pull/168) | 게이트웨이 오류 응답 계약·하위 호환 회귀, CI | Worker 운영 배포 및 나머지 계약·관측 확인 별도 |
 | ST-11 | 일부 구현·검증 완료 | [#175](https://github.com/Transient-Onlooker/opencigan/pull/175) | 기본 OFF 관측 변경 통계·인증·미관측·보존 기간·관리 화면 회귀, [CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/44965076624) | 관측 횟수·공백은 확인 불가; 이상 트래픽 등 나머지 기능 및 운영 적용 별도 |
 | ST-09 | 격리 구현·자동검증 완료 | [#182](https://github.com/Transient-Onlooker/opencigan/pull/182) | 예약 시각·방해 금지·중복·장애 복구 및 Chromium/WebKit CI | 기본 OFF, 실제 작업자·발송 미활성 |
-| ST-04, ST-04A, ST-12 ~ ST-14 | 진행 전 또는 부분 조사 | — | — | — |
+| ST-04, ST-04A, ST-12 ~ ST-14 | 진행 전 또는 부분 조사 | — | ST-14 부분: Python 311 로컬 통과(2026-11-24), Worker 게이트웨이 27·d1_cache 51 로컬 통과 | ST-04/04A/12/13 및 ST-14 나머지 미실행 |
 
 **끝내는 기준:** 오늘의 목표는 체크박스를 억지로 100%로 만드는 것이 아니라, 실제 구현과 자동 테스트를 가능한 한 많이 안전하게 병합하는 것이다. 원래 장기 로드맵은 보존한다.

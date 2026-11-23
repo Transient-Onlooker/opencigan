@@ -10,6 +10,7 @@
 | 구조 이해 | [아키텍처](architecture.md) | 공개 서비스 흐름과 코드 책임 |
 | 개발 시작 | [개발 가이드](development.md) · [기여 가이드](../CONTRIBUTING.md) | 로컬 실행·테스트·PR |
 | API 사용 | [API 가이드](api-guide.md) · [OpenAPI 3.1](openapi.yaml) | REST·ICS 계약 |
+| API 계약 유지 | [버전·호환 정책](api-versioning.md) | API 버전·오류·캐시 계약 |
 | 클라이언트 | [Python/TypeScript 예제](client-examples.md) | SDK 사용법 |
 | 임베드 | [위젯 가이드](embed.md) | iframe 연동 |
 | 기타 | [라이선스](licensing.md) · [내비게이션 상태](navigation.md) · [NEIS 영양 필드](neis-nutrition.md) | 권한·구현 참고 |
