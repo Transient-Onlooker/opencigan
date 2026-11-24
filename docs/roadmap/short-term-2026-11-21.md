@@ -228,6 +228,8 @@ flowchart TB
 
 ### ST-13 · 번들 실측·경량화
 
+- [#230](https://github.com/Transient-Onlooker/opencigan/pull/230) 이미지 내보내기 분리 실험은 서비스 워커 설치까지 포함한 로컬 첫 방문 JS 전송이 625바이트 증가해 병합하지 않았다. [측정과 한계](../qa/bundle-baseline-2026-11-23.md#이미지-내보내기-분리-실험--2026-11-25)를 참고하고 다른 최적화 후보를 찾는다.
+
 - [번들 기준선](../qa/bundle-baseline-2026-11-23.md)에 초기 HTML이 참조하는 JS/CSS, 전체 자산 및 선택 PDF 청크 크기를 기록했다. 실제 전송·로딩 시간과 최적화는 아직 미검증이다.
 - [x] 초기 JS/CSS·전체 자산·선택 PDF 청크의 원본/압축 크기 및 격리 Chromium 최초 자산 요청 기준선을 기록한다 ([#193](https://github.com/Transient-Onlooker/opencigan/pull/193), [측정 기록](../qa/bundle-baseline-2026-11-23.md)).
 - [ ] 중복 의존성이나 초기 화면에 불필요한 선택 기능을 찾고 실제 전송·로딩 측정 및 개선 전후 비교를 보완한다.
