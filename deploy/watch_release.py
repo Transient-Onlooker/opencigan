@@ -44,12 +44,34 @@ def poll(root, release, school, week):
         state = {}
         if status.is_file():
             state = json.loads(status.read_text(encoding="utf-8"))
-            if state.get("success") and state.get("pinSync") in ("pending", "failed"):
+        pending = state.get("success") and state.get("pinSync") in ("pending", "failed")
+        try:
+            tag, sha = latest_release()
+        except Exception:
+            if pending:
+                try:
+                    retry_pending_pin(root)
+                except Exception:
+                    pass
+            raise
+        failed = state.get("lastAttempt", state)
+        if failed.get("requestedSha") == sha and failed.get("phase") == "activation_failed":
+            if pending:
                 return retry_pending_pin(root)
-        tag, sha = latest_release()
-        if state.get("requestedSha") == sha and state.get("phase") == "activation_failed":
             return {"skipped": True, "reason": "previous_activation_failed", "requestedSha": sha}
-        return deploy(tag, sha, root, release, school, week)
+        if pending and state.get("activeSha") == sha:
+            return retry_pending_pin(root)
+        try:
+            return deploy(tag, sha, root, release, school, week)
+        except Exception:
+            if pending and status.is_file():
+                current = json.loads(status.read_text(encoding="utf-8"))
+                if current.get("success") and current.get("pinSync") in ("pending", "failed"):
+                    try:
+                        retry_pending_pin(root)
+                    except Exception:
+                        pass
+            raise
 
 
 def main():

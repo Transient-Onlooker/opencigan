@@ -6,5 +6,6 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=%h/opensigan-releases/current
-ExecStart=%h/opensigan-releases/current/.venv/bin/python -m deploy.watch_release --root %h/.local/share/opencigan/components/pycomcigan --release %h/opensigan-releases/current --school 53143:보인고등학교
+EnvironmentFile=%h/.config/opencigan/release-watch.env
+ExecStart=%h/opensigan-releases/current/.venv/bin/python -m deploy.watch_release --root %h/.local/share/opencigan/components/pycomcigan --release %h/opensigan-releases/current --school ${OPENCIGAN_RELEASE_TEST_SCHOOL}
 Nice=10

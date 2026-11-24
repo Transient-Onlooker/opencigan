@@ -10,6 +10,24 @@ from deploy.fork_manifest import HEX40, TAG
 from deploy.prepare_component import prepare
 
 
+def preserve_pending_after_failure(root, status, previous):
+    if not previous.get("success") or previous.get("pinSync") not in ("pending", "failed"):
+        return
+    verification = previous.get("verification", {})
+    if not verification.get("internal") or not verification.get("public"):
+        return
+    try:
+        if installed_sha(root, Path.home()) != previous.get("activeSha"):
+            return
+        failure = json.loads(status.read_text(encoding="utf-8"))
+        if failure.get("phase") == "activation_failed" and not failure.get("rollback"):
+            return
+        restored = {**previous, "lastAttempt": failure}
+        write_atomic(status, json.dumps(restored) + "\n")
+    except Exception:
+        return
+
+
 def deploy(tag, sha, root, release, school, week):
     import fcntl
 
@@ -24,6 +42,7 @@ def deploy(tag, sha, root, release, school, week):
         raise ValueError("Unsafe deployment state path")
     with lock.open("a") as handle:
         fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        previous = {}
         if status.is_file():
             previous = json.loads(status.read_text(encoding="utf-8"))
             verified = previous.get("verification", {})
@@ -50,8 +69,13 @@ def deploy(tag, sha, root, release, school, week):
                       "phase": "prepare_failed", "errorType": type(error).__name__,
                       "timestamp": datetime.now(timezone.utc).isoformat()}
             write_atomic(status, json.dumps(result) + "\n")
+            preserve_pending_after_failure(root, status, previous)
             raise
-        return activate(tag, sha, root, school, week)
+        try:
+            return activate(tag, sha, root, school, week)
+        except Exception:
+            preserve_pending_after_failure(root, status, previous)
+            raise
 
 
 def retry_pending_pin(root):

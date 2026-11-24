@@ -33,6 +33,6 @@ cd "$HOME/opensigan-releases/current"
 
 결과는 컴포넌트 루트의 `deployment-status.json`에 `requestedSha`, `activeSha`, `success`, `verification`, `rollback`, `pinSync`, `phase`, `timestamp`로 기록된다. 성공 후 OpenCigan `backend/requirements.txt`의 포크 SHA 한 줄만 갱신하고 자동 커밋·푸시를 최대 세 번 시도한다. 핀 동기화만 실패했다면 `python -m deploy.release_deploy --root <컴포넌트 루트> --retry-pin`으로 재시도한다. 파일 상태에 `pinSync: failed`가 남으며 검증된 활성 컴포넌트는 유지한다. Pi의 첫 자동 전환에서는 핀이 이미 일치해 `pinSync: already_synced`로 기록됐으며 실제 핀 변경 커밋은 발생하지 않았다.
 
-`opencigan-release-watch.timer`는 30분 간격으로 포크의 공개 정식 Release를 확인한다. 공식 신규 릴리스의 우선 채택은 기존대로 pycomcigan 에이전트가 포크 Release를 만드는 단계에서 담당한다. 감지 후에는 동일한 매니페스트·패키지 검증, 테스트, 실조회 및 배포 잠금을 거친다. 핀 동기화가 실패하거나 중단된 경우 새 Release보다 동기화 재시도를 먼저 수행한다. 서비스 전환에 실패한 SHA는 반복 재시작을 막기 위해 자동 재시도하지 않으며, 원인 확인 후 수동 배포하거나 새 Release를 기다린다. 확인 결과와 오류는 `journalctl --user -u opencigan-release-watch.service`에서 볼 수 있다.
+`opencigan-release-watch.timer`는 30분 간격으로 포크의 공개 정식 Release를 확인한다. 공식 신규 릴리스의 우선 채택은 기존대로 pycomcigan 에이전트가 포크 Release를 만드는 단계에서 담당한다. 감지 후에는 동일한 매니페스트·패키지 검증, 테스트, 실조회 및 배포 잠금을 거친다. 핀 동기화가 실패했더라도 새 Release 확인과 배포를 우선하며, 활성 SHA가 최신이면 핀 동기화만 재시도한다. 검증 학교는 Pi의 `~/.config/opencigan/release-watch.env`에 `OPENCIGAN_RELEASE_TEST_SCHOOL`로 지정한다. 서비스 전환에 실패한 SHA는 반복 재시작을 막기 위해 자동 재시도하지 않으며, 원인 확인 후 수동 배포하거나 새 Release를 기다린다. 확인 결과와 오류는 `journalctl --user -u opencigan-release-watch.service`에서 볼 수 있다.
 
 운영 감시는 인증된 `/api/v1/admin/analytics` 응답의 `refreshObservations`, `cacheStatuses`, `failureKinds`에서 각각 갱신 실패, stale 응답 및 상류 조회 오류를 확인한다. 이 집계는 요청이 관측된 범위만 나타내며 기존 로그 보존 정책을 따른다.
