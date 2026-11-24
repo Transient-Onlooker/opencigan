@@ -1441,6 +1441,19 @@ test('source lesson starts follow the selected school', async ({ page }) => {
   await expect(page.getByLabel('원본 교시 시작 시각')).not.toContainText('09:00');
 });
 
+test('stale timetable does not offer source lesson start suggestions', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/v1/timetable?*', (route) => route.fulfill({ json: {
+    ...timetable, stale: true, sourceLessonStarts: { '1': '09:00' },
+  } }));
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('#class-error')).toContainText('시간표 데이터가 없어 공유 링크의 학년·반을 확인하지 못했어요.');
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('학교 교시 시각 설정', { exact: true }).click();
+  await expect(page.getByLabel('원본 교시 시작 시각')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '원본 시작 시각 입력란에 적용' })).toHaveCount(0);
+});
+
 test('weekday bell times save independently and are included in school backup', async ({ page }) => {
   await mockApi(page);
   await page.goto('/' + sharedHash(1));
