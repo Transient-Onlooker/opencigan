@@ -9,7 +9,7 @@ import sqlite3
 import threading
 import uuid
 from contextlib import closing
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from queue import Empty, Full, Queue
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
@@ -441,6 +441,26 @@ class AccessLogStore:
             "limit": limit,
             "has_more": has_more,
         }
+
+    def review_anomalies(self, *, window_hours: int, max_requests_per_ip: int,
+                         max_error_ratio: float, max_distinct_schools: int,
+                         min_requests: int = 0) -> List[Dict[str, Any]]:
+        """Review retained logs using the same lifecycle as ordinary queries."""
+        from backend.query_anomalies import detect
+
+        today = self._current_day()
+        earliest_day = (
+            date.fromisoformat(today) - timedelta(days=self.retention_days - 1)
+        ).isoformat()
+        with closing(self._connect()) as db:
+            self._purge_if_due(db, today)
+            return detect(
+                db, window_hours=window_hours,
+                max_requests_per_ip=max_requests_per_ip,
+                max_error_ratio=max_error_ratio,
+                max_distinct_schools=max_distinct_schools,
+                min_requests=min_requests, earliest_day=earliest_day,
+            )
 
     def export_csv(
         self,

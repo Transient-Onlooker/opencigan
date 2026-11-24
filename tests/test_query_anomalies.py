@@ -17,14 +17,13 @@ class QueryAnomalyTests(unittest.TestCase):
         self.store = AccessLogStore(":memory:")
 
         def rec(hours_ago, **event):
-            event.setdefault("timestamp", iso_hours_ago(hours_ago))
-            event.setdefault("day", datetime.now(tz=SEOUL).date().isoformat())
+            received_at = event.pop("received_at", iso_hours_ago(hours_ago))
             event.setdefault("route", "/api/v1/timetable")
             event.setdefault("client_ip", "203.0.113.1")
             event.setdefault("status", 200)
             event.setdefault("duration_ms", 10.0)
             event.setdefault("origin_class", "external")
-            self.store.record(event)
+            self.store.record(event, received_at=received_at)
 
         self.rec = rec
 
@@ -75,10 +74,53 @@ class QueryAnomalyTests(unittest.TestCase):
 
         for _ in range(20):
             self.rec(1)
-        self.rec(48, client_ip="198.51.100.9", status=500)
+        for _ in range(6):
+            self.rec(48, client_ip="198.51.100.9", status=500)
 
         findings = detect(self.store._connect(), window_hours=24, max_requests_per_ip=5, max_error_ratio=0.5, max_distinct_schools=50, min_requests=0)
         self.assertEqual([f["client_ip"] for f in findings if f["kind"] == "request_volume"], ["203.0.113.1"])
+        self.assertNotIn("198.51.100.9", {f["client_ip"] for f in findings})
+
+    def test_first_and_last_seen_follow_receipt_time_not_insert_order(self):
+        whole_second = (datetime.now(tz=SEOUL) - timedelta(hours=1)).replace(microsecond=0)
+        later = whole_second.replace(microsecond=500000)
+        self.rec(1, received_at=later, school_id="school-a", status=429)
+        self.rec(1, received_at=whole_second, school_id="school-a", status=200)
+        self.rec(1, received_at=whole_second, school_id="school-b", status=500)
+
+        findings = self.store.review_anomalies(
+            window_hours=24, max_requests_per_ip=2,
+            max_error_ratio=0.5, max_distinct_schools=1, min_requests=3,
+        )
+        self.assertEqual([f["kind"] for f in findings], [
+            "request_volume", "error_ratio", "school_scan",
+        ])
+        for finding in findings:
+            self.assertEqual(finding["first_seen"], whole_second.isoformat())
+            self.assertEqual(finding["last_seen"], later.isoformat())
+            self.assertEqual(finding["errors"], 2)
+        self.assertEqual(findings[2]["observed"], 2)
+
+    def test_review_respects_retention_and_does_not_group_unknown_clients(self):
+        for _ in range(3):
+            self.rec(48, client_ip="198.51.100.9", status=500)
+            self.rec(0, client_ip="unknown", status=500)
+        self.store.retention_days = 1
+        findings = self.store.review_anomalies(
+            window_hours=720, max_requests_per_ip=1,
+            max_error_ratio=0.5, max_distinct_schools=50, min_requests=1,
+        )
+        self.assertEqual(findings, [])
+
+    def test_exact_thresholds_and_distinct_ip_are_not_flagged(self):
+        for ip in ("203.0.113.1", "203.0.113.2"):
+            self.rec(0, client_ip=ip, school_id="school-a", status=404)
+            self.rec(0, client_ip=ip, school_id="school-a", status=200)
+        findings = self.store.review_anomalies(
+            window_hours=24, max_requests_per_ip=2,
+            max_error_ratio=0.5, max_distinct_schools=1, min_requests=2,
+        )
+        self.assertEqual(findings, [])
 
 
 class QueryAnomalyEndpointTests(unittest.TestCase):
