@@ -66,6 +66,17 @@ class OpenApiContractTests(unittest.TestCase):
             Draft202012Validator(parameters[key]["schema"]).validate(value)
         self.assertFalse(Draft202012Validator(parameters["grade"]["schema"]).is_valid(7))
 
+    def test_history_unavailable_responses_match_documented_examples(self):
+        path = "/api/v1/timetable/history"
+        query = urlencode({"school": "2:예시학교", "week": self.start.isoformat()})
+        examples = self.spec["paths"][path]["get"]["responses"]["503"]["content"]["application/json"]["examples"]
+        for store, example in ((None, "disabled"), (Mock(list=Mock(side_effect=OSError("storage"))), "unavailable")):
+            with self.subTest(example=example), patch("backend.app._history_store", return_value=store):
+                status, headers, body = dispatch_request("GET", path, query, self.cache)
+                self.assertEqual(status, 503)
+                self.assert_json_response(path, status, headers, body)
+                self.assertEqual(json.loads(body), examples[example]["value"])
+
     def test_other_read_endpoints_follow_response_schemas(self):
         path = "/api/v1/status"
         status, headers, body = dispatch_request("GET", path, "")
