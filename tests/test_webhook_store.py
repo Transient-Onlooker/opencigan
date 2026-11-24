@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from backend.webhook_store import WebhookStore, enqueue_observed_change, quiet_until
-from backend.webhook_worker import deliver_next
+from backend.webhook_worker import deliver_next, run_worker
 from backend.history import HistoryStore
 
 
@@ -91,6 +91,20 @@ class WebhookStoreTests(unittest.TestCase):
         with closing(sqlite3.connect(self.path)) as db:
             self.assertEqual(db.execute("SELECT state FROM webhook_deliveries").fetchone()[0], "failed")
         self.store.claim(now=460 + 30 * 24 * 60 * 60 + 1)
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM webhook_deliveries").fetchone()[0], 0)
+
+    def test_idle_worker_prunes_expired_delivery_without_new_events(self):
+        from unittest.mock import Mock
+        identifier = self.subscription["id"]
+        self.store.enqueue(identifier, "finished", b'{}', now=100)
+        claim = self.store.claim(now=100)
+        self.store.finish(claim["id"], claim["leaseToken"], {"delivered": True, "retryable": False}, now=100)
+        stop = Mock()
+        stop.is_set.side_effect = [False, True]
+        with patch("backend.webhook_store.time.time", return_value=100 + 30 * 24 * 60 * 60 + 1):
+            run_worker(self.store, stop)
+        stop.wait.assert_called_once_with(2)
         with closing(sqlite3.connect(self.path)) as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM webhook_deliveries").fetchone()[0], 0)
 
