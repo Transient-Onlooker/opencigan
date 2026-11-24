@@ -97,7 +97,7 @@ test('custom domain uses the same-origin gateway when no API base is configured'
   await page.getByLabel('학교 ID').fill('2:예시학교');
   await page.getByLabel('학년', { exact: true }).fill('2');
   await page.getByLabel('반', { exact: true }).fill('3');
-  await page.getByLabel('Webhook 주소').fill('https://discord.com/api/webhooks/123/secret');
+  await page.getByLabel('Webhook 주소', { exact: true }).fill('https://discord.com/api/webhooks/123/secret');
   await page.getByRole('button', { name: '구독 만들기' }).click();
   await expect(page.getByLabel('관리 토큰')).toHaveValue('b'.repeat(43));
   await page.unrouteAll({ behavior: 'wait' });
