@@ -785,7 +785,16 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+        '503':
+          description: History storage is disabled or temporarily unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                disabled:
+                  value: { error: 변경 이력 저장이 활성화되지 않았습니다, code: history_disabled }
+                unavailable:
+                  value: { error: 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요., code: upstream_unavailable }
 components:
   securitySchemes:
     WebhookManagement:
