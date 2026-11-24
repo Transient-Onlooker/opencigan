@@ -36,3 +36,25 @@ class PinSyncTests(unittest.TestCase):
             run.side_effect = clone
             self.assertEqual(sync("b" * 40, key, dry_run=True), "would_sync")
             self.assertEqual(run.call_count, 1)
+
+    @unittest.skipIf(os.name == "nt", "requires Unix file permissions")
+    @patch("deploy.sync_pin.subprocess.check_output", return_value="backend/requirements.txt\n")
+    @patch("deploy.sync_pin.subprocess.run")
+    def test_commit_uses_repository_author_identity(self, run, check_output):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            key = root / "key"
+            key.touch(mode=0o600)
+            key.with_name("opencigan-github-known-hosts").touch(mode=0o600)
+            def command(args, **kwargs):
+                if "clone" in args:
+                    checkout = Path(args[-1])
+                    (checkout / "backend").mkdir(parents=True)
+                    (checkout / "backend/requirements.txt").write_text(
+                        "pycomcigan @ git+https://github.com/Transient-Onlooker/pycomcigan.git@" + "a" * 40 + "\n")
+            run.side_effect = command
+            self.assertEqual(sync("b" * 40, key), "synced")
+            commit = next(call for call in run.call_args_list if "commit" in call.args[0])
+            self.assertIn("user.name=Transient-Onlooker", commit.args[0])
+            self.assertIn("user.email=swapomit@gmail.com", commit.args[0])
+            self.assertNotIn("GIT_AUTHOR_NAME", commit.kwargs["env"])

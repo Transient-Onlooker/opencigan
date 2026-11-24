@@ -1,0 +1,10 @@
+[Unit]
+Description=Check verified pycomcigan fork releases
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/opensigan-releases/current
+ExecStart=%h/opensigan-releases/current/.venv/bin/python -m deploy.watch_release --root %h/.local/share/opencigan/components/pycomcigan --release %h/opensigan-releases/current --school 53143:보인고등학교
+Nice=10
