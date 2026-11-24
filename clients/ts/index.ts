@@ -113,14 +113,16 @@ export class OpensiganError extends Error {
   readonly code?: string;
   readonly isTimeout: boolean;
   readonly isNetworkError: boolean;
+  readonly retryAfter?: string;
 
-  constructor(message: string, options: { status?: number; code?: string; isTimeout?: boolean; isNetworkError?: boolean } = {}) {
+  constructor(message: string, options: { status?: number; code?: string; isTimeout?: boolean; isNetworkError?: boolean; retryAfter?: string } = {}) {
     super(message);
     this.name = 'OpensiganError';
     this.status = options.status;
     this.code = options.code;
     this.isTimeout = Boolean(options.isTimeout);
     this.isNetworkError = Boolean(options.isNetworkError);
+    this.retryAfter = options.retryAfter;
   }
 }
 
@@ -185,7 +187,7 @@ export class OpensiganClient {
           ? body.code : undefined;
         const message = body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
           ? body.error : `Request failed (HTTP ${status}).`;
-        throw new OpensiganError(message, { status, code });
+        throw new OpensiganError(message, { status, code, retryAfter: response.headers.get('Retry-After') ?? undefined });
       }
       if (!body || typeof body !== 'object' || Array.isArray(body)) {
         throw new OpensiganError('Response must be a JSON object.', { status, code: 'invalid_response' });

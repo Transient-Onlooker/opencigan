@@ -139,6 +139,7 @@ Both examples accept an optional school-name search as the final argument. They 
 Both clients raise structured error types (`OpensiganError`) containing:
 - `status`: HTTP status code (e.g. 400, 404, 429, 503)
 - `code`: API machine-readable error code (`invalid_request`, `not_found`, `upstream_unavailable`, `history_disabled`, `rate_limited`)
+- TypeScript `retryAfter` / Python `retry_after`: the original `Retry-After` header on HTTP errors, or `undefined` / `None` when absent. It can contain seconds or an HTTP date. Clients do not retry automatically.
 - TypeScript `isTimeout` / Python `is_timeout`: timeout flag
 - TypeScript `isNetworkError` / Python `is_network_error`: connection/read failure flag
 - Client-only `invalid_response`: malformed/empty JSON or a non-object success response; `status` preserves the HTTP status.

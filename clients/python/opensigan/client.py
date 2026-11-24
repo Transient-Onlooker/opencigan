@@ -7,12 +7,13 @@ from http.client import HTTPException
 
 
 class OpensiganError(Exception):
-    def __init__(self, message, status=None, code=None, is_timeout=False, is_network_error=False):
+    def __init__(self, message, status=None, code=None, is_timeout=False, is_network_error=False, retry_after=None):
         super().__init__(message)
         self.status = status
         self.code = code
         self.is_timeout = is_timeout
         self.is_network_error = is_network_error
+        self.retry_after = retry_after
 
 
 def _validate_timeout(timeout):
@@ -69,7 +70,7 @@ class OpensiganClient:
         except (OSError, HTTPException):
             raise OpensiganError("Unable to connect to the API or read its response.", is_network_error=True) from None
 
-    def _parse_json(self, body, status):
+    def _parse_json(self, body, status, headers=None):
         try:
             parsed = json.loads(body.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
@@ -82,14 +83,15 @@ class OpensiganClient:
             raise OpensiganError(
                 message if isinstance(message, str) else f"Request failed (HTTP {status}).",
                 status=status, code=code if isinstance(code, str) else None,
+                retry_after=headers.get("Retry-After") if headers is not None else None,
             )
         if not isinstance(parsed, dict):
             raise OpensiganError("Response must be a JSON object.", status=status, code="invalid_response")
         return parsed
 
     def _get_json(self, path, params=None, timeout=None):
-        status, _, body = self._request(self._build_url(path, params), timeout=timeout)
-        return self._parse_json(body, status)
+        status, headers, body = self._request(self._build_url(path, params), timeout=timeout)
+        return self._parse_json(body, status, headers)
 
     def get_status(self, timeout=None):
         return self._get_json("/api/v1/status", timeout=timeout)
@@ -126,7 +128,7 @@ class OpensiganClient:
         if status == 304:
             return None, True, etag
         if not 200 <= status < 300:
-            self._parse_json(body, status)
+            self._parse_json(body, status, response_headers)
         try:
             return body.decode("utf-8"), False, etag
         except UnicodeDecodeError:
