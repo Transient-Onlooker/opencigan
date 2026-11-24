@@ -1,6 +1,8 @@
 import unittest
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import Mock, patch
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request
 
 from backend import comcigan_proxy
@@ -47,12 +49,63 @@ class ComciganProxyTests(unittest.TestCase):
                 opener.open.side_effect = TimeoutError("private details")
                 with self.assertRaises(TimeoutError):
                     helpers.urlopen(Request("http://comci.net:4082/private?school=secret"))
-            self.assertIn("stage=service_page duration_ms=250.0", logs.output[0])
-            self.assertIn("stage=data duration_ms=500.0", logs.output[1])
+            self.assertIn("stage=service_page duration_ms=250.0 result=success timeout_s=30", logs.output[0])
+            self.assertIn("stage=data duration_ms=500.0 result=timeout timeout_s=30", logs.output[1])
             self.assertEqual(opener.open.call_args.kwargs['timeout'], 30)
             for line in logs.output:
                 for private in ("secret", "school", "comci.net", "private details"):
                     self.assertNotIn(private, line)
+
+    def test_wrapped_timeout_and_network_error_are_distinguished_without_error_details(self):
+        import pycomcigan.helpers as helpers
+        original = helpers.urlopen
+        self.addCleanup(setattr, helpers, "urlopen", original)
+        opener = Mock()
+        with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": "http://127.0.0.1:18084"}), \
+             patch.object(comcigan_proxy, "build_opener", return_value=opener):
+            comcigan_proxy.configure_comcigan_proxy()
+            for reason, result in ((TimeoutError("private"), "timeout"), (OSError("private"), "network_error")):
+                with self.subTest(result=result):
+                    opener.open.side_effect = URLError(reason)
+                    with self.assertLogs("opensigan.comcigan_proxy", level="INFO") as logs:
+                        with self.assertRaises(URLError):
+                            helpers.urlopen(Request("http://comci.net:4082/st?school=secret"))
+                    self.assertIn(f"result={result} timeout_s=30", logs.output[0])
+                    self.assertNotIn("secret", logs.output[0])
+                    self.assertNotIn("private", logs.output[0])
+
+    def test_proxy_header_wait_obeys_connection_timeout(self):
+        import pycomcigan.helpers as helpers
+        original = helpers.urlopen
+        self.addCleanup(setattr, helpers, "urlopen", original)
+        release = threading.Event()
+        started = threading.Event()
+
+        class SlowProxy(BaseHTTPRequestHandler):
+            def do_GET(self):
+                started.set()
+                release.wait(2)
+
+            def log_message(self, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), SlowProxy)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            proxy = f"http://127.0.0.1:{server.server_port}"
+            with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": proxy}):
+                comcigan_proxy.configure_comcigan_proxy()
+                with self.assertLogs("opensigan.comcigan_proxy", level="INFO") as logs:
+                    with self.assertRaises((TimeoutError, URLError)):
+                        helpers.urlopen(Request("http://comci.net:4082/st"), timeout=0.15)
+                self.assertTrue(started.is_set())
+                self.assertIn("result=timeout timeout_s=0.15", logs.output[0])
+        finally:
+            release.set()
+            server.shutdown()
+            server.server_close()
+            thread.join()
 
     def test_rejection_status_logged_without_request_details(self):
         import pycomcigan.helpers as helpers
