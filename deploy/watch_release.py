@@ -41,11 +41,14 @@ def poll(root, release, school, week):
         raise ValueError("Unsafe watcher state")
     with lock.open("a") as handle:
         fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        state = {}
         if status.is_file():
             state = json.loads(status.read_text(encoding="utf-8"))
             if state.get("success") and state.get("pinSync") in ("pending", "failed"):
                 return retry_pending_pin(root)
         tag, sha = latest_release()
+        if state.get("requestedSha") == sha and state.get("phase") == "activation_failed":
+            return {"skipped": True, "reason": "previous_activation_failed", "requestedSha": sha}
         return deploy(tag, sha, root, release, school, week)
 
 
@@ -57,7 +60,11 @@ def main():
     args = parser.parse_args()
     today = datetime.now(timezone(timedelta(hours=9))).date()
     week = (today - timedelta(days=today.weekday())).isoformat()
-    print(json.dumps(poll(args.root, args.release, args.school, week)))
+    try:
+        result = poll(args.root, args.release, args.school, week)
+    except BlockingIOError:
+        result = {"skipped": True, "reason": "deployment_locked"}
+    print(json.dumps(result))
 
 
 if __name__ == "__main__":

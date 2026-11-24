@@ -37,3 +37,13 @@ class WatchReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             self.assertTrue(poll(temporary, "/release", "1:A", "2026-11-23")["success"])
             deploy.assert_called_once_with("1.4.6", "a" * 40, Path(temporary), "/release", "1:A", "2026-11-23")
+
+    @patch("deploy.watch_release.deploy")
+    @patch("deploy.watch_release.latest_release", return_value=("1.4.6", "a" * 40))
+    def test_failed_activation_is_not_repeated_by_timer(self, latest, deploy):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "deployment-status.json").write_text(json.dumps({
+                "requestedSha": "a" * 40, "success": False, "phase": "activation_failed"}))
+            self.assertEqual(poll(root, "/release", "1:A", "2026-11-23")["reason"], "previous_activation_failed")
+            deploy.assert_not_called()
