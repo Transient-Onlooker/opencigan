@@ -62,6 +62,17 @@ class WebhookApiTests(unittest.TestCase):
             self.assertEqual(dispatch_request("POST", "/api/v1/webhooks", "", request_body=b"[" * 1500 + b"]" * 1500)[0], 400)
             self.assertEqual(self.request("POST", "/api/v1/webhooks", {**self.payload, "school": "2:bad\nname"})[0], 400)
 
+    def test_subscription_limit_is_enforced_without_deleting_existing_subscriptions(self):
+        with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}), \
+             patch("backend.webhook_store.MAX_SUBSCRIPTIONS", 1):
+            status, _, body = self.request("POST", "/api/v1/webhooks", self.payload)
+            self.assertEqual(status, 200)
+            created = json.loads(body)
+            status, _, body = self.request("POST", "/api/v1/webhooks", self.payload)
+            self.assertEqual(status, 503)
+            self.assertEqual(json.loads(body)["code"], "subscription_limit")
+            self.assertEqual(self.request("GET", "/api/v1/webhooks/" + created["id"], token=created["token"])[0], 200)
+
     def test_subscription_requests_have_their_own_rate_limit(self):
         with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
             for _ in range(60):

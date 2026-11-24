@@ -20,6 +20,7 @@ class SubscriptionLimitError(Exception):
 
 MAX_PENDING_PER_SUBSCRIPTION = 1000
 MAX_DELIVERY_RECORDS = 50000
+MAX_SUBSCRIPTIONS = 500
 MAX_DELIVERY_ATTEMPTS = 6
 DELIVERY_RETENTION_SECONDS = 30 * 24 * 60 * 60
 
@@ -186,7 +187,7 @@ class WebhookStore:
         with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
             try:
-                if db.execute("SELECT COUNT(*) FROM webhook_subscriptions").fetchone()[0] >= 500:
+                if db.execute("SELECT COUNT(*) FROM webhook_subscriptions").fetchone()[0] >= MAX_SUBSCRIPTIONS:
                     raise SubscriptionLimitError()
                 db.execute("INSERT INTO webhook_subscriptions(id, token_hash, school, grade, classroom, destination, provider, signing_secret) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                            (identifier, self._token_hash(token), school, grade, classroom, destination, provider, secrets.token_bytes(32)))
