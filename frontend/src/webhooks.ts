@@ -51,7 +51,7 @@ function reset() {
   controller.abort(); controller = new AbortController();
   window.clearTimeout(previewTimer);
   previewRevision += 1;
-  input('id').value = ''; input('token').value = ''; input('destination').value = '';
+  input('id').value = ''; input('token').value = ''; input('destination').value = ''; input('new-destination').value = '';
   clearRotation();
   manage.hidden = true; table.replaceChildren();
   document.querySelector<HTMLFormElement>('#filters')!.reset(); document.querySelector('#scope')!.textContent = '';
@@ -373,6 +373,13 @@ document.querySelector('#filters')!.addEventListener('submit', (event) => {
     const start = input('quiet-start').value, end = input('quiet-end').value;
     if (start || end) { if (!start || !end || start === end) throw new Error('방해 금지 시작과 종료를 서로 다르게 입력해 주세요.'); filters.quietHours = { start, end }; }
     await call(subscriptionPath(), 'PUT', { filters }); state.textContent = '알림 조건을 저장했어요.';
+  });
+});
+document.querySelector('#destination-form')!.addEventListener('submit', (event) => {
+  event.preventDefault(); void run(async () => {
+    await call(subscriptionPath(), 'PUT', { destination: input('new-destination').value });
+    input('new-destination').value = '';
+    state.textContent = '전송 주소를 변경했어요.';
   });
 });
 document.querySelector('#test')!.addEventListener('click', () => { void run(async () => { const path = subscriptionPath(); await call(`${path}/test`, 'POST'); await loadDeliveries(path); state.textContent = '테스트 알림을 대기열에 넣었어요. 전송 상태를 확인해 주세요.'; }); });

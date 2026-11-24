@@ -2,6 +2,8 @@ import io
 import json
 import tempfile
 import unittest
+import yaml
+from jsonschema import Draft202012Validator
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -72,6 +74,33 @@ class WebhookApiTests(unittest.TestCase):
             self.assertEqual(status, 503)
             self.assertEqual(json.loads(body)["code"], "subscription_limit")
             self.assertEqual(self.request("GET", "/api/v1/webhooks/" + created["id"], token=created["token"])[0], 200)
+    def test_destination_update_requires_token_and_preserves_pending_delivery(self):
+        with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
+            _, _, body = self.request("POST", "/api/v1/webhooks", self.payload)
+            created = json.loads(body)
+            path = "/api/v1/webhooks/" + created["id"]
+            store = WebhookStore(self.path)
+            store.enqueue(created["id"], "event_1", b'{}', now=100)
+            new_url = "https://discord.com/api/webhooks/456/new_secret"
+            self.assertEqual(self.request("PUT", path, {"destination": new_url}, token="wrong")[0], 401)
+            self.assertEqual(self.request("PUT", path, {"destination": "https://chat.googleapis.com/v1/spaces/a/messages?key=k&token=t"}, token=created["token"])[0], 400)
+            self.assertEqual(self.request("PUT", path, {"destination": "https://127.0.0.1/"}, token=created["token"])[0], 400)
+            status, _, response = self.request("PUT", path, {"destination": new_url}, token=created["token"])
+            self.assertEqual(status, 200)
+            self.assertNotIn(b"new_secret", response)
+            claim = store.claim(now=100)
+            self.assertEqual(claim["event_id"], "event_1")
+            self.assertEqual(claim["destination"], new_url)
+            self.assertNotIn(b"new_secret", self.request("GET", path, token=created["token"])[2])
+
+    def test_update_request_schema_matches_exclusive_payloads(self):
+        spec = yaml.safe_load((Path(__file__).resolve().parents[1] / "docs" / "openapi.yaml").read_text(encoding="utf-8"))
+        schema = spec["paths"]["/api/v1/webhooks/{id}"]["put"]["requestBody"]["content"]["application/json"]["schema"]
+        validator = Draft202012Validator(schema)
+        self.assertTrue(validator.is_valid({"filters": {"period": 1}}))
+        self.assertTrue(validator.is_valid({"destination": "https://discord.com/api/webhooks/123/token"}))
+        self.assertFalse(validator.is_valid({}))
+        self.assertFalse(validator.is_valid({"filters": {}, "destination": "https://discord.com/api/webhooks/123/token"}))
 
     def test_subscription_requests_have_their_own_rate_limit(self):
         with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):

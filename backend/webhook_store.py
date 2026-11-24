@@ -228,6 +228,25 @@ class WebhookStore:
             return db.execute("UPDATE webhook_subscriptions SET filters_json=? WHERE id=? AND token_hash=?",
                               (json.dumps(filters, ensure_ascii=False), identifier, self._token_hash(token))).rowcount == 1
 
+    def update_destination(self, identifier, token, destination):
+        provider = validate_destination(destination)
+        with closing(self._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                row = db.execute("SELECT provider FROM webhook_subscriptions WHERE id=? AND token_hash=?",
+                                 (identifier, self._token_hash(token))).fetchone()
+                if row is None:
+                    db.execute("COMMIT")
+                    return False
+                if row["provider"] != provider:
+                    raise ValueError("provider cannot be changed")
+                db.execute("UPDATE webhook_subscriptions SET destination=? WHERE id=?", (destination, identifier))
+                db.execute("COMMIT")
+                return True
+            except BaseException:
+                db.execute("ROLLBACK")
+                raise
+
     def get_template(self, identifier, token):
         with closing(self._connect()) as db:
             row = db.execute("SELECT provider, template_json FROM webhook_subscriptions WHERE id=? AND token_hash=?",

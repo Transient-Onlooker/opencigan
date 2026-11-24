@@ -102,9 +102,11 @@ def webhook_api(method, path, body, request_headers, client, headers, rate_allow
             return respond(405, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
         elif method == "PUT":
             payload = json.loads(body or b"{}")
-            if not isinstance(payload, dict) or set(payload) != {"filters"}:
+            if not isinstance(payload, dict) or set(payload) not in ({"filters"}, {"destination"}):
                 raise ValueError("invalid payload")
-            result = {"updated": True} if store.update_filters(identifier, token, payload["filters"]) else None
+            updated = (store.update_filters(identifier, token, payload["filters"]) if "filters" in payload
+                       else store.update_destination(identifier, token, payload["destination"]))
+            result = {"updated": True} if updated else None
         elif method == "DELETE":
             result = {"deleted": True} if store.delete(identifier, token) else None
         else:
