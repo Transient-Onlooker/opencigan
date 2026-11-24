@@ -157,6 +157,17 @@ class WebhookStoreTests(unittest.TestCase):
         with closing(sqlite3.connect(self.path)) as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM webhook_deliveries").fetchone()[0], 1)
 
+    def test_global_capacity_recovers_after_expired_history_is_pruned(self):
+        identifier = self.subscription["id"]
+        with patch("backend.webhook_store.MAX_DELIVERY_RECORDS", 1):
+            self.assertTrue(self.store.enqueue(identifier, "finished", b'{}', now=100))
+            claim = self.store.claim(now=100)
+            self.assertTrue(self.store.finish(claim["id"], claim["leaseToken"],
+                                              {"delivered": True, "retryable": False}, now=100))
+            self.assertFalse(self.store.enqueue(identifier, "new", b'{}', now=101))
+            self.assertIsNone(self.store.claim(now=100 + 30 * 24 * 60 * 60 + 1))
+            self.assertTrue(self.store.enqueue(identifier, "new", b'{}', now=100 + 30 * 24 * 60 * 60 + 2))
+
     def test_rejects_invalid_external_inputs(self):
         with self.assertRaises(ValueError):
             self.store.create("2:예시학교", True, 1, "https://discord.com/api/webhooks/123/secret")
