@@ -1099,7 +1099,8 @@ test('meal menu search, allergy filters, NEIS details and timetable date link wo
   await page.goto('/' + sharedHash(1));
   await page.getByRole('button', { name: '급식', exact: true }).click();
   await expect(page.getByText('열량(NEIS 원문): 650 kcal')).toBeVisible();
-  await expect(page.locator('.meal-filter-note')).toHaveCount(0);
+  await expect(page.locator('#meals-panel .meal-filter-note')).toContainText('모든 메뉴 표시 중');
+  await expect(page.locator('#meals-panel .meal-filter-note')).toContainText('미표시 메뉴도 안전을 보장하지 않습니다');
   const allergyWarning = page.locator('.meal-types li.warning').filter({ hasText: '계란말이' });
   await expect(allergyWarning).toContainText('⚠ 주의: 1. 난류');
   await expect(allergyWarning).toHaveCSS('border-left-color', 'rgb(196, 38, 61)');
@@ -1132,6 +1133,7 @@ test('meal menu search, allergy filters, NEIS details and timetable date link wo
   await expect(page.getByText('검색·필터에 맞는 메뉴가 없어요.')).toBeVisible();
   await page.getByRole('searchbox', { name: '메뉴 검색' }).clear();
   await page.getByRole('button', { name: '주간 식단' }).click();
+  await expect(page.locator('#meals-panel .meal-filter-note')).toContainText('선택한 알레르기 1개');
   await expect(page.getByText('김치볶음밥(5.6)')).toBeVisible();
   await page.getByRole('button', { name: '하루 식단' }).click();
   await page.getByRole('button', { name: '알레르기 설정', exact: true }).click();
@@ -1169,6 +1171,23 @@ test('active allergy filter remains visible without a selected school or meal da
   await page.reload();
   await page.getByRole('button', { name: '급식', exact: true }).click();
   await expect(note).toBeVisible();
+  await note.getByRole('button', { name: '알레르기 설정' }).click();
+  await expect(page.getByLabel('메뉴 표시 방식')).toBeFocused();
+});
+
+test('today meals show allergy status and link to settings', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 844 });
+  await page.addInitScript(() => {
+    localStorage.setItem('opensigan-allergies', '[1]');
+    localStorage.setItem('opensigan-meal-allergy-filter', 'unmarked');
+  });
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  await page.getByRole('group', { name: '시간표 보기' }).getByRole('button', { name: '오늘', exact: true }).click();
+  const note = page.locator('.today-meals .meal-filter-note');
+  await expect(note).toBeVisible();
+  await expect(note).toContainText('선택한 알레르기 1개');
+  await expect(note).toContainText('미표시 메뉴도 안전을 보장하지 않습니다');
   await note.getByRole('button', { name: '알레르기 설정' }).click();
   await expect(page.getByLabel('메뉴 표시 방식')).toBeFocused();
 });

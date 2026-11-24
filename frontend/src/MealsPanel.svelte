@@ -1,5 +1,6 @@
 <script lang="ts">
   import MealMenu from './MealMenu.svelte';
+  import MealAllergyStatus from './MealAllergyStatus.svelte';
   import { addDays, pasteDate } from './date';
   import type { Meal, NeisSchool, School } from './api';
   import type { MealAllergyFilter } from './meal-filter';
@@ -43,9 +44,7 @@
           <div class="view-switch" role="group" aria-label="급식 보기"><button aria-pressed={mealView === 'day'} onclick={() => setMealView('day')}>하루 식단</button><button aria-pressed={mealView === 'week'} onclick={() => setMealView('week')}>주간 식단</button></div>
           <div class="calendar-toolbar"><button class="arrow-button" onclick={() => changeMealDate(mealView === 'week' ? -7 : -1)} aria-label={mealView === 'week' ? '이전 급식 주' : '이전 날짜'}>←</button><div class="calendar-date"><strong aria-live="polite">{mealView === 'week' ? dateText(mealDates[0]) + ' — ' + dateText(mealDates[6]) : dateText(mealDate, { month: 'long', day: 'numeric', weekday: 'long' })}</strong><label class="date-picker">날짜 선택 <input type="date" min="1900-01-01" max="9999-12-31" value={mealDateDraft} oninput={updateMealDateDraft} onpaste={pasteDate} onchange={(event) => selectMealDate(event, true)} onblur={selectMealDate} onkeydown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} aria-invalid={!!dateError} aria-describedby={dateError ? 'meal-date-error' : undefined} /></label></div><button class="arrow-button" onclick={() => changeMealDate(mealView === 'week' ? 7 : 1)} aria-label={mealView === 'week' ? '다음 급식 주' : '다음 날짜'}>→</button></div>
           {#if dateError}<p id="meal-date-error" class="notice" role="alert">{dateError}</p>{/if}
-          {#if mealAllergyFilter !== 'all'}
-            <p class="meal-filter-note">알레르기 필터 적용 중 · 선택한 알레르기 {allergySelection.length}개 · {mealAllergyFilter === 'marked' ? '표시된 메뉴만' : '미표시 메뉴만'} 표시. 미표시 메뉴도 안전을 보장하지 않습니다.{!allergySelection.length ? ' 주의 알레르기를 선택해 주세요.' : ''} <button type="button" class="text-button" onclick={openAllergySettings}>알레르기 설정</button></p>
-          {/if}
+          <MealAllergyStatus selection={allergySelection} filter={mealAllergyFilter} openSettings={openAllergySettings} />
            <div class="meal-connection" aria-live="polite">{!neis && school ? neisSearchState : ''}</div>
           {#if !school}<div class="state-message"><strong>학교를 먼저 선택해 주세요</strong><p>시간표 학교를 선택하면 급식도 함께 연결돼요.</p></div>
           {:else if neisLoading}<div class="state-message" role="status">같은 학교의 급식을 연결하고 있어요.</div>
@@ -77,5 +76,4 @@
 <style>
 .meal-connection{font-size:14px;color:var(--muted);margin:0 0 18px;overflow-wrap:anywhere}
 .meal-connection:empty{display:none}
-.meal-filter-note{margin:0 0 14px;color:var(--muted);font-size:12px;line-height:1.6;overflow-wrap:anywhere}.meal-filter-note button{min-height:44px}
 </style>
