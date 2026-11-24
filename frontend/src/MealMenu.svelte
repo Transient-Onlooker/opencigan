@@ -47,11 +47,12 @@
         {#if onDateSelect}
           {#if date >= timetableFrom && date <= timetableTo}
             <button type="button" onclick={() => onDateSelect?.(date)}>이 날짜 시간표</button>
-          {:else}
-            <span class="meal-range-note">시간표는 이번 주·다음 주만 조회할 수 있어요.</span>
           {/if}
         {/if}
       </header>
+      {#if onDateSelect && (date < timetableFrom || date > timetableTo)}
+        <p class="meal-range-note">급식은 표시된 날짜의 식단이에요. 시간표 연결은 이번 주·다음 주 날짜에만 제공돼요.</p>
+      {/if}
       {#if !meals.some((meal) => meal.date === date && visibleTypes.includes(meal.type))}
         <p class="meal-day-empty">{meals.some((meal) => meal.date === date) ? '표시하도록 설정한 식사에 등록된 식단이 없어요.' : '이 날짜에 등록된 식단이 없어요.'}</p>
       {:else}
@@ -102,7 +103,7 @@
   .meal-filters label{display:grid;gap:5px;flex:1;min-width:min(220px,100%);font-size:13px;font-weight:650}
   .meal-filters input,.meal-day button{width:100%;min-height:44px;max-width:100%;padding:8px 10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit}
   .meal-day button{width:auto;cursor:pointer;font-size:13px}
-  .meal-range-note{font-size:12px;color:var(--muted);line-height:1.6;overflow-wrap:anywhere}
+  .meal-range-note{margin:0;padding:10px 14px 0;font-size:12px;color:var(--muted);line-height:1.6;overflow-wrap:anywhere}
   .meal-days{display:grid;gap:14px}
   .meal-day{min-width:0;border:1px solid var(--line)}
   .meal-day.current{border-color:var(--ink)}
