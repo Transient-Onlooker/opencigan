@@ -446,11 +446,18 @@
   function chooseNeis(value: NeisSchool) {
     mealSession.choose(value, (selected) => { if (school) writeMealSchool(localStorage, school.id, selected); }, loadMeals);
   }
+  function replaceInvalidSharedAddress(fallback: { school: School | null; grade: number; classroom: number }) {
+    if (typeof window.history?.replaceState !== 'function') return;
+    const url = new URL(window.location.href);
+    url.hash = fallback.school ? new URL(shareClassUrl(url.href, fallback.school, fallback.grade, fallback.classroom)).hash : '';
+    window.history.replaceState(window.history.state, '', url.href);
+  }
   function ensureAvailableClass() {
     if (pendingSharedClass && pendingSharedClass.schoolId === school?.id && !sharedCandidateRequest) {
       const pending = sharedSelection.consume()!;
       const outcome = selectionState.resolveShared(pending, timetable, timetableFromDevice, school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6);
       if (outcome.status === 'rolled-back') {
+        replaceInvalidSharedAddress(outcome.fallback);
         const message = outcome.reason === 'missing'
           ? `공유 링크의 ${pending.grade}학년 ${pending.classroom}반이 선택한 주의 시간표 데이터에 없어 적용하지 않았어요.`
           : '시간표 데이터가 없어 공유 링크의 학년·반을 확인하지 못했어요.';
@@ -753,6 +760,7 @@
         const valid = validateSharedCandidate(candidate, verified, requestedWeek, shared.grade, shared.classroom);
         if (!valid || !candidate) {
           sharedSelection.consume();
+          replaceInvalidSharedAddress(fallback);
           const available = candidate?.schoolId === verified.id && candidate.weekStart === requestedWeek && !candidate.stale && candidate.records.length > 0;
           const reason = available ? '선택한 주의 시간표에 없어요.' : '시간표 데이터를 확인할 수 없어요.';
           sharedClassState = `공유 링크의 ${shared.grade}학년 ${shared.classroom}반은 ${reason} 기존 ${fallback.school.name} ${fallback.grade}학년 ${fallback.classroom}반을 유지했어요.`;

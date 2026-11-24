@@ -601,6 +601,10 @@ test('invalid shared classroom explains why the saved class is retained', async 
   await expect(page.getByRole('status').filter({ hasText: '공유 링크의 1학년 99반' })).toContainText('기존 봄빛고등학교 1학년 2반을 유지');
   await expect(page.getByRole('status').filter({ hasText: '공유 링크의 1학년 99반' })).toContainText('시간표에 없어요');
   expect(await page.evaluate(() => localStorage.getItem('opensigan-class'))).toBe('2');
+  await expect.poll(() => new URLSearchParams(new URL(page.url()).hash.slice(1)).get('class')).toBe('2');
+  await page.reload();
+  await expect(page.locator('.quick-class select').nth(1)).toHaveValue('2');
+  expect(await page.evaluate(() => localStorage.getItem('opensigan-class'))).toBe('2');
 });
 
 test('invalid shared classroom exposes an error and can be corrected without saving the forged class', async ({ page }) => {
@@ -610,6 +614,7 @@ test('invalid shared classroom exposes an error and can be corrected without sav
   await expect(input).toBeVisible();
   await expect(input).toHaveAttribute('aria-invalid', 'true');
   await expect(page.locator('#class-error')).toContainText('1학년 7반');
+  expect(new URL(page.url()).hash).toBe('');
   expect(await page.evaluate(() => localStorage.getItem('opensigan-school'))).toBeNull();
   await input.fill('2');
   await input.press('Tab');
