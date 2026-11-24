@@ -3,7 +3,7 @@
 정적 웹앱과 Raspberry Pi API를 배포하거나 점검하는 운영자를 위한 문서입니다. **구성 및 마지막 배포 기록**과 **현재 실측한 상태**를 구별하세요.
 
 - 공식 웹: [opencigan.mcv.kr](https://opencigan.mcv.kr/) · 보조 주소: [opencigan.pages.dev](https://opencigan.pages.dev/) — 동일한 Cloudflare Pages 및 API 백엔드 경로를 사용합니다.
-- 2026-11-19의 Worker/Pi 배포와 기능 확인은 [운영 기록](cloudflare-tunnel-rollout.md)에 남아 있습니다. 그 이후 변경 여부는 실제 버전·서비스 상태로 확인해야 합니다.
+- 2026-11-19의 Worker/Pi 배포 기록은 [운영 기록](cloudflare-tunnel-rollout.md), 이후 내부 API와 검증된 컴포넌트 배포는 [내부 시간표 운영 문서](internal-timetable.md)에 있습니다. 현재 상태는 실제 버전과 서비스 상태로 확인해야 합니다.
 - [서비스 토폴로지](../architecture.md) · [Cloudflare 게이트웨이 구성](../../cloudflare-gateway/README.md)
 
 ## 실행 경로 구분
@@ -13,11 +13,12 @@
 | **Cloudflare Pages** | 공식/보조 웹 주소, Svelte 정적 프런트엔드, Pages Functions | `opencigan.mcv.kr` · `opencigan.pages.dev` |
 | **Cloudflare API Worker** | Service Binding `OPENCIGAN_GATEWAY`, VPC `PRIVATE_API` | 외부에 독립 `workers.dev` API 호스트를 열지 않는 비공개 연결 |
 | **Pi Python API** | `backend.app` / Waitress, 데이터 조회·캐시 | `127.0.0.1:8000` 루프백 수신, Cloudflare Tunnel로 연결 |
-| **Pi LAN 미리보기** | 독립적인 개발/검수 화면 및 API | `LAN_HOST:8080/opensigan/`, 지정 내부망에서만 |
+| **Pi 내부 시간표 API** | 토큰 인증, 캐시 없는 시간표 조회 | `127.0.0.1:8001`, 공개 경로에 연결하지 않음 |
+| **Pi LAN 미리보기** | 선택적인 개발/검수 화면 및 API | 2026-11-25 중지 및 자동 시작 해제; 필요한 경우 별도 확인 후 사용 |
 | **기존 GitHub Pages** | 보존된 별도 정적 프런트엔드 배포 | 저장소 변수 `API_BASE_URL`로 별도 API 출처 지정 |
 | **과거 Workers/D1 실험** | `experiments/workers-api/`의 예전 실험 코드 | 현재 운영하는 `cloudflare-gateway/` Worker와 다름 |
 
-운영 파일: `deploy/opensigan.service`, `deploy/opensigan-preview.service`, `deploy/opensigan-preview-p0.conf`, `deploy/rpi-guard-opensigan.conf`. 서비스는 `systemd --user`에서 실행하도록 설계되어 있습니다. 자동 시작 여부와 실제 설치 상태는 RPi에서 따로 확인해야 합니다.
+운영 파일: `deploy/opensigan.service`, `deploy/opencigan-internal.service`, `deploy/opencigan-release-watch.service`와 `.timer`. 이전 미리보기용 `deploy/opensigan-preview.service` 및 관련 설정은 선택적입니다. 서비스는 `systemd --user`에서 실행하며 실제 설치·자동 시작 상태는 Pi에서 확인합니다.
 
 ## 외부 데이터 연결
 
@@ -34,9 +35,9 @@
 ## 비파괴적 점검 (RPi 내부)
 
 ```bash
-systemctl --user status opensigan opensigan-preview --no-pager
+systemctl --user status opensigan opencigan-internal opencigan-release-watch.timer --no-pager
 curl --fail --silent --show-error http://127.0.0.1:8000/api/v1/status
-journalctl --user -u opensigan-preview -n 30 --no-pager
+journalctl --user -u opencigan-release-watch.service -n 30 --no-pager
 ```
 
 `/api/v1/status`는 프로세스가 응답하는지만 확인하며 컴시간 또는 NEIS 상태를 보장하지 않습니다. 자세한 외부 API 점검은 [API 가이드](../api-guide.md) 참조. 실제 학교 검색/시간표·급식 호출은 원본 서버에 트래픽을 발생시키므로 캐시/제한을 고려해 필요한 경우만 하세요.
@@ -60,7 +61,9 @@ journalctl --user -u opensigan -n 100 --no-pager
 
 학교 시간표 파싱을 따로 확인해야 할 때는 백엔드 실행 환경에서 `python -m backend.parser_health_probe --timetable '학교코드:학교명'`을 사용합니다. 해당 학교의 이번 주 시간표 조회 작업을 한 번 실행하며, 검사 도구에서 학교 검색이나 재시도를 추가하지 않습니다. 한 번의 조회 작업이 내부적으로 여러 HTTP 교환을 사용할 수 있습니다. 수업이 한 건 이상이면 정규화 경로를 확인한 것이며 전체 데이터의 정확성을 보장하지 않습니다. 수업이 0건이면 방학·시험 등의 정상 상황일 수 있어 결과는 **판정 보류**(종료 코드 2)이며 학교 일정과 원본을 확인해야 합니다. 자동 주간 검사에는 이 추가 조회를 포함하지 않습니다.
 
-## 내부망 검수 및 되돌리기
+## 내부망 미리보기: 선택적 검수 및 되돌리기
+
+이 절은 과거 미리보기 구성을 유지하거나 다시 검수해야 할 때만 적용합니다. 2026-11-25 운영 정리에서 해당 서비스는 중지하고 자동 시작을 해제했습니다. 공개·내부 API의 현재 실행 경로는 `current`이며, 아래 과거 P0 경로는 현재 운영 릴리스가 아닙니다.
 
 - `opensigan-preview`는 `frontend/dist`를 제공하며, `LAN_HOST`가 없으면 시작하지 않습니다.
 - P0 검수용 `deploy/opensigan-preview-p0.conf`는 `WorkingDirectory`를 `~/opensigan-releases/p0-20261114`로 지정하고 이력 DB 환경 변수를 비웁니다. 실제 적용 여부는 `systemctl --user cat opensigan-preview`로 확인하세요.
@@ -101,9 +104,9 @@ PY
 - 사이트 배포·기본 API 연결은 **완료 보고/기존 기록**, 기능별 검증은 [P0 체크리스트](cloudflare-tunnel-rollout.md)의 **2026-11-17 예정 QA**에 남겨 둔다.
 - GitHub Pages는 별도 복구 판단 전까지 유지한다. Tailscale Funnel은 아래 실행 기록과 같이 중지했다. Cloudflare Workers VPC는 베타 기능이므로 버전·가용성 변화를 관찰한다.
 
-**클라이언트 IP·보안:** PR #96의 서명된 IP 전달 코드는 Worker에 배포했고 Pi의 서명 키를 Worker 비밀값에 등록했다. 서로 다른 외부망에서의 실제 서명 검증·IP·로그·429 실측은 미확인이다. 임의 X-Forwarded-For·Forwarded를 신뢰하지 않으며 자세한 조건은 [IP 보안 문서](proxy-client-ip.md)를 따른다. 관리자 인증·Webhook 기본 비활성·CORS/ICS 304·429/503 계약을 유지한다.
+**클라이언트 IP·보안:** PR #96의 서명된 IP 전달은 Worker와 Pi에 적용됐다. 2026-11-17 외부 요청의 서명 전달 및 활성화 이후 로그 관찰 기록이 있다. 해당 기록은 모든 외부망이나 실제 제한 초과 시 429 발생까지 검증한 것은 아니다. 임의 X-Forwarded-For·Forwarded를 신뢰하지 않으며 자세한 조건은 [IP 보안 문서](proxy-client-ip.md)를 따른다. 관리자 인증·Webhook 기본 비활성·CORS/ICS 304·429/503 계약을 유지한다.
 
-### Tailscale Funnel 단계적 퇴역
+### 과거 Tailscale Funnel 경로
 
 이전 공개 접근 경로는 종료됐습니다. 현재 사용자용 주소는 공식·보조 Cloudflare Pages 호스트이며, 과거 구독 주소를 다시 사용하거나 내부 네트워크를 변경하기 전에는 운영자 확인이 필요합니다. 내부 접속·중지·복구 명령과 장비 정보는 비공개 운영 기록에서 관리합니다.
 

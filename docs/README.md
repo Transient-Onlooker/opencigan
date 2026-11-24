@@ -20,6 +20,7 @@
 운영·보안·관측 문서는 [운영 문서 색인](operations/README.md)에서 찾을 수 있습니다.
 
 - [운영 절차](operations/operations.md)
+- [내부 시간표 API와 컴포넌트 배포](operations/internal-timetable.md)
 - [프록시 IP 신뢰 경계](operations/proxy-client-ip.md)
 - [접속 로그](operations/access-logs.md) · [관리자 화면](operations/access-log-ui.md)
 - [이용 통계](operations/analytics.md) · [Webhook](operations/webhooks.md)
@@ -36,7 +37,7 @@
 
 [전체 로드맵](roadmap/README.md)에서 P0~P4의 진행 방향과 세부 작업을 확인합니다.
 
-- [단기 집중 로드맵](roadmap/short-term-2026-11-21.md)
+- [2026-11-21 단기 작업 기록](roadmap/short-term-2026-11-21.md)
 - [핵심 품질·운영](roadmap/core-quality.md)
 - [사용자 경험](roadmap/user-experience.md)
 - [API·운영](roadmap/api-operations.md)

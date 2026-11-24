@@ -6,7 +6,7 @@
 
 인증 실패는 401, 잘못된 입력은 400, 상류 조회 실패는 503이다. 200의 빈 `records`는 빈 결과이며 503과 구분한다. 이 구분은 상류 라이브러리가 오류를 발생시키거나 잘못된 구조를 반환하는 경우에 한한다. 원본이 불완전한 빈 데이터를 정상 응답으로 보내면 별도로 판별할 수 없다.
 
-`deploy/opencigan-internal.service`는 사용자 서비스 템플릿이다. `current` 릴리스와 `~/.config/opencigan/internal.env`가 필요하며, 기존 WARP 브리지 설정을 사용한다. Pi의 환경 파일은 0600으로 설정되어 있다.
+`deploy/opencigan-internal.service`는 사용자 서비스 템플릿이다. `current` 릴리스와 `~/.config/opencigan/internal.env`가 필요하며, 기존 WARP 브리지 설정을 사용한다. 내부 API의 루프백 수신 포트와 컴시간 상류로 나가는 프록시 포트는 역할이 서로 다르다. Pi의 환경 파일은 0600으로 설정되어 있다.
 
 ## 컴포넌트 검증과 배포
 
@@ -22,14 +22,14 @@
 
 ```sh
 cd "$HOME/opensigan-releases/current"
-.venv/bin/python -m deploy.release_deploy --tag 1.4.6+autofix.1 \
-  --sha 106a6b14f265257514d62eb8babb0c460c9c4792 \
+.venv/bin/python -m deploy.release_deploy --tag '<포크 Release 태그>' \
+  --sha '<해당 태그의 40자리 커밋 SHA>' \
   --root "$HOME/.local/share/opencigan/components/pycomcigan" \
   --release "$HOME/opensigan-releases/current" \
   --school '학교코드:학교명' --week YYYY-MM-DD
 ```
 
-위 값은 형식 예시이며 이미 검증된 활성 SHA는 전환 없이 건너뛴다. 이전에 준비된 검증 컴포넌트로 되돌리려면 먼저 `systemctl --user stop opencigan-release-watch.timer`로 자동 감시를 중지한 뒤 해당 태그·SHA로 `python -m deploy.activate_component --tag <태그> --sha <SHA> --root <컴포넌트 루트> --school <학교 ID> --week <월요일>`을 실행한다. 이 명령도 양쪽 서비스를 순서대로 검증하고 핀을 동기화한다. 감시를 다시 시작하면 현재 최신 Release를 재배포할 수 있다.
+태그와 SHA는 실행 시점에 검증된 포크 Release를 확인해 입력한다. 이미 검증된 활성 SHA는 전환 없이 건너뛴다. 이전에 준비된 검증 컴포넌트로 되돌리려면 먼저 `systemctl --user stop opencigan-release-watch.timer`로 자동 감시를 중지한 뒤 해당 태그·SHA로 `python -m deploy.activate_component --tag <태그> --sha <SHA> --root <컴포넌트 루트> --school <학교 ID> --week <월요일>`을 실행한다. 이 명령도 양쪽 서비스를 순서대로 검증하고 핀을 동기화한다. 감시를 다시 시작하면 현재 최신 Release를 재배포할 수 있다.
 
 결과는 컴포넌트 루트의 `deployment-status.json`에 `requestedSha`, `activeSha`, `success`, `verification`, `rollback`, `pinSync`, `phase`, `timestamp`로 기록된다. 성공 후 OpenCigan `backend/requirements.txt`의 포크 SHA 한 줄만 갱신하고 자동 커밋·푸시를 최대 세 번 시도한다. 핀 동기화만 실패했다면 `python -m deploy.release_deploy --root <컴포넌트 루트> --retry-pin`으로 재시도한다. 파일 상태에 `pinSync: failed`가 남으며 검증된 활성 컴포넌트는 유지한다. Pi의 첫 자동 전환에서는 핀이 이미 일치해 `pinSync: already_synced`로 기록됐으며 실제 핀 변경 커밋은 발생하지 않았다.
 

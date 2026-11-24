@@ -5,6 +5,7 @@
 | 주제 | 문서 | 설명 |
 | --- | --- | --- |
 | 배포·복구 | [운영 절차](operations.md) | 배포 경로, 상태 점검, 백업·롤백 |
+| 내부 시간표·컴포넌트 | [내부 API와 배포](internal-timetable.md) | 인증·응답, Release 검증·전환 및 핀 동기화 |
 | 네트워크 신뢰 | [프록시 IP 정책](proxy-client-ip.md) | 프록시 헤더 검증과 요청 제한 경계 |
 | 접속 기록 | [접속 로그](access-logs.md) · [관리자 UI](access-log-ui.md) | 수집 범위, 인증, 조회·내보내기 |
 | 사용 통계 | [이용 통계](analytics.md) | 가명 집계와 관리자 조회 |
