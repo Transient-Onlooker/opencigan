@@ -24,9 +24,14 @@ def sync(sha, key, attempts=3):
     key = Path(key)
     if not key.is_file() or key.is_symlink() or key.stat().st_mode & 0o077:
         raise ValueError("Pin synchronization key missing or has unsafe permissions")
+    known_hosts = key.with_name("opencigan-github-known-hosts")
+    if not known_hosts.is_file() or known_hosts.is_symlink() or known_hosts.stat().st_mode & 0o077:
+        raise ValueError("Dedicated GitHub host keys missing or have unsafe permissions")
     env = os.environ.copy()
     env["GIT_TERMINAL_PROMPT"] = "0"
-    env["GIT_SSH_COMMAND"] = "ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -i " + shlex.quote(str(key))
+    env["GIT_SSH_COMMAND"] = ("ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "
+                              "-o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=" + shlex.quote(str(known_hosts))
+                              + " -i " + shlex.quote(str(key)))
     last_error = None
     for attempt in range(attempts):
         try:

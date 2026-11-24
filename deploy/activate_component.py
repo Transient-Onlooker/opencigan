@@ -147,6 +147,9 @@ def _activate(tag, sha, root, school, week):
     key = home / ".ssh/opencigan-pin-sync"
     if key.is_symlink() or not key.is_file() or key.stat().st_mode & 0o077:
         raise ValueError("Pin synchronization key unavailable or unsafe")
+    known_hosts = key.with_name("opencigan-github-known-hosts")
+    if known_hosts.is_symlink() or not known_hosts.is_file() or known_hosts.stat().st_mode & 0o077:
+        raise ValueError("Dedicated GitHub host keys unavailable or unsafe")
     state = {"requestedSha": sha, "activeSha": old_sha, "success": False,
              "verification": {"release": True, "package": True, "internal": False, "public": False},
              "rollback": False, "pinSync": "pending", "phase": "activating", "timestamp": datetime.now(timezone.utc).isoformat()}

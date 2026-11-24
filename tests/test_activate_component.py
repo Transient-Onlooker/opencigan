@@ -34,6 +34,7 @@ class ActivateComponentTests(unittest.TestCase):
         key = self.home / ".ssh/opencigan-pin-sync"
         key.parent.mkdir(parents=True)
         key.touch(mode=0o600)
+        key.with_name("opencigan-github-known-hosts").touch(mode=0o600)
         metadata = {"url": "https://github.com/Transient-Onlooker/pycomcigan.git", "vcs_info": {"commit_id": "b" * 40}}
         direct = patch("deploy.activate_component.subprocess.check_output", return_value=json.dumps(metadata))
         direct.start()
