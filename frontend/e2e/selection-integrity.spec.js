@@ -1175,6 +1175,24 @@ test('active allergy filter remains visible without a selected school or meal da
   await expect(page.getByLabel('메뉴 표시 방식')).toBeFocused();
 });
 
+test('meal date remains available outside timetable range', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/v1/meals?*', (route) => route.fulfill({ json: {
+    meals: [{ date: '2026-12-25', type: '중식', dishes: ['날짜별 식단'] }], stale: false,
+  } }));
+  await page.goto('/' + sharedHash(1));
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  const panel = page.locator('#meals-panel');
+  const date = panel.getByLabel('날짜 선택');
+  await date.fill('2026-12-25');
+  await date.blur();
+  await expect(date).toHaveValue('2026-12-25');
+  await expect(panel.locator('.meal-range-note')).toContainText('급식은 표시된 날짜의 식단이에요');
+  await expect(panel.locator('.meal-range-note')).toContainText('시간표 연결은 이번 주·다음 주');
+  await expect(panel.getByRole('button', { name: '이 날짜 시간표' })).toHaveCount(0);
+  await expect(panel.locator('.meal-day[aria-label="2026-12-25 식단"]')).toContainText('날짜별 식단');
+});
+
 test('today meals show allergy status and link to settings', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 844 });
   await page.addInitScript(() => {
