@@ -99,6 +99,8 @@ class ScheduledStoreTests(unittest.TestCase):
         self.assertTrue(self.webhooks.enqueue(identifier, "existing", b"{}", now=100))
         with patch("backend.scheduled_store.MAX_PENDING_PER_SUBSCRIPTION", 1):
             self.assertFalse(self.store.enqueue_due(identifier, revision, "2026-11-23", b"{}", 100))
+        with patch("backend.webhook_store.MAX_DELIVERY_RECORDS", 1):
+            self.assertFalse(self.store.enqueue_due(identifier, revision, "2026-11-23", b"{}", 100))
         with closing(sqlite3.connect(self.path)) as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM scheduled_occurrences").fetchone()[0], 0)
 
