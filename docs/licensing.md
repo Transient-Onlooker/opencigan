@@ -44,7 +44,7 @@ Opencigan의 코드 라이선스는 오직 프로그램 구현물에만 적용�
 
 확인한 주요 의존성은 다음과 같습니다. 각 구성요소의 저작권·허락·면책 고지와 번들된 의존성 고지 전문을 보존해야 하며, 아래 요약으로 대체할 수 없습니다.
 
-- **pycomcigan**: MIT, `Copyright (c) 2023 hegelty`. [requirements.txt의 고정 커밋 LICENSE](https://github.com/hegelty/pycomcigan/blob/8b2b4644ceec8a37bf01a0ebbc544743410ae1cf/LICENSE)를 확인했습니다.
+- **pycomcigan**: MIT, `Copyright (c) 2023 hegelty`. [requirements.txt의 고정 커밋 LICENSE](https://github.com/Transient-Onlooker/pycomcigan/blob/8b2b4644ceec8a37bf01a0ebbc544743410ae1cf/LICENSE)를 확인했습니다.
 - **Pretendard Font**: SIL Open Font License, Version 1.1 (Copyright (c) 2021 Kil Hyung-jin). 상세 라이선스는 [PRETENDARD-LICENSE.txt](../frontend/PRETENDARD-LICENSE.txt) 참조.
 - **Svelte 5.57.3 / Vite 6.4.6**: 코어 MIT. 설치된 각 패키지의 `LICENSE.md`를 확인했습니다. Vite 파일에는 번들된 의존성의 별도 라이선스도 포함됩니다.
 - **pdf-lib 1.17.1**: MIT. 설치된 패키지의 `LICENSE.md`를 확인했습니다.
