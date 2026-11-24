@@ -15,7 +15,7 @@
 <style>
 .calendar-menu{display:flex;align-items:center;gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:28px}
 .menu-label{margin-right:auto;padding-right:20px;font-size:14px;font-weight:750}
-.calendar-menu button{min-width:144px;min-height:52px;padding:12px 22px;border:0;border-left:1px solid var(--line);background:var(--surface);color:var(--muted);font-size:16px;font-weight:750}
+.calendar-menu button{min-width:144px;min-height:52px;padding:12px 22px;border:0;border-left:1px solid var(--line);background:var(--surface);color:var(--muted);font-size:16px;font-weight:750;transition:border-color .16s ease}
 .calendar-menu button :global(.icon){margin-right:5px}
 .calendar-menu button[aria-pressed=true]{color:var(--surface);background:var(--ink)}
 .calendar-menu button:hover{color:var(--surface);background:var(--muted)}
