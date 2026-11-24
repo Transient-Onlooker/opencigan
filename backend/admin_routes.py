@@ -96,8 +96,11 @@ def access_anomaly_review(method, query_string, request_headers, headers, access
         store = access_log_store()
         if store is None:
             return unavailable()
-        from backend.query_anomalies import detect
-        findings = detect(store._connect(), window_hours=window_hours, max_requests_per_ip=max_requests_per_ip, max_error_ratio=max_error_ratio, max_distinct_schools=max_distinct_schools, min_requests=min_requests)
+        findings = store.review_anomalies(
+            window_hours=window_hours, max_requests_per_ip=max_requests_per_ip,
+            max_error_ratio=max_error_ratio, max_distinct_schools=max_distinct_schools,
+            min_requests=min_requests,
+        )
     except ValueError:
         return bad_request("숫자 형식이나 범위가 올바르지 않습니다")
     except (OSError, sqlite3.Error):

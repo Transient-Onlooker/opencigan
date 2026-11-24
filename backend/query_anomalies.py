@@ -22,47 +22,62 @@ def _cutoff_iso(window_hours: int) -> str:
 
 
 def detect(db, *, window_hours: int, max_requests_per_ip: int,
-           max_error_ratio: float, max_distinct_schools: int, min_requests: int = 0):
+           max_error_ratio: float, max_distinct_schools: int, min_requests: int = 0,
+           earliest_day: str = ""):
     """Group recent access-log rows per client IP and flag configured patterns.
 
     Thresholds are caller-supplied so the review can be exercised in tests
     without touching real traffic or production thresholds.
     """
+    cutoff = _cutoff_iso(window_hours)
+    # Stored timestamps are normalized to KST. Removing the fixed offset
+    # before comparison also sorts whole seconds before fractional seconds.
+    # Aggregate in SQLite rather than loading every request into Python.
     rows = db.execute(
-        "SELECT timestamp, client_ip, route, status, school_id FROM access_logs "
-        "WHERE timestamp >= ?", (_cutoff_iso(window_hours),)).fetchall()
-    grouped = {}
-    for row in rows:
-        grouped.setdefault(row["client_ip"], []).append(row)
+        """
+        SELECT client_ip, COUNT(*) AS requests,
+               SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) AS errors,
+               COUNT(DISTINCT NULLIF(school_id, '')) AS distinct_schools,
+               MIN(substr(timestamp, 1, length(timestamp) - 6)) || '+09:00' AS first_seen,
+               MAX(substr(timestamp, 1, length(timestamp) - 6)) || '+09:00' AS last_seen
+        FROM access_logs
+        WHERE day >= ?
+          AND substr(timestamp, 1, length(timestamp) - 6) >= ?
+          AND client_ip NOT IN ('', 'unknown')
+        GROUP BY client_ip
+        HAVING COUNT(*) >= ?
+        ORDER BY client_ip
+        """, (max(cutoff[:10], earliest_day), cutoff[:-6], min_requests))
 
     findings = []
-    for client_ip, entries in sorted(grouped.items()):
-        count = len(entries)
-        errors = sum(1 for entry in entries if int(entry["status"]) >= 400)
-        schools = {entry["school_id"] for entry in entries if entry["school_id"]}
-        error_ratio = (errors / count) if count else 0.0
+    for row in rows:
+        client_ip = row["client_ip"]
+        count = row["requests"]
+        errors = row["errors"]
+        distinct_schools = row["distinct_schools"]
+        error_ratio = errors / count
         if count > max_requests_per_ip and count >= min_requests:
             findings.append({
                 "client_ip": client_ip, "kind": "request_volume", "observed": count,
                 "threshold": max_requests_per_ip, "errors": errors,
-                "error_ratio": round(error_ratio, 4), "distinct_schools": len(schools),
-                "first_seen": entries[0]["timestamp"], "last_seen": entries[-1]["timestamp"],
+                "error_ratio": round(error_ratio, 4), "distinct_schools": distinct_schools,
+                "first_seen": row["first_seen"], "last_seen": row["last_seen"],
                 "detail": "요청 수가 검토 기준을 넘음",
             })
         if count >= min_requests and error_ratio > max_error_ratio:
             findings.append({
                 "client_ip": client_ip, "kind": "error_ratio", "observed": round(error_ratio, 4),
                 "threshold": max_error_ratio, "errors": errors, "requests": count,
-                "distinct_schools": len(schools),
-                "first_seen": entries[0]["timestamp"], "last_seen": entries[-1]["timestamp"],
+                "distinct_schools": distinct_schools,
+                "first_seen": row["first_seen"], "last_seen": row["last_seen"],
                 "detail": "오류 응답 비율이 검토 기준을 넘음",
             })
-        if len(schools) > max_distinct_schools and count >= min_requests:
+        if distinct_schools > max_distinct_schools and count >= min_requests:
             findings.append({
-                "client_ip": client_ip, "kind": "school_scan", "observed": len(schools),
+                "client_ip": client_ip, "kind": "school_scan", "observed": distinct_schools,
                 "threshold": max_distinct_schools, "requests": count, "errors": errors,
                 "error_ratio": round(error_ratio, 4),
-                "first_seen": entries[0]["timestamp"], "last_seen": entries[-1]["timestamp"],
+                "first_seen": row["first_seen"], "last_seen": row["last_seen"],
                 "detail": "검토 구간에서 조회된 학교 수가 많음",
             })
     return findings
