@@ -48,7 +48,7 @@ def prepare(tag, sha, components, release, school, week):
         env = os.environ.copy()
         env.update({"PYTHONPATH": str(package), "PYTHONDONTWRITEBYTECODE": "1",
                     "OPENCIGAN_COMCIGAN_PROXY": "http://127.0.0.1:18084"})
-        run([str(python), "-m", "unittest", "tests.test_public_api", "tests.test_timetable_cache",
+        run([str(python), "-m", "unittest", "tests.test_public_api", "tests.test_timetable_cache", "tests.test_timetable_protocol_reuse",
              "tests.test_comcigan_proxy", "tests.test_internal_api"], cwd=release, env=env)
         probe = ("import importlib.metadata as m,json,sys,pycomcigan; from pathlib import Path; "
                  "assert Path(pycomcigan.__file__).resolve().is_relative_to(Path(sys.argv[3]).resolve()); "

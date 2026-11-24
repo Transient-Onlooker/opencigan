@@ -210,7 +210,7 @@ class ContractTest(unittest.TestCase):
             [6347, "region A", "Example", 76524],
             [9999, "region B", "Example", 76525],
         ]
-        with patch("backend.timetable._search_with_cached_protocol", return_value=fixture) as provider:
+        with patch("backend.timetable._search_with_cached_protocol", return_value=(fixture, None)) as provider:
             status, body = self.request("/api/v1/schools?q=Example")
             self.assertEqual((status, body), (200, {
                 "schools": [
@@ -219,9 +219,9 @@ class ContractTest(unittest.TestCase):
                 ],
                 "stale": False,
             }))
-            provider.assert_called_once_with("Example")
+            provider.assert_called_once_with("Example", with_protocol=True)
             self.assertEqual(self.request("/schools?q=Example"), (200, body))
-            provider.assert_called_once_with("Example")
+            provider.assert_called_once_with("Example", with_protocol=True)
 
     def test_upstream_errors_do_not_leak(self):
         for error in (ValueError("private data"), RuntimeError("private data")):
