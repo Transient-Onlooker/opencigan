@@ -447,6 +447,7 @@
     mealSession.choose(value, (selected) => { if (school) writeMealSchool(localStorage, school.id, selected); }, loadMeals);
   }
   function replaceInvalidSharedAddress(fallback: { school: School | null; grade: number; classroom: number }) {
+    if (typeof window.history?.replaceState !== 'function') return;
     const url = new URL(window.location.href);
     url.hash = fallback.school ? new URL(shareClassUrl(url.href, fallback.school, fallback.grade, fallback.classroom)).hash : '';
     window.history.replaceState(window.history.state, '', url.href);
