@@ -55,7 +55,8 @@ test('late schedule response is not shown after changing subscriptions', async (
     if (path.endsWith('/schedule')) {
       started();
       await waiting;
-      return route.fulfill({ json: { schedule: { mode: 'daily_summary', time: '07:30', subject: null } } });
+      try { await route.fulfill({ json: { schedule: { mode: 'daily_summary', time: '07:30', subject: null } } }); } catch { /* Request was canceled. */ }
+      return;
     }
     if (path.endsWith('/deliveries')) return route.fulfill({ json: { deliveries: [] } });
     if (path.endsWith('/template')) return route.fulfill({ status: 503 });
@@ -64,10 +65,10 @@ test('late schedule response is not shown after changing subscriptions', async (
   await page.goto(`/webhooks.html#id=${id}&token=${token}`);
   await requested;
   await expect(page.locator('#manage')).toBeVisible();
+  const canceled = page.waitForEvent('requestfailed', request => request.url().endsWith('/schedule'));
   await page.getByLabel('구독 ID').fill('c'.repeat(24));
-  const response = page.waitForResponse(result => result.url().endsWith('/schedule'));
   release();
-  await response;
+  await canceled;
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await expect(page.locator('#schedule-editor')).toBeHidden();
 });
@@ -83,7 +84,8 @@ test('late cancellation does not reset a different subscription form', async ({ 
       if (request.method() === 'DELETE') {
         started();
         await waiting;
-        return route.fulfill({ json: { deleted: true } });
+        try { await route.fulfill({ json: { deleted: true } }); } catch { /* Request was canceled. */ }
+        return;
       }
       return route.fulfill({ json: { schedule: null } });
     }
@@ -97,10 +99,10 @@ test('late cancellation does not reset a different subscription form', async ({ 
   await page.getByLabel('예약 시각').fill('18:20');
   await page.getByRole('button', { name: '일정 사용 안 함' }).click();
   await requested;
+  const canceled = page.waitForEvent('requestfailed', request => request.url().endsWith('/schedule') && request.method() === 'DELETE');
   await page.getByLabel('구독 ID').fill('c'.repeat(24));
-  const response = page.waitForResponse(result => result.url().endsWith('/schedule') && result.request().method() === 'DELETE');
   release();
-  await response;
+  await canceled;
   await page.waitForFunction(() => !document.querySelector('#schedule-reset').disabled);
   await expect(page.locator('#schedule-mode')).toHaveValue('daily_summary');
   await expect(page.locator('#schedule-time')).toHaveValue('18:20');
