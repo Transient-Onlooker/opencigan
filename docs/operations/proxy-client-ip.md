@@ -102,9 +102,9 @@
 
 ---
 
-## 7. Workers VPC 원본 IP 서명 전달 (코드 준비, 실제 운영 미검증)
+## 7. Workers VPC 원본 IP 서명 전달
 
-Cloudflare Pages → Private Worker → Workers VPC → Pi 환경에서는 기존 Funnel에서도 루프백을 통해 접근할 수 있습니다. 이때 루프백의 X-Forwarded-For를 신뢰하면 IP 위조 가능성이 있으므로 별도 공유 비밀키로 서명된 IP만 인식합니다.
+Cloudflare Pages → Private Worker → Workers VPC → Pi 환경에서 루프백의 X-Forwarded-For를 신뢰하면 IP 위조 가능성이 있으므로 별도 공유 비밀키로 서명된 IP만 인식합니다. 과거 Funnel 경로도 루프백을 사용했으나 현재 공개 경로에서 중지된 상태입니다.
 
 - Worker는 Cloudflare의 CF-Connecting-IP를 검증하고 X-Opencigan-Client-IP, X-Opencigan-IP-Timestamp, X-Opencigan-IP-Signature를 직접 생성합니다. 외부 요청의 동명 헤더는 전달하지 않습니다.
 - HMAC-SHA256의 UTF-8 입력은 METHOD, PATH, RAW_QUERY, IP, UNIX_SECONDS를 각각 LF로 이어 붙입니다. 16진수 소문자 서명을 사용하고 서버는 타임스탬프 ±60초를 허용합니다.
@@ -114,7 +114,9 @@ Cloudflare Pages → Private Worker → Workers VPC → Pi 환경에서는 기�
 
 ### 활성화 및 검증
 
+2026-11-17 20:18~20:21 외부 요청으로 서명 전달을 확인했다는 운영 기록이 있습니다. 서명 활성화 이후 관찰된 요청 95건 중 89건은 서명된 IP였고, 루프백 6건은 로컬 확인 4건과 당시 무서명 Funnel 2건으로 기록됐습니다. 이 표본은 실제 한도 초과 시 429나 모든 외부망의 동작을 증명하지 않습니다. 백엔드는 OPTIONS를 일반·관리자 요청 제한 카운트에 포함하지 않습니다. 게이트웨이는 OPTIONS에 `preflight:` 접두사가 붙은 별도 제한 키를 적용합니다.
+
 1. 충분히 무작위인 32바이트 이상의 동일한 비밀키를 Pi의 OPENCIGAN_PROXY_IP_SIGNING_KEY에 먼저 설정하고, Worker의 PROXY_IP_SIGNING_KEY는 Wrangler secret으로 설정합니다. 키를 저장소나 프런트엔드 빌드 변수에 넣지 않습니다.
 2. 두 네트워크에서 API를 각각 한 번 호출하여 Pi의 IP별 Rate Limit 및 접속 로그가 실제 공인 IP와 일치하는지 확인합니다. 서명이 깨진 요청과 기존 Funnel 경로의 동작도 검증해야 합니다.
-3. 장기 접속 로그는 별도 OPENCIGAN_ACCESS_LOG_DB와 OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN이 있어야 활성화됩니다. 이 작업은 해당 설정·운영 배포를 수행하지 않습니다.
-4. 실운영 환경에서 Cloudflare의 CF-Connecting-IP가 Pages Service Binding에 보존되는지, VPC 통신에서 서명 헤더가 전달되는지 검증할 때까지 완료로 표시하지 않습니다.
+3. 장기 접속 로그는 별도 OPENCIGAN_ACCESS_LOG_DB와 OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN이 있어야 활성화됩니다. 실제 값과 보존 설정은 운영 환경에서 확인합니다.
+4. 추가 외부망과 실제 제한 초과 상황의 검증은 기존 표본과 구분해 기록합니다.
