@@ -16,6 +16,7 @@ export interface TimetableRecord {
 }
 
 export interface TimetableResponse {
+  sourceLessonStarts?: Record<string, string>;
   schoolId: string;
   weekStart: string;
   records: TimetableRecord[];

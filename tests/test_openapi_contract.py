@@ -44,13 +44,19 @@ class OpenApiContractTests(unittest.TestCase):
         records = [dict(grade=2, date=week, period=1, subject="수학", teacher="김교사", isChanged=False, **{"class": room})
                    for room in (3, 4)]
         source = {"schoolId": "2:예시학교", "weekStart": week, "records": records,
-                  "sourceUpdatedAt": None, "fetchedAt": "2026-11-14T00:00:00Z", "stale": False}
+                  "sourceUpdatedAt": None, "fetchedAt": "2026-11-14T00:00:00Z", "stale": False,
+                  "sourceLessonStarts": {"1": "09:10", "2": "10:10"}}
         params = {"school": source["schoolId"], "week": week, "grade": "2", "class": "3", "teacher": "김"}
         with patch("backend.app.fetch_timetable", return_value=source):
             status, headers, body = dispatch_request("GET", path, urlencode(params), self.cache)
         self.assertEqual(status, 200)
         self.assert_json_response(path, status, headers, body)
         self.assertEqual(json.loads(body)["records"], records[:1])
+        self.assertEqual(json.loads(body)["sourceLessonStarts"], source["sourceLessonStarts"])
+        status, headers, body = dispatch_request("GET", path, urlencode(params), self.cache)
+        self.assert_json_response(path, status, headers, body)
+        self.assertEqual(json.loads(body)["sourceLessonStarts"], source["sourceLessonStarts"])
+        self.assertEqual(json.loads(body)["cacheStatus"], "hit")
         params["grade"] = "7"
         status, headers, body = dispatch_request("GET", path, urlencode(params), self.cache)
         self.assertEqual(status, 400)

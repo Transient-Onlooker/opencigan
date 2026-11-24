@@ -1389,6 +1389,71 @@ test('lesson time rules preview lunch and require explicit application and savin
   await expect(page.getByLabel('5교시 시작', { exact: true })).toHaveValue('');
 });
 
+test('source lesson starts are an explicit proposal that preserves manual times', async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript((id) => localStorage.setItem('opensigan-weekday-lesson-times:' + id,
+    JSON.stringify({ '2': { '1': { start: '08:00', end: '08:45' } } })), school.id);
+  await page.route('**/api/v1/timetable?*', (route) => route.fulfill({ json: {
+    ...timetable, sourceLessonStarts: { '1': '09:00', '2': '10:00' },
+  } }));
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('#timetable-panel').getByRole('table')).toBeVisible();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('학교 교시 시각 설정', { exact: true }).click();
+  await expect(page.getByLabel('원본 교시 시작 시각')).toContainText('2교시 10:00');
+  await page.getByText('상세 시간 설정하기', { exact: true }).click();
+  await page.getByLabel('1교시 시작', { exact: true }).fill('08:30');
+  await page.getByLabel('1교시 종료', { exact: true }).fill('09:20');
+  await page.getByRole('button', { name: '원본 시작 시각 입력란에 적용' }).click();
+  await expect(page.getByLabel('1교시 시작', { exact: true })).toHaveValue('08:30');
+  await expect(page.getByLabel('2교시 시작', { exact: true })).toHaveValue('10:00');
+  await expect(page.getByLabel('2교시 종료', { exact: true })).toHaveValue('');
+  expect(await page.evaluate((id) => localStorage.getItem('opensigan-lesson-times:' + id), school.id)).toBeNull();
+  await page.getByRole('button', { name: '시각 저장', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: '2교시 시작과 종료 시각을 모두 입력해 주세요' })).toBeVisible();
+  await page.getByLabel('2교시 종료', { exact: true }).fill('10:50');
+  await page.getByRole('button', { name: '시각 저장', exact: true }).click();
+  await expect(page.getByText('이 학교의 교시 시각을 저장했어요.')).toBeVisible();
+  const weekdayTimes = JSON.parse(await page.evaluate((id) => localStorage.getItem('opensigan-weekday-lesson-times:' + id), school.id));
+  expect(weekdayTimes['2']['1']).toEqual({ start: '08:00', end: '08:45' });
+});
+
+test('source lesson starts follow the selected school', async ({ page }) => {
+  const other = { id: '3:푸른중학교', name: '푸른중학교', region: '서울' };
+  await mockApi(page);
+  await page.route('**/api/v1/schools?*', (route) => route.fulfill({ json: {
+    schools: new URL(route.request().url()).searchParams.get('q').includes('푸른') ? [other] : [school], stale: false,
+  } }));
+  await page.route('**/api/v1/timetable?*', (route) => {
+    const selected = new URL(route.request().url()).searchParams.get('school');
+    return route.fulfill({ json: { ...timetable, schoolId: selected,
+      sourceLessonStarts: { '1': selected === school.id ? '09:00' : '08:20' } } });
+  });
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('#timetable-panel').getByRole('table')).toBeVisible();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('학교 교시 시각 설정', { exact: true }).click();
+  await expect(page.getByLabel('원본 교시 시작 시각')).toContainText('1교시 09:00');
+  await page.getByRole('button', { name: '학교/학년 변경', exact: true }).click();
+  await page.getByRole('searchbox', { name: '학교 찾기' }).fill('푸른');
+  await page.getByRole('button', { name: /푸른중학교/ }).click();
+  await expect(page.getByLabel('원본 교시 시작 시각')).toContainText('1교시 08:20');
+  await expect(page.getByLabel('원본 교시 시작 시각')).not.toContainText('09:00');
+});
+
+test('stale timetable does not offer source lesson start suggestions', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/v1/timetable?*', (route) => route.fulfill({ json: {
+    ...timetable, stale: true, sourceLessonStarts: { '1': '09:00' },
+  } }));
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('#class-error')).toContainText('시간표 데이터가 없어 공유 링크의 학년·반을 확인하지 못했어요.');
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('학교 교시 시각 설정', { exact: true }).click();
+  await expect(page.getByLabel('원본 교시 시작 시각')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '원본 시작 시각 입력란에 적용' })).toHaveCount(0);
+});
+
 test('weekday bell times save independently and are included in school backup', async ({ page }) => {
   await mockApi(page);
   await page.goto('/' + sharedHash(1));

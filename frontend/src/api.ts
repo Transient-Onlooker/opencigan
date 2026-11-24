@@ -3,7 +3,7 @@ import { apiError } from './api-error';
 export interface School { id: string; name: string; region: string }
 export interface NeisSchool extends School { address: string }
 export interface TimetableRecord { grade: number; class: number | string; date: string; period: number; subject: string; teacher: string | null; isChanged: boolean }
-export interface TimetableResponse { schoolId: string; weekStart: string; records: TimetableRecord[]; sourceUpdatedAt: string | null; fetchedAt: string; stale: boolean }
+export interface TimetableResponse { schoolId: string; weekStart: string; records: TimetableRecord[]; sourceUpdatedAt: string | null; fetchedAt: string; stale: boolean; sourceLessonStarts?: Record<string, string> }
 export interface Meal { date: string; type: string; dishes: string[]; calories?: string | null; nutrition?: string | null; origin?: string | null }
 export interface MealsResponse { meals: Meal[]; stale: boolean }
 export interface HistoryLesson { subject: string; teacher: string | null }
