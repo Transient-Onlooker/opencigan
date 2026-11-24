@@ -4,9 +4,10 @@ test.use({ serviceWorkers: 'block' });
 
 test('calendar tabs retain readable contrast in light and dark themes', async ({ page }) => {
   await page.route('**/api/v1/**', (route) => route.fulfill({ status: 503, json: {} }));
+  await page.goto('/');
   for (const theme of ['light', 'dark']) {
-    await page.addInitScript((value) => localStorage.setItem('opensigan-theme', value), theme);
-    await page.goto('/');
+    await page.evaluate((value) => localStorage.setItem('opensigan-theme', value), theme);
+    await page.reload();
     if (theme === 'dark') await expect(page.locator('.app-shell')).toHaveClass(/\bdark\b/);
     else await expect(page.locator('.app-shell')).not.toHaveClass(/\bdark\b/);
     const menu = page.getByRole('navigation', { name: '캘린더 메뉴' });
