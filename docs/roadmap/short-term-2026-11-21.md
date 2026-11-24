@@ -4,6 +4,8 @@
 >
 > **작성 기준:** GitHub `main` = `4a5b1e4` (2026-11-21 확인), 현재 열린 PR 0개, 미구현 성능 이슈 [#140](https://github.com/Transient-Onlooker/opencigan/issues/140). 이 문서의 [ ]는 **오늘의 새 실행 목록에서 미착수/미검증**을 뜻하며, 기존 파일의 과거 완료 기록을 부정하지 않는다.
 
+> **현황 갱신: 2026-11-24** — 확인 기준 `167e529`, [main CI 45353469338](https://github.com/Transient-Onlooker/opencigan/actions/runs/45353469338) check/deploy 성공(GitHub Actions 기록). Pi·Cloudflare Worker/Pages의 실제 적용 SHA 및 운영 검증은 이 확인에 포함하지 않는다. 아래 체크리스트는 구현·자동검증 기준이며 모든 미완료 항목의 작업량이 동일하지 않다.
+
 ## 실행 규칙
 
 1. **구현 중심:** 오늘은 새로운 코드, 필요한 결함 수정, 자동 테스트·CI, 안전한 리팩터링을 진행한다. 실기기 수동 QA·외부 허락·운영자 정책 결정·이미 끝난 배포 기록은 작업량으로 세지 않는다.
@@ -64,7 +66,7 @@ flowchart TB
 
 - [ ] 프런트 요청 제한(15초), 컴시간 프록시 단일 연결 기본값(30초), Worker/Pi의 실제 요청 경계를 비교하는 재현 테스트와 경로별 계측을 구현한다.
 - [ ] 오류가 **재현된 경우에만** 전체 요청 시간 예산·취소·재시도·캐시 대체와 `Retry-After`, 502/503/504 안내를 수정한다. 단순히 타임아웃 숫자를 바꾸지 않는다.
-- [ ] 상류 403/429/네트워크 지연·캐시 없음/오래됨·다음 주/타 학교 조회·급식 독립 동작을 모의 오류 복구 테스트로 확인한다. `/api/v1/status`의 process-liveness 의미는 유지한다.
+- [x] 상류 403/429/네트워크 지연·캐시 없음/오래됨·다음 주/타 학교 조회·급식 독립 동작을 모의 오류 복구 테스트로 확인한다. `/api/v1/status`의 process-liveness 의미는 유지한다. [#164](https://github.com/Transient-Onlooker/opencigan/pull/164)의 격리 검증 및 ST-01의 후속 모의 통합 검증에 한하며, 실제 운영 503 원인과 시간 예산은 미확정이다.
 - **완료 조건:** 원인/재현/수정 전후 비교와 자동 회귀. 근본 원인이 확인되지 않으면 추측성 패치를 하지 않고 테스트·관측만 병합한 뒤 미완료 표시.
 - 원본: [NEW-01](core-quality.md), [가용성 관측](api-operations.md).
 
@@ -149,7 +151,10 @@ flowchart TB
 ### ST-10 · API 호환성·가용성 계측 정리
 
 - [PR #185](https://github.com/Transient-Onlooker/opencigan/pull/185): Webhook 템플릿 조회·저장·초기화와 두 제공자의 미리보기 성공 응답을 OpenAPI에 명시하고 격리 라우트 응답과 대조했다. 나머지 계약과 운영 관측은 미완료다.
-- [ ] 기존 OpenAPI 3.1과 Worker/Pi/TypeScript/Python 클라이언트의 오류·응답 계약을 대조하고 버전 변경·하위 호환 정책과 계약 회귀 테스트를 추가한다.
+- [#190](https://github.com/Transient-Onlooker/opencigan/pull/190): 분석 API의 202/400/413/429/503 및 Retry-After 계약을 격리 라우트와 대조했다. [#199](https://github.com/Transient-Onlooker/opencigan/pull/199)에서 [공개 API 버전·하위 호환 정책](../api-versioning.md) 문서가 실제 병합됐다. 전체 응답 계약 대조와 경로별 운영 관측은 계속 미완료다.
+
+- [x] 공개 API 버전 변경·하위 호환 정책을 문서화한다 ([#199](https://github.com/Transient-Onlooker/opencigan/pull/199)).
+- [ ] 기존 OpenAPI 3.1과 Worker/Pi/TypeScript/Python 클라이언트의 남은 오류·응답 계약을 대조하고 계약 회귀 테스트를 보강한다.
 - [ ] 관리자 관측에서 경로별 지연/오류/캐시·상류 실패를 구분하는 코드의 누락 부분만 보완한다. `status` 프로세스 생존과 상류 readiness를 섞지 않는다.
 - **완료 조건:** 문서-테스트-실제 응답 일치, 민감한 요청 내용·토큰·IP 노출 추가 금지.
 - 원본: [P2 API 운영](api-operations.md).
@@ -160,9 +165,13 @@ flowchart TB
 
 - 보존된 최신 스냅샷에 한해 과목별 학급 교시 수를 관리자 통계에 추가한다. 관측이 없으면 `null`로 구분하며, 미제공 수업이나 개별 학생의 수강 시수로 해석하지 않는다. 이상 트래픽과 나머지 집계는 별도다.
 - 같은 교사 이름이 같은 날짜·교시에 여러 학급에 나타나는 관측을 관리자에게 확인 대상으로 표시한다. 합반과 동명이인을 확정 충돌로 간주하지 않으며 관측이 없는 경우와 겹침이 없는 경우를 구분한다.
-- [ ] 시간표 변경 추이·과목별 시수·교시 충돌 및 갱신 주기의 **정의 가능한 데이터**를 집계 API/관리 UI에 추가한다. 원본 `isChanged`와 별도 DB 이력이 다름을 명시하고 미관측을 0건으로 오인하지 않도록 한다.
+- [#195](https://github.com/Transient-Onlooker/opencigan/pull/195)·[#196](https://github.com/Transient-Onlooker/opencigan/pull/196): 최근 관측 스냅샷의 과목별 학급 교시 수 및 교사 이름 겹침 검토를 관리자 API/UI에 추가했다. 미관측은 null, 겹침 없음은 빈 배열이며 실제 충돌을 확정하지 않는다.
+
+- [x] 최근 관측의 과목별 학급 교시 수와 교사 이름 겹침 확인을 관리자 API/UI에 구현하고 미관측·중복·안전 출력 회귀를 확인한다 ([#195](https://github.com/Transient-Onlooker/opencigan/pull/195), [#196](https://github.com/Transient-Onlooker/opencigan/pull/196)).
+- [ ] 시간표 변경 추이·갱신 주기 등 나머지 **정의 가능한 데이터**의 집계·표시를 검증/보완한다. 원본 `isChanged`와 별도 DB 이력의 차이, 관측 공백 및 미관측을 명시한다.
 - 기존 백엔드의 관리자 이상 조회 검토 API를 보완한다. 보존 기간과 조회 구간을 함께 적용하고 IP별 집계를 SQLite에서 수행하며, 미확인 IP를 하나의 클라이언트로 합산하지 않는다. 최초·최종 수신 시각과 임계치 경계 회귀 테스트를 추가한다. 기존 기능 플래그·인증·제한 정책은 유지한다.
-- [ ] 동일 IP 과다 조회·반복 404/429/5xx·비정상 학교 순회 패턴을 설정 가능한 조건으로 탐지하고 테스트 환경에서 관리자 기록/알림을 검증한다. 백엔드 조회 구현과 별도로 상태별 탐지·공개 게이트웨이/관리 UI·운영 알림 정책은 미완료다.
+- [x] 관리자 토큰으로 보호된 읽기 전용 이상 조회 API에서 IP별 요청량·오류 비율·서로 다른 학교 수를 설정 가능한 임계치로 집계하고, 보존 기간·미확인 IP 제외·수신 시각·임계치 경계를 검증한다 ([#198](https://github.com/Transient-Onlooker/opencigan/pull/198), [#200](https://github.com/Transient-Onlooker/opencigan/pull/200)).
+- [ ] 상태별 반복 404/429/5xx 탐지, 공개 게이트웨이·관리 UI 연결 및 관리자 알림을 별도 검증한다. 자동 차단·발송 및 운영 임계치는 설정하지 않는다.
 - **완료 조건:** 집계 단위·누락값·오탐 경계·권한·로그 보관 테스트. 실서비스 감지 임계치와 알림 발송은 임의로 켜지 않는다.
 - 원본: [P3 남용 탐지·P4 통계](automation-and-future.md).
 
@@ -171,6 +180,8 @@ flowchart TB
 ### ST-12 · 선택·비동기 상태/로컬 저장 책임 분리
 
 - 시간표 세션이 요청한 학교·주차와 현재 선택을 각각 확인해 선택 변경 후의 성공·실패 응답을 무시하도록 경합 검사를 보강한다. 나머지 저장 책임 정리와 회귀 검증은 미완료다.
+- [#194](https://github.com/Transient-Onlooker/opencigan/pull/194): 요청한 학교·주차와 현재 선택을 대조해 늦은 성공/실패를 무시한다. [#201](https://github.com/Transient-Onlooker/opencigan/pull/201): 저장된 학교 객체와 정수 학년을 검증하며 기존 저장 키·정상 학급 복원 계약을 유지한다. 최신 main CI 성공. 저장 책임 전체 정리와 운영 QA는 별도다.
+
 - [ ] `App.svelte`의 현재 컴포넌트 분리/기존 CSS 정리·백엔드 라우팅 분리는 **이미 완료한 것으로 취급하고 중복 구현 금지**. 미완료인 선택/공유 복원, 늦은 응답 취소, `localStorage` 저장 순서의 소유권과 경합 테스트를 정리한다.
 - [ ] 시간표·급식 도메인 처리, 개인화, 공유·내보내기의 순수 로직·저장 책임을 명료하게 분리하되 이전 저장 키·백업 파일·요청 수·캐시 계약을 유지한다.
 - **완료 조건:** 동일 선택·공유·설정·오프라인 회귀 결과, 범위를 분리한 작은 PR.
@@ -179,7 +190,8 @@ flowchart TB
 ### ST-13 · 번들 실측·경량화
 
 - [번들 기준선](../qa/bundle-baseline-2026-11-23.md)에 초기 HTML이 참조하는 JS/CSS, 전체 자산 및 선택 PDF 청크 크기를 기록했다. 실제 전송·로딩 시간과 최적화는 아직 미검증이다.
-- [ ] JS/CSS·폰트·의존성의 원본/압축 크기 측정 결과를 먼저 기록한다. 중복 의존성이나 초기 화면에 불필요한 선택 기능을 찾는다.
+- [x] 초기 JS/CSS·전체 자산·선택 PDF 청크의 원본/압축 크기 및 격리 Chromium 최초 자산 요청 기준선을 기록한다 ([#193](https://github.com/Transient-Onlooker/opencigan/pull/193), [측정 기록](../qa/bundle-baseline-2026-11-23.md)).
+- [ ] 중복 의존성이나 초기 화면에 불필요한 선택 기능을 찾고 실제 전송·로딩 측정 및 개선 전후 비교를 보완한다.
 - [ ] 근거가 있는 부분만 지연 로딩·의존성 정리로 개선한다. PDF 내보내기 **파일 크기** 최적화와 혼동하지 않는다.
 - **완료 조건:** 변경 전후 용량/초기 로드 수치와 모바일·데스크톱·빌드 회귀.
 - 원본: [배치 7 단계 9](refactoring-and-release.md).
@@ -202,6 +214,13 @@ flowchart TB
 - **과거의 개인 시간표·시험 오버레이와 Jev 급식 취향, 미정 홈 위젯/QR·다국어 범위:** 보류·아이디어를 오늘 작업으로 임의 승격하지 않는다.
 - **원본 데이터 이용 조건·추가 AGPL 출처 표시 조건·접속 로그 보존 정책:** 개발과 별개인 사용자/법률·운영 결정 사항이다.
 
+## 현황 요약 (2026-11-24)
+
+- 작업 단위 16개: 구현·자동검증 완료 6개(ST-00/02/05/06/08/09), 부분 진행 9개, 미착수 1개(ST-04A). 완료율 6/16(37.5%)은 작업 수 기준이지 실제 공수 또는 배포율이 아니다.
+- 현재 세부 체크리스트: 18/42개 체크됨. 완료된 하위 항목을 별도로 나누어 기록했으므로 과거 체크박스 개수와 단순 비교하지 않는다.
+- 열린 성능 PR [#162](https://github.com/Transient-Onlooker/opencigan/pull/162)은 draft로 남고 Issue #140은 open이다. 모의 1회와 달리 실제 단일 학교 비교는 3→4회(858→1059ms)였으므로 개선 완료가 아니다.
+- 다음 집중: ST-01 실경로 원인/시간 예산, ST-03 실제 상류 왕복 축소, ST-04A 원본 일과시간 검증, ST-07/10/11/12/13 잔여 작업, 마지막 ST-14 최종 회귀. 공개·발송·운영 활성화는 별도.
+
 ## 실행 결과 기록
 
 작업 후 아래를 실제 증거로 채운다. **완료 체크는 결과 기록 이후.**
@@ -209,16 +228,20 @@ flowchart TB
 | 작업 | 상태 | PR/커밋 | 통과한 검사 | 미배포·사용자 검증 등 잔여 |
 | --- | --- | --- | --- | --- |
 | ST-00 | 구현·자동검증 완료 | [#157](https://github.com/Transient-Onlooker/opencigan/pull/157) | 기준선 및 Chromium/WebKit CI | 실제 기기 QA는 별도 |
-| ST-01 | 관측·모의 재현 일부 완료 | [#158](https://github.com/Transient-Onlooker/opencigan/pull/158), [#164](https://github.com/Transient-Onlooker/opencigan/pull/164), [#165](https://github.com/Transient-Onlooker/opencigan/pull/165), [#166](https://github.com/Transient-Onlooker/opencigan/pull/166) | 프록시·프런트 및 학교별 장애·급식·캘린더 복구 회귀, CI | 운영 미배포, 503 원인·전체 시간 예산 미확정 |
+| ST-01 | 관측·모의 재현 일부 완료 | [#158](https://github.com/Transient-Onlooker/opencigan/pull/158), [#164](https://github.com/Transient-Onlooker/opencigan/pull/164), [#165](https://github.com/Transient-Onlooker/opencigan/pull/165), [#166](https://github.com/Transient-Onlooker/opencigan/pull/166), [#184](https://github.com/Transient-Onlooker/opencigan/pull/184), [#191](https://github.com/Transient-Onlooker/opencigan/pull/191) | 프록시·프런트 및 학교별 장애·급식·캘린더 복구 회귀, CI | 운영 미배포, 503 원인·전체 시간 예산 미확정 |
 | ST-02 | 격리 자동검증 완료 | [#159](https://github.com/Transient-Onlooker/opencigan/pull/159) | Worker·WSGI 및 CI | 실제 운영 제한 초과는 미검증 |
 | ST-03 | 검증 중 | [#162](https://github.com/Transient-Onlooker/opencigan/pull/162) 초안 | 단일 격리 비교에서 수업 데이터 일치 | 실측 요청 수·지연 개선 미달, 상류 학교 식별값 확인 필요 |
 | ST-05 | 격리 구현·자동검증 완료 | [#167](https://github.com/Transient-Onlooker/opencigan/pull/167) | 별도 저장소·권한·백업 회귀, 통합 CI | 기본 OFF, 공개·운영 미적용 |
 | ST-06 | 격리 구현·자동검증 완료 | [#172](https://github.com/Transient-Onlooker/opencigan/pull/172) | 모의 API·Chromium/WebKit CI | 기본 OFF, 공개·실기기 검증 별도 |
-- ST-07 | 일부 구현·검증 완료 | [#169](https://github.com/Transient-Onlooker/opencigan/pull/169), [#179](https://github.com/Transient-Onlooker/opencigan/pull/179) | 공식 도메인 연결 및 관리 링크 교체·복구 회귀, CI · 로컬 웹훅 모듈 테스트 38개 통과(2026-11-24, 이 세션) | 나머지 요구사항 확인 및 실제 발송 비활성 유지 |
+| ST-07 | 일부 구현·검증 완료 | [#169](https://github.com/Transient-Onlooker/opencigan/pull/169), [#179](https://github.com/Transient-Onlooker/opencigan/pull/179) | 공식 도메인 연결 및 관리 링크 교체·복구 회귀, CI · 로컬 웹훅 모듈 테스트 38개 통과(2026-11-24, 이 세션) | 나머지 요구사항 확인 및 실제 발송 비활성 유지 |
 | ST-08 | 격리 구현·자동검증 완료 | [#180](https://github.com/Transient-Onlooker/opencigan/pull/180) | 템플릿 인증·안전 출력·이전 DB·게이트웨이·Chromium/WebKit CI | 운영 미배포, 실제 발송 비활성 유지 |
-| ST-10 | 일부 구현·검증 완료 | [#168](https://github.com/Transient-Onlooker/opencigan/pull/168) | 게이트웨이 오류 응답 계약·하위 호환 회귀, CI | Worker 운영 배포 및 나머지 계약·관측 확인 별도 |
-| ST-11 | 일부 구현·검증 완료 | [#175](https://github.com/Transient-Onlooker/opencigan/pull/175) | 기본 OFF 관측 변경 통계·인증·미관측·보존 기간·관리 화면 회귀, [CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/44965076624) | 관측 횟수·공백은 확인 불가; 이상 트래픽 등 나머지 기능 및 운영 적용 별도 |
+| ST-10 | 일부 구현·검증 완료 | [#168](https://github.com/Transient-Onlooker/opencigan/pull/168), [#185](https://github.com/Transient-Onlooker/opencigan/pull/185), [#190](https://github.com/Transient-Onlooker/opencigan/pull/190), [#199](https://github.com/Transient-Onlooker/opencigan/pull/199) | 게이트웨이·Webhook·분석 API 일부 계약 회귀, 버전 정책 문서화, CI | 전체 계약·운영 관측 미완료 |
+| ST-11 | 일부 구현·검증 완료 | [#175](https://github.com/Transient-Onlooker/opencigan/pull/175), [#195](https://github.com/Transient-Onlooker/opencigan/pull/195), [#196](https://github.com/Transient-Onlooker/opencigan/pull/196), [#198](https://github.com/Transient-Onlooker/opencigan/pull/198), [#200](https://github.com/Transient-Onlooker/opencigan/pull/200) | 관측 변경 통계·학급 교시 수·교사 겹침·이상조회 및 보존 기간 회귀, CI | 나머지 집계, 상태별 탐지, 관리 UI·게이트웨이·알림 및 운영 적용 별도 |
 | ST-09 | 격리 구현·자동검증 완료 | [#182](https://github.com/Transient-Onlooker/opencigan/pull/182) | 예약 시각·방해 금지·중복·장애 복구 및 Chromium/WebKit CI | 기본 OFF, 실제 작업자·발송 미활성 |
-| ST-04, ST-04A, ST-12 ~ ST-14 | 진행 전 또는 부분 조사 | — | ST-14 부분: Python 311 로컬 통과(2026-11-24), Worker 게이트웨이 27·d1_cache 51 로컬 통과 | ST-04/04A/12/13 및 ST-14 나머지 미실행 |
+| ST-04 | 일부 구현·검증 완료 | [#192](https://github.com/Transient-Onlooker/opencigan/pull/192) | 급식 중복 오류 안내 정리, CI | 나머지 레이아웃·날짜·모바일 회귀 |
+| ST-04A | 미착수 | — | — | 원본 일과시간 확인 및 설계·구현 |
+| ST-12 | 일부 구현·검증 완료 | [#194](https://github.com/Transient-Onlooker/opencigan/pull/194), [#201](https://github.com/Transient-Onlooker/opencigan/pull/201) | 늦은 응답·저장 학교/학년 복원 경합/검증, CI | 나머지 상태·저장 책임 정리 |
+| ST-13 | 기준선 완료, 최적화 미완료 | [#193](https://github.com/Transient-Onlooker/opencigan/pull/193) | 격리 빌드 자산·초기 요청 측정 | 경량화·전후 성능·회귀 |
+| ST-14 | 부분 검증 | [#198](https://github.com/Transient-Onlooker/opencigan/pull/198), [main CI 45353469338](https://github.com/Transient-Onlooker/opencigan/actions/runs/45353469338) | #198 기록: Python 311, Worker 27, D1 51, Python SDK 7, TS SDK 6 로컬 통과; 기준 SHA의 check/deploy 성공 | 남은 구현 병합 후 최종 회귀, 운영 플래그·DB·롤백 및 실기기 검증 |
 
 **끝내는 기준:** 오늘의 목표는 체크박스를 억지로 100%로 만드는 것이 아니라, 실제 구현과 자동 테스트를 가능한 한 많이 안전하게 병합하는 것이다. 원래 장기 로드맵은 보존한다.
