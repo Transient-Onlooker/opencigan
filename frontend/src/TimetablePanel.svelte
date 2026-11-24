@@ -6,6 +6,7 @@
   import TeacherTimetable from './TeacherTimetable.svelte';
   import TodayLessons from './TodayLessons.svelte';
   import MealMenu from './MealMenu.svelte';
+  import MealAllergyStatus from './MealAllergyStatus.svelte';
   import type { Meal, NeisSchool } from './api';
   import type { MealAllergyFilter } from './meal-filter';
   import WeekGrid from './WeekGrid.svelte';
@@ -70,7 +71,7 @@
   export let shortDate: (value: string) => string;
   export let timeText: (value: string | null | undefined, withSeconds?: boolean) => string;
   export let subjectStyle: (subject: string | null | undefined) => string | undefined;
-  export let todayMeal: { neis: NeisSchool | null; neisLoading: boolean; neisSearchState: string; mealState: string; hasMeals: boolean; mealLoading: boolean; meals: Meal[]; mealsStale: boolean; visibleMealTypes: string[]; allergySelection: number[]; mealAllergyFilter: MealAllergyFilter; showAllergenNumbers: boolean; loadMeals: (preserve?: boolean) => void };
+  export let todayMeal: { neis: NeisSchool | null; neisLoading: boolean; neisSearchState: string; mealState: string; hasMeals: boolean; mealLoading: boolean; meals: Meal[]; mealsStale: boolean; visibleMealTypes: string[]; allergySelection: number[]; mealAllergyFilter: MealAllergyFilter; showAllergenNumbers: boolean; loadMeals: (preserve?: boolean) => void; openAllergySettings: () => void };
 </script>
 
 <section id="timetable-panel" hidden={view !== 'timetable'} aria-labelledby="timetable-title">
@@ -100,6 +101,7 @@
           {#if view === 'timetable' && timetableView === 'today' && school}
             <aside class="today-meals" aria-labelledby="today-meals-title">
               <h3 id="today-meals-title">{dateText(selectedDay)} 급식</h3>
+              <MealAllergyStatus selection={todayMeal.allergySelection} filter={todayMeal.mealAllergyFilter} openSettings={todayMeal.openAllergySettings} />
               {#if todayMeal.neisLoading}<p role="status">급식을 연결하고 있어요.</p>
               {:else if !todayMeal.neis}<p>{todayMeal.neisSearchState || '급식 학교를 연결해 주세요.'}</p>
               {:else}
