@@ -169,20 +169,28 @@ def _activate(tag, sha, root, school, week):
         probe(8000, "/api/v1/timetable", {"school": school, "week": week})
         state["verification"]["public"] = True
         state.update(activeSha=sha, success=True)
+        write_atomic(state_file, json.dumps(state, ensure_ascii=False) + "\n")
     except BaseException:
+        state.update(activeSha=old_sha, success=False)
         if switched:
-            if previous:
-                link = root / (".rollback-" + str(os.getpid()))
-                link.symlink_to(previous, target_is_directory=True)
-                os.replace(link, current)
-            else:
-                current.unlink(missing_ok=True)
-            for target, old in snapshots.items():
-                if old is None:
-                    target.unlink(missing_ok=True)
-                else:
-                    write_atomic(target, old)
             errors = []
+            try:
+                if previous:
+                    link = root / (".rollback-" + str(os.getpid()))
+                    link.symlink_to(previous, target_is_directory=True)
+                    os.replace(link, current)
+                else:
+                    current.unlink(missing_ok=True)
+            except Exception as error:
+                errors.append(type(error).__name__)
+            for target, old in snapshots.items():
+                try:
+                    if old is None:
+                        target.unlink(missing_ok=True)
+                    else:
+                        write_atomic(target, old)
+                except Exception as error:
+                    errors.append(type(error).__name__)
             for args in (("daemon-reload",), ("restart", "opencigan-internal.service")):
                 try:
                     systemctl(*args)
@@ -205,6 +213,10 @@ def _activate(tag, sha, root, school, week):
         state["phase"] = "activation_failed"
         raise
     finally:
+        try:
+            state["activeSha"] = installed_sha(root, home)
+        except Exception:
+            state["activeSha"] = None
         state["timestamp"] = datetime.now(timezone.utc).isoformat()
         write_atomic(state_file, json.dumps(state, ensure_ascii=False) + "\n")
     try:
