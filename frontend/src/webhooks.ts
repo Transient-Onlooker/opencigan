@@ -22,16 +22,20 @@ let previewTimer = 0;
 let previewRevision = 0;
 let controller = new AbortController();
 let rotationToken = '';
+let actionRunning = false;
 
 async function call(path: string, method = 'GET', payload?: unknown, authenticated = true) {
+  const active = controller;
   if (!base && location.hostname.endsWith('.github.io')) throw new Error('API가 연결된 배포 주소에서 이용해 주세요.');
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (authenticated) headers.Authorization = `Bearer ${input('token').value}`;
   if (payload !== undefined) headers['Content-Type'] = 'application/json';
   const response = await fetch(`${base}/api/v1/webhooks${path}`, { method, headers, body: payload === undefined ? undefined : JSON.stringify(payload),
-    credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]) });
+    credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', signal: AbortSignal.any([active.signal, AbortSignal.timeout(10_000)]) });
   if (!response.ok) throw new Error(response.status === 401 ? '구독 ID와 관리 토큰을 확인해 주세요.' : response.status === 429 ? '요청이 많아요. 잠시 후 다시 시도해 주세요.' : response.status === 503 ? '서버에서 알림 기능을 사용할 수 없어요.' : `요청을 처리하지 못했어요. (${response.status})`);
-  return response.json();
+  const result = await response.json();
+  if (active !== controller || active.signal.aborted) throw new DOMException('Request canceled', 'AbortError');
+  return result;
 }
 
 function subscriptionPath() {
@@ -41,14 +45,16 @@ function subscriptionPath() {
 }
 
 async function run(action: () => Promise<void>) {
+  actionRunning = true;
   buttons.forEach((button) => { if (button.id !== 'lock') button.disabled = true; });
   const active = controller;
   try { await action(); } catch (error) { if (!active.signal.aborted) state.textContent = error instanceof Error ? error.message : '요청을 처리하지 못했어요.'; }
-  finally { if (active === controller) buttons.forEach((button) => { button.disabled = false; }); }
+  finally { if (active === controller) { actionRunning = false; buttons.forEach((button) => { button.disabled = false; }); } }
 }
 
 function reset() {
   controller.abort(); controller = new AbortController();
+  actionRunning = false;
   window.clearTimeout(previewTimer);
   previewRevision += 1;
   input('id').value = ''; input('token').value = ''; input('destination').value = ''; input('new-destination').value = '';
@@ -97,6 +103,7 @@ async function loadDeliveries(path: string) {
 }
 
 async function load() {
+  const active = controller;
   manage.hidden = true; table.replaceChildren();
   const path = subscriptionPath();
   const result = await call(path);
@@ -108,6 +115,7 @@ async function load() {
   } catch {
     // Older servers may not provide template management yet.
   }
+  if (active !== controller || active.signal.aborted) return;
   const scheduleEditor = document.querySelector<HTMLElement>('#schedule-editor')!;
   scheduleEditor.hidden = true;
   void loadSchedule(path, input('token').value, controller);
@@ -324,7 +332,15 @@ document.querySelector('#create')!.addEventListener('submit', (event) => {
 });
 document.querySelector('#connect')!.addEventListener('submit', (event) => { event.preventDefault(); input('token').type = 'password'; void run(load); });
 document.querySelector('#copy-link')?.addEventListener('click', () => { void run(copyLink); });
-for (const id of ['id', 'token']) input(id).addEventListener('input', () => { manage.hidden = true; table.replaceChildren(); clearRotation(); });
+for (const id of ['id', 'token']) input(id).addEventListener('input', () => {
+  const wasBusy = actionRunning;
+  controller.abort(); controller = new AbortController();
+  actionRunning = false;
+  window.clearTimeout(previewTimer); previewRevision += 1;
+  manage.hidden = true; table.replaceChildren(); clearRotation();
+  buttons.forEach((button) => { button.disabled = false; });
+  if (wasBusy) state.textContent = '관리 정보를 변경했어요. 진행 중이던 변경 요청은 처리 여부를 다시 확인해 주세요.';
+});
 document.querySelector('#prepare-rotation')!.addEventListener('click', () => {
   try {
     subscriptionPath();
