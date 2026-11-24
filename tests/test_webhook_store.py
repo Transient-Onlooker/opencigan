@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.webhook_store import WebhookStore, quiet_until
+from backend.webhook_store import WebhookStore, enqueue_observed_change, quiet_until
 from backend.webhook_worker import deliver_next
 from backend.history import HistoryStore
 
@@ -107,6 +107,17 @@ class WebhookStoreTests(unittest.TestCase):
             self.assertEqual(self.store.get(self.subscription["id"], self.subscription["token"])["dropped_events"], 1)
             with closing(sqlite3.connect(self.path)) as db:
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM webhook_deliveries").fetchone()[0], 1)
+
+    def test_duplicate_observation_does_not_count_as_dropped_when_queue_is_full(self):
+        identifier, token = self.subscription["id"], self.subscription["token"]
+        lesson = {"subject": "수학", "teacher": "김"}
+        with patch("backend.webhook_store.MAX_PENDING_PER_SUBSCRIPTION", 1), closing(self.store._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            for change_id in (1, 1, 2):
+                enqueue_observed_change(db, "2:예시학교", 2, 3, "2026-11-16", 1, "changed", lesson, lesson, change_id, 100)
+            db.execute("COMMIT")
+        self.assertEqual(self.store.get(identifier, token)["dropped_events"], 1)
+        self.assertEqual([item["event_id"] for item in self.store.deliveries(identifier, token)], ["change_1"])
 
     def test_rejects_invalid_external_inputs(self):
         with self.assertRaises(ValueError):
