@@ -28,6 +28,8 @@ def sync(sha, key, attempts=3, *, dry_run=False):
     if not known_hosts.is_file() or known_hosts.is_symlink() or known_hosts.stat().st_mode & 0o077:
         raise ValueError("Dedicated GitHub host keys missing or have unsafe permissions")
     env = os.environ.copy()
+    for name in ("GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"):
+        env.pop(name, None)
     env["GIT_TERMINAL_PROMPT"] = "0"
     env["GIT_SSH_COMMAND"] = ("ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "
                               "-o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=" + shlex.quote(str(known_hosts))
@@ -51,8 +53,8 @@ def sync(sha, key, attempts=3, *, dry_run=False):
                 if changed != ["backend/requirements.txt"]:
                     raise ValueError("Unexpected source changes")
                 subprocess.run(["git", "-C", str(root), "add", "--", "backend/requirements.txt"], check=True, env=env)
-                subprocess.run(["git", "-C", str(root), "-c", "user.name=OpenCigan dependency bot",
-                                "-c", "user.email=opencigan-dependency-bot@users.noreply.github.com",
+                subprocess.run(["git", "-C", str(root), "-c", "user.name=Transient-Onlooker",
+                                "-c", "user.email=swapomit@gmail.com",
                                 "-c", "core.hooksPath=/dev/null", "commit", "-m", "Update pycomcigan active commit"],
                                check=True, env=env, timeout=30, stdout=subprocess.DEVNULL)
                 subprocess.run(["git", "-C", str(root), "push", "origin", "HEAD:refs/heads/main"], check=True, env=env, timeout=90)

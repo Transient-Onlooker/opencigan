@@ -1,6 +1,7 @@
 """Prepare, validate and activate one explicitly requested fork release."""
 import argparse
 import json
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -23,8 +24,22 @@ def deploy(tag, sha, root, release, school, week):
         raise ValueError("Unsafe deployment state path")
     with lock.open("a") as handle:
         fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if status.is_file():
+            previous = json.loads(status.read_text(encoding="utf-8"))
+            verified = previous.get("verification", {})
+            if (previous.get("activeSha") == sha and previous.get("success")
+                    and verified.get("internal") and verified.get("public")
+                    and installed_sha(root, Path.home()) == sha):
+                if previous.get("pinSync") in ("pending", "failed"):
+                    return retry_pin(root)
+                return {**previous, "skipped": True}
         try:
-            prepare(tag, sha, root, release, school, week)
+            if (root / sha).exists() or (root / sha).is_symlink():
+                # Revalidate and retest even when a prior candidate is retained.
+                with tempfile.TemporaryDirectory(prefix=".recheck-", dir=root) as temporary:
+                    prepare(tag, sha, temporary, release, school, week)
+            else:
+                prepare(tag, sha, root, release, school, week)
         except Exception as error:
             try:
                 active = installed_sha(root, Path.home())
@@ -37,6 +52,18 @@ def deploy(tag, sha, root, release, school, week):
             write_atomic(status, json.dumps(result) + "\n")
             raise
         return activate(tag, sha, root, school, week)
+
+
+def retry_pending_pin(root):
+    import fcntl
+
+    root = Path(root).resolve(strict=True)
+    lock = root / ".orchestration.lock"
+    if lock.is_symlink():
+        raise ValueError("Unsafe deployment lock")
+    with lock.open("a") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return retry_pin(root)
 
 
 def main():
@@ -52,7 +79,7 @@ def main():
     if args.retry_pin:
         if any((args.tag, args.sha, args.release, args.school, args.week)):
             parser.error("--retry-pin cannot be combined with deployment arguments")
-        result = retry_pin(args.root)
+        result = retry_pending_pin(args.root)
     else:
         if not all((args.tag, args.sha, args.release, args.school, args.week)):
             parser.error("--tag, --sha, --release, --school and --week are required")
