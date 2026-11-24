@@ -2,6 +2,8 @@ import io
 import json
 import tempfile
 import unittest
+import yaml
+from jsonschema import Draft202012Validator
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -80,6 +82,15 @@ class WebhookApiTests(unittest.TestCase):
             self.assertEqual(claim["event_id"], "event_1")
             self.assertEqual(claim["destination"], new_url)
             self.assertNotIn(b"new_secret", self.request("GET", path, token=created["token"])[2])
+
+    def test_update_request_schema_matches_exclusive_payloads(self):
+        spec = yaml.safe_load((Path(__file__).resolve().parents[1] / "docs" / "openapi.yaml").read_text(encoding="utf-8"))
+        schema = spec["paths"]["/api/v1/webhooks/{id}"]["put"]["requestBody"]["content"]["application/json"]["schema"]
+        validator = Draft202012Validator(schema)
+        self.assertTrue(validator.is_valid({"filters": {"period": 1}}))
+        self.assertTrue(validator.is_valid({"destination": "https://discord.com/api/webhooks/123/token"}))
+        self.assertFalse(validator.is_valid({}))
+        self.assertFalse(validator.is_valid({"filters": {}, "destination": "https://discord.com/api/webhooks/123/token"}))
 
     def test_subscription_requests_have_their_own_rate_limit(self):
         with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
