@@ -10,6 +10,20 @@ from deploy.release_deploy import deploy
 
 @unittest.skipIf(os.name == "nt", "requires Linux file locking")
 class ReleaseDeployTests(unittest.TestCase):
+    @patch("deploy.release_deploy.installed_sha", return_value="a" * 40)
+    @patch("deploy.release_deploy.prepare", side_effect=RuntimeError("offline"))
+    def test_failed_new_candidate_preserves_previous_pending_pin(self, prepare, installed):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            status = root / "deployment-status.json"
+            status.write_text(json.dumps({"activeSha": "a" * 40, "success": True, "pinSync": "failed",
+                                          "verification": {"internal": True, "public": True}}))
+            with self.assertRaisesRegex(RuntimeError, "offline"):
+                deploy("1.4.7", "b" * 40, root, "/release", "1:A", "2026-11-23")
+            result = json.loads(status.read_text())
+            self.assertEqual(result["activeSha"], "a" * 40)
+            self.assertEqual(result["pinSync"], "failed")
+            self.assertEqual(result["lastAttempt"]["phase"], "prepare_failed")
     @patch("deploy.release_deploy.activate", return_value={"success": True})
     @patch("deploy.release_deploy.prepare")
     def test_existing_inactive_candidate_is_retested_before_activation(self, prepare, activate):
