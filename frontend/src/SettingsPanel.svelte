@@ -320,6 +320,7 @@
                    </div>
                  {/each}</div>
                </details>
+               <p class="display-settings-hint">시각 초기화는 저장된 기본 교시 시각과 요일별 예외를 지워요. 위의 계산 입력값은 유지돼요.</p>
                <div class="lesson-time-actions"><button class="secondary-button" type="button" onclick={(event) => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); event.currentTarget.focus(); submitLessonTimes(); }}><Icon name="save" /> 시각 저장</button><button class="secondary-button" type="button" onclick={() => { timeError = null; clearLessonTimes(); }}>시각 초기화</button></div>
                {#if lessonTimeState}<p class="state-inline" role="status">{lessonTimeState}</p>{/if}
              </details>

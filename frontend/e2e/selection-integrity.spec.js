@@ -1377,6 +1377,16 @@ test('lesson time rules preview lunch and require explicit application and savin
   await page.getByText('상세 시간 설정하기', { exact: true }).click();
   await expect(page.getByLabel('5교시 시작', { exact: true })).toHaveValue('13:10');
   await expect(page.getByLabel('계산된 교시 시각 미리보기')).toContainText('5교시 13:05–13:55');
+  await expect(page.getByText('시각 초기화는 저장된 기본 교시 시각과 요일별 예외를 지워요. 위의 계산 입력값은 유지돼요.')).toBeVisible();
+  await page.getByRole('button', { name: '시각 초기화' }).click();
+  await expect(page.getByLabel('5교시 시작', { exact: true })).toHaveValue('');
+  await expect(page.getByLabel('1교시 시작 시각')).toHaveValue('08:15');
+  await page.reload();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('학교 교시 시각 설정', { exact: true }).click();
+  await expect(page.getByLabel('1교시 시작 시각')).toHaveValue('08:15');
+  await page.getByText('상세 시간 설정하기', { exact: true }).click();
+  await expect(page.getByLabel('5교시 시작', { exact: true })).toHaveValue('');
 });
 
 test('weekday bell times save independently and are included in school backup', async ({ page }) => {
