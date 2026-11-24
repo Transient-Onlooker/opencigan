@@ -4,14 +4,15 @@ After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/opensigan
+WorkingDirectory=%h/opensigan-releases/current
 Environment=HOST=127.0.0.1
 Environment=PORT=8000
 Environment=ALLOWED_ORIGIN=https://opencigan.mcv.kr,http://opencigan.mcv.kr,https://transient-onlooker.github.io
 EnvironmentFile=-%h/.config/opensigan/neis.env
-ExecStart=%h/opensigan/.venv/bin/python -m backend.app
+ExecStart=%h/opensigan-releases/current/.venv/bin/python -m backend.app
 Restart=on-failure
 RestartSec=3
+Nice=5
 
 [Install]
 WantedBy=default.target
