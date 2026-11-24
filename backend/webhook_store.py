@@ -93,6 +93,9 @@ def enqueue_observed_change(db, school, grade, classroom, date, period, kind, be
         if any(filters.get(key) and not any(filters[key] in (value or {}).get(key, "") for value in (before, after))
                for key in ("subject", "teacher")):
             continue
+        event_id = f"change_{change_id}"
+        if db.execute("SELECT 1 FROM webhook_deliveries WHERE subscription_id=? AND event_id=?", (subscription["id"], event_id)).fetchone():
+            continue
         if db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')", (subscription["id"],)).fetchone()[0] >= MAX_PENDING_PER_SUBSCRIPTION:
             db.execute("UPDATE webhook_subscriptions SET dropped_events=dropped_events+1 WHERE id=?", (subscription["id"],))
             continue
@@ -108,7 +111,7 @@ def enqueue_observed_change(db, school, grade, classroom, date, period, kind, be
             payload = {"content": safe_text, "allowed_mentions": {"parse": []}} if subscription["provider"] == "discord" else {"text": safe_text}
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         db.execute("INSERT OR IGNORE INTO webhook_deliveries(subscription_id, event_id, body, next_at) VALUES (?, ?, ?, ?)",
-                   (subscription["id"], f"change_{change_id}", body, now))
+                   (subscription["id"], event_id, body, now))
 
 
 class WebhookStore:

@@ -8,8 +8,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.webhook_store import WebhookStore, quiet_until
-from backend.webhook_worker import deliver_next
+from backend.webhook_store import WebhookStore, enqueue_observed_change, quiet_until
+from backend.webhook_worker import deliver_next, run_worker
 from backend.history import HistoryStore
 
 
@@ -94,6 +94,20 @@ class WebhookStoreTests(unittest.TestCase):
         with closing(sqlite3.connect(self.path)) as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM webhook_deliveries").fetchone()[0], 0)
 
+    def test_idle_worker_prunes_expired_delivery_without_new_events(self):
+        from unittest.mock import Mock
+        identifier = self.subscription["id"]
+        self.store.enqueue(identifier, "finished", b'{}', now=100)
+        claim = self.store.claim(now=100)
+        self.store.finish(claim["id"], claim["leaseToken"], {"delivered": True, "retryable": False}, now=100)
+        stop = Mock()
+        stop.is_set.side_effect = [False, True]
+        with patch("backend.webhook_store.time.time", return_value=100 + 30 * 24 * 60 * 60 + 1):
+            run_worker(self.store, stop)
+        stop.wait.assert_called_once_with(2)
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM webhook_deliveries").fetchone()[0], 0)
+
     def test_queue_limit_drops_new_event_without_breaking_history(self):
         with patch("backend.webhook_store.MAX_PENDING_PER_SUBSCRIPTION", 1):
             self.assertTrue(self.store.enqueue(self.subscription["id"], "first", b'{}', now=1))
@@ -107,6 +121,17 @@ class WebhookStoreTests(unittest.TestCase):
             self.assertEqual(self.store.get(self.subscription["id"], self.subscription["token"])["dropped_events"], 1)
             with closing(sqlite3.connect(self.path)) as db:
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM webhook_deliveries").fetchone()[0], 1)
+
+    def test_duplicate_observation_does_not_count_as_dropped_when_queue_is_full(self):
+        identifier, token = self.subscription["id"], self.subscription["token"]
+        lesson = {"subject": "수학", "teacher": "김"}
+        with patch("backend.webhook_store.MAX_PENDING_PER_SUBSCRIPTION", 1), closing(self.store._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            for change_id in (1, 1, 2):
+                enqueue_observed_change(db, "2:예시학교", 2, 3, "2026-11-16", 1, "changed", lesson, lesson, change_id, 100)
+            db.execute("COMMIT")
+        self.assertEqual(self.store.get(identifier, token)["dropped_events"], 1)
+        self.assertEqual([item["event_id"] for item in self.store.deliveries(identifier, token)], ["change_1"])
 
     def test_rejects_invalid_external_inputs(self):
         with self.assertRaises(ValueError):
