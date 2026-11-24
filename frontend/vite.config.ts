@@ -7,4 +7,4 @@ import { resolveBuildSha } from './scripts/resolve-build-sha.mjs';
 const buildSha = resolveBuildSha(process.env);
 if (buildSha) process.env.VITE_BUILD_SHA = buildSha;
 
-export default defineConfig({ base: '/', plugins: [svelte()], build: { rollupOptions: { input: { main: 'index.html', analytics: 'analytics.html', accessLogs: 'access-logs.html', embed: 'embed.html', embedBuilder: 'embed-builder.html', webhooks: 'webhooks.html' } } }, server: { proxy: { '^/api(?:/|$)': 'http://127.0.0.1:8000' } } });
+export default defineConfig({ base: '/', plugins: [svelte()], build: { manifest: true, rollupOptions: { input: { main: 'index.html', analytics: 'analytics.html', accessLogs: 'access-logs.html', embed: 'embed.html', embedBuilder: 'embed-builder.html', webhooks: 'webhooks.html' } } }, server: { proxy: { '^/api(?:/|$)': 'http://127.0.0.1:8000' } } });

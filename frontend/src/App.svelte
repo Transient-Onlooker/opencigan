@@ -15,7 +15,7 @@
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
   import { shareClassUrl, readSharedClass } from './sharing';
-  import { saveTimetablePdf, saveTimetablePng, shareTimetablePng, type ExportOptions } from './export-png';
+  import type { ExportOptions } from './export-png';
   import { createTimetableSession } from './timetable-cache';
   import { createMealSession } from './meal-session';
   import { createSchoolSearchSession } from './school-search-session';
@@ -631,6 +631,7 @@
     imageShareCancelled = false;
     exportState = format + ' 파일을 만드는 중…';
     try {
+      const { saveTimetablePdf, saveTimetablePng } = await import('./export-png');
       await (format === 'PDF' ? saveTimetablePdf(options) : saveTimetablePng(options));
       exportState = format + ' 다운로드를 시작했어요.';
     } catch (error) { exportState = errorText(error); }
@@ -643,6 +644,7 @@
     imageShareCancelled = false;
     exportState = '시간표 이미지를 만드는 중…';
     try {
+      const { shareTimetablePng } = await import('./export-png');
       const result = await shareTimetablePng(options);
       imageShareCancelled = result === 'cancelled';
       exportState = result === 'shared' ? '시간표 이미지를 공유했어요.' : result === 'cancelled' ? '공유를 취소했어요.' : result === 'failed' ? '공유하지 못해 PNG 다운로드를 시작했어요.' : '이 브라우저는 이미지 공유를 지원하지 않아 PNG 다운로드를 시작했어요.';
