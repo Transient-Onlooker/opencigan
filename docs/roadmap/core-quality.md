@@ -38,6 +38,8 @@
   - 독립 GitHub Actions의 Chromium에서 실제 공식 사이트의 학교 검색·시간표 조회와 표시를 390px·1280px 화면으로 확인했다. 모의 API는 사용하지 않았으며 이 결과는 실기기·PWA·캘린더 앱 전체 검증을 대체하지 않는다.
 - [ ] **NEW-02 · 선택된 공개 ICS 엔드포인트 실사용 검증 (동일 도메인 강제 없음):** Funnel 중지 후 공개 구독은 `https://opencigan.pages.dev/api/v1/timetable.ics` 또는 공식 Pages 호스트를 사용한다. 기존 `.ts.net`은 현재 공개되지 않는다. **실제 외부 접속, ICS 본문·ETag/304, Apple/Google Calendar 재구독·자동 갱신, TLS·접속 지속성·캐시·운영 중단 시 대체 안내**를 검증하면 완료 판정.
 - [x] **NEW-02 · 공개 ICS HTTP 조건부 요청 확인:** 2026-11-18 KST 단일 네트워크에서 `opencigan.pages.dev`와 `opencigan.mcv.kr`에 같은 학교·학급으로 요청하여 HTTPS GET 200·VCALENDAR 시작/종료·ETag·동일 ETag의 조건부 GET 304·HEAD 200을 확인했다. 브라우저/캘린더 앱 구독·자동 갱신, 별도 외부망과 장기 안정성은 위 항목에 남는다.
+**2026-11-25 3차 운영 QA(사용자 제공):** 양 공식/Pages 호스트의 same-origin 상태·학교·시간표·ICS 200, ETag/304, HEAD 200/OPTIONS 204, 허용/비허용 Origin CORS, 공개 내부 경로 5종 404, robots 차단을 확인했다고 보고. 일부 운영 경계 확인으로 기록하며 내부 루프백 인증·활성 파서 SHA 직접 대조, 실제 IP별 제한, 장애 복구·PWA·실캘린더 및 실기기 전체 게이트는 남는다. [3차 QA 후속](qa3-followup-2026-11-25.md).
+
 **QA 이외의 잔여 운영 과제**
 
 - [ ] **P0 · 롤백/베타 가용성:** Cloudflare Pages / Worker VPC Beta / cloudflared 연결 장애, 429·503, 캐시·원본 가용성을 분리하고 복구 경로를 검증한다. 기존 GitHub Pages·Tailscale Funnel은 대체 경로의 필요성 확인 전까지 보존하고, 기존 원본 데이터 연결은 유지한다.

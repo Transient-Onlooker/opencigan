@@ -24,6 +24,12 @@
 - ST-12: [#194](https://github.com/Transient-Onlooker/opencigan/pull/194) 늦은 시간표 성공/실패 무시, [#201](https://github.com/Transient-Onlooker/opencigan/pull/201) 저장 학교 객체·정수 학년 검증 병합. 나머지 저장 책임 정리와 종합 회귀 미완료.
 - ST-13: [#193](https://github.com/Transient-Onlooker/opencigan/pull/193) [번들 기준선](../qa/bundle-baseline-2026-11-23.md) 완료. 실제 전송·로딩 성능 및 경량화 전후 비교는 미완료.
 
+### 2026-11-25 3차 통합 QA
+
+- 사용자 제공 판정 CONDITIONAL PASS. 5d3a17c에서 시작, 도중 fb9ed13으로 배포 변경; 두 SHA의 GitHub CI check/deploy 성공은 별도 조회로 확인 ([5d3a17c CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/45422361152), [fb9ed13 CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/45425309399)).
+- 운영 API/ICS HTTP·내부 공개 경계 및 학교 3곳 핵심 조회, PNG/PDF/설정 JSON 내보내기 보고 확인. QA2-003·QA3-001 재개방, QA2-008은 원래 공유 진입 범위 유지 및 별도 UX 결정. 실제 파일 가져오기·실기기·PWA·실캘린더·장애/롤백 검증 미완료. [3차 QA 후속](qa3-followup-2026-11-25.md).
+- ST-14 전체 최종 릴리스 게이트는 닫지 않는다.
+
 ### 2026-11-16 종합 QA 이후 릴리스 체크
 **2026-11-17 2차 QA 보고(사용자 제공)** — [요약](../qa/qa-2026-11-17.md). **QA2-001~003**(교시 폼 새로고침 복원, 무효 시각 오류 안내, 급식 알레르기 적용 상태 표시)와 공식 ICS/Cloudflare 연결을 우선 검증·수정한다. QA 판정 CONDITIONAL PASS는 실기기·실제 파일 내용·백업 복원·오프라인·실캘린더 검증 합격이나 최종 출시 완료를 의미하지 않는다.
 
