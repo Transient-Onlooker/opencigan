@@ -19,8 +19,14 @@ class SubscriptionLimitError(Exception):
 
 
 MAX_PENDING_PER_SUBSCRIPTION = 1000
+MAX_DELIVERY_RECORDS = 50000
+MAX_SUBSCRIPTIONS = 500
 MAX_DELIVERY_ATTEMPTS = 6
 DELIVERY_RETENTION_SECONDS = 30 * 24 * 60 * 60
+
+
+def delivery_capacity_available(db):
+    return db.execute("SELECT COUNT(*) FROM webhook_deliveries").fetchone()[0] < MAX_DELIVERY_RECORDS
 
 
 def validate_filters(filters):
@@ -96,7 +102,8 @@ def enqueue_observed_change(db, school, grade, classroom, date, period, kind, be
         event_id = f"change_{change_id}"
         if db.execute("SELECT 1 FROM webhook_deliveries WHERE subscription_id=? AND event_id=?", (subscription["id"], event_id)).fetchone():
             continue
-        if db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')", (subscription["id"],)).fetchone()[0] >= MAX_PENDING_PER_SUBSCRIPTION:
+        if (db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')", (subscription["id"],)).fetchone()[0] >= MAX_PENDING_PER_SUBSCRIPTION
+                or not delivery_capacity_available(db)):
             db.execute("UPDATE webhook_subscriptions SET dropped_events=dropped_events+1 WHERE id=?", (subscription["id"],))
             continue
         raw_template = subscription["template_json"]
@@ -180,7 +187,7 @@ class WebhookStore:
         with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
             try:
-                if db.execute("SELECT COUNT(*) FROM webhook_subscriptions").fetchone()[0] >= 500:
+                if db.execute("SELECT COUNT(*) FROM webhook_subscriptions").fetchone()[0] >= MAX_SUBSCRIPTIONS:
                     raise SubscriptionLimitError()
                 db.execute("INSERT INTO webhook_subscriptions(id, token_hash, school, grade, classroom, destination, provider, signing_secret) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                            (identifier, self._token_hash(token), school, grade, classroom, destination, provider, secrets.token_bytes(32)))
@@ -310,7 +317,7 @@ class WebhookStore:
                     return None
                 recent = row["last_test_at"] is not None and row["last_test_at"] > now - 60
                 pending = db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')", (identifier,)).fetchone()[0]
-                if recent or pending >= MAX_PENDING_PER_SUBSCRIPTION:
+                if recent or pending >= MAX_PENDING_PER_SUBSCRIPTION or not delivery_capacity_available(db):
                     db.execute("COMMIT")
                     return False
                 event_id = "test_" + secrets.token_urlsafe(18)
@@ -337,7 +344,8 @@ class WebhookStore:
         with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
             try:
-                if db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')", (identifier,)).fetchone()[0] >= MAX_PENDING_PER_SUBSCRIPTION:
+                if (db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')", (identifier,)).fetchone()[0] >= MAX_PENDING_PER_SUBSCRIPTION
+                        or not delivery_capacity_available(db)):
                     db.execute("COMMIT")
                     return False
                 inserted = db.execute("INSERT OR IGNORE INTO webhook_deliveries(subscription_id, event_id, body, next_at) VALUES (?, ?, ?, ?)",

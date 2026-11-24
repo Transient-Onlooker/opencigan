@@ -133,6 +133,41 @@ class WebhookStoreTests(unittest.TestCase):
         self.assertEqual(self.store.get(identifier, token)["dropped_events"], 1)
         self.assertEqual([item["event_id"] for item in self.store.deliveries(identifier, token)], ["change_1"])
 
+    def test_global_capacity_blocks_all_insertion_paths_without_removing_history(self):
+        identifier, token = self.subscription["id"], self.subscription["token"]
+        other = self.store.create("2:예시학교", 2, 4, "https://discord.com/api/webhooks/456/token")
+        with patch("backend.webhook_store.MAX_DELIVERY_RECORDS", 1):
+            self.assertTrue(self.store.enqueue(identifier, "existing", b'{}', now=100))
+            self.assertFalse(self.store.enqueue(other["id"], "new", b'{}', now=100))
+            self.assertFalse(self.store.enqueue_test(other["id"], other["token"], now=100))
+            lesson = {"subject": "수학", "teacher": "김"}
+            with closing(self.store._connect()) as db:
+                db.execute("BEGIN IMMEDIATE")
+                enqueue_observed_change(db, "2:예시학교", 2, 3, "2026-11-16", 1, "changed", lesson, lesson, 7, 100)
+                db.execute("COMMIT")
+            self.assertEqual(self.store.get(identifier, token)["dropped_events"], 1)
+            self.assertEqual([item["event_id"] for item in self.store.deliveries(identifier, token)], ["existing"])
+
+    def test_global_capacity_is_atomic_across_subscriptions(self):
+        other = self.store.create("2:예시학교", 2, 4, "https://discord.com/api/webhooks/456/token")
+        with patch("backend.webhook_store.MAX_DELIVERY_RECORDS", 1), ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda sub: self.store.enqueue(sub["id"], "event", b'{}', now=100),
+                                    (self.subscription, other)))
+        self.assertEqual(sum(results), 1)
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM webhook_deliveries").fetchone()[0], 1)
+
+    def test_global_capacity_recovers_after_expired_history_is_pruned(self):
+        identifier = self.subscription["id"]
+        with patch("backend.webhook_store.MAX_DELIVERY_RECORDS", 1):
+            self.assertTrue(self.store.enqueue(identifier, "finished", b'{}', now=100))
+            claim = self.store.claim(now=100)
+            self.assertTrue(self.store.finish(claim["id"], claim["leaseToken"],
+                                              {"delivered": True, "retryable": False}, now=100))
+            self.assertFalse(self.store.enqueue(identifier, "new", b'{}', now=101))
+            self.assertIsNone(self.store.claim(now=100 + 30 * 24 * 60 * 60 + 1))
+            self.assertTrue(self.store.enqueue(identifier, "new", b'{}', now=100 + 30 * 24 * 60 * 60 + 2))
+
     def test_rejects_invalid_external_inputs(self):
         with self.assertRaises(ValueError):
             self.store.create("2:예시학교", True, 1, "https://discord.com/api/webhooks/123/secret")
