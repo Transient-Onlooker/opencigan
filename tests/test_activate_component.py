@@ -122,3 +122,17 @@ class ActivateComponentTests(unittest.TestCase):
         state_path.write_text(json.dumps({"activeSha": self.sha, "success": False}))
         with self.assertRaisesRegex(ValueError, "not verified"):
             retry_pin(self.root)
+
+    @patch("deploy.activate_component.wait_ready")
+    @patch("deploy.activate_component.probe", side_effect=[RuntimeError("initial failure"), None, None])
+    @patch("deploy.activate_component.systemctl", side_effect=[None, None, RuntimeError("reload failure"), None, None])
+    @patch("deploy.activate_component.load_release")
+    def test_partial_rollback_error_is_recorded_and_public_restart_attempted(self, load, systemctl, probe, ready):
+        load.return_value = self.manifest
+        with patch("deploy.activate_component.Path.home", return_value=self.home):
+            with self.assertRaisesRegex(RuntimeError, "initial failure"):
+                _activate("1.4.6", self.sha, self.root, "1:A", "2026-11-23")
+        state = json.loads((self.root / "deployment-status.json").read_text())
+        self.assertFalse(state["rollback"])
+        self.assertEqual(state["rollbackErrors"], ["RuntimeError"])
+        self.assertEqual(systemctl.call_args_list[-1].args, ("restart", "opensigan.service"))
