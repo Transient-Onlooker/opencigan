@@ -110,11 +110,15 @@ test('enabled history stats: fetches stats, handles observed=false and observed=
     lastObservedAt: '2026-11-16T10:00:00+00:00',
     retainedSince: '2026-10-23T00:00:00+00:00',
     comparisonCoverage: 'unknown',
+    changesByObservedDay: [{ date: '2026-11-15', count: 5 }, { date: '2026-11-16', count: 7 }],
     subjectPeriods: [{ subject: '<img src=x onerror=alert(1)>', classPeriods: 2 }, { subject: '수학', classPeriods: 3 }],
     teacherOverlaps: [{ date: '2026-11-16', period: 1, teacher: '<script>alert(1)</script>', classes: [{ grade: 1, class: 1 }, { grade: 1, class: 2 }] }],
   };
   await page.locator('#history-stats-load').click();
   await expect(resultsContainer).toContainText('12건');
+  await expect(resultsContainer).toContainText('관측일별 변경 (한국 시간)');
+  await expect(resultsContainer).toContainText('2026-11-15: 5건');
+  await expect(resultsContainer).toContainText('실제 변경 시각이나 관측하지 못한 변경은 알 수 없습니다');
   await expect(resultsContainer).toContainText('수학: 3학급 교시');
   await expect(resultsContainer).toContainText('<img src=x onerror=alert(1)>: 2학급 교시');
   await expect(resultsContainer.locator('img')).toHaveCount(0);

@@ -166,7 +166,8 @@ class HistoryStore:
             if observed is None:
                 return {"observed": False, "totalChanges": None, "byType": None,
                         "affectedClasses": None, "lastObservedAt": None, "retainedSince": cutoff,
-                        "comparisonCoverage": "unknown", "subjectPeriods": None, "teacherOverlaps": None}
+                        "comparisonCoverage": "unknown", "subjectPeriods": None, "teacherOverlaps": None,
+                        "changesByObservedDay": None}
             rows = db.execute(
                 "SELECT type, COUNT(*) AS count FROM changes WHERE school=? AND week=? AND observed_at>=? GROUP BY type",
                 (school, week, cutoff),
@@ -178,6 +179,11 @@ class HistoryStore:
             by_type = {key: 0 for key in ("added", "changed", "deleted")}
             for row in rows:
                 by_type[row["type"]] = row["count"]
+            observed_days = db.execute("""
+                SELECT date(observed_at, '+09:00') AS day, COUNT(*) AS count
+                FROM changes WHERE school=? AND week=? AND observed_at>=?
+                GROUP BY day ORDER BY day
+            """, (school, week, cutoff)).fetchall()
             subject_periods = db.execute("""
                 SELECT subject, COUNT(*) AS periods FROM (
                     SELECT DISTINCT grade, class_number, date, period, TRIM(subject) AS subject
@@ -206,6 +212,7 @@ class HistoryStore:
             return {"observed": True, "totalChanges": sum(by_type.values()), "byType": by_type,
                     "affectedClasses": count, "lastObservedAt": observed["observed_at"], "retainedSince": cutoff,
                     "comparisonCoverage": "unknown",
+                    "changesByObservedDay": [{"date": row["day"], "count": row["count"]} for row in observed_days],
                     "subjectPeriods": [{"subject": row["subject"], "classPeriods": row["periods"]}
                                        for row in subject_periods], "teacherOverlaps": teacher_overlaps}
 

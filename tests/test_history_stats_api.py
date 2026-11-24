@@ -62,6 +62,8 @@ class HistoryStatsApiTests(unittest.TestCase):
             self.assertTrue(result['observed'])
             self.assertEqual(result['totalChanges'], 1)
             self.assertEqual(result['byType']['changed'], 1)
+            observed_day = (base + timedelta(seconds=1)).astimezone(timezone(timedelta(hours=9))).date().isoformat()
+            self.assertEqual(result['changesByObservedDay'], [{'date': observed_day, 'count': 1}])
             self.assertEqual(result['subjectPeriods'], [{'subject': 'Science', 'classPeriods': 1}])
             self.assertEqual(result['teacherOverlaps'], [])
 
