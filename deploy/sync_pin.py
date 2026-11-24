@@ -18,7 +18,7 @@ def replace_pin(content, sha):
     return PIN.sub("pycomcigan @ git+https://github.com/Transient-Onlooker/pycomcigan.git@" + sha, content)
 
 
-def sync(sha, key, attempts=3):
+def sync(sha, key, attempts=3, *, dry_run=False):
     if not HEX40.fullmatch(sha):
         raise ValueError("Invalid component SHA")
     key = Path(key)
@@ -44,6 +44,8 @@ def sync(sha, key, attempts=3):
                 updated = replace_pin(original, sha)
                 if updated == original:
                     return "already_synced"
+                if dry_run:
+                    return "would_sync"
                 requirements.write_bytes(updated.encode("utf-8"))
                 changed = subprocess.check_output(["git", "-C", str(root), "diff", "--name-only"], env=env, text=True).splitlines()
                 if changed != ["backend/requirements.txt"]:

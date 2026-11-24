@@ -18,7 +18,7 @@
 
 후보 준비는 Release 태그의 커밋을 체크아웃하고 매니페스트 파일 해시를 복사 전후 대조한다. 임의 빌드 스크립트를 실행하지 않고 검증된 Python 파일만 복사하며, 현재 지원하지 않는 의존성은 거부한다. `deploy.release_deploy`는 후보 준비 후 내부 API, 공개 API 순으로 전환·실조회하고 전환 실패 시 이전 컴포넌트로 복구하도록 구현되어 있다. 이 자동 전환 코드는 아직 Pi 운영에 설치·활성화되지 않았다.
 
-구현된 호출 형식은 다음과 같다. 실행 전 GitHub 호스트 키가 들어 있는 전용 `~/.ssh/opencigan-github-known-hosts`와 OpenCigan 저장소에 대한 전용 쓰기 키 `~/.ssh/opencigan-pin-sync`(각 0600)가 필요하다. 이 키는 아직 Pi에 설치되지 않았다. GitHub 배포 키의 쓰기 권한은 저장소 단위이며 특정 파일 한 줄로 제한되지 않는다. 자동화 코드가 수정 대상을 검증해 한 줄로 제한한다. `--sha`는 **포크 Release 태그와 매니페스트의 SHA**여야 하며 상류 동등 SHA로 대체하면 거부된다.
+구현된 호출 형식은 다음과 같다. 실행 전 GitHub 호스트 키가 들어 있는 전용 `~/.ssh/opencigan-github-known-hosts`와 OpenCigan 저장소에 대한 전용 쓰기 키 `~/.ssh/opencigan-pin-sync`(각 0600)가 필요하다. Pi에 전용 키를 만들고 GitHub 인증을 확인했다. GitHub 배포 키의 쓰기 권한은 저장소 단위이며 특정 파일 한 줄로 제한되지 않는다. 자동화 코드가 수정 대상을 검증해 한 줄로 제한한다. `--sha`는 **포크 Release 태그와 매니페스트의 SHA**여야 하며 상류 동등 SHA로 대체하면 거부된다.
 
 ```sh
 cd "$HOME/opensigan-releases/current"
@@ -29,6 +29,6 @@ cd "$HOME/opensigan-releases/current"
   --school '학교코드:학교명' --week YYYY-MM-DD
 ```
 
-결과는 컴포넌트 루트의 `deployment-status.json`에 `requestedSha`, `activeSha`, `success`, `verification`, `rollback`, `pinSync`, `phase`, `timestamp`로 기록된다. 성공 후 OpenCigan `backend/requirements.txt`의 포크 SHA 한 줄만 갱신하고 자동 커밋·푸시를 최대 세 번 시도한다. 핀 동기화만 실패했다면 `python -m deploy.release_deploy --root <컴포넌트 루트> --retry-pin`으로 재시도한다. 파일 상태에 `pinSync: failed`가 남으며 검증된 활성 컴포넌트는 유지한다. GitHub 쓰기 인증과 실제 서비스 전환·롤백 실환경 검증은 아직 완료되지 않았다.
+결과는 컴포넌트 루트의 `deployment-status.json`에 `requestedSha`, `activeSha`, `success`, `verification`, `rollback`, `pinSync`, `phase`, `timestamp`로 기록된다. 성공 후 OpenCigan `backend/requirements.txt`의 포크 SHA 한 줄만 갱신하고 자동 커밋·푸시를 최대 세 번 시도한다. 핀 동기화만 실패했다면 `python -m deploy.release_deploy --root <컴포넌트 루트> --retry-pin`으로 재시도한다. 파일 상태에 `pinSync: failed`가 남으며 검증된 활성 컴포넌트는 유지한다. GitHub 인증은 확인했지만 실제 자동 서비스 전환·롤백의 실환경 검증은 아직 완료되지 않았다.
 
 운영 감시는 인증된 `/api/v1/admin/analytics` 응답의 `refreshObservations`, `cacheStatuses`, `failureKinds`에서 각각 갱신 실패, stale 응답 및 상류 조회 오류를 확인한다. 이 집계는 요청이 관측된 범위만 나타내며 기존 로그 보존 정책을 따른다.
