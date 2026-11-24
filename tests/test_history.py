@@ -58,6 +58,22 @@ class HistoryTests(unittest.TestCase):
         self.assertTrue(stats['observed'])
         self.assertEqual(stats['totalChanges'], 0)
         self.assertEqual(stats['comparisonCoverage'], 'unknown')
+        self.assertEqual(stats['changesByObservedDay'], [])
+
+    def test_observed_day_counts_use_korean_time_and_distinguish_unobserved(self):
+        base = datetime.now(timezone.utc).replace(hour=14, minute=58, second=0, microsecond=0)
+        self.assertIsNone(self.store.change_stats('s', 'w')['changesByObservedDay'])
+        self.store.observe('s', 'w', [lesson()], base)
+        self.assertEqual(self.store.change_stats('s', 'w')['changesByObservedDay'], [])
+        self.store.observe('s', 'w', [lesson('Science')], base + timedelta(minutes=1))
+        self.store.observe('s', 'w', [lesson('Art')], base + timedelta(minutes=2))
+        self.store.observe('other', 'w', [lesson()], base)
+        self.store.observe('other', 'w', [lesson('Art')], base + timedelta(minutes=1))
+        first_day = (base + timedelta(minutes=1, hours=9)).date().isoformat()
+        second_day = (base + timedelta(minutes=2, hours=9)).date().isoformat()
+        self.assertEqual(self.store.change_stats('s', 'w')['changesByObservedDay'], [
+            {'date': first_day, 'count': 1}, {'date': second_day, 'count': 1},
+        ])
 
     def test_subject_periods_count_observed_class_slots_not_duplicate_teachers(self):
         base = datetime.now(timezone.utc)

@@ -19,6 +19,7 @@ interface HistoryStatsResponse {
   lastObservedAt?: string | null;
   retainedSince?: string | null;
   comparisonCoverage?: string | null;
+  changesByObservedDay?: { date: string; count: number }[] | null;
   subjectPeriods?: { subject: string; classPeriods: number }[] | null;
   teacherOverlaps?: { date: string; period: number; teacher: string; classes: { grade: number; class: number }[] }[] | null;
 }
@@ -275,6 +276,32 @@ if (historyStatsEnabled && historyForm && historySchool && historyWeek && histor
         infoDiv.append(noteP);
 
         historyResults.append(metricsContainer, infoDiv);
+        if (data.changesByObservedDay != null) {
+          if (!Array.isArray(data.changesByObservedDay) || data.changesByObservedDay.some(item =>
+            !item || typeof item.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(item.date) || !Number.isInteger(item.count) || item.count < 1)) {
+            throw new Error('서버의 관측일별 통계 응답이 올바르지 않습니다.');
+          }
+          const section = document.createElement('section');
+          const heading = document.createElement('h3');
+          heading.textContent = '관측일별 변경 (한국 시간)';
+          const description = document.createElement('p');
+          description.textContent = '변경을 발견한 날짜별 건수입니다. 실제 변경 시각이나 관측하지 못한 변경은 알 수 없습니다.';
+          section.append(heading, description);
+          if (!data.changesByObservedDay.length) {
+            const empty = document.createElement('p');
+            empty.textContent = '보존된 관측 변경이 없습니다.';
+            section.append(empty);
+          } else {
+            const list = document.createElement('ul');
+            for (const item of data.changesByObservedDay) {
+              const row = document.createElement('li');
+              row.textContent = `${item.date}: ${item.count.toLocaleString('ko-KR')}건`;
+              list.append(row);
+            }
+            section.append(list);
+          }
+          historyResults.append(section);
+        }
         if (data.subjectPeriods !== undefined && data.subjectPeriods !== null) {
           if (!Array.isArray(data.subjectPeriods) || data.subjectPeriods.some(item => !item || typeof item.subject !== 'string' || !item.subject.trim() || !Number.isInteger(item.classPeriods) || item.classPeriods < 1)) {
             throw new Error('서버의 과목별 통계 응답이 올바르지 않습니다.');
