@@ -105,6 +105,29 @@ test('selection restoration preserves read order and applies valid values before
   assert.equal(exports.readSelection(storage, () => {}).id, '2:school');
 });
 
+test('selection restoration ignores fractional grades and malformed school identities', () => {
+  const values = new Map([['opensigan-grade', '2.5'], ['opensigan-class', '7']]);
+  const storage = { getItem: (key) => values.get(key) ?? null };
+  for (const invalid of [
+    null, [], true, 'school', {}, { id: '2:school', name: 'school' },
+    { id: 'bad', name: 'school', region: 'r' },
+    { id: '2:school', name: ' ', region: 'r' },
+    { id: '2:school', name: 'school', region: 1 },
+    { id: '2:school', name: 'a'.repeat(51), region: 'r' },
+  ]) {
+    values.set('opensigan-school', JSON.stringify(invalid));
+    const changes = [];
+    assert.equal(exports.readSelection(storage, (change) => changes.push({ ...change })), null);
+    assert.deepEqual(changes, [{ classroom: 7 }]);
+  }
+  values.set('opensigan-grade', '2');
+  values.set('opensigan-school', JSON.stringify({ id: '2:school', name: 'school', region: 'r', obsolete: true }));
+  const changes = [];
+  const result = exports.readSelection(storage, (change) => changes.push({ ...change }));
+  assert.deepEqual({ ...result }, { id: '2:school', name: 'school', region: 'r' });
+  assert.deepEqual(changes, [{ grade: 2 }, { classroom: 7 }]);
+});
+
 test('shared classroom requires fresh matching data and valid school grade', () => {
   const data = { stale: false, records: [{ grade: 1, class: '3' }, { grade: 4, class: 3 }] };
   assert.equal(exports.validateSharedClass(data, false, 3, 1, 3), 'valid');

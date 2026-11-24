@@ -51,11 +51,19 @@ export function saveSelection(storage: Pick<Storage, 'setItem'>, selection: { sc
 
 export function readSelection(storage: Pick<Storage, 'getItem'>, update: (change: Partial<SelectionState>) => void): School | null {
   const grade = Number(storage.getItem('opensigan-grade'));
-  if (grade >= 1 && grade <= 6) update({ grade });
+  if (Number.isInteger(grade) && grade >= 1 && grade <= 6) update({ grade });
   const classroom = Number(storage.getItem('opensigan-class'));
   if (Number.isInteger(classroom) && classroom >= 1 && classroom <= 99) update({ classroom });
-  const school = storage.getItem('opensigan-school');
-  return school ? JSON.parse(school) as School : null;
+  const rawSchool = storage.getItem('opensigan-school');
+  if (!rawSchool) return null;
+  const parsed: unknown = JSON.parse(rawSchool);
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const { id, name, region } = parsed as Record<string, unknown>;
+  // Match the school identity contract used by history and shared links.
+  if (typeof id !== 'string' || !/^[0-9]+:[^:]{1,50}$/.test(id) || id.length > 100 ||
+      typeof name !== 'string' || !name.trim() || name.length > 50 ||
+      typeof region !== 'string' || region.length > 100) return null;
+  return { id, name, region };
 }
 
 export function validateSharedClass(timetable: TimetableResponse | null, fromDevice: boolean, maxGrade: number, grade: number, classroom: number): 'valid' | 'missing' | 'unavailable' {
