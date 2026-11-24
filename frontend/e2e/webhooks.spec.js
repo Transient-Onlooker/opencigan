@@ -144,6 +144,35 @@ test('management link auto-authenticates via fragment, strips fragment immediate
   expect(await page.evaluate(() => window._copied)).toContain(`#id=${id}&token=${token}`);
 });
 
+for (const heldStage of ['subscription', 'template']) test(`changing credentials while loading ${heldStage} does not show the previous subscription`, async ({ page }) => {
+  const oldId = 'a'.repeat(24), newId = 'c'.repeat(24), token = 'b'.repeat(43);
+  let release;
+  const waiting = new Promise((resolve) => { release = resolve; });
+  let requested;
+  const started = new Promise((resolve) => { requested = resolve; });
+  await page.route('**/api/v1/webhooks**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if ((heldStage === 'subscription' && path.endsWith(oldId)) ||
+        (heldStage === 'template' && path.endsWith(`${oldId}/template`))) { requested(); await waiting; }
+    try {
+      if (path.endsWith('/deliveries')) return await route.fulfill({ json: { deliveries: [] } });
+      if (path.endsWith('/template')) return await route.fulfill({ json: { template: null, discordEmbed: false, provider: 'discord' } });
+      if (path.endsWith('/template/preview')) return await route.fulfill({ json: { payload: { content: 'preview' } } });
+      if (path.endsWith('/schedule')) return await route.fulfill({ json: { schedule: null } });
+      await route.fulfill({ json: { school: path.endsWith(oldId) ? '이전 학교' : '새 학교', grade: 2, classroom: 3, provider: 'discord', dropped_events: 0, filters: {} } });
+    } catch { /* The browser may cancel the held request. */ }
+  });
+  await page.goto(`/webhooks.html#id=${oldId}&token=${token}`);
+  await started;
+  await page.locator('#id').fill(newId);
+  release();
+  await expect(page.locator('#manage')).toBeHidden();
+  await expect(page.getByText('이전 학교')).toHaveCount(0);
+  await page.locator('#connect').evaluate((form) => form.requestSubmit());
+  await expect(page.locator('#scope')).toContainText('새 학교');
+  await expect(page.locator('#manage')).toBeVisible();
+});
+
 test('shows next_at in local time only for pending deliveries', async ({ page }) => {
   const nextAt = Date.UTC(2026, 10, 22, 3, 4) / 1000;
   await page.route('**/api/v1/webhooks**', async (route) => {
@@ -237,7 +266,7 @@ test('rotation does not replace credentials edited while the request is in fligh
   await requestStarted;
   await page.getByLabel('구독 ID').fill('c'.repeat(24));
   release();
-  await expect(page.getByRole('status')).toContainText('이전 구독의 관리 링크가 교체');
+  await expect(page.getByRole('status')).toContainText('진행 중이던 변경 요청은 처리 여부를 다시 확인');
   await expect(page.getByLabel('구독 ID')).toHaveValue('c'.repeat(24));
   await expect(page.getByLabel('관리 토큰')).toHaveValue('b'.repeat(43));
 });
