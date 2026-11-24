@@ -570,6 +570,26 @@ test('history controls are absent while source change badges remain visible', as
   expect(historyRequests).toBe(0);
 });
 
+test('teacher subtitle follows the selected week', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/v1/timetable?*', (route) => {
+    const requestedWeek = new URL(route.request().url()).searchParams.get('week');
+    return route.fulfill({ json: { ...timetable, weekStart: requestedWeek,
+      records: timetable.records.map((record) => ({ ...record, date: requestedWeek, teacher: '김교사' })) } });
+  });
+  await page.goto('/' + sharedHash(1));
+  const panel = page.locator('#timetable-panel');
+  await panel.getByRole('group', { name: '시간표 보기' }).getByRole('button', { name: '교사', exact: true }).click();
+  await panel.getByLabel('교사별 주간 시간표').fill('김교사');
+  await expect(panel.getByText('김교사 선생님 · 이번 주 수업', { exact: false })).toBeVisible();
+  await panel.getByRole('button', { name: '다음 주', exact: true }).click();
+  await panel.getByLabel('교사별 주간 시간표').fill('김교사');
+  await expect(panel.getByText('김교사 선생님 · 다음 주 수업', { exact: false })).toBeVisible();
+  await panel.getByRole('button', { name: '이전 주', exact: true }).click();
+  await panel.getByLabel('교사별 주간 시간표').fill('김교사');
+  await expect(panel.getByText('김교사 선생님 · 이번 주 수업', { exact: false })).toBeVisible();
+});
+
 test('invalid shared classroom explains why the saved class is retained', async ({ page }) => {
   await mockApi(page);
   await page.addInitScript((saved) => {
