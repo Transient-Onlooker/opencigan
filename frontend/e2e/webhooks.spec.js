@@ -33,7 +33,7 @@ test('webhook page shares the app brand and supports light, dark and system them
     for (const width of [320, 390, 800, 1366]) {
       await page.setViewportSize({ width, height: 844 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
-      expect((await page.getByLabel('Webhook 주소').boundingBox()).height).toBeGreaterThanOrEqual(44);
+      expect((await page.getByLabel('Webhook 주소', { exact: true }).boundingBox()).height).toBeGreaterThanOrEqual(44);
     }
   }
 });
@@ -54,10 +54,10 @@ test('subscription management uses bearer token and keeps secrets out of storage
   await page.getByLabel('학교 ID').fill('2:예시학교');
   await page.getByLabel('학년', { exact: true }).fill('2');
   await page.getByLabel('반', { exact: true }).fill('3');
-  await page.getByLabel('Webhook 주소').fill('https://discord.com/api/webhooks/123/secret');
+  await page.getByLabel('Webhook 주소', { exact: true }).fill('https://discord.com/api/webhooks/123/secret');
   await page.getByRole('button', { name: '구독 만들기' }).click();
   await expect(page.getByLabel('관리 토큰')).toHaveValue(token);
-  await expect(page.getByLabel('Webhook 주소')).toHaveValue('');
+  await expect(page.getByLabel('Webhook 주소', { exact: true })).toHaveValue('');
   await expect(page.getByRole('status')).toContainText('안전한 곳');
   await page.getByRole('button', { name: '구독 불러오기' }).click();
   await expect(page.getByText('2:예시학교 · 2학년 3반')).toBeVisible();
@@ -67,6 +67,12 @@ test('subscription management uses bearer token and keeps secrets out of storage
   await page.getByRole('button', { name: '조건 저장' }).click();
   await expect(page.getByRole('status')).toContainText('저장');
   expect(calls.find((call) => call.method === 'PUT').body.filters).toEqual({ subject: '수학', quietHours: { start: '22:00', end: '07:00' } });
+  await page.getByLabel('새 Webhook 주소').fill('https://discord.com/api/webhooks/456/new_secret');
+  await page.getByRole('button', { name: '전송 주소 변경' }).click();
+  await expect(page.getByRole('status')).toContainText('전송 주소를 변경했어요');
+  await expect(page.getByLabel('새 Webhook 주소')).toHaveValue('');
+  expect(calls.find((call) => call.body?.destination?.includes('new_secret')).headers.authorization).toBe(`Bearer ${token}`);
+  expect(await page.evaluate(() => JSON.stringify({ local: localStorage, session: sessionStorage, url: location.href }))).not.toContain('new_secret');
   await page.getByRole('button', { name: '테스트 알림' }).click();
   await expect(page.getByRole('status')).toContainText('대기열');
   expect(calls.filter((call) => call.path !== '/api/v1/webhooks').every((call) => call.headers.authorization === `Bearer ${token}`)).toBeTruthy();

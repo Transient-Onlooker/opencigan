@@ -62,6 +62,25 @@ class WebhookApiTests(unittest.TestCase):
             self.assertEqual(dispatch_request("POST", "/api/v1/webhooks", "", request_body=b"[" * 1500 + b"]" * 1500)[0], 400)
             self.assertEqual(self.request("POST", "/api/v1/webhooks", {**self.payload, "school": "2:bad\nname"})[0], 400)
 
+    def test_destination_update_requires_token_and_preserves_pending_delivery(self):
+        with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
+            _, _, body = self.request("POST", "/api/v1/webhooks", self.payload)
+            created = json.loads(body)
+            path = "/api/v1/webhooks/" + created["id"]
+            store = WebhookStore(self.path)
+            store.enqueue(created["id"], "event_1", b'{}', now=100)
+            new_url = "https://discord.com/api/webhooks/456/new_secret"
+            self.assertEqual(self.request("PUT", path, {"destination": new_url}, token="wrong")[0], 401)
+            self.assertEqual(self.request("PUT", path, {"destination": "https://chat.googleapis.com/v1/spaces/a/messages?key=k&token=t"}, token=created["token"])[0], 400)
+            self.assertEqual(self.request("PUT", path, {"destination": "https://127.0.0.1/"}, token=created["token"])[0], 400)
+            status, _, response = self.request("PUT", path, {"destination": new_url}, token=created["token"])
+            self.assertEqual(status, 200)
+            self.assertNotIn(b"new_secret", response)
+            claim = store.claim(now=100)
+            self.assertEqual(claim["event_id"], "event_1")
+            self.assertEqual(claim["destination"], new_url)
+            self.assertNotIn(b"new_secret", self.request("GET", path, token=created["token"])[2])
+
     def test_subscription_requests_have_their_own_rate_limit(self):
         with patch.dict("os.environ", {"OPENCIGAN_HISTORY_DB": self.path, "OPENCIGAN_WEBHOOKS_ENABLED": "1"}):
             for _ in range(60):

@@ -65,7 +65,7 @@ paths:
         '503': { description: Feature disabled or storage unavailable. }
     put:
       tags: [System]
-      summary: Replace a subscription's change filters
+      summary: Replace subscription filters or its destination
       security: [{ WebhookManagement: [] }]
       requestBody:
         required: true
@@ -73,9 +73,12 @@ paths:
           application/json:
             schema:
               type: object
-              required: [filters]
+              oneOf:
+                - required: [filters]
+                - required: [destination]
               additionalProperties: false
               properties:
+                destination: { type: string, format: uri, maxLength: 2048, description: New allowed URL for the existing provider. }
                 filters:
                   type: object
                   additionalProperties: false
@@ -94,8 +97,8 @@ paths:
                         start: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$' }
                         end: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$' }
       responses:
-        '200': { description: Filters replaced. }
-        '400': { description: Invalid filters. }
+        '200': { description: Filters or destination replaced. }
+        '400': { description: Invalid filters or destination, or different destination provider. }
         '401': { description: Invalid subscription or token. }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { description: Feature disabled or storage unavailable. }
