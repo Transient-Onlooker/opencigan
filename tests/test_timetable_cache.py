@@ -215,10 +215,10 @@ class TimetableTests(unittest.TestCase):
     def test_search_id_is_stable_across_region_code_changes(self):
         rows = [[6347, "region A", "Example", 76524],
                 [1234, "region B", "Example", 76525]]
-        with patch("backend.timetable._search_with_cached_protocol", return_value=rows):
+        with patch("backend.timetable._search_with_cached_protocol", return_value=(rows, None)):
             first = timetable.search_schools("Example")
         rows[0][0] = 9999
-        with patch("backend.timetable._search_with_cached_protocol", return_value=rows):
+        with patch("backend.timetable._search_with_cached_protocol", return_value=(rows, None)):
             second = timetable.search_schools("Example")
         self.assertEqual(first, second)
         self.assertEqual(first, [{"id": "76524:Example", "name": "Example", "region": "region A"},
@@ -226,7 +226,7 @@ class TimetableTests(unittest.TestCase):
 
     def test_malformed_school_search_response_is_rejected(self):
         for row in ([1, "region", "Example", 0], [1, "region", "bad:name", 2], [1]):
-            with self.subTest(row=row), patch("backend.timetable._search_with_cached_protocol", return_value=[row]):
+            with self.subTest(row=row), patch("backend.timetable._search_with_cached_protocol", return_value=([row], None)):
                 with self.assertRaises(RuntimeError):
                     timetable.search_schools("Example")
 
@@ -252,7 +252,7 @@ class TimetableTests(unittest.TestCase):
             base = f"http://127.0.0.1:{server.server_port}"
             with patch("backend.app.cache", cache_module.Cache()), patch(
                 "backend.timetable.datetime", fixed
-            ), patch("backend.timetable._search_with_cached_protocol", return_value=[[6347, "region", "Example", 76524]]), patch(
+            ), patch("backend.timetable._search_with_cached_protocol", return_value=([[6347, "region", "Example", 76524]], None)), patch(
                 "pycomcigan.timetable.school_search", return_value=rows
             ), patch("pycomcigan.TimeTable", side_effect=construct):
                 with urlopen(base + "/api/v1/schools?q=Example") as response:
