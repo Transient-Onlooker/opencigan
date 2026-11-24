@@ -3,6 +3,18 @@ import type { TimetableRecord } from './api';
 export type LessonTimes = Record<number, { start: string; end: string }>;
 export type WeekdayLessonTimes = Record<number, LessonTimes>;
 
+export function applySourceLessonStarts(drafts: LessonTimes, source: Record<string, string>, periods: number[]): LessonTimes {
+  const result = { ...drafts };
+  for (const period of periods) {
+    const start = source[String(period)];
+    const existing = result[period];
+    if (typeof start === 'string' && minutes(start) !== null && !existing?.start && !existing?.end) {
+      result[period] = { start, end: '' };
+    }
+  }
+  return result;
+}
+
 export function lessonTimesForDate(common: LessonTimes, weekdays: WeekdayLessonTimes, date: string): LessonTimes {
   const weekday = new Date(`${date}T00:00:00Z`).getUTCDay() || 7;
   return { ...common, ...(weekdays[weekday] ?? {}) };

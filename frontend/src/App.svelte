@@ -20,7 +20,7 @@
   import { createMealSession } from './meal-session';
   import { createSchoolSearchSession } from './school-search-session';
   import { classLessons, teacherLessons, teacherNamesInTimetable, teacherSuggestions as findTeacherSuggestions, selectedTeacherName as findSelectedTeacherName, gradeLessons, comparisonClasses, missingWeekdayDates, observedClassCount as countObservedClasses, subjectNamesInTimetable } from './timetable-view';
-  import { dailyLessonOverview, koreaClockMinutes, parseLessonTimes, parseWeekdayLessonTimes, lessonTimesForDate, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
+  import { applySourceLessonStarts, dailyLessonOverview, koreaClockMinutes, parseLessonTimes, parseWeekdayLessonTimes, lessonTimesForDate, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
   import { createClassDisplayPreferences, defaultDisplaySettings, parseDisplaySettings, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
   import { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, saveLessonTimePreferences, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
   import { apiNotConfigured, getMeals, getTimetable, searchSchools, searchNeisSchools, timetableSubscriptionUrl, type Meal, type NeisSchool, type School, type TimetableRecord, type TimetableResponse } from './api';
@@ -150,7 +150,11 @@
   $: dates = Array.from({ length: weekendClasses ? 7 : 5 }, (_, i) => addDays(week, i));
   $: missingWeekdays = missingWeekdayDates(filtered, dates);
   $: periods = Array.from({ length: Math.max(0, ...filtered.map((r) => Number(r.period))) }, (_, i) => i + 1);
-  $: lessonTimePeriods = Array.from({ length: Math.max(8, ...((timetable?.records ?? []).map((r) => Number(r.period)).filter((period) => Number.isInteger(period) && period > 0 && period <= 20))) }, (_, i) => i + 1);
+  $: lessonTimePeriods = Array.from({ length: Math.max(8, ...[
+    ...(timetable?.records ?? []).map((r) => Number(r.period)),
+    ...Object.keys(lessonTimeDrafts).map(Number),
+    ...(school && timetable?.schoolId === school.id && timetable.weekStart === week ? Object.keys(timetable.sourceLessonStarts ?? {}).map(Number) : []),
+  ].filter((period) => Number.isInteger(period) && period > 0 && period <= 20)) }, (_, i) => i + 1);
   $: visibleMealTypes = mealTypes.filter((type) => enabledMealTypes.includes(type));
   $: mealDates = Array.from({ length: 7 }, (_, index) => addDays(monday(mealDate), index));
   $: if (school && neis && (view === 'meals' || view === 'timetable' && timetableView === 'today')) {
@@ -321,6 +325,11 @@
   function applyLessonTimeRules(value: LessonTimes) {
     lessonTimeDrafts = value;
     lessonTimeState = '계산된 시각을 입력했어요. 확인 후 시각 저장을 눌러 주세요.';
+  }
+  function applySourceStarts() {
+    if (!school || !timetable || timetable.schoolId !== school.id || timetable.weekStart !== week || timetable.stale || timetableFromDevice || !timetable.sourceLessonStarts) return;
+    lessonTimeDrafts = applySourceLessonStarts(lessonTimeDrafts, timetable.sourceLessonStarts, lessonTimePeriods);
+    lessonTimeState = '빈 교시의 원본 시작 시각을 입력했어요. 종료 시각을 확인해 입력한 뒤 저장해 주세요.';
   }
   function editWeekdayTime(day: number, period: number, part: 'start' | 'end', value: string) {
     const entry = weekdayTimeDrafts[day]?.[period] ?? { start: '', end: '' };
@@ -836,7 +845,7 @@
     <div id="calendar" class="calendar-content" tabindex="-1">
       <TimetablePanel {view} {timetableView} {school} {timetable} {week} {current} {today} {selectedDay} {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {tableState} {tableRefreshState} {timetableCheckedAt} {timetableFromDevice} {exportState} {exportBusy} {imageShareCancelled} {canExport} {weekendClasses} {classError} {sharedClassState} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} lessonTimes={selectedDayTimes} {comparableClasses} {gradeRecords} bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {dates} {periods} {filtered} {missingWeekdays} {observedClassCount} {teacherNames} {exportTimetable} {sharePng} {refreshTimetable} {currentWeek} {selectTimetableView} {selectGrade} {selectClass} {changeWeek} {loadTimetable} {selectTimetableDate} {dateText} {shortDate} {timeText} {subjectStyle} todayMeal={{ neis, neisLoading, neisSearchState, mealState, hasMeals, mealLoading, meals, mealsStale, visibleMealTypes, allergySelection, mealAllergyFilter, showAllergenNumbers, loadMeals, openAllergySettings }} />
         <MealsPanel {view} {mealDate} {today} {mealView} {mealDates} {mealDateDraft} {dateError} {neis} {school} {neisSearchState} {neisLoading} {neisResults} {mealState} {hasMeals} {mealLoading} {meals} {visibleMealTypes} {allergySelection} {mealAllergyFilter} {openAllergySettings} {showAllergenNumbers} {current} {mealsStale} {todayMeals} {setMealView} {changeMealDate} {dateText} {updateMealDateDraft} {selectMealDate} {chooseNeis} {connectMeals} {loadMeals} {selectMealTimetableDate} />
-        <SettingsPanel {view} {school} {useClassDisplay} {classError} {grade} {classroom} {theme} {animationsEnabled} {displaySettings} {subjectNames} {teacherNames} {lessonTimePeriods} {lessonTimeDrafts} {weekdayTimeDrafts} {lessonTimeState} {settingsBackupState} {mealTypes} {enabledMealTypes} {showAllergenNumbers} {allergySelection} {mealAllergyFilter} {setMealAllergyFilter} {openAllergySettingsRequest} {setClassDisplay} {setTheme} {setAnimationsEnabled} {setColorMode} {saveAlias} {saveSubjectColor} {clearSubjectColors} {saveDisplaySettings} {editLessonTime} {editWeekdayTime} {clearWeekdayTime} {applyLessonTimeRules} {saveLessonTimes} {clearLessonTimes} {downloadSettingsBackup} {importSettingsFile} {resetDisplaySettings} {toggleMealType} {setAllergenNumbersVisible} {toggleAllergy} />
+        <SettingsPanel {view} {school} {useClassDisplay} {classError} {grade} {classroom} {theme} {animationsEnabled} {displaySettings} {subjectNames} {teacherNames} {lessonTimePeriods} {lessonTimeDrafts} {weekdayTimeDrafts} {lessonTimeState} sourceLessonStarts={school && timetable?.schoolId === school.id && timetable.weekStart === week && !timetable.stale && !timetableFromDevice ? timetable.sourceLessonStarts : undefined} {applySourceStarts} {settingsBackupState} {mealTypes} {enabledMealTypes} {showAllergenNumbers} {allergySelection} {mealAllergyFilter} {setMealAllergyFilter} {openAllergySettingsRequest} {setClassDisplay} {setTheme} {setAnimationsEnabled} {setColorMode} {saveAlias} {saveSubjectColor} {clearSubjectColors} {saveDisplaySettings} {editLessonTime} {editWeekdayTime} {clearWeekdayTime} {applyLessonTimeRules} {saveLessonTimes} {clearLessonTimes} {downloadSettingsBackup} {importSettingsFile} {resetDisplaySettings} {toggleMealType} {setAllergenNumbersVisible} {toggleAllergy} />
     </div>
     <ShareTools {view} {school} {classActionsReady} {apiNotConfigured} {shareUrl} {shareState} {subscriptionUrl} {subscriptionState} {subscriptionPanelOpen} {subscriptionMode} {subscriptionTimesConsent} {canExport} {exportBusy} {shareClass} {subscribeTimetable} {exportTimetable} {changeSubscriptionMode} setSubscriptionTimesConsent={(value) => { subscriptionTimesConsent = value; updateSubscriptionUrl(); }} {copySubscription} />
     <footer><div class="footer-open"><svg class="github-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .75a11.25 11.25 0 0 0-3.56 21.92c.56.1.77-.24.77-.54v-2.1c-3.13.68-3.79-1.33-3.79-1.33-.51-1.3-1.25-1.64-1.25-1.64-1.02-.7.08-.69.08-.69 1.13.08 1.72 1.16 1.72 1.16 1 1.72 2.63 1.22 3.27.93.1-.72.39-1.22.7-1.5-2.5-.28-5.13-1.25-5.13-5.56 0-1.23.44-2.24 1.16-3.03-.12-.28-.5-1.43.11-2.98 0 0 .95-.3 3.1 1.16A10.8 10.8 0 0 1 12 6.17c.96 0 1.92.13 2.82.38 2.15-1.46 3.1-1.16 3.1-1.16.61 1.55.23 2.7.11 2.98.72.79 1.16 1.8 1.16 3.03 0 4.32-2.63 5.27-5.14 5.55.4.35.76 1.03.76 2.08v3.1c0 .3.2.65.78.54A11.25 11.25 0 0 0 12 .75Z"/></svg><div><strong>함께 만드는 오픈소스</strong><p>Opencigan은 오픈소스 프로젝트예요. GitHub에서 함께 기여해 주세요.</p><div class="footer-links"><a href="https://github.com/Transient-Onlooker/opencigan">Opencigan GitHub ↗</a><a href="https://github.com/hegelty/pycomcigan">pycomcigan ↗</a><a href="https://opencigan.mcv.kr/">Opencigan 사이트 ↗</a><a href="/api-docs.html">API 문서</a></div></div></div></footer>

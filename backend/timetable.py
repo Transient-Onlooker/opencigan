@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta, timezone
 from collections import Counter, OrderedDict
+import re
 import threading
 import time
 from backend.comcigan_proxy import configure_comcigan_proxy
@@ -9,6 +10,30 @@ _protocol_expires = 0.0
 _protocol_content = None
 _protocol_lock = threading.Lock()
 _verified_schools = OrderedDict()
+
+
+def _source_lesson_starts(day_time):
+    if not isinstance(day_time, (list, tuple)):
+        return {}
+    starts = {}
+    duplicates = set()
+    for value in day_time:
+        if not isinstance(value, str):
+            continue
+        match = re.fullmatch(r"\s*([1-9][0-9]?)\((\d{2}):(\d{2})\)\s*", value)
+        if not match:
+            continue
+        period, hour, minute = map(int, match.groups())
+        if period > 30 or hour > 23 or minute > 59:
+            continue
+        key = str(period)
+        if key in starts:
+            duplicates.add(key)
+        else:
+            starts[key] = f"{hour:02d}:{minute:02d}"
+    for key in duplicates:
+        starts.pop(key, None)
+    return starts
 
 
 def _search_with_cached_protocol(query, *, retry=True, with_protocol=False):
@@ -182,6 +207,10 @@ def fetch_timetable(school_id, week, *, include_original=False):
         kst = timezone(timedelta(hours=9))
         updated_at = (updated.replace(tzinfo=kst) if updated.tzinfo is None
                       else updated.astimezone(kst)).isoformat()
-    return {"schoolId": school_id, "weekStart": week, "records": records,
+    result = {"schoolId": school_id, "weekStart": week, "records": records,
         "sourceUpdatedAt": updated_at,
         "fetchedAt": datetime.now(timezone.utc).isoformat(), "stale": False}
+    starts = _source_lesson_starts(getattr(timetable, "day_time", None))
+    if starts:
+        result["sourceLessonStarts"] = starts
+    return result
