@@ -70,7 +70,7 @@ def validate_timetable_week(week):
     return offset
 
 
-def fetch_timetable(school_id, week):
+def fetch_timetable(school_id, week, *, include_original=False):
     configure_comcigan_proxy()
     from pycomcigan import TimeTable
 
@@ -115,10 +115,15 @@ def fetch_timetable(school_id, week):
                         raise RuntimeError("시간표 응답 형식이 올바르지 않습니다")
                     if not lesson.subject and not lesson.teacher and not lesson.replaced:
                         continue
-                    records.append({"grade": grade, "class": class_number,
+                    record = {"grade": grade, "class": class_number,
                         "date": (start + timedelta(days=day - 1)).isoformat(),
                         "period": lesson.period, "subject": lesson.subject,
-                        "teacher": lesson.teacher, "isChanged": lesson.replaced})
+                        "teacher": lesson.teacher, "isChanged": lesson.replaced}
+                    if include_original:
+                        original = getattr(lesson, "original", None)
+                        record["originalSubject"] = getattr(original, "subject", None)
+                        record["originalTeacher"] = getattr(original, "teacher", None)
+                    records.append(record)
     updated_at = None
     if timetable.update_date:
         try:

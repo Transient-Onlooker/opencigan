@@ -21,6 +21,28 @@ class FakeLesson:
 
 
 class TimetableTests(unittest.TestCase):
+    def test_internal_original_fields_are_optional_and_do_not_change_public_contract(self):
+        from types import SimpleNamespace
+        lesson = FakeLesson(1, "Math", "Kim", True)
+        lesson.original = SimpleNamespace(subject="Science", teacher="Lee")
+        table = SimpleNamespace(timetable=[[], [[], [[], [lesson]]]], update_date=None)
+        fake_module = SimpleNamespace(TimeTable=lambda *args, **kwargs: table)
+        with patch("backend.timetable.validate_timetable_week", return_value=0), \
+             patch("backend.timetable.configure_comcigan_proxy"), \
+             patch.dict("sys.modules", {"pycomcigan": fake_module}):
+            public = timetable.fetch_timetable("2:Example", "2026-11-23")
+            internal = timetable.fetch_timetable("2:Example", "2026-11-23", include_original=True)
+        self.assertNotIn("originalSubject", public["records"][0])
+        self.assertEqual(internal["records"][0]["originalSubject"], "Science")
+        self.assertEqual(internal["records"][0]["originalTeacher"], "Lee")
+        lesson.original = None
+        with patch("backend.timetable.validate_timetable_week", return_value=0), \
+             patch("backend.timetable.configure_comcigan_proxy"), \
+             patch.dict("sys.modules", {"pycomcigan": fake_module}):
+            internal = timetable.fetch_timetable("2:Example", "2026-11-23", include_original=True)
+        self.assertIsNone(internal["records"][0]["originalSubject"])
+        self.assertIsNone(internal["records"][0]["originalTeacher"])
+
     def test_403_invalidates_without_immediate_retry(self):
         from types import SimpleNamespace
         timetable._protocol = None

@@ -1,0 +1,16 @@
+[Unit]
+Description=OpenCigan internal timetable API
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/opensigan-releases/current
+EnvironmentFile=%h/.config/opencigan/internal.env
+Environment=OPENCIGAN_COMCIGAN_PROXY=http://127.0.0.1:18084
+ExecStart=%h/opensigan-releases/current/.venv/bin/python -m backend.internal_api
+Restart=on-failure
+RestartSec=3
+Nice=0
+
+[Install]
+WantedBy=default.target
