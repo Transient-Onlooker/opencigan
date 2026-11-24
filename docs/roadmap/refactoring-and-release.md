@@ -5,8 +5,10 @@
 - [ ] 코드와 venv가 일치하는 릴리스를 만들고 `current` 심링크를 통한 배포·롤백을 지원한다. 복구 순서는 내부 API, 공개 API다.
 - [ ] 인증 토큰을 사용하는 루프백 전용 `127.0.0.1:8001` 내부 서비스를 별도 실행하고 공개 셔터·스레드 풀·캐시와 격리한다. 내부 서비스의 자원 우선권과 외부 접근 차단을 검증한다.
 - [ ] `GET /internal/v1/timetable?school=&week=`에서 캐시 없이 원본을 조회하고 기존 camelCase와 `originalSubject`, `originalTeacher`를 반환한다. 빈 결과와 실패를 구분한다.
-- [ ] 공개·내부 API가 사용하는 pycomcigan을 버전별 공유 구성 요소로 분리한다. GitHub Release 태그와 별도 `deploy-manifest.json`으로 공식·포크 배포를 구분하고 커밋 SHA와 패키지 무결성을 확인한다.
+- [ ] 공개·내부 API가 사용하는 pycomcigan을 버전별 공유 구성 요소로 분리한다. 의존성은 `Transient-Onlooker/pycomcigan` 포크로 통일하고, GitHub Release 태그와 별도 `deploy-manifest.json`으로 상류 동기화 버전·자체 수정 버전을 구분하며 커밋 SHA와 패키지 무결성을 확인한다. 공식 신규 릴리스 채택은 pycomcigan 에이전트가 담당한다.
 - [ ] 배포 전 테스트 및 실조회, 실패 시 롤백을 구현한다. 상태 JSON에는 요청·활성 SHA, 성공·검증·롤백 결과와 시각을 기록한다.
+- [ ] 배포 성공 후 실제 활성 SHA를 `backend/requirements.txt`의 pycomcigan 한 줄에만 동기화해 자동 커밋한다. 실패 시 재시도하고 상태에 기록한다. 이 한 줄 외의 OpenCigan 무인 소스 수정은 금지한다.
+- [ ] 운영 감시에서 캐시 갱신 실패·stale 응답·상류 조회 오류를 확인할 수 있게 한다.
 - [ ] 공개 API 회귀 및 Pi 실환경에서 인증·외부 차단·원본 조회·배포와 복구를 검증한다. 기존 WARP와 warp-bridge 설정을 보존한다.
 
 > 기존 배치별 구현 기록과 리팩터링 선행 조건, 테스트·배포 통과 조건을 보존합니다. 체크박스 **[x]는 코드 구현 기록**이지 운영 배포·실기기 QA 완료를 뜻하지 않습니다. [전체 개요](README.md)로 돌아가기.
