@@ -35,7 +35,10 @@
 - [x] iframe 임베드 위젯·Embed Builder (2026-11-15: 실제 학년·반 선택, 복수 수업·20교시, 안전한 문자열 표시·취소 경합 브라우저 회귀 검증.)
 - [x] TypeScript/Python 경량 클라이언트, 실행 예제 및 모의 HTTP 경계 회귀 (2026-11-15)
 - [x] AI Agent Skill(`agent-skill/SKILL.md`), `llms.txt` (실제 API 계약·식별자·조회 범위·개인정보 경계 안내)
-- [x] 공개 API 버전/하위 호환성 정책 문서화 (`docs/api-versioning.md`) — 경로 접두사 계약, 오류 코드, 캐시/조건부 요청, 호환성 규칙 정리
+- [x] 공개 API 버전/하위 호환성 정책 문서화 ([정책 문서](../api-versioning.md), [#199](https://github.com/Transient-Onlooker/opencigan/pull/199)) — 경로 접두사 계약, 오류 코드, 캐시/조건부 요청, 호환성 규칙 정리
+- [x] 일부 오류/응답 계약: Webhook 템플릿·미리보기 및 분석 API 202/400/413/429/503 계약을 명세와 격리 라우트로 대조 ([#185](https://github.com/Transient-Onlooker/opencigan/pull/185), [#190](https://github.com/Transient-Onlooker/opencigan/pull/190)). 전체 계약 및 운영 관측은 ST-10 미완료.
+- [x] 관리자 읽기 전용 이상조회 API: 인증·IP별 요청량/오류 비율/학교 수·보존 기간·미확인 IP 제외·수신 시각 검사 ([#198](https://github.com/Transient-Onlooker/opencigan/pull/198), [#200](https://github.com/Transient-Onlooker/opencigan/pull/200)). 상태별 탐지/관리 UI·게이트웨이 연결·운영 알림 정책은 미완료이며 자동 차단이나 발송을 수행하지 않는다.
+
 - [ ] 요청량·지연·오류 모니터링과 임계치 정책
 - [x] 캘린더 구독(.ics)에 ETag·조건부 요청을 지원해 변경되지 않은 일정의 중복 다운로드 감소 (SHA-256 ETag 및 If-None-Match 304 로컬 구현 완료; 공개 서버 외부 접근 및 클라이언트별 재검증 대기)
 - [x] 사용자 동의를 받은 교시 시각 URL 전달 및 `mode=timed` 일정 구현. 한국 시각 입력·표시를 유지하고 ICS는 UTC 순간으로 직렬화. 공개 API 배포·실제 캘린더 동기화는 별도 게이트.

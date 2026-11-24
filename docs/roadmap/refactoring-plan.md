@@ -163,6 +163,16 @@ backend/
 
 2026-11-16 운영 상태에 대한 세부 로컬 경로·릴리스 식별자·네트워크 설정은 공개 문서에서 제외하며 운영자 전용 기록으로 관리한다. 이 문서의 리팩터링 결정과 테스트 기준은 유지한다.
 
+### 2026-11-24 후속 현황 (기존 11-16 기록 유지)
+
+| 범위 | 추가 확인 | 잔여 |
+| --- | --- | --- |
+| 선택·시간표 세션 | [#194](https://github.com/Transient-Onlooker/opencigan/pull/194) 늦은 성공·실패 응답 경합, [#201](https://github.com/Transient-Onlooker/opencigan/pull/201) 저장 학교 및 정수 학년 복원 검증 | 나머지 선택·공유·저장 소유권과 전체 회귀 |
+| 번들 | [#193](https://github.com/Transient-Onlooker/opencigan/pull/193) [격리 자산 측정 기준선](../qa/bundle-baseline-2026-11-23.md) | 실제 로딩 성능·경량화 전후 비교 |
+| 통합 | `167e529` [main CI 45353469338](https://github.com/Transient-Onlooker/opencigan/actions/runs/45353469338) check/deploy 성공 | ST-14 남은 구현 병합 이후 최종 회귀, Pi/Worker 실제 적용과 롤백·실기기 QA |
+
+기존 제안 구조는 설계 참고이며 실제 저장소 전체 구조가 그 상태라는 뜻은 아니다.
+
 ### 브라우저 회귀 기록 — 2026-11-16
 
 - 병합 커밋 `5490a66`을 기준으로 한 후속 브랜치에서 Chromium·WebKit 전체 Playwright 검사를 실행해 65개가 통과했다. WebKit 오프라인 쉘 재시작 1개는 기존 테스트 설정으로 건너뛰었으므로 검증 완료가 아니다.

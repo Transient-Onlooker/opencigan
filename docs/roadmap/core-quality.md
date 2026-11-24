@@ -47,6 +47,8 @@
 
 **운영 정보:** 외부 데이터 제공처 연결 방식과 관련 환경 변수의 실제 설정은 비공개 운영 기록에서 관리한다.
 
+**2026-11-24 코드/자동검증 갱신 (운영 적용 별도):** ST-00 기준선·ST-02 IP/429/CORS 격리 검증 완료 ([#157](https://github.com/Transient-Onlooker/opencigan/pull/157), [#159](https://github.com/Transient-Onlooker/opencigan/pull/159)). ST-01 모의 상류 장애/복구·캐시 키별 갱신 잠금·게이트웨이/프런트/Pi 모의 취소 경계 보강 ([#164](https://github.com/Transient-Onlooker/opencigan/pull/164), [#184](https://github.com/Transient-Onlooker/opencigan/pull/184), [#191](https://github.com/Transient-Onlooker/opencigan/pull/191)). 실제 반복 503 원인, Cloudflare/Pi 종단 시간 예산, 운영 429/독립 IP 제한 및 실기기·롤백 검증은 미완료. 최신 확인 기준 `167e529`의 [main CI 45353469338](https://github.com/Transient-Onlooker/opencigan/actions/runs/45353469338) 성공은 운영 적용 증거가 아니다.
+
 **2026-11-16 QA 후속 ([결함 NEW-01~09](../qa/qa-2026-11-16.md))**
 
 - [ ] **NEW-01 (P0 사용자 진입 차단): 반복 503 원인 규명**. `upstream_unavailable`은 `backend/app.py`의 포괄적인 예외 처리 결과라 컴시간 장애로 단정 불가. 캐시 갱신 실패와 오래된 데이터 대체 여부를 작업 종류별로 기록하고, 저장본이 없는 경우 최초 실패 응답부터 재시도 대기 시간과 이후 남은 시간을 `Retry-After`로 제공하도록 구현했다. 실제 예외 로그·원본 연결·셔터 `service_overloaded`·IP 제한 `rate_limited`을 구분해 재현하고, 검색·다음 주·타 학교 조회의 복구를 검증. `/api/v1/status`의 프로세스 생존 계약 유지, 별도 upstream/readiness 관측 설계.
