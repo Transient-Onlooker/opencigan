@@ -1,6 +1,20 @@
 # OpenCigan 단기 집중 로드맵 — 2026-11-21
 
-> **기간 한정 작업 기록:** 이 문서의 '오늘'과 체크리스트는 작성 당시의 실행 계획이며 최신 배포 상태를 보장하지 않습니다. 현재 우선순위는 [전체 로드맵](README.md)과 각 상세 문서를 확인하세요.
+> **단기 실행 큐:** 작성 당시의 '오늘'과 과거 집계는 역사적 기록입니다. 이후 작업의 병합·검증 상태는 바로 아래 현황을 확인하세요. 체크박스는 전체 완료 조건을 충족한 경우에만 표시하며 운영 배포를 뜻하지 않습니다.
+
+## 최근 작업 현황 (2026-11-25)
+
+기준: `main`에 병합된 PR #222까지. PR 병합과 운영 배포는 별개이며, 실제 서비스의 적용 버전은 이 표에서 확인하지 않았습니다.
+
+| 작업 | 최근 병합 및 확인 범위 | 남은 일 |
+| --- | --- | --- |
+| ST-01 장애 경계 | [#211](https://github.com/Transient-Onlooker/opencigan/pull/211) 상류 타임아웃 진단, [#212](https://github.com/Transient-Onlooker/opencigan/pull/212) 모의 프록시·백오프 회귀 | 실제 Worker/Pi 경계와 운영 503 원인 확인 |
+| ST-03 성능 | [#213](https://github.com/Transient-Onlooker/opencigan/pull/213) 검증된 학교·프로토콜 재사용. 한 학교 실측 요청 3→1회, 768→236ms, 수업 데이터 일치 | 다른 학교·조건 및 운영 배포 후 확인. 단일 표본을 전체 성능으로 일반화하지 않음 |
+| ST-04 UX | [#214](https://github.com/Transient-Onlooker/opencigan/pull/214)~[#218](https://github.com/Transient-Onlooker/opencigan/pull/218) 알레르기 상태, 교사 주차, 급식 날짜 안내, 초기화 설명 및 탭 대비 개선 | 남은 QA 항목과 실제 기기 확인 |
+| ST-04A 교시 시각 | [#219](https://github.com/Transient-Onlooker/opencigan/pull/219) 원본 시각 제안 및 기존 설정 보호 구현 | 학교별 원본 제공 범위와 실제 운영·기기 검증 |
+| ST-07 Webhook | [#220](https://github.com/Transient-Onlooker/opencigan/pull/220) 중복 이벤트 집계, [#223](https://github.com/Transient-Onlooker/opencigan/pull/223) 유휴 정리 검증, [#222](https://github.com/Transient-Onlooker/opencigan/pull/222) 인증된 목적지 수정 | 나머지 보안·운영 검증. 작업자와 실제 발송은 기본 OFF 유지 |
+
+진행 중인 [#221](https://github.com/Transient-Onlooker/opencigan/pull/221)·[#224](https://github.com/Transient-Onlooker/opencigan/pull/224)는 병합 전이므로 완료로 집계하지 않습니다. 아래 2026-11-24 현황과 실행 결과 표는 해당 시점의 기록입니다.
 
 > **오늘 목표:** 기존 P0~P4에서 아직 **코드 구현·수정·자동검증이 필요한 일**만 모아, 에이전트가 의존성 순서대로 최대한 많이 완료한다. 기존 장기 로드맵을 삭제하거나 대체하지 않는 **오늘 전용 실행 큐**다.
 >
