@@ -2,6 +2,7 @@
 
 import hashlib
 import hmac
+import math
 import re
 from urllib.parse import parse_qs, urlsplit
 
@@ -55,5 +56,8 @@ def send_webhook(url, body, secret, event_id, session_factory=requests.Session):
             response.close()
         except requests.RequestException:
             return {"delivered": False, "retryable": True, "status": None, "retryAfter": None}
+    delay = None
+    if isinstance(retry_after, str) and len(retry_after) <= 12 and re.fullmatch(r"[0-9]{1,6}(?:\.[0-9]{1,6})?", retry_after, re.ASCII):
+        delay = min(math.ceil(float(retry_after)), 3600)
     return {"delivered": 200 <= status < 300, "retryable": status in (408, 429) or status >= 500,
-            "status": status, "retryAfter": min(int(retry_after), 3600) if retry_after.isascii() and retry_after.isdecimal() and len(retry_after) <= 6 else None}
+            "status": status, "retryAfter": delay}
