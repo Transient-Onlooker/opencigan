@@ -46,6 +46,7 @@ test('gateway errors follow the API error contract and retain message compatibil
 test('only /api/v1/ routes are forwarded; no open proxy', async () => {
   const { env, calls } = setup();
   assert.equal((await worker.fetch(req('/private?url=http://evil.test'), env)).status, 404);
+  assert.equal((await worker.fetch(req('/internal/v1/timetable?school=2%3AExample&week=2026-11-23', {headers: {Authorization: 'Bearer secret'}}), env)).status, 404);
   assert.equal((await worker.fetch(req('/api/other'), env)).status, 404);
   assert.equal((await worker.fetch(req('/api/v1/unknown'), env)).status, 404);
   assert.equal((await worker.fetch(req('/api/v1/%2e%2e/admin'), env)).status, 404);
