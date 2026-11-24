@@ -10,9 +10,9 @@
 
 ## 컴포넌트 검증 (배포 자동화 미완성)
 
-실제 포크 Release의 `deploy-manifest.json`은 `repo`, `tag`, `git_sha`, `origin`, `files`를 사용한다. `deploy.fork_manifest`는 포크 저장소·태그·요청 SHA·Release 자산 SHA-256 및 각 Python 파일의 SHA-256을 확인한다. `python -m deploy.prepare_component --tag <태그> --sha <40자리 SHA> --components <후보 디렉터리> --release <현재 릴리스> --school <학교 ID> --week <월요일>`은 검증된 후보를 별도 경로에 설치하고 회귀 테스트와 실조회를 수행한다. 이 단계는 실행 중인 서비스를 전환하지 않는다.
+실제 포크 Release의 `deploy-manifest.json`은 버전에 따라 `repo`·`tag`·파일명 또는 `name`·`version`·`pycomcigan/` 접두 경로를 사용한다. 두 형식 모두 `git_sha`, `origin`, `files`를 포함한다. `deploy.fork_manifest`는 고정된 포크 저장소에서 Release와 태그를 직접 확인하고 요청 SHA·자산 SHA-256 및 각 Python 파일의 SHA-256을 대조한다. `python -m deploy.prepare_component --tag <태그> --sha <40자리 SHA> --components <후보 디렉터리> --release <현재 릴리스> --school <학교 ID> --week <월요일>`은 검증된 후보를 별도 경로에 설치하고 회귀 테스트와 실조회를 수행한다. 이 단계는 실행 중인 서비스를 전환하지 않는다.
 
-2026-11-24 확인한 포크 `1.4.6` 태그와 매니페스트 SHA는 `9a21fffde4a9afd398ce0ce24a64bbd28e8dc987`이다. 공개·내부 서비스의 기존 설치는 사용자가 명시한 상류 동등 커밋 `8b2b4644ceec8a37bf01a0ebbc544743410ae1cf`이며 포크에서도 이 커밋을 받았다. 두 SHA는 다르므로 태그 검증 시 서로 대체하지 않는다.
+2026-11-24 확인한 포크 `1.4.6+autofix.1` 태그와 매니페스트 SHA는 `106a6b14f265257514d62eb8babb0c460c9c4792`이다. 이전 `1.4.6` 태그의 SHA는 `9a21fffde4a9afd398ce0ce24a64bbd28e8dc987`이며, 상류 동등 SHA `8b2b4644ceec8a37bf01a0ebbc544743410ae1cf`와 서로 다르므로 태그 검증 시 대체하지 않는다.
 
 이전 `deploy.verify_component`는 별도의 wheel 매니페스트 실험 형식을 검증한다. 현재 포크 Release 형식과 호환되지 않으며 자동 배포에 사용하지 않는다.
 
@@ -22,8 +22,8 @@
 
 ```sh
 cd "$HOME/opensigan-releases/current"
-.venv/bin/python -m deploy.release_deploy --tag 1.4.6 \
-  --sha 9a21fffde4a9afd398ce0ce24a64bbd28e8dc987 \
+.venv/bin/python -m deploy.release_deploy --tag 1.4.6+autofix.1 \
+  --sha 106a6b14f265257514d62eb8babb0c460c9c4792 \
   --root "$HOME/.local/share/opencigan/components/pycomcigan" \
   --release "$HOME/opensigan-releases/current" \
   --school '학교코드:학교명' --week YYYY-MM-DD

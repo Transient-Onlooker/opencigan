@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 REPOSITORY = "Transient-Onlooker/pycomcigan"
 HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
-TAG = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}\Z")
+TAG = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,99}\Z")
 FILENAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\.py\Z")
 VERSION = re.compile(r"[0-9][A-Za-z0-9.+_-]{0,63}\Z")
 
@@ -28,13 +28,23 @@ def api(path):
 
 
 def validate_manifest(manifest, tag, commit):
-    if (not isinstance(manifest, dict) or manifest.get("repo") != REPOSITORY
-            or manifest.get("tag") != tag or manifest.get("git_sha") != commit
-            or manifest.get("origin") not in ("upstream", "custom", "fork")
+    if (not isinstance(manifest, dict) or manifest.get("git_sha") != commit
+            or manifest.get("origin") not in ("upstream", "custom", "fork", "patched")
             or not isinstance(manifest.get("version"), str) or not VERSION.fullmatch(manifest["version"])):
         raise ValueError("Release manifest identity mismatch")
+    legacy = manifest.get("repo") == REPOSITORY and manifest.get("tag") == tag
+    current = ("repo" not in manifest and "tag" not in manifest
+               and manifest.get("name") == "pycomcigan" and manifest["version"] == tag)
+    if not (legacy or current):
+        raise ValueError("Release manifest identity mismatch")
     files = manifest.get("files")
-    if not isinstance(files, dict) or "__init__.py" not in files or not files:
+    if not isinstance(files, dict) or not files:
+        raise ValueError("Release manifest file list missing")
+    if current:
+        if any(not isinstance(name, str) or not name.startswith("pycomcigan/") for name in files):
+            raise ValueError("Release manifest contains invalid file paths")
+        files = {name.removeprefix("pycomcigan/"): digest for name, digest in files.items()}
+    if "__init__.py" not in files:
         raise ValueError("Release manifest file list missing")
     if any(not isinstance(name, str) or not FILENAME.fullmatch(name)
            or not isinstance(digest, str) or not HEX64.fullmatch(digest)
@@ -77,7 +87,7 @@ def load_release(tag, requested_sha):
 
 
 def verify_package(directory, manifest):
-    files = validate_manifest(manifest, manifest["tag"], manifest["git_sha"])
+    files = validate_manifest(manifest, manifest.get("tag", manifest["version"]), manifest["git_sha"])
     directory = Path(directory)
     actual = {p.relative_to(directory).as_posix() for p in directory.rglob("*") if p.is_file() or p.is_symlink()}
     if actual != set(files):

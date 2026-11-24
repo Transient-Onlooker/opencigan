@@ -34,7 +34,7 @@ def prepare(tag, sha, components, release, school, week):
         if actual_sha != sha:
             raise ValueError("Source SHA mismatch")
         verify_package(source / "pycomcigan", manifest)
-        if manifest.get("dependencies") != {"pycryptodomex": ">=3.23,<4"}:
+        if manifest.get("dependencies") not in ({"pycryptodomex": ">=3.23,<4"}, ["pycryptodomex>=3.23,<4"]):
             raise ValueError("Unsupported component dependencies")
         package.mkdir(mode=0o700)
         shutil.copytree(source / "pycomcigan", package / "pycomcigan")
