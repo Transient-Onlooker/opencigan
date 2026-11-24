@@ -1,12 +1,13 @@
 import hashlib
 import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from deploy.activate_component import _activate, retry_pin
+from deploy.activate_component import _activate, main, retry_pin
 
 
 @unittest.skipIf(os.name == "nt", "requires Linux symlink semantics")
@@ -42,6 +43,18 @@ class ActivateComponentTests(unittest.TestCase):
         sync = patch("deploy.activate_component.sync", return_value="synced")
         sync.start()
         self.addCleanup(sync.stop)
+
+    @patch("deploy.activate_component.activate")
+    def test_manual_activation_respects_orchestration_lock(self, activate):
+        import fcntl
+
+        args = ["activate", "--root", str(self.root), "--tag", "1.4.6", "--sha", self.sha,
+                "--school", "1:A", "--week", "2026-11-23"]
+        with (self.root / ".orchestration.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with patch.object(sys, "argv", args), self.assertRaises(BlockingIOError):
+                main()
+        activate.assert_not_called()
 
     @patch("deploy.activate_component.wait_ready")
     @patch("deploy.activate_component.probe")

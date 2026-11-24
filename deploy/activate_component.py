@@ -267,6 +267,8 @@ def retry_pin(root):
 
 
 def main():
+    import fcntl
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tag")
     parser.add_argument("--sha")
@@ -275,14 +277,18 @@ def main():
     parser.add_argument("--week")
     parser.add_argument("--retry-pin", action="store_true")
     args = parser.parse_args()
-    if args.retry_pin:
-        if any((args.tag, args.sha, args.school, args.week)):
-            parser.error("--retry-pin cannot be combined with deployment arguments")
-        result = retry_pin(args.root)
-    else:
-        if not all((args.tag, args.sha, args.school, args.week)):
-            parser.error("--tag, --sha, --school and --week are required")
-        result = activate(args.tag, args.sha, args.root, args.school, args.week)
+    if args.retry_pin and any((args.tag, args.sha, args.school, args.week)):
+        parser.error("--retry-pin cannot be combined with deployment arguments")
+    if not args.retry_pin and not all((args.tag, args.sha, args.school, args.week)):
+        parser.error("--tag, --sha, --school and --week are required")
+    root = args.root.resolve(strict=True)
+    lock = root / ".orchestration.lock"
+    if lock.is_symlink():
+        raise ValueError("Unsafe deployment lock")
+    with lock.open("a") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        result = (retry_pin(root) if args.retry_pin else
+                  activate(args.tag, args.sha, root, args.school, args.week))
     print(json.dumps(result))
 
 
