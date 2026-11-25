@@ -28,7 +28,7 @@ flowchart LR
 | --- | --- |
 | 라우팅 | `cloudflare-gateway/src/index.mjs`의 허용된 API 경로와 메서드만 전달 |
 | 원본 IP | Cloudflare 제공 IP를 검증해 HMAC 서명 후 Pi에 전달. 사용자가 전송한 `X-Forwarded-For` 등은 신뢰하지 않음 |
-| 요청 제한 | 일반·검색·시간표·ICS·급식·관리자·Webhook의 **7개 Rate Limit binding**. `OPTIONS`는 별도 처리 |
+| 요청 제한 | 일반·검색·시간표·ICS·급식·관리자·Webhook·기능 제안의 **8개 Rate Limit binding**. `OPTIONS`는 별도 처리 |
 | 오류 응답 | Worker 연결/설정·429 등은 JSON 오류와 허용 출처 CORS 계약을 따름 |
 | 관리자·Webhook | 관리자 인증은 보존; **Webhook 백엔드는 운영 기본 비활성** |
 
