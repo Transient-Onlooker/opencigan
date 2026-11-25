@@ -52,8 +52,12 @@ export function saveSelection(storage: Pick<Storage, 'getItem' | 'setItem' | 're
     for (const [key] of entries) previous.push([key, storage.getItem(key)]);
     for (const [key, value] of entries) { storage.setItem(key, value); written += 1; }
   } catch {
-    for (const [key, value] of previous.slice(0, written).reverse()) {
-      try { if (value === null) storage.removeItem(key); else storage.setItem(key, value); }
+    for (let index = written - 1; index >= 0; index -= 1) {
+      const [key, value] = previous[index];
+      try {
+        if (storage.getItem(key) !== entries[index][1]) continue;
+        if (value === null) storage.removeItem(key); else storage.setItem(key, value);
+      }
       catch { /* Storage can reject the rollback too. */ }
     }
   }
