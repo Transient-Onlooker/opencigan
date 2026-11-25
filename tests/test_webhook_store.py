@@ -261,6 +261,20 @@ class WebhookStoreTests(unittest.TestCase):
         self.assertEqual(self.store.get(identifier, token)["dropped_events"], 1)
         self.assertEqual(len(self.store.deliveries(identifier, token)), 1)
 
+    def test_history_observation_shares_payload_total_across_changes(self):
+        from backend.webhook_store import delivery_payload_capacity_available
+
+        history = HistoryStore(self.path)
+        base = datetime.now(timezone.utc)
+        first = {"grade": 2, "class": 3, "date": "2026-11-16", "period": 1, "subject": "수학", "teacher": "김"}
+        lessons = [first, {**first, "period": 2}]
+        history.observe("2:예시학교", "2026-11-16", lessons, base)
+        with patch("backend.webhook_store.delivery_payload_capacity_available", wraps=delivery_payload_capacity_available) as check:
+            history.observe("2:예시학교", "2026-11-16", [{**lesson, "subject": "과학"} for lesson in lessons], base + timedelta(seconds=1))
+        self.assertEqual(check.call_count, 2)
+        self.assertIs(check.call_args_list[0].args[2], check.call_args_list[1].args[2])
+        self.assertEqual(len(self.store.deliveries(self.subscription["id"], self.subscription["token"])), 2)
+
     def test_payload_budget_is_atomic_across_concurrent_insertions(self):
         identifier = self.subscription["id"]
         with patch("backend.webhook_store.MAX_DELIVERY_PAYLOAD_BYTES", 3), ThreadPoolExecutor(max_workers=2) as pool:
