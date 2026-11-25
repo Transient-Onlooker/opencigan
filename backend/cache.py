@@ -6,7 +6,7 @@ import time
 from collections import OrderedDict
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 logger = logging.getLogger("opensigan.cache")
 RESOURCE_TYPES = frozenset(("timetable", "school_search", "neis_school_search", "meals"))
@@ -123,9 +123,15 @@ class Cache:
                                                                "result": "failure", "observedAt": observed_at,
                                                                "durationMs": max(0, round((now - started_at) * 1000)),
                                                                "lastFailureAt": observed_at}
-                status = exc.code if isinstance(exc, HTTPError) and type(exc.code) is int and 100 <= exc.code <= 599 else None
-                logger.warning("cache refresh failed resource=%s fallback=%s error_type=%s upstream_http_status=%s",
-                               resource or "other", "stale" if previous_value is not None else "none", type(exc).__name__, status)
+                cause = exc
+                for _ in range(8):
+                    if cause.__cause__ is None:
+                        break
+                    cause = cause.__cause__
+                status = cause.code if isinstance(cause, HTTPError) and type(cause.code) is int and 100 <= cause.code <= 599 else None
+                cause_type = type(cause).__name__ if type(cause) in (HTTPError, URLError, TimeoutError, OSError, ValueError, RuntimeError) else "other"
+                logger.warning("cache refresh failed resource=%s fallback=%s error_type=%s upstream_http_status=%s cause_type=%s",
+                               resource or "other", "stale" if previous_value is not None else "none", type(exc).__name__, status, cause_type)
                 if previous_value is not None:
                     return output(self._stale(previous_value), "stale")
                 if self.retry_delay > 0:
