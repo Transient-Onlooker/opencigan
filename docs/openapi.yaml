@@ -561,6 +561,31 @@ paths:
         '401': { description: Missing or incorrect bearer token. }
         '503': { description: Analytics disabled or storage temporarily unavailable. }
   /api/v1/admin/access-anomalies:
+    parameters:
+      - name: window_hours
+        in: query
+        description: Look-back window, bounded by the configured access-log retention period.
+        schema: { type: integer, minimum: 1, maximum: 720, default: 24 }
+      - name: max_requests_per_ip
+        in: query
+        description: Flag request volume strictly greater than this threshold.
+        schema: { type: integer, minimum: 1, maximum: 100000, default: 1000 }
+      - name: max_error_ratio
+        in: query
+        description: Flag an error ratio strictly greater than this threshold.
+        schema: { type: number, exclusiveMinimum: 0, maximum: 1, default: 0.5 }
+      - name: max_distinct_schools
+        in: query
+        description: Flag a distinct-school count strictly greater than this threshold.
+        schema: { type: integer, minimum: 1, maximum: 100000, default: 50 }
+      - name: min_requests
+        in: query
+        description: Minimum request count required for a client IP to be considered for any finding, including status_errors.
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 20 }
+      - name: max_status_errors
+        in: query
+        description: Optional threshold. When supplied, separately flag 404, 429, or 5xx counts strictly greater than this value.
+        schema: { type: integer, minimum: 1, maximum: 100000 }
     get:
       tags: [System]
       summary: Review retained access logs for configured traffic patterns
@@ -572,31 +597,6 @@ paths:
         OPENCIGAN_ADMIN_TOKEN bearer token. Without the gateway flag the edge
         returns 404. Supports GET and HEAD.
       security: [{ AnalyticsAdmin: [] }]
-      parameters:
-        - name: window_hours
-          in: query
-          description: Look-back window, bounded by the configured access-log retention period.
-          schema: { type: integer, minimum: 1, maximum: 720, default: 24 }
-        - name: max_requests_per_ip
-          in: query
-          description: Flag request volume strictly greater than this threshold.
-          schema: { type: integer, minimum: 1, maximum: 100000, default: 1000 }
-        - name: max_error_ratio
-          in: query
-          description: Flag an error ratio strictly greater than this threshold.
-          schema: { type: number, exclusiveMinimum: 0, maximum: 1, default: 0.5 }
-        - name: max_distinct_schools
-          in: query
-          description: Flag a distinct-school count strictly greater than this threshold.
-          schema: { type: integer, minimum: 1, maximum: 100000, default: 50 }
-        - name: min_requests
-          in: query
-          description: Minimum request count required for a client IP to be considered for any finding, including status_errors.
-          schema: { type: integer, minimum: 0, maximum: 1000000, default: 20 }
-        - name: max_status_errors
-          in: query
-          description: Optional threshold. When supplied, separately flag 404, 429, or 5xx counts strictly greater than this value.
-          schema: { type: integer, minimum: 1, maximum: 100000 }
       responses:
         '200':
           description: Findings computed from retained rows within the requested window and retention period.
@@ -647,7 +647,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: API 연결을 처리하지 못했어요., code: not_found, message: API 연결을 처리하지 못했어요. }
         '405':
-          description: Method other than GET or HEAD is not supported. The backend and Cloudflare edge return different error text.
+          description: When the route is enabled at the gateway, a method other than GET or HEAD is not supported. The backend and enabled Cloudflare route return different error text. When ACCESS_ANOMALIES_ENABLED is not "1", the edge returns 404 for every method.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -684,6 +684,32 @@ paths:
                   value: { error: API 연결을 처리하지 못했어요., code: gateway_unconfigured, message: API 연결을 처리하지 못했어요. }
                 gateway_unavailable:
                   value: { error: API 연결을 처리하지 못했어요., code: gateway_unavailable, message: API 연결을 처리하지 못했어요. }
+    head:
+      tags: [System]
+      summary: Check the access-anomaly review response without a body
+      description: Uses the same authentication, query validation, analysis, and rate limits as GET. The response body is empty for every status.
+      security: [{ AnalyticsAdmin: [] }]
+      responses:
+        '200':
+          description: Findings were computed successfully. The response body is empty for HEAD.
+          headers:
+            Cache-Control:
+              description: Responses are not stored by caches.
+              schema: { type: string, const: no-store }
+        '400': { description: Unsupported, repeated, malformed, or out-of-range query parameter. No response body. }
+        '401':
+          description: OPENCIGAN_ADMIN_TOKEN is missing or does not match. No response body.
+          headers:
+            WWW-Authenticate:
+              schema: { type: string }
+        '404': { description: The Cloudflare gateway route is not exposed when ACCESS_ANOMALIES_ENABLED is not "1". No response body. }
+        '429':
+          description: Backend admin or Cloudflare general/admin request limit reached. No response body.
+          headers:
+            Retry-After:
+              description: Retry delay in seconds, when supplied by the backend or edge.
+              schema: { type: string }
+        '503': { description: Backend access-log storage or gateway configuration is unavailable. No response body. }
   /api/v1/status:
     get:
       tags: [System]

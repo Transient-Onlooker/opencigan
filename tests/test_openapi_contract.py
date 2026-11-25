@@ -55,6 +55,11 @@ class OpenApiContractTests(unittest.TestCase):
         from backend.access_logs import AccessLogStore
 
         path = '/api/v1/admin/access-anomalies'
+        parameters = {parameter['name']: parameter for parameter in self.spec['paths'][path]['parameters']}
+        self.assertEqual(set(parameters), {
+            'window_hours', 'max_requests_per_ip', 'max_error_ratio',
+            'max_distinct_schools', 'min_requests', 'max_status_errors',
+        })
         auth = {'Authorization': 'Bearer synthetic-admin-token'}
         store = AccessLogStore(':memory:')
         self.addCleanup(store.close)
