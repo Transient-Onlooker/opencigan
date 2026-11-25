@@ -20,7 +20,7 @@
 
 운영 파일: `deploy/opensigan.service`, `deploy/opencigan-internal.service`, `deploy/opencigan-release-watch.service`와 `.timer`. 이전 미리보기용 `deploy/opensigan-preview.service` 및 관련 설정은 선택적입니다. 서비스는 `systemd --user`에서 실행하며 실제 설치·자동 시작 상태는 Pi에서 확인합니다.
 
-2026-11-25 확인 기준 Release 감지는 30분 타이머와 최대 2분의 지연을 사용하며 게시 직후 이벤트 전달 경로는 아직 구성되지 않았습니다. `1.4.8`의 초기 매니페스트에는 기존 검증기가 요구하는 `name` 필드가 없어 정기 감시가 `Release manifest identity mismatch`로 실패했습니다. 이후 교체된 매니페스트는 Pi의 기존 `latest_release` 검증을 통과했습니다. 이는 배포 성공을 뜻하지 않으며 서비스 실행과 활성 SHA는 별도로 확인해야 합니다. 서비스 실패는 `journalctl --user -u opencigan-release-watch.service`에서 확인할 수 있습니다.
+2026-11-25 확인 기준 Release 감지는 30분 타이머와 최대 2분의 지연을 사용하며 게시 직후 이벤트 전달 경로는 아직 구성되지 않았습니다. `1.4.8`의 초기 매니페스트에는 기존 검증기가 요구하는 `name` 필드가 없어 정기 감시가 `Release manifest identity mismatch`로 실패했고 이후 의존성 검증 실패도 기록됐습니다. 매니페스트가 교체된 뒤 20:04 KST 정기 감시에서 `85bf4db852fad74c280e5225d730c8f83e163f7a` 배포가 성공했습니다. 상태 파일에는 릴리스·패키지·내부·공개 검증 성공, 롤백 없음, 핀 동기화 성공이 기록됐습니다. 서비스 실패는 `journalctl --user -u opencigan-release-watch.service`에서 확인할 수 있습니다.
 
 ## 외부 데이터 연결
 
