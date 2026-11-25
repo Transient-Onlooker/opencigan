@@ -22,6 +22,30 @@ const log = {
   user_agent: '<img src=x onerror=alert(1)>',
 };
 
+test('editing the token cancels an in-flight log query and clears previous rows', async ({ page }) => {
+  let release, started, count = 0;
+  const pending = new Promise(resolve => { release = resolve; });
+  const requested = new Promise(resolve => { started = resolve; });
+  await page.route('**/api/v1/admin/access-logs**', async route => {
+    count++;
+    if (count === 2) { started(); await pending; }
+    try { await route.fulfill({ json: { items: [log], next_cursor: null, limit: 50, has_more: false } }); } catch { /* Request may be canceled. */ }
+  });
+  await page.goto('/access-logs.html');
+  await page.getByLabel('관리자 토큰').fill('first-token');
+  await page.getByRole('button', { name: '조회', exact: true }).click();
+  await expect(page.locator('#logs-body')).toContainText(log.client_ip);
+  await page.getByRole('button', { name: '조회', exact: true }).click();
+  await requested;
+  const canceled = page.waitForEvent('requestfailed', request => request.url().includes('/api/v1/admin/access-logs'));
+  await page.getByLabel('관리자 토큰').fill('second-token');
+  release();
+  await canceled;
+  await expect(page.locator('#results')).toBeHidden();
+  await expect(page.locator('#logs-body')).toBeEmpty();
+  await expect(page.getByRole('button', { name: '조회', exact: true })).toBeEnabled();
+});
+
 test('anomaly review remains hidden by default', async ({ page }) => {
   test.skip(process.env.VITE_ACCESS_ANOMALIES_ENABLED === '1', 'Only applies to the default build');
   await page.goto('/access-logs.html');
