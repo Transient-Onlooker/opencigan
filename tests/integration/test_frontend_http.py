@@ -77,13 +77,16 @@ const assert = require('node:assert/strict');
                   error => { request.signal.removeEventListener('abort', abort); reject(error); });
       });
     };
+    const realDeadline = process.env.OPENCIGAN_SLOW_NETWORK_TESTS === '1';
     AbortSignal.timeout = (milliseconds) => {
       assert.equal(milliseconds, 15_000);
+      if (realDeadline) return originalTimeout(milliseconds);
       const deadline = new AbortController();
       deadlines.push(deadline);
       return deadline.signal;
     };
     try {
+      const startedAt = performance.now();
       const slowRequest = api.getTimetable('2:ST01-slow', '2026-11-09');
       let slowStarted = false;
       for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -96,8 +99,9 @@ const assert = require('node:assert/strict');
       }
       assert.equal(slowStarted, true, 'the local backend should enter its delayed upstream fetch');
 
-      deadlines[0].abort(new DOMException('Synthetic client deadline', 'TimeoutError'));
+      if (!realDeadline) deadlines[0].abort(new DOMException('Synthetic client deadline', 'TimeoutError'));
       await assert.rejects(slowRequest, /서버 응답이 늦어요/);
+      if (realDeadline) assert.ok(performance.now() - startedAt >= 14_900, 'the real client deadline must elapse');
       assert.equal(forwarded.length, 1, 'the slow request should pass through the gateway');
       assert.equal(forwarded[0].signal.aborted, false, 'the mocked gateway should not abort the private request');
       const afterCancel = await fetch(`${process.env.VITE_API_BASE_URL}/__test__/state`).then(response => response.json());
@@ -139,7 +143,7 @@ class FrontendHttpTests(unittest.TestCase):
         def fetch_timetable(school, week):
             if school == "2:ST01-slow":
                 upstream_started.set()
-                if not upstream_release.wait(10):
+                if not upstream_release.wait(30):
                     raise RuntimeError("synthetic upstream gate was not released")
                 upstream_completed.set()
             return {**timetable, "schoolId": school, "weekStart": week}
