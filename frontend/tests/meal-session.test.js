@@ -43,6 +43,21 @@ test('meal school connection ignores a late response after switching schools', a
   assert.equal(state.neisLoading, false);
 });
 
+test('meal school connection clears loading when its response becomes stale after a school switch', async () => {
+  let state;
+  let current = 'a';
+  let resolve;
+  let chosen = false;
+  const session = personalizationVm.createMealSession((next) => { state = next; });
+  const pending = session.connect({ id: 'a', name: 'school', region: '서울' }, () => current,
+    () => new Promise((done) => { resolve = done; }), () => ({ id: 'neis' }), () => [], () => { chosen = true; }, String);
+  current = 'b';
+  resolve({ schools: [], stale: false });
+  await pending;
+  assert.equal(chosen, false);
+  assert.equal(state.neisLoading, false);
+});
+
 test('a cancelled meal request cannot replace the new request state when it fails late', async () => {
   let state;
   const requests = [];
