@@ -7,12 +7,15 @@ only for this worker instance (no alert state is written to any database).
 
 import logging
 import math
+import os
+import signal
 import sqlite3
 import threading
 import time
 from contextlib import closing
 from datetime import date, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 
 logger = logging.getLogger("opensigan.admin_anomaly_alert")
@@ -120,3 +123,81 @@ class AdminAnomalyAlertWorker:
                     logger.warning("admin anomaly notification failed")
                     self._retry_at[key] = self.clock() + self.retry_seconds
             return delivered
+
+
+def run_persistent_once(log_store, alert_store, thresholds, destination, secret, *, enabled=False, now=None, sender=None):
+    """Review and process at most one alert using a separate persistent outbox."""
+    if not enabled:
+        return False
+    from backend.admin_alert_delivery import send_admin_alert
+
+    if not log_store or not alert_store or not destination or not isinstance(secret, bytes) or len(secret) < 32:
+        raise ValueError("complete administrator alert configuration is required")
+    thresholds = _validate_thresholds(thresholds)
+    findings = _review_read_only(log_store, thresholds)
+    alert_store.sync_findings(findings, now=now)
+    alert_store.prune(now=now)
+    delivery = alert_store.claim(now=now)
+    if delivery is None:
+        return False
+    payload = delivery["payload"]
+    try:
+        options = {"send": sender} if sender is not None else {}
+        result = send_admin_alert(destination, secret, delivery["event_id"], payload["kind"], payload.get("status_group"), **options)
+    except (ValueError, OSError):
+        result = {"delivered": False, "retryable": False}
+    alert_store.finish(delivery["id"], delivery["lease_token"], delivered=result["delivered"],
+                       retryable=result.get("retryable", True), now=now)
+    return True
+
+
+def main():
+    if os.environ.get("OPENCIGAN_ADMIN_ALERT_ENABLED") != "1":
+        return
+    from datetime import datetime, timedelta, timezone
+    from backend.admin_alert_store import AdminAlertStore
+    from backend.webhook_delivery import validate_destination
+
+    try:
+        log_path = Path(os.environ["OPENCIGAN_ACCESS_LOG_DB"]).resolve(strict=True)
+        state_path = Path(os.environ["OPENCIGAN_ADMIN_ALERT_DB"]).absolute()
+        if state_path.resolve() == log_path or (state_path.exists() and os.path.samefile(state_path, log_path)):
+            raise ValueError("alert state must use a separate database")
+        destination = os.environ["OPENCIGAN_ADMIN_ALERT_DESTINATION"]
+        validate_destination(destination)
+        secret = os.environ["OPENCIGAN_ADMIN_ALERT_SIGNING_KEY"].encode("utf-8")
+        hmac_key = os.environ["OPENCIGAN_ADMIN_ALERT_ID_KEY"].encode("utf-8")
+        if len(secret) < 32 or len(hmac_key) < 32:
+            raise ValueError("administrator alert keys must contain at least 32 bytes")
+        thresholds = _validate_thresholds({
+            "window_hours": int(os.environ["OPENCIGAN_ADMIN_ALERT_WINDOW_HOURS"]),
+            "max_requests_per_ip": int(os.environ["OPENCIGAN_ADMIN_ALERT_MAX_REQUESTS"]),
+            "max_error_ratio": float(os.environ["OPENCIGAN_ADMIN_ALERT_MAX_ERROR_RATIO"]),
+            "max_distinct_schools": int(os.environ["OPENCIGAN_ADMIN_ALERT_MAX_SCHOOLS"]),
+            "min_requests": int(os.environ["OPENCIGAN_ADMIN_ALERT_MIN_REQUESTS"]),
+            "max_status_errors": int(os.environ["OPENCIGAN_ADMIN_ALERT_MAX_STATUS_ERRORS"]),
+        })
+        interval = int(os.environ["OPENCIGAN_ADMIN_ALERT_INTERVAL_SECONDS"])
+        retention = int(os.environ.get("OPENCIGAN_ACCESS_LOG_RETENTION_DAYS", "7"))
+        if not 10 <= interval <= 3600 or not 1 <= retention <= 90 or not log_path.is_file():
+            raise ValueError("invalid administrator alert configuration")
+    except (KeyError, ValueError, OSError):
+        raise SystemExit("Administrator alerts require a valid explicit configuration") from None
+
+    log_store = SimpleNamespace(path=str(log_path), retention_days=retention,
+        _current_day=lambda: datetime.now(timezone(timedelta(hours=9))).date().isoformat())
+    alert_store = AdminAlertStore(state_path, hmac_key)
+    stop = threading.Event()
+    for name in ("SIGINT", "SIGTERM"):
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), lambda *_: stop.set())
+    while not stop.is_set():
+        try:
+            run_persistent_once(log_store, alert_store, thresholds, destination, secret, enabled=True)
+        except (OSError, sqlite3.Error, ValueError):
+            logger.warning("admin anomaly alert processing unavailable")
+        stop.wait(interval)
+
+
+if __name__ == "__main__":
+    main()

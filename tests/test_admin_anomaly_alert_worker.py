@@ -6,9 +6,12 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
+import os
+import tempfile
+from pathlib import Path
 
 from backend.access_logs import AccessLogStore
-from backend.admin_anomaly_alert_worker import AdminAnomalyAlertWorker
+from backend.admin_anomaly_alert_worker import AdminAnomalyAlertWorker, main, run_persistent_once
 
 
 SEOUL = timezone(timedelta(hours=9))
@@ -23,6 +26,58 @@ THRESHOLDS = {
 
 
 class AdminAnomalyAlertWorkerTests(unittest.TestCase):
+    def test_persistent_worker_is_inert_without_explicit_enable(self):
+        log_store, alert_store, sender = Mock(), Mock(), Mock()
+        self.assertFalse(run_persistent_once(log_store, alert_store, {}, "", b"", sender=sender))
+        log_store._connect.assert_not_called()
+        alert_store.sync_findings.assert_not_called()
+        sender.assert_not_called()
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertIsNone(main())
+
+    def test_main_incomplete_configuration_does_not_initialize_state(self):
+        with patch.dict(os.environ, {"OPENCIGAN_ADMIN_ALERT_ENABLED": "1"}, clear=True), \
+             patch("backend.admin_alert_store.AdminAlertStore") as state:
+            with self.assertRaises(SystemExit):
+                main()
+            state.assert_not_called()
+
+    def test_persistent_worker_restarts_without_duplicate_delivery(self):
+        from backend.admin_alert_store import AdminAlertStore
+
+        log_store = self.make_store()
+        self.record_status_mix(log_store, datetime.now(SEOUL))
+        sender = Mock(return_value={"delivered": True, "retryable": False})
+        root = Path(os.environ["LOCALAPPDATA"]) / "Temp" if os.name == "nt" else None
+        with tempfile.TemporaryDirectory(dir=root) as directory:
+            path = Path(directory) / "alerts.sqlite"
+            destination = "https://discord.com/api/webhooks/123/test_token"
+            first = AdminAlertStore(path, b"i" * 32)
+            self.assertTrue(run_persistent_once(log_store, first, THRESHOLDS, destination, b"s" * 32, enabled=True, sender=sender))
+            second = AdminAlertStore(path, b"i" * 32)
+            self.assertFalse(run_persistent_once(log_store, second, THRESHOLDS, destination, b"s" * 32, enabled=True, sender=sender))
+            self.assertEqual(sender.call_count, 1)
+            self.assertNotIn(b"203.0.113.1", path.read_bytes())
+
+    def test_persistent_worker_retries_with_same_event_id_and_preserves_pending_on_read_failure(self):
+        from backend.admin_alert_store import AdminAlertStore
+
+        log_store = self.make_store()
+        self.record_status_mix(log_store, datetime.now(SEOUL))
+        sender = Mock(side_effect=[{"delivered": False, "retryable": True}, {"delivered": True}])
+        root = Path(os.environ["LOCALAPPDATA"]) / "Temp" if os.name == "nt" else None
+        with tempfile.TemporaryDirectory(dir=root) as directory:
+            state = AdminAlertStore(Path(directory) / "alerts.sqlite", b"i" * 32)
+            destination = "https://discord.com/api/webhooks/123/test_token"
+            args = (log_store, state, THRESHOLDS, destination, b"s" * 32)
+            self.assertTrue(run_persistent_once(*args, enabled=True, now=100, sender=sender))
+            with patch("backend.admin_anomaly_alert_worker._review_read_only", side_effect=sqlite3.OperationalError):
+                with self.assertRaises(sqlite3.OperationalError):
+                    run_persistent_once(*args, enabled=True, now=160, sender=sender)
+            self.assertEqual(sender.call_count, 1)
+            self.assertTrue(run_persistent_once(*args, enabled=True, now=160, sender=sender))
+            self.assertEqual(sender.call_args_list[0].args[3], sender.call_args_list[1].args[3])
+
     def make_store(self):
         store = AccessLogStore(":memory:")
         self.addCleanup(store.close)
