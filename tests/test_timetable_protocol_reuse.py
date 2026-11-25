@@ -68,6 +68,46 @@ class ProtocolReuseTests(unittest.TestCase):
                 timetable.search_schools("School")
                 self.assertNotIn("42:School", timetable._verified_schools)
 
+    def test_verified_schools_keep_separate_identity_and_results(self):
+        calls = []
+
+        class FakeTimeTable:
+            def __init__(self, *args, **kwargs):
+                raise AssertionError("verified schools should reuse the protocol")
+
+            @staticmethod
+            def _get_comcigan_codes(content):
+                return ()
+
+            @staticmethod
+            def _fetch_timetable_data(code, week, codes, protocol):
+                calls.append((code, week))
+                return code
+
+            def _initialize_from_data(self, data, local_code, school_name, school_code, codes):
+                calls.append((local_code, school_name, school_code))
+                lesson = SimpleNamespace(subject=f"Subject {data}", teacher="Teacher", period=1, replaced=False)
+                self.timetable = [[], [[], [[], [lesson]]]]
+                self.update_date = None
+
+        def search(query, **kwargs):
+            rows = {"A": [[3, "Region A", "School A", 42]],
+                    "B": [[4, "Region B", "School B", 43]]}
+            return rows[query], self.protocol
+
+        with patch.object(timetable.time, "monotonic", return_value=100), \
+             patch.object(timetable, "configure_comcigan_proxy"), \
+             patch.object(timetable, "validate_timetable_week", return_value=0), \
+             patch.object(timetable, "_search_with_cached_protocol", side_effect=search), \
+             patch("pycomcigan.TimeTable", FakeTimeTable):
+            timetable.search_schools("A")
+            timetable.search_schools("B")
+            b = timetable.fetch_timetable("43:School B", "2026-11-23")
+            a = timetable.fetch_timetable("42:School A", "2026-11-23")
+        self.assertEqual(calls, [(43, 0), (4, "School B", 43), (42, 0), (3, "School A", 42)])
+        self.assertEqual(b["records"][0]["subject"], "Subject 43")
+        self.assertEqual(a["records"][0]["subject"], "Subject 42")
+
     def test_authentication_failure_invalidates_protocol_and_retries_once(self):
         calls = []
 
