@@ -276,7 +276,9 @@ def _cached_timetable(school, week, current_cache):
         try:
             store = _history_store()
             if store is not None and not data.get("stale", False):
-                store.observe(school, week, data["records"], observed_at=data["fetchedAt"], started_at=started_at)
+                store.observe(school, week, data["records"], observed_at=data["fetchedAt"], started_at=started_at,
+                              source_updated_at=data.get("sourceUpdatedAt"),
+                              track_source_updates=os.environ.get("OPENCIGAN_HISTORY_STATS_ENABLED") == "1")
         except Exception:
             logger.exception("history recording failed")
         return data
