@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Icon from './Icon.svelte';
+  import { suggestionsEnabled } from './suggestions-config';
   import MealsPanel from './MealsPanel.svelte';
   import CalendarNav from './CalendarNav.svelte';
   import SchoolSelector from './SchoolSelector.svelte';
@@ -39,6 +40,7 @@
   let SuggestionsComponent: typeof import('./Suggestions.svelte').default | null = null;
   let suggestionsLoading = false;
   let suggestionsLoadFailed = false;
+  let suggestionsRetryPending = false;
   let previousView: 'timetable' | 'meals' | 'settings' = view;
   let timetableView: 'today' | 'week' | 'grade' | 'teacher' = 'week';
   let teacherQuery = '';
@@ -157,18 +159,24 @@
   $: if (view !== previousView) {
     previousView = view;
     suggestionsLoadFailed = false;
-    if (view === 'settings' && import.meta.env.VITE_SUGGESTIONS_ENABLED !== '0') void loadSuggestions();
+    if (view === 'settings' && suggestionsEnabled) void loadSuggestions();
   }
 
   async function loadSuggestions() {
-    if (SuggestionsComponent || suggestionsLoading || suggestionsLoadFailed) return;
+    if (SuggestionsComponent || suggestionsLoadFailed) return;
+    if (suggestionsLoading) { suggestionsRetryPending = true; return; }
     suggestionsLoading = true;
+    suggestionsRetryPending = false;
     try {
       SuggestionsComponent = (await import('./Suggestions.svelte')).default;
     } catch {
       suggestionsLoadFailed = true;
     } finally {
       suggestionsLoading = false;
+      if (suggestionsRetryPending && view === 'settings' && !SuggestionsComponent) {
+        suggestionsLoadFailed = false;
+        void loadSuggestions();
+      }
     }
   }
   $: selectedTeacherName = findSelectedTeacherName(teacherNames, teacherQuery, (name) => displayTeacher(name, displaySettings));

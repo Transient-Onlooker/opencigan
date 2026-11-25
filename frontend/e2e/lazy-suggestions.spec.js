@@ -18,3 +18,24 @@ test('suggestions recover after a failed chunk fetch', async ({ page }) => {
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await expect(page.getByText('만들어주세요', { exact: true })).toBeVisible({ timeout: 5000 });
 });
+
+test('reentering settings while a chunk request fails retries after it settles', async ({ page }) => {
+  test.skip(process.env.VITE_SUGGESTIONS_ENABLED === '0', 'Explicitly disabled build does not load suggestions');
+  let attempts = 0;
+  let releaseFirst;
+  const firstRequest = new Promise(resolve => { releaseFirst = resolve; });
+  await page.route('**/assets/Suggestions-*.js', async route => {
+    attempts++;
+    if (attempts === 1) { await firstRequest; return route.abort('failed'); }
+    return route.continue();
+  });
+  await page.route('**/api/v1/suggestions**', route => route.fulfill({ json: { suggestions: [], nextCursor: null } }));
+  await page.goto('/');
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await expect.poll(() => attempts).toBe(1);
+  await page.getByRole('button', { name: '시간표', exact: true }).click();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  releaseFirst();
+  await expect(page.getByText('만들어주세요', { exact: true })).toBeVisible({ timeout: 5000 });
+  expect(attempts).toBe(2);
+});
