@@ -29,7 +29,7 @@ JSON은 `items`, `next_cursor`, `limit`, `has_more`, `dropped`를 반환합니�
 
 ## 관리자 이상 조회 검토 (백엔드)
 
-백엔드의 `GET /api/v1/admin/access-anomalies`는 접속 로그 전용 Bearer 토큰을 사용합니다. 기존 로그가 비활성화되어 있으면 503을 반환하며 별도 수집을 시작하지 않습니다. 이 경로의 공개 게이트웨이 노출·관리 UI는 별도 확인이 필요합니다.
+백엔드의 `GET /api/v1/admin/access-anomalies`는 접속 로그 전용 Bearer 토큰을 사용합니다. 기존 로그가 비활성화되어 있으면 503을 반환하며 별도 수집을 시작하지 않습니다. 게이트웨이는 기본적으로 이 경로를 노출하지 않으며 `ACCESS_ANOMALIES_ENABLED=1`로 별도 설정한 경우에만 기존 관리자 요청 제한과 백엔드 인증을 거쳐 전달합니다. 관리 UI 및 운영 활성화는 별도입니다.
 
 - `window_hours`: 최근 조회 시간, 기본 24·범위 1~720시간. 실제 보존 기간을 넘는 기록은 조회하지 않습니다.
 - `max_requests_per_ip`: IP별 요청 수, 기본 1,000·범위 1~100,000.

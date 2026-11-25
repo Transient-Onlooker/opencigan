@@ -69,7 +69,8 @@ export default {
     const path = url.pathname;
     const webhook = path.match(/^\/api\/v1\/webhooks\/([A-Za-z0-9_-]{24})(\/deliveries|\/test|\/rotate|\/schedule|\/template(?:\/preview)?)?$/);
     let methods;
-    if (READ_PATHS.has(path)) methods = ['GET', 'HEAD'];
+    if (path === '/api/v1/admin/access-anomalies' && env?.ACCESS_ANOMALIES_ENABLED === '1') methods = ['GET', 'HEAD'];
+    else if (READ_PATHS.has(path)) methods = ['GET', 'HEAD'];
     else if (path === '/api/v1/suggestions') methods = ['GET', 'HEAD', 'POST'];
     else if (SUGGESTION_ITEM.test(path)) methods = ['GET', 'HEAD'];
     else if (path === '/api/v1/admin/suggestions') methods = ['GET', 'HEAD'];
