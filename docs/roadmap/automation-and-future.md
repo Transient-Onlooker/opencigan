@@ -13,7 +13,7 @@
 
 
 
-- [ ] Webhook 구독·삭제·인증·HMAC 서명·재시도·중복 방지 (기본 비활성 API·이력 관측·별도 작업자 로컬 구현 및 모의 테스트. 저장 공간 상한·악용 방지·운영 검증 남음) [#220](https://github.com/Transient-Onlooker/opencigan/pull/220)·[#222](https://github.com/Transient-Onlooker/opencigan/pull/222)·[#223](https://github.com/Transient-Onlooker/opencigan/pull/223)·[#224](https://github.com/Transient-Onlooker/opencigan/pull/224)·[#226](https://github.com/Transient-Onlooker/opencigan/pull/226) 구현/격리 검증, 행 상한 50000(파일 바이트 상한 아님), #221 미병합.
+- [ ] Webhook 구독·삭제·인증·HMAC 서명·재시도·중복 방지 (기본 비활성 API·이력 관측·별도 작업자 로컬 구현 및 모의 테스트. 저장 공간 상한·악용 방지·운영 검증 남음) [#220](https://github.com/Transient-Onlooker/opencigan/pull/220)·[#221](https://github.com/Transient-Onlooker/opencigan/pull/221)·[#222](https://github.com/Transient-Onlooker/opencigan/pull/222)·[#223](https://github.com/Transient-Onlooker/opencigan/pull/223)·[#224](https://github.com/Transient-Onlooker/opencigan/pull/224)·[#226](https://github.com/Transient-Onlooker/opencigan/pull/226) 구현/격리 검증, 행 상한 50000(파일 바이트 상한 아님). 실제 발송은 비활성 상태 유지.
 - [ ] 기존 [timetable-watcher](https://github.com/Transient-Onlooker/timetable-watcher)의 Google Chat 전송·변경 비교·메시지 생성·중복 알림 방지 로직을 OpenCigan에 재사용
 - [ ] 로그인 없이 비밀 관리 링크로 Webhook 구독 생성·수정·삭제하기 — 관리 링크 교체·응답 유실 복구는 [#179](https://github.com/Transient-Onlooker/opencigan/pull/179)에서 구현·검증; 전체 보안 요구와 운영 검증은 ST-07에 남김.
 - [x] **Webhook 사용자 지정 메시지 템플릿·미리보기 (격리 구현)** — 허용 변수, Discord Embed·Google Chat 포맷, 미리보기·초기화·입력 검증 및 개발자 메뉴 통합을 [#180](https://github.com/Transient-Onlooker/opencigan/pull/180)에서 구현·검증했다. 원래 변경 유형별 문구·테스트 발송 등 세부 요구와 실제 채널 발송/운영 검증은 ST-07/08에서 구분해 관리한다. 기본 OFF 유지.
