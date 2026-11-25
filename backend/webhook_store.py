@@ -30,8 +30,13 @@ def delivery_capacity_available(db):
     return db.execute("SELECT COUNT(*) FROM webhook_deliveries").fetchone()[0] < MAX_DELIVERY_RECORDS
 
 
-def delivery_payload_capacity_available(db, body_size):
-    stored_bytes = db.execute("SELECT COALESCE(SUM(length(body)), 0) FROM webhook_deliveries").fetchone()[0]
+def delivery_payload_capacity_available(db, body_size, transaction_bytes=None):
+    if transaction_bytes is not None and transaction_bytes:
+        stored_bytes = transaction_bytes[0]
+    else:
+        stored_bytes = db.execute("SELECT COALESCE(SUM(length(body)), 0) FROM webhook_deliveries").fetchone()[0]
+        if transaction_bytes is not None:
+            transaction_bytes.append(stored_bytes)
     return stored_bytes + body_size <= MAX_DELIVERY_PAYLOAD_BYTES
 
 
@@ -70,7 +75,7 @@ def quiet_until(now, quiet_hours):
     return target.timestamp()
 
 
-def enqueue_observed_change(db, school, grade, classroom, date, period, kind, before, after, change_id, now):
+def enqueue_observed_change(db, school, grade, classroom, date, period, kind, before, after, change_id, now, transaction_bytes=None):
     columns = {row["name"] for row in db.execute("PRAGMA table_info(webhook_subscriptions)")}
     template_column = "template_json" if "template_json" in columns else "NULL"
     subscriptions = db.execute(f"SELECT id, provider, filters_json, {template_column} AS template_json "
@@ -121,11 +126,13 @@ def enqueue_observed_change(db, school, grade, classroom, date, period, kind, be
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         pending = db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')", (subscription["id"],)).fetchone()[0]
         if (pending >= MAX_PENDING_PER_SUBSCRIPTION or not delivery_capacity_available(db)
-                or not delivery_payload_capacity_available(db, len(body))):
+                or not delivery_payload_capacity_available(db, len(body), transaction_bytes)):
             db.execute("UPDATE webhook_subscriptions SET dropped_events=dropped_events+1 WHERE id=?", (subscription["id"],))
             continue
-        db.execute("INSERT OR IGNORE INTO webhook_deliveries(subscription_id, event_id, body, next_at) VALUES (?, ?, ?, ?)",
-                   (subscription["id"], event_id, body, now))
+        inserted = db.execute("INSERT OR IGNORE INTO webhook_deliveries(subscription_id, event_id, body, next_at) VALUES (?, ?, ?, ?)",
+                              (subscription["id"], event_id, body, now)).rowcount
+        if inserted and transaction_bytes is not None:
+            transaction_bytes[0] += len(body)
 
 
 class WebhookStore:

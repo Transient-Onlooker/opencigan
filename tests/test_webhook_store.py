@@ -230,6 +230,37 @@ class WebhookStoreTests(unittest.TestCase):
         self.assertEqual(self.store.get(identifier, token)["dropped_events"], 1)
         self.assertEqual(self.store.deliveries(identifier, token), [])
 
+    def test_observed_changes_reuse_byte_total_in_same_transaction(self):
+        identifier, token = self.subscription["id"], self.subscription["token"]
+        lesson = {"subject": "수학", "teacher": "김"}
+        queries = []
+        with patch("backend.webhook_store.MAX_DELIVERY_PAYLOAD_BYTES", 1), closing(self.store._connect()) as db:
+            db.set_trace_callback(queries.append)
+            db.execute("BEGIN IMMEDIATE")
+            transaction_bytes = []
+            for change_id in (1, 2):
+                enqueue_observed_change(db, "2:예시학교", 2, 3, "2026-11-16", 1, "changed",
+                                        lesson, lesson, change_id, 100, transaction_bytes)
+            db.execute("COMMIT")
+        self.assertEqual(self.store.get(identifier, token)["dropped_events"], 2)
+        self.assertEqual(sum("SUM(length(body))" in query for query in queries), 1)
+
+    def test_observed_changes_update_reused_byte_total_after_insert(self):
+        identifier, token = self.subscription["id"], self.subscription["token"]
+        lesson = {"subject": "수학", "teacher": "김"}
+        with closing(self.store._connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            transaction_bytes = []
+            enqueue_observed_change(db, "2:예시학교", 2, 3, "2026-11-16", 1, "changed",
+                                    lesson, lesson, 1, 100, transaction_bytes)
+            self.assertGreater(transaction_bytes[0], 0)
+            with patch("backend.webhook_store.MAX_DELIVERY_PAYLOAD_BYTES", transaction_bytes[0]):
+                enqueue_observed_change(db, "2:예시학교", 2, 3, "2026-11-16", 1, "changed",
+                                        lesson, lesson, 2, 100, transaction_bytes)
+            db.execute("COMMIT")
+        self.assertEqual(self.store.get(identifier, token)["dropped_events"], 1)
+        self.assertEqual(len(self.store.deliveries(identifier, token)), 1)
+
     def test_payload_budget_is_atomic_across_concurrent_insertions(self):
         identifier = self.subscription["id"]
         with patch("backend.webhook_store.MAX_DELIVERY_PAYLOAD_BYTES", 3), ThreadPoolExecutor(max_workers=2) as pool:
