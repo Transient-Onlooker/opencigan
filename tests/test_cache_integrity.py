@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.error import HTTPError
 from unittest.mock import patch
 
-from backend.cache import Cache
+from backend.cache import Cache, CacheBackoffError
 
 
 class CacheIntegrityTests(unittest.TestCase):
@@ -44,6 +44,54 @@ class CacheIntegrityTests(unittest.TestCase):
         self.assertNotIn('private-school', str(waits))
         self.assertEqual(cache.get(key, lambda: self.fail('cache hit')), {'records': []})
         self.assertEqual(cache.waits(), waits)
+
+    def test_waiter_shares_backoff_after_inflight_timeout(self):
+        cache = Cache(retry_delay=30, lock_stripes=1)
+        key = ('timetable', 'private-school')
+        entered, release, waiting = threading.Event(), threading.Event(), threading.Event()
+        calls = []
+
+        class TrackingLock:
+            def __init__(self, inner):
+                self.inner = inner
+
+            def acquire(self, blocking=True):
+                if blocking:
+                    waiting.set()
+                return self.inner.acquire(blocking)
+
+            def release(self):
+                self.inner.release()
+
+        def timeout():
+            calls.append(1)
+            entered.set()
+            if not release.wait(3):
+                raise AssertionError('fixture was not released')
+            raise TimeoutError('private upstream detail')
+
+        with self.assertLogs('opensigan.cache', level='WARNING') as logs:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                first = pool.submit(cache.get, key, timeout)
+                self.assertTrue(entered.wait(2))
+                with cache.locks[0]:
+                    cache._flights[0][key][0] = TrackingLock(cache._flights[0][key][0])
+                second = pool.submit(cache.get, key, timeout)
+                try:
+                    self.assertTrue(waiting.wait(2))
+                finally:
+                    release.set()
+                with self.assertRaises(CacheBackoffError) as leader:
+                    first.result(timeout=2)
+                with self.assertRaises(CacheBackoffError) as follower:
+                    second.result(timeout=2)
+        self.assertIsInstance(leader.exception.__cause__, TimeoutError)
+        self.assertGreater(follower.exception.retry_after, 0)
+        self.assertEqual(calls, [1])
+        self.assertGreaterEqual(cache.waits()['timetable']['waitMs'], 0)
+        self.assertNotIn('private-school', str(cache.waits()))
+        self.assertNotIn('private upstream detail', str(logs.output))
+        self.assertTrue(all(not flights for flights in cache._flights))
 
     def test_distinct_keys_do_not_block_when_lock_stripes_collide(self):
         cache = Cache(lock_stripes=1)
