@@ -13,7 +13,13 @@ export function createSchoolSearchSession(onChange: (results: School[], message:
         if (!Array.isArray(entry) || typeof entry[0] !== 'string' || entry[0].trim() !== entry[0] || entry[0].length < 2 || entry[0].length > 50) continue;
         const value = entry[1];
         if (!value || !Number.isFinite(value.savedAt) || value.savedAt <= 0 || value.savedAt > Date.now() || !Array.isArray(value.schools) || !value.schools.length || value.schools.length > 100) continue;
-        if (!value.schools.every((school: unknown) => school && typeof school === 'object' && ['id', 'name', 'region'].every((key) => typeof (school as Record<string, unknown>)[key] === 'string' && ((school as Record<string, string>)[key]).length <= 500))) continue;
+        if (!value.schools.every((school: unknown) => {
+          if (!school || typeof school !== 'object') return false;
+          const { id, name, region } = school as Record<string, unknown>;
+          return typeof id === 'string' && id.length <= 100 && /^[0-9]+:[^:]{1,50}$/.test(id)
+            && typeof name === 'string' && !!name.trim() && name.length <= 50
+            && typeof region === 'string' && region.length <= 100;
+        })) continue;
         cache.set(entry[0], { savedAt: value.savedAt, schools: value.schools.map((school: School) => ({ id: school.id, name: school.name, region: school.region })) });
       }
     }

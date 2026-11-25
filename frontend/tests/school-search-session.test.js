@@ -120,7 +120,7 @@ test('search cache retains at most ten successful queries', async () => {
 test('fresh results survive a new session and are used only for the matching failed query', async () => {
   const values = new Map();
   const storage = () => ({ getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) });
-  const school = { id: '123', name: '봄빛고등학교', region: '서울' };
+  const school = { id: '123:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
   const first = exports.createSchoolSearchSession(() => {}, storage);
   first.find(() => '봄빛', async () => ({ schools: [school], stale: false }), String);
   await scheduled();
@@ -143,6 +143,25 @@ test('unavailable or malformed storage does not prevent searching', async () => 
     session.find(() => '봄빛', async () => ({ schools: [{ id: '123', name: '봄빛', region: '서울' }], stale: false }), String);
     await scheduled();
     assert.equal(latest[0].id, '123');
+  }
+});
+
+test('invalid cached school identities are not offered after a search failure', async () => {
+  const valid = { id: '123:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
+  const invalid = [
+    { ...valid, id: '123' }, { ...valid, id: '123:학교:추가' },
+    { ...valid, name: ' ' }, { ...valid, name: '가'.repeat(51) },
+    { ...valid, region: '가'.repeat(101) },
+  ];
+  for (const school of invalid) {
+    let latest;
+    const raw = JSON.stringify([['봄빛', { schools: [school], savedAt: Date.now() }]]);
+    const session = exports.createSchoolSearchSession((results, message) => { latest = { results, message }; },
+      () => ({ getItem: () => raw, setItem: () => {} }));
+    session.find(() => '봄빛', async () => { throw new Error('offline'); }, String);
+    await scheduled();
+    assert.equal(latest.results.length, 0);
+    assert.match(latest.message, /저장된 결과가 없어요/);
   }
 });
 
