@@ -34,7 +34,7 @@ for (const width of [320, 390, 700, 960]) {
             const rect = element.getBoundingClientRect();
             return rect.width && (rect.left < 0 || rect.right > width + 1);
           })
-          .map((element) => ({ selector: element.tagName.toLowerCase() + (element.className ? '.' + String(element.className).trim().replaceAll(' ', '.') : ''), left: Math.round(element.getBoundingClientRect().left), right: Math.round(element.getBoundingClientRect().right) }));
+          .map((element) => ({ selector: element.tagName.toLowerCase(), type: element.getAttribute('type'), label: element.getAttribute('aria-label'), parent: element.parentElement?.className, left: Math.round(element.getBoundingClientRect().left), right: Math.round(element.getBoundingClientRect().right) }));
       });
       expect(overflow, `settings overflow at ${width}px`).toEqual([]);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
