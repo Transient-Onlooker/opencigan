@@ -16,7 +16,12 @@
 </p>
 
 <p align="center">
-  <a href="https://opencigan.mcv.kr/">공식 웹사이트</a> ·
+  <strong><a href="https://opencigan.mcv.kr/">opencigan.mcv.kr</a></strong> ·
+  <a href="https://opencigan.pages.dev/">opencigan.pages.dev</a> ·
+  <a href="https://xn--s39a564b8jcxrw.xn--hk3b17f.xn--3e0b707e/">오픈시간.서버.한국</a>
+</p>
+
+<p align="center">
   <a href="docs/api-guide.md">API 문서</a> ·
   <a href="docs/roadmap/README.md">개발 로드맵</a> ·
   <a href="https://github.com/Transient-Onlooker/opencigan/issues">문제 제보</a>
@@ -25,18 +30,6 @@
 ---
 
 학교 **시간표와 급식**을 한곳에서 확인하는 웹앱입니다. 학교·학년·반을 선택해 시간표를 조회하고, NEIS 급식 정보와 캘린더 구독 기능을 사용할 수 있습니다. 기본 조회에는 로그인이 필요하지 않습니다.
-
-## 서비스 접속
-
-| 주소 | 용도 |
-| --- | --- |
-| **[공식 웹사이트 · opencigan.mcv.kr](https://opencigan.mcv.kr/)** | 기본 접속 주소 (Cloudflare Pages 사용자 지정 도메인) |
-| **[보조 접속 주소 · opencigan.pages.dev](https://opencigan.pages.dev/)** | 동일한 웹앱의 Cloudflare Pages 기본 도메인 |
-| **[한글 도메인 · 오픈시간.서버.한국](https://xn--s39a564b8jcxrw.xn--hk3b17f.xn--3e0b707e/)** | OpenCigan 웹앱의 한글 접속 주소 |
-
-위 세 주소는 OpenCigan 웹앱의 접속 주소입니다. 두 Pages 주소는 **동일한 웹앱과 백엔드 경로를 공유**합니다. 보조 주소가 독립적인 API 서버나 완전한 장애 대비 경로를 의미하지는 않습니다.
-
-[단기 작업 기록](docs/roadmap/short-term-2026-11-21.md) · [기여 가이드](CONTRIBUTING.md)
 
 ## 주요 기능
 
@@ -62,6 +55,8 @@
 **이전 개인 일정:** 개인 시간표·시험 일정 편집 화면은 종료됐지만 기존 브라우저 데이터는 삭제하지 않았습니다. 해당 데이터가 있으면 설정에서 원본 JSON을 내보낼 수 있으며, 현재 앱에서 그 파일을 다시 불러오는 기능은 없습니다.
 
 ## 서비스 구조
+
+기본 접속 주소는 Cloudflare Pages 사용자 지정 도메인 `opencigan.mcv.kr`이며, `opencigan.pages.dev`는 동일한 웹앱의 기본 도메인입니다. 한글 도메인도 웹앱 접속에 사용할 수 있습니다. 두 Pages 주소는 **동일한 웹앱과 백엔드 경로를 공유**하므로 보조 주소가 독립적인 API 서버나 완전한 장애 대비 경로를 의미하지는 않습니다.
 
 ```mermaid
 flowchart LR
