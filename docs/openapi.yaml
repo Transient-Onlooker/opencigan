@@ -50,7 +50,18 @@ paths:
         '400': { description: Invalid request. }
         '413': { description: Body exceeds 4096 bytes. }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Feature disabled, subscription limit reached, or storage unavailable. }
+        '503':
+          description: Feature disabled, subscription limit reached, or storage unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                disabled:
+                  value: { error: Webhook 기능이 활성화되지 않았습니다, code: webhooks_disabled }
+                limit:
+                  value: { error: 구독 한도에 도달했습니다, code: subscription_limit }
+                unavailable:
+                  value: { error: Webhook 저장소를 사용할 수 없습니다, code: webhooks_unavailable }
   /api/v1/webhooks/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }

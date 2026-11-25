@@ -11,6 +11,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 from backend.app import _rate_clients, dispatch_request
 from backend.cache import Cache
+from backend.webhook_store import SubscriptionLimitError
 
 
 class OpenApiContractTests(unittest.TestCase):
@@ -120,6 +121,24 @@ class OpenApiContractTests(unittest.TestCase):
                 self.assertEqual(status, 503)
                 self.assert_json_response(path, status, headers, body)
                 self.assertEqual(json.loads(body), examples[example]["value"])
+
+    def test_webhook_create_unavailable_responses_match_documented_examples(self):
+        path = "/api/v1/webhooks"
+        examples = self.spec["paths"][path]["post"]["responses"]["503"]["content"]["application/json"]["examples"]
+        payload = json.dumps({"school": "2:예시학교", "grade": 2, "class": 3,
+                              "destination": "https://discord.com/api/webhooks/123/secret"}).encode()
+        for store, example in ((None, "disabled"),
+                               (Mock(create=Mock(side_effect=SubscriptionLimitError())), "limit"),
+                               (Mock(create=Mock(side_effect=OSError("private storage detail"))), "unavailable")):
+            with self.subTest(example=example), patch("backend.app._webhook_store", return_value=store):
+                status, headers, body = dispatch_request("POST", path, "", self.cache, request_body=payload)
+                self.assertEqual(status, 503)
+                self.assertTrue(headers["Content-Type"].startswith("application/json"))
+                schema = self.spec["paths"][path]["post"]["responses"]["503"]["content"]["application/json"]["schema"]
+                Draft202012Validator({"$ref": "#/$defs/response", "$defs": {"response": schema},
+                                      "components": self.spec["components"]}).validate(json.loads(body))
+                self.assertEqual(json.loads(body), examples[example]["value"])
+                self.assertNotIn("private storage detail", body.decode())
 
     def test_other_read_endpoints_follow_response_schemas(self):
         path = "/api/v1/status"
