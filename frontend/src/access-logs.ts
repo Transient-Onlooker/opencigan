@@ -83,6 +83,9 @@ anomalyForm.addEventListener('submit', (event) => {
   if (!base && location.hostname.endsWith('.github.io')) { anomalyState.textContent = 'API가 연결된 배포 주소에서 이용해 주세요.'; return; }
   const params = new URLSearchParams({
     window_hours: document.querySelector<HTMLInputElement>('#anomaly-window')!.value,
+    max_requests_per_ip: document.querySelector<HTMLInputElement>('#anomaly-volume')!.value,
+    max_error_ratio: document.querySelector<HTMLInputElement>('#anomaly-ratio')!.value,
+    max_distinct_schools: document.querySelector<HTMLInputElement>('#anomaly-schools')!.value,
     min_requests: document.querySelector<HTMLInputElement>('#anomaly-minimum')!.value,
   });
   const statusLimit = document.querySelector<HTMLInputElement>('#anomaly-status-limit')!.value;

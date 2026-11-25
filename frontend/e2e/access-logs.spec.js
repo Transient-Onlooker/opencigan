@@ -38,6 +38,9 @@ test('enabled anomaly review authenticates, safely renders and clears on lock', 
   await page.setViewportSize({ width: 320, height: 844 });
   await page.goto('/access-logs.html');
   await page.getByLabel('관리자 토큰').fill('test-secret');
+  await page.getByLabel('IP별 요청 수 기준').fill('25');
+  await page.getByLabel('오류 비율 기준').fill('0.25');
+  await page.getByLabel('서로 다른 학교 수 기준').fill('4');
   await page.getByLabel('상태별 오류 기준 (선택)').fill('3');
   await page.getByRole('button', { name: '이상 조회 검토' }).click();
   await expect(page.locator('#anomaly-results')).toContainText('429');
@@ -45,6 +48,9 @@ test('enabled anomaly review authenticates, safely renders and clears on lock', 
   expect(request.headers().authorization).toBe('Bearer test-secret');
   expect(request.url()).not.toContain('test-secret');
   expect(new URL(request.url()).searchParams.get('max_status_errors')).toBe('3');
+  expect(new URL(request.url()).searchParams.get('max_requests_per_ip')).toBe('25');
+  expect(new URL(request.url()).searchParams.get('max_error_ratio')).toBe('0.25');
+  expect(new URL(request.url()).searchParams.get('max_distinct_schools')).toBe('4');
   expect(await page.evaluate(() => JSON.stringify({ local: localStorage, session: sessionStorage, url: location.href }))).not.toContain('test-secret');
   await page.getByRole('button', { name: '잠금' }).click();
   await expect(page.locator('#anomaly-results')).toBeEmpty();
