@@ -148,6 +148,7 @@ flowchart TB
 
 - 급식 갱신 실패로 이전 식단을 보여줄 때 오류 안내와 오래된 데이터 안내가 중복되던 부분을 정리한다. 서버가 오래된 식단을 정상 응답한 경우의 별도 경고는 유지한다. 나머지 화면·실기기 검증은 미완료다.
 - [ ] 메인 선택 폼·시간표 조작부·탭·설정의 기준선, 행 높이, 여백과 테마별 일관성을 보완한다. 320/390/700/960px 라이트·다크 전후 캡처 및 수평 넘침 검사. **후속:** [#218](https://github.com/Transient-Onlooker/opencigan/pull/218)·[#246](https://github.com/Transient-Onlooker/opencigan/pull/246)·[#257](https://github.com/Transient-Onlooker/opencigan/pull/257)·[#261](https://github.com/Transient-Onlooker/opencigan/pull/261) 대비·주간 화면·아이콘 반영, 전체 화면 검증 잔여.
+- 2026-11-26 Chromium 자동 검사: 교사 주간 시간표의 320/390/700/960px 라이트·다크 및 수평 넘침 8건 통과. 전체 화면의 시각적 전후 비교 또는 실기기 검사로 간주하지 않는다.
 - [ ] `NEW-03` 날짜 편집과 `NEW-09` 중복 오류 안내, 모바일 하단 메뉴 가림의 **현재 구현을 확인한 뒤** 실제 재현되는 차이만 수정한다. 이미 해결된 부분은 반복 작업하지 않는다. **후속:** [#233](https://github.com/Transient-Onlooker/opencigan/pull/233) 날짜 오류 안내·복원 완료, #192 중복 오류 정리. 하단 메뉴 및 나머지 검증 잔여.
 - **완료 조건:** 실제 수정한 컴포넌트의 스크린샷·E2E·키보드 포커스 회귀. 사용자 디자인 승인·실기기 확인은 별도 게이트.
 - 원본: [P1 UX](user-experience.md), [P0 모바일](core-quality.md).
