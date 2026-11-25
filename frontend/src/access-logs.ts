@@ -380,6 +380,20 @@ nextBtn.addEventListener('click', () => {
   }
 });
 
+tokenInput.addEventListener('input', () => {
+  activeAbortController?.abort();
+  activeAbortController = undefined;
+  searchBtn.disabled = false;
+  csvBtn.disabled = false;
+  nextBtn.hidden = true;
+  nextCursor = null;
+  currentLoadedCount = 0;
+  resultsSection.hidden = true;
+  logsBody.replaceChildren();
+  pageInfo.textContent = '';
+  stateEl.textContent = '토큰이 변경됐어요. 다시 조회해 주세요.';
+});
+
 lockBtn.addEventListener('click', () => {
   clearAnomalies();
   activeAbortController?.abort();
