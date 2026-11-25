@@ -126,7 +126,7 @@ class AdminAnomalyAlertWorker:
 
 
 def run_persistent_once(log_store, alert_store, thresholds, destination, secret, *, enabled=False, now=None, sender=None):
-    """Review and process at most one alert using a separate persistent outbox."""
+    """Review once and process a bounded batch using a separate persistent outbox."""
     if not enabled:
         return False
     from backend.admin_alert_delivery import send_admin_alert
@@ -137,18 +137,21 @@ def run_persistent_once(log_store, alert_store, thresholds, destination, secret,
     findings = _review_read_only(log_store, thresholds)
     alert_store.sync_findings(findings, now=now)
     alert_store.prune(now=now)
-    delivery = alert_store.claim(now=now)
-    if delivery is None:
-        return False
-    payload = delivery["payload"]
-    try:
-        options = {"send": sender} if sender is not None else {}
-        result = send_admin_alert(destination, secret, delivery["event_id"], payload["kind"], payload.get("status_group"), **options)
-    except (ValueError, OSError):
-        result = {"delivered": False, "retryable": False}
-    alert_store.finish(delivery["id"], delivery["lease_token"], delivered=result["delivered"],
-                       retryable=result.get("retryable", True), now=now)
-    return True
+    processed = False
+    for _ in range(20):
+        delivery = alert_store.claim(now=now)
+        if delivery is None:
+            break
+        payload = delivery["payload"]
+        try:
+            options = {"send": sender} if sender is not None else {}
+            result = send_admin_alert(destination, secret, delivery["event_id"], payload["kind"], payload.get("status_group"), **options)
+        except (ValueError, OSError):
+            result = {"delivered": False, "retryable": False}
+        alert_store.finish(delivery["id"], delivery["lease_token"], delivered=result["delivered"],
+                           retryable=result.get("retryable", True), now=now)
+        processed = True
+    return processed
 
 
 def main():

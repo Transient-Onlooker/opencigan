@@ -78,6 +78,20 @@ class AdminAnomalyAlertWorkerTests(unittest.TestCase):
             self.assertTrue(run_persistent_once(*args, enabled=True, now=160, sender=sender))
             self.assertEqual(sender.call_args_list[0].args[3], sender.call_args_list[1].args[3])
 
+    def test_persistent_worker_processes_multiple_alerts_in_one_review(self):
+        from backend.admin_alert_store import AdminAlertStore
+
+        log_store = self.make_store()
+        for address in ("203.0.113.1", "203.0.113.2"):
+            self.record_status_mix(log_store, datetime.now(SEOUL), client_ip=address)
+        sender = Mock(return_value={"delivered": True})
+        root = Path(os.environ["LOCALAPPDATA"]) / "Temp" if os.name == "nt" else None
+        with tempfile.TemporaryDirectory(dir=root) as directory:
+            state = AdminAlertStore(Path(directory) / "alerts.sqlite", b"i" * 32)
+            self.assertTrue(run_persistent_once(log_store, state, THRESHOLDS,
+                "https://discord.com/api/webhooks/123/test_token", b"s" * 32, enabled=True, sender=sender))
+            self.assertEqual(sender.call_count, 2)
+
     def make_store(self):
         store = AccessLogStore(":memory:")
         self.addCleanup(store.close)
