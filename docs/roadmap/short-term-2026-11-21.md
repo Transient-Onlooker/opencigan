@@ -4,7 +4,7 @@
 
 ## 최근 작업 현황 (2026-11-25)
 
-2026-11-26 추가: main `f1787b1` 기준 [#270](https://github.com/Transient-Onlooker/opencigan/pull/270)에서 제안 진입점을 설정의 오픈소스 영역으로 이동하고, [#271](https://github.com/Transient-Onlooker/opencigan/pull/271)에서 RSS 오류 계약을 보완하고, [#272](https://github.com/Transient-Onlooker/opencigan/pull/272)에서 원본 교시 시작 시각의 기본 적용을 구현했다. `8caefeb`의 검사 및 Cloudflare Pages 배포는 성공했으나 GitHub Pages 배포와 실패 작업 재실행 요청은 GitHub 서버 500 오류로 실패했다. 이후 운영 배포 상태는 이 기록으로 확정하지 않는다.
+2026-11-26 추가: main `f1787b1` 기준 [#270](https://github.com/Transient-Onlooker/opencigan/pull/270)에서 제안 진입점을 설정의 오픈소스 영역으로 이동하고, [#271](https://github.com/Transient-Onlooker/opencigan/pull/271)에서 RSS 오류 계약을 보완하고, [#272](https://github.com/Transient-Onlooker/opencigan/pull/272)에서 원본 교시 시작 시각의 기본 적용을 구현했다. `8caefeb`의 GitHub Pages 배포와 재실행 요청은 서버 500 오류로 실패했으나 후속 `f1787b1`에서는 [검사와 GitHub Pages 배포](https://github.com/Transient-Onlooker/opencigan/actions/runs/45658165407) 및 Cloudflare Pages 배포가 성공했다. Pi 운영 상태는 이 기록으로 확정하지 않는다.
 
 기준: 2026-11-25 KST, main `d47fd7e`, 병합 PR #261 및 #221까지(#261은 시간표 보기 아이콘, #221은 웹훅 재시도 지연 개선). [#162](https://github.com/Transient-Onlooker/opencigan/pull/162)는 [#213](https://github.com/Transient-Onlooker/opencigan/pull/213)으로 대체되어 미병합 종료. [직전 성공 CI 45613810081](https://github.com/Transient-Onlooker/opencigan/actions/runs/45613810081) 및 이후 병합을 구분하며 최신 배포·운영·실기기 성공을 가정하지 않는다.
 
@@ -150,6 +150,7 @@ flowchart TB
 - [ ] 메인 선택 폼·시간표 조작부·탭·설정의 기준선, 행 높이, 여백과 테마별 일관성을 보완한다. 320/390/700/960px 라이트·다크 전후 캡처 및 수평 넘침 검사. **후속:** [#218](https://github.com/Transient-Onlooker/opencigan/pull/218)·[#246](https://github.com/Transient-Onlooker/opencigan/pull/246)·[#257](https://github.com/Transient-Onlooker/opencigan/pull/257)·[#261](https://github.com/Transient-Onlooker/opencigan/pull/261) 대비·주간 화면·아이콘 반영, 전체 화면 검증 잔여.
 - 2026-11-26 Chromium 자동 검사: 교사 주간 시간표의 320/390/700/960px 라이트·다크 및 수평 넘침 8건 통과. 전체 화면의 시각적 전후 비교 또는 실기기 검사로 간주하지 않는다.
 - [ ] `NEW-03` 날짜 편집과 `NEW-09` 중복 오류 안내, 모바일 하단 메뉴 가림의 **현재 구현을 확인한 뒤** 실제 재현되는 차이만 수정한다. 이미 해결된 부분은 반복 작업하지 않는다. **후속:** [#233](https://github.com/Transient-Onlooker/opencigan/pull/233) 날짜 오류 안내·복원 완료, #192 중복 오류 정리. 하단 메뉴 및 나머지 검증 잔여.
+- 2026-11-26 Chromium에서 시간표 범위 오류와 급식 날짜 오류·복원 2건, 위 주간 화면의 하단 메뉴 가림 검사를 통과했다. 다른 화면의 미검증 범위는 남겨 둔다.
 - **완료 조건:** 실제 수정한 컴포넌트의 스크린샷·E2E·키보드 포커스 회귀. 사용자 디자인 승인·실기기 확인은 별도 게이트.
 - 원본: [P1 UX](user-experience.md), [P0 모바일](core-quality.md).
 
@@ -280,6 +281,7 @@ flowchart TB
 - [#230](https://github.com/Transient-Onlooker/opencigan/pull/230) 이미지 내보내기 분리 실험은 서비스 워커 설치까지 포함한 로컬 첫 방문 JS 전송이 625바이트 증가해 병합하지 않았다. [측정과 한계](../qa/bundle-baseline-2026-11-23.md#이미지-내보내기-분리-실험--2026-11-25)를 참고하고 다른 최적화 후보를 찾는다.
 
 - [번들 기준선](../qa/bundle-baseline-2026-11-23.md)에 초기 HTML이 참조하는 JS/CSS, 전체 자산 및 선택 PDF 청크 크기를 기록했다. 실제 전송·로딩 시간과 최적화는 아직 미검증이다.
+- 2026-11-26 `f1787b1` 프런트 빌드의 기존 로컬 측정 스크립트 결과: 390/1366px 모두 최초 JS 76,175바이트, CSS 22,872바이트, WOFF2 333,884바이트(각 encoded body, 서비스 워커·외부/API 차단). 이전 측정과 기능 구성이 달라 최적화 전후 비교가 아니다.
 - [x] 초기 JS/CSS·전체 자산·선택 PDF 청크의 원본/압축 크기 및 격리 Chromium 최초 자산 요청 기준선을 기록한다 ([#193](https://github.com/Transient-Onlooker/opencigan/pull/193), [측정 기록](../qa/bundle-baseline-2026-11-23.md)).
 - [ ] 중복 의존성이나 초기 화면에 불필요한 선택 기능을 찾고 실제 전송·로딩 측정 및 개선 전후 비교를 보완한다.
 - [ ] 근거가 있는 부분만 지연 로딩·의존성 정리로 개선한다. PDF 내보내기 **파일 크기** 최적화와 혼동하지 않는다.
