@@ -7,9 +7,9 @@ only for this worker instance (no alert state is written to any database).
 
 import logging
 import math
-import os
 import sqlite3
 import threading
+import time
 from contextlib import closing
 from datetime import date, timedelta
 from pathlib import Path
@@ -68,13 +68,18 @@ class AdminAnomalyAlertWorker:
     Failed deliveries are left eligible for retry on the next run.
     """
 
-    def __init__(self, store, *, enabled=False, thresholds=None, receiver_path="", sender=None):
+    def __init__(self, store, *, enabled=False, thresholds=None, receiver_path="", sender=None, retry_seconds=60, clock=time.monotonic):
         self.store = store
         self.enabled = enabled is True
         self.thresholds = thresholds
         self.receiver_path = receiver_path.strip() if isinstance(receiver_path, str) else ""
         self.sender = sender
         self._sent = set()
+        if not isinstance(retry_seconds, (int, float)) or isinstance(retry_seconds, bool) or not math.isfinite(retry_seconds) or retry_seconds <= 0:
+            raise ValueError("retry_seconds must be positive and finite")
+        self.retry_seconds = retry_seconds
+        self.clock = clock
+        self._retry_at = {}
         self._lock = threading.Lock()
 
     def run_once(self):
@@ -96,18 +101,22 @@ class AdminAnomalyAlertWorker:
             ]
             active = {key for key, _ in keyed}
             self._sent.intersection_update(active)
+            self._retry_at = {key: deadline for key, deadline in self._retry_at.items() if key in active}
             delivered = 0
             for key, finding in keyed:
-                if key in self._sent:
+                if key in self._sent or self.clock() < self._retry_at.get(key, 0):
                     continue
                 try:
                     sent = self.sender(self.receiver_path, dict(finding))
                 except Exception:
                     logger.warning("admin anomaly notification failed")
+                    self._retry_at[key] = self.clock() + self.retry_seconds
                     continue
                 if sent is True:
                     self._sent.add(key)
+                    self._retry_at.pop(key, None)
                     delivered += 1
                 else:
                     logger.warning("admin anomaly notification failed")
+                    self._retry_at[key] = self.clock() + self.retry_seconds
             return delivered

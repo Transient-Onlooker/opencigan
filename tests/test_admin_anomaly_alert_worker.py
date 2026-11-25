@@ -106,9 +106,13 @@ class AdminAnomalyAlertWorkerTests(unittest.TestCase):
         store = self.make_store()
         self.record_status_mix(store, datetime.now(SEOUL))
         sender = Mock(side_effect=[RuntimeError("mock failure"), True])
-        worker = self.worker(store, sender)
+        clock = Mock(return_value=100.0)
+        worker = self.worker(store, sender, clock=clock, retry_seconds=60)
 
         self.assertEqual(worker.run_once(), 0)
+        self.assertEqual(worker.run_once(), 0)
+        self.assertEqual(sender.call_count, 1)
+        clock.return_value = 160.0
         self.assertEqual(worker.run_once(), 1)
         self.assertEqual(sender.call_count, 2)
 
