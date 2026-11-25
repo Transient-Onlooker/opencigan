@@ -9,6 +9,7 @@ import os
 import secrets
 import sqlite3
 import stat
+import tempfile
 from contextlib import closing
 from pathlib import Path
 
@@ -49,24 +50,48 @@ class AdminAlertStore:
         self._initialized = False
         if self.path.is_symlink():
             raise ValueError("alert database path must not be a symbolic link")
-        created = False
         try:
-            flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
-            descriptor = os.open(self.path, flags, 0o600)
-        except FileExistsError:
+            self.path.lstat()
+        except FileNotFoundError:
             pass
         else:
-            os.close(descriptor)
-            created = True
+            self._initialize_database(created=False)
+            return
 
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{self.path.name}.", suffix=".tmp", dir=self.path.parent)
+        os.close(descriptor)
+        temporary_path = Path(temporary_name)
+        target_path = self.path
+        try:
+            self.path = temporary_path
+            self._initialize_database(created=True)
+            try:
+                os.link(temporary_path, target_path)
+            except FileExistsError:
+                self.path = target_path
+                self._initialized = False
+                self._initialize_database(created=False)
+            else:
+                self.path = target_path
+                if os.name != "nt":
+                    directory_fd = os.open(target_path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+                    try:
+                        os.fsync(directory_fd)
+                    finally:
+                        os.close(directory_fd)
+        finally:
+            self.path = target_path
+            temporary_path.unlink(missing_ok=True)
+
+    def _initialize_database(self, *, created):
+        if self.path.is_symlink():
+            raise ValueError("alert database path must not be a symbolic link")
         file_stat = self.path.lstat()
         if not stat.S_ISREG(file_stat.st_mode):
             raise ValueError("alert database path must be a regular file")
         if os.name != "nt" and file_stat.st_mode & 0o077:
             raise PermissionError("alert database permissions must be 0600")
-
         with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
             try:

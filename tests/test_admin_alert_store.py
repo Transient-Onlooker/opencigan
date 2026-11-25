@@ -48,10 +48,47 @@ class AdminAlertStoreTests(unittest.TestCase):
     def test_existing_unidentified_empty_database_is_rejected(self):
         empty = Path(self.temp.name) / "empty.sqlite"
         sqlite3.connect(empty).close()
+        original_contents = empty.read_bytes()
         if os.name != "nt":
             empty.chmod(0o600)
         with self.assertRaises(ValueError):
             AdminAlertStore(empty, self.key)
+        self.assertEqual(empty.read_bytes(), original_contents)
+
+    def test_interrupted_initialization_leaves_no_public_database(self):
+        new_path = Path(self.temp.name) / "interrupted.sqlite"
+        initialize = AdminAlertStore._initialize_database
+
+        def interrupt_after_initialization(store, *, created):
+            initialize(store, created=created)
+            if created:
+                raise RuntimeError("simulated interruption before publication")
+
+        from unittest.mock import patch
+
+        with patch.object(AdminAlertStore, "_initialize_database", interrupt_after_initialization):
+            with self.assertRaisesRegex(RuntimeError, "simulated interruption"):
+                AdminAlertStore(new_path, self.key)
+
+        self.assertFalse(new_path.exists())
+        self.assertEqual(list(Path(self.temp.name).glob(".interrupted.sqlite.*.tmp")), [])
+        recovered = AdminAlertStore(new_path, self.key)
+        self.assertEqual(recovered.sync_findings([self.finding], now=100), 1)
+
+    def test_concurrent_initialization_publishes_one_valid_store(self):
+        new_path = Path(self.temp.name) / "concurrent-init.sqlite"
+
+        def initialize_and_sync(_):
+            store = AdminAlertStore(new_path, self.key)
+            return store.sync_findings([self.finding], now=100)
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            inserted = list(pool.map(initialize_and_sync, range(8)))
+
+        self.assertEqual(sum(inserted), 1)
+        with closing(sqlite3.connect(new_path)) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM admin_alerts").fetchone()[0], 1)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM admin_alert_deliveries").fetchone()[0], 1)
 
     @unittest.skipUnless(hasattr(os, "symlink"), "symlinks are unavailable")
     def test_symlink_path_is_rejected(self):
