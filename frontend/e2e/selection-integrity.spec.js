@@ -48,6 +48,15 @@ test('out-of-range timetable dates show an accessible error until restored', asy
     await expect(input).toHaveValue('2026-11-10');
     await input.fill(week);
     await input.blur();
+    await input.focus();
+    await input.evaluate((element) => {
+      const clipboard = new DataTransfer();
+      clipboard.setData('text/plain', '2026-11-30');
+      element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: clipboard, bubbles: true, cancelable: true }));
+    });
+    await expect(input).toHaveAttribute('aria-invalid', 'true');
+    await input.blur();
+    await expect(input).toHaveValue(week);
   }
 });
 
