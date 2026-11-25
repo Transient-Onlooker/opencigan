@@ -23,7 +23,7 @@ def _cutoff_iso(window_hours: int) -> str:
 
 def detect(db, *, window_hours: int, max_requests_per_ip: int,
            max_error_ratio: float, max_distinct_schools: int, min_requests: int = 0,
-           earliest_day: str = ""):
+           earliest_day: str = "", max_status_errors: int | None = None):
     """Group recent access-log rows per client IP and flag configured patterns.
 
     Thresholds are caller-supplied so the review can be exercised in tests
@@ -37,6 +37,9 @@ def detect(db, *, window_hours: int, max_requests_per_ip: int,
         """
         SELECT client_ip, COUNT(*) AS requests,
                SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) AS errors,
+               SUM(CASE WHEN status = 404 THEN 1 ELSE 0 END) AS errors_404,
+               SUM(CASE WHEN status = 429 THEN 1 ELSE 0 END) AS errors_429,
+               SUM(CASE WHEN status >= 500 AND status < 600 THEN 1 ELSE 0 END) AS errors_5xx,
                COUNT(DISTINCT NULLIF(school_id, '')) AS distinct_schools,
                MIN(substr(timestamp, 1, length(timestamp) - 6)) || '+09:00' AS first_seen,
                MAX(substr(timestamp, 1, length(timestamp) - 6)) || '+09:00' AS last_seen
@@ -56,6 +59,16 @@ def detect(db, *, window_hours: int, max_requests_per_ip: int,
         errors = row["errors"]
         distinct_schools = row["distinct_schools"]
         error_ratio = errors / count
+        if max_status_errors is not None:
+            for category in ("404", "429", "5xx"):
+                observed = row[f"errors_{category}"]
+                if observed > max_status_errors:
+                    findings.append({
+                        "client_ip": client_ip, "kind": "status_errors", "status_group": category,
+                        "observed": observed, "threshold": max_status_errors, "requests": count,
+                        "first_seen": row["first_seen"], "last_seen": row["last_seen"],
+                        "detail": "상태별 오류 수가 검토 기준을 넘음",
+                    })
         if count > max_requests_per_ip and count >= min_requests:
             findings.append({
                 "client_ip": client_ip, "kind": "request_volume", "observed": count,

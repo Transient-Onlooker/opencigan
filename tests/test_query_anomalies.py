@@ -122,6 +122,22 @@ class QueryAnomalyTests(unittest.TestCase):
         )
         self.assertEqual(findings, [])
 
+    def test_opt_in_status_groups_are_isolated_and_respect_threshold_and_window(self):
+        for status in (404, 404, 429, 429, 500, 503, 200):
+            self.rec(1, status=status)
+        self.rec(1, client_ip='203.0.113.2', status=404)
+        self.rec(48, status=404)
+        self.rec(1, client_ip='unknown', status=404)
+        self.rec(1, client_ip='unknown', status=404)
+        kwargs = dict(window_hours=24, max_requests_per_ip=1000,
+                      max_error_ratio=1.0, max_distinct_schools=50, min_requests=0)
+        self.assertEqual(self.store.review_anomalies(**kwargs), [])
+        findings = self.store.review_anomalies(**kwargs, max_status_errors=1)
+        self.assertEqual([(item['client_ip'], item['status_group'], item['observed']) for item in findings], [
+            ('203.0.113.1', '404', 2), ('203.0.113.1', '429', 2), ('203.0.113.1', '5xx', 2),
+        ])
+        self.assertEqual(self.store.review_anomalies(**kwargs, max_status_errors=2), [])
+
 
 class QueryAnomalyEndpointTests(unittest.TestCase):
     def setUp(self):
@@ -153,11 +169,23 @@ class QueryAnomalyEndpointTests(unittest.TestCase):
         from backend.app import dispatch_request
 
         auth = {"Authorization": "Bearer secret"}
-        for query in ("window_hours=0", "window_hours=x", "max_requests_per_ip=0", "max_error_ratio=2", "unknown=1"):
+        for query in ("window_hours=0", "window_hours=x", "max_requests_per_ip=0", "max_error_ratio=2", "max_status_errors=0", "max_status_errors=1&max_status_errors=2", "unknown=1"):
             with self.subTest(query=query):
                 status, _, body = dispatch_request("GET", "/api/v1/admin/access-anomalies", query, request_headers=auth)
                 self.assertEqual(status, 400)
                 self.assertTrue(__import__("json").loads(body)["code"])
+
+    def test_endpoint_status_review_is_explicit_and_authenticated(self):
+        from backend.app import dispatch_request
+        for status in (429, 429):
+            self.store.record({"client_ip": "203.0.113.1", "route": "/api/v1/timetable", "status": status, "duration_ms": 1.0, "origin_class": "external"})
+        path = "/api/v1/admin/access-anomalies"
+        self.assertEqual(dispatch_request("GET", path, "max_status_errors=1")[0], 401)
+        status, _, body = dispatch_request("GET", path, "max_status_errors=1&min_requests=1", request_headers={"Authorization": "Bearer secret"})
+        payload = __import__("json").loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual(payload['thresholds']['max_status_errors'], 1)
+        self.assertEqual([(row['status_group'], row['observed']) for row in payload['findings'] if row['kind'] == 'status_errors'], [('429', 2)])
 
     def test_endpoint_requires_admin_auth(self):
         from backend.app import dispatch_request

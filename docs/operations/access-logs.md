@@ -36,6 +36,7 @@ JSON은 `items`, `next_cursor`, `limit`, `has_more`, `dropped`를 반환합니�
 - `max_error_ratio`: 전체 요청 중 상태 코드 400 이상 응답의 비율, 기본 0.5·범위 0 초과~1 이하.
 - `max_distinct_schools`: IP별 서로 다른 학교 식별자 수, 기본 50·범위 1~100,000.
 - `min_requests`: 판정 최소 요청 수, 기본 20·범위 0~1,000,000.
+- `max_status_errors`: 선택적 상태별 오류 횟수 기준, 범위 1~100,000. 지정한 경우에만 IP별 404, 429, 5xx를 각각 세어 기준을 초과한 그룹을 `status_errors`와 `status_group`으로 반환합니다. `min_requests`와 보존·조회 구간도 적용합니다.
 
 최소 요청 수 이상이며 각 임계치를 **초과**할 때만 검토 결과를 반환합니다. IP 미확인(`unknown`) 요청은 한 사람의 요청으로 합산하지 않습니다. 최초·최종 시각은 저장 순서가 아닌 수신 시각으로 집계합니다. 반환값은 `findings`, `window_hours`, `thresholds`입니다.
 
