@@ -72,6 +72,23 @@ class WsGITests(unittest.TestCase):
         self.assertEqual(headers["Content-Type"], "application/json; charset=utf-8")
         self.assertEqual(body, b"")
 
+    def test_admin_access_anomalies_head_matches_get_headers_without_body(self):
+        path = "/api/v1/admin/access-anomalies?window_hours=12&max_status_errors=2"
+        headers = {"Authorization": "Bearer synthetic-admin-token"}
+        store = Mock(review_anomalies=Mock(return_value=[]))
+        with (
+            patch.dict(os.environ, {"OPENCIGAN_ADMIN_TOKEN": "synthetic-admin-token"}),
+            patch("backend.app._access_log_store", return_value=store),
+        ):
+            get_status, get_headers, get_body = self._call_app("GET", path, headers=headers)
+            head_status, head_headers, head_body = self._call_app("HEAD", path, headers=headers)
+
+        self.assertEqual(head_status, get_status)
+        self.assertEqual(head_headers, get_headers)
+        self.assertEqual(head_headers["Cache-Control"], "no-store")
+        self.assertEqual(head_body, b"")
+        self.assertTrue(get_body)
+
     def test_method_not_allowed(self):
         for method in ("POST", "PUT", "DELETE", "PATCH"):
             status, headers, body = self._call_app(method, "/api/v1/status")
