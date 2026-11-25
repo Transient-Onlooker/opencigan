@@ -75,7 +75,7 @@ def access_anomaly_review(method, query_string, request_headers, headers, access
 
     try:
         values = parse_qs(query_string, keep_blank_values=True, max_num_fields=10)
-        allowed = {"window_hours", "max_requests_per_ip", "max_error_ratio", "max_distinct_schools", "min_requests"}
+        allowed = {"window_hours", "max_requests_per_ip", "max_error_ratio", "max_distinct_schools", "min_requests", "max_status_errors"}
         if set(values) - allowed or any(len(items) != 1 or len(items[0]) > 32 for items in values.values()):
             raise ValueError("invalid query")
         window_hours = int(values.get("window_hours", ["24"])[0])
@@ -93,16 +93,22 @@ def access_anomaly_review(method, query_string, request_headers, headers, access
         min_requests = int(values.get("min_requests", ["20"])[0])
         if not 0 <= min_requests <= 1000000:
             raise ValueError("invalid minimum")
+        max_status_errors = int(values["max_status_errors"][0]) if "max_status_errors" in values else None
+        if max_status_errors is not None and not 1 <= max_status_errors <= 100000:
+            raise ValueError("invalid status threshold")
         store = access_log_store()
         if store is None:
             return unavailable()
         findings = store.review_anomalies(
             window_hours=window_hours, max_requests_per_ip=max_requests_per_ip,
             max_error_ratio=max_error_ratio, max_distinct_schools=max_distinct_schools,
-            min_requests=min_requests,
+            min_requests=min_requests, max_status_errors=max_status_errors,
         )
     except ValueError:
         return bad_request("숫자 형식이나 범위가 올바르지 않습니다")
     except (OSError, sqlite3.Error):
         return json_response(503, headers, {"error": "접속 로그를 불러오지 못했습니다", "code": "access_logs_unavailable"})
-    return json_response(200, headers, {"findings": findings, "window_hours": window_hours, "thresholds": {"max_requests_per_ip": max_requests_per_ip, "max_error_ratio": max_error_ratio, "max_distinct_schools": max_distinct_schools, "min_requests": min_requests}})
+    thresholds = {"max_requests_per_ip": max_requests_per_ip, "max_error_ratio": max_error_ratio, "max_distinct_schools": max_distinct_schools, "min_requests": min_requests}
+    if max_status_errors is not None:
+        thresholds["max_status_errors"] = max_status_errors
+    return json_response(200, headers, {"findings": findings, "window_hours": window_hours, "thresholds": thresholds})

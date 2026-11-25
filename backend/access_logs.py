@@ -444,7 +444,7 @@ class AccessLogStore:
 
     def review_anomalies(self, *, window_hours: int, max_requests_per_ip: int,
                          max_error_ratio: float, max_distinct_schools: int,
-                         min_requests: int = 0) -> List[Dict[str, Any]]:
+                         min_requests: int = 0, max_status_errors: Optional[int] = None) -> List[Dict[str, Any]]:
         """Review retained logs using the same lifecycle as ordinary queries."""
         from backend.query_anomalies import detect
 
@@ -459,7 +459,7 @@ class AccessLogStore:
                 max_requests_per_ip=max_requests_per_ip,
                 max_error_ratio=max_error_ratio,
                 max_distinct_schools=max_distinct_schools,
-                min_requests=min_requests, earliest_day=earliest_day,
+                min_requests=min_requests, earliest_day=earliest_day, max_status_errors=max_status_errors,
             )
 
     def export_csv(
