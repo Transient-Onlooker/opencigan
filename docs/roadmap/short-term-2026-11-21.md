@@ -76,6 +76,7 @@ flowchart TB
 - 확인 당시 Pi의 `current`는 `release-e11839f-recovery`, GitHub main은 `c5f546c`였다. 모든 실패의 표면 예외는 `RuntimeError`이나, 당시 운영 pycomcigan은 상류 403·429도 `RuntimeError`로 변환하므로 이 집계로 원인이나 특정 HTTP 상태를 확정할 수 없다.
 - 2026-11-25 후속 확인에서 설정된 검증 학교의 내부 조회 503을 재현했고, pycomcigan이 변경된 컴시간 POST 요청을 파싱하지 못함을 확인했다. 포크 [PR #2](https://github.com/Transient-Onlooker/pycomcigan/pull/2)의 `1.4.7+autofix.1`은 격리 실조회 및 회귀 검증 후 매니페스트·SHA 확인을 거쳐 컴포넌트 `c67a805`로 적용했다. GitHub 의존성 핀은 자동 동기화됐고, Pi 코드·venv는 `fa69fb3` 릴리스로 전환했다. 내부 API·Pi 로컬 공개 API·브라우저 헤더를 사용한 공식 공개 API에서 같은 검증 학교의 시간표 826건을 확인했다. 이는 해당 시점과 학교의 복구 증거이며 모든 과거 503의 원인을 뜻하지 않는다.
 - [#240](https://github.com/Transient-Onlooker/opencigan/pull/240)의 명시적 예외 원인 분류도 운영 릴리스에 포함됐다. 15초/30초의 실제 Worker–Pi 경계 및 지연 예산은 계속 미확인이다.
+- Pi의 격리된 루프백 모의 프록시에서 활성 pycomcigan POST 요청의 기본 소켓 제한을 실제로 기다려 30.095초에 타임아웃을 확인했다. 재현은 `OPENCIGAN_SLOW_NETWORK_TESTS=1 python -m unittest discover -s tests/integration -p test_real_proxy_timeout.py`로 선택 실행하며 기본 테스트에서는 건너뛴다. 실제 컴시간·Cloudflare 경계의 지연이나 취소 전파를 검증한 것은 아니다.
 
 - 동일 캐시 키 갱신 대기가 끝난 시각과 대기 시간을 조회 종류별로 관측한다. 실제 갱신 시간과 다른 요청에서 수집될 수 있으며 학교명·키·요청 내용은 기록하지 않는다. 실제 운영 503 원인과 경로별 시간 예산은 아직 미확인이다.
 
