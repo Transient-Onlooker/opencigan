@@ -398,11 +398,14 @@ def dispatch_request(method, path, query_string, cache_instance=None, client=Non
     response = _dispatch_request(method, path, query_string, cache_instance, rate_client, request_origin, request_body, request_headers, shutter_instance)
     if method in ("GET", "HEAD") and path in ("/api/v1/schools", "/api/v1/neis/schools", "/api/v1/timetable", "/api/v1/timetable.ics", "/api/v1/timetable/history", "/api/v1/timetable/history.rss", "/api/v1/meals") and os.environ.get("OPENCIGAN_ANALYTICS_DB"):
         metadata = {}
-        if (path == "/api/v1/timetable" or response[0] >= 500) and response[1].get("Content-Type", "").startswith("application/json"):
+        if response[1].get("Content-Type", "").startswith("application/json"):
             try:
                 payload = json.loads(response[2])
                 if isinstance(payload, dict):
-                    metadata = payload
+                    metadata = {
+                        **payload,
+                        "cacheStatus": payload.get("cacheStatus") or ("stale" if payload.get("stale") else None),
+                    }
             except (ValueError, TypeError):
                 pass
         _api_recorder.submit(path, method, response[0], (time.perf_counter() - started) * 1000,

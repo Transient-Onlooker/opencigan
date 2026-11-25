@@ -50,6 +50,16 @@ class OpenApiContractTests(unittest.TestCase):
                                              'components': self.spec['components']})
             validator.validate({'code': code, 'error': 'unavailable', 'message': 'unavailable'})
 
+    def test_retry_after_headers_allow_sdk_supported_values(self):
+        cases = (
+            ('TooManyRequests', '30'),
+            ('UpstreamUnavailable', 'Wed, 25 Nov 2026 12:00:00 GMT'),
+        )
+        for response_name, retry_after in cases:
+            with self.subTest(response=response_name, retry_after=retry_after):
+                schema = self.spec['components']['responses'][response_name]['headers']['Retry-After']['schema']
+                Draft202012Validator(schema).validate(retry_after)
+
     def test_search_backoff_503_documents_retry_after(self):
         path = '/api/v1/schools'
         with patch('backend.app.search_schools', side_effect=TimeoutError('private upstream detail')):

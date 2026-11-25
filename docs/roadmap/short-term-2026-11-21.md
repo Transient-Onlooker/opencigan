@@ -149,6 +149,7 @@ flowchart TB
 - 급식 갱신 실패로 이전 식단을 보여줄 때 오류 안내와 오래된 데이터 안내가 중복되던 부분을 정리한다. 서버가 오래된 식단을 정상 응답한 경우의 별도 경고는 유지한다. 나머지 화면·실기기 검증은 미완료다.
 - [ ] 메인 선택 폼·시간표 조작부·탭·설정의 기준선, 행 높이, 여백과 테마별 일관성을 보완한다. 320/390/700/960px 라이트·다크 전후 캡처 및 수평 넘침 검사. **후속:** [#218](https://github.com/Transient-Onlooker/opencigan/pull/218)·[#246](https://github.com/Transient-Onlooker/opencigan/pull/246)·[#257](https://github.com/Transient-Onlooker/opencigan/pull/257)·[#261](https://github.com/Transient-Onlooker/opencigan/pull/261) 대비·주간 화면·아이콘 반영, 전체 화면 검증 잔여.
 - 2026-11-26 Chromium 자동 검사: 교사 주간 시간표의 320/390/700/960px 라이트·다크 및 수평 넘침 8건 통과. 전체 화면의 시각적 전후 비교 또는 실기기 검사로 간주하지 않는다.
+- [#278](https://github.com/Transient-Onlooker/opencigan/pull/278)에서 같은 화면 폭·테마 조합의 설정 화면과 학교·학년·반 선택 폼을 검사했다. Windows에서는 8건이 통과했으나 Linux Chromium 320px에서 설정 JSON 파일 선택란 넘침이 발견돼 수정했으며 최종 Linux CI도 통과했다. 시각적 전후 비교는 여전히 남는다.
 - [ ] `NEW-03` 날짜 편집과 `NEW-09` 중복 오류 안내, 모바일 하단 메뉴 가림의 **현재 구현을 확인한 뒤** 실제 재현되는 차이만 수정한다. 이미 해결된 부분은 반복 작업하지 않는다. **후속:** [#233](https://github.com/Transient-Onlooker/opencigan/pull/233) 날짜 오류 안내·복원 완료, #192 중복 오류 정리. 하단 메뉴 및 나머지 검증 잔여.
 - 2026-11-26 Chromium에서 시간표 범위 오류와 급식 날짜 오류·복원 2건, 위 주간 화면의 하단 메뉴 가림 검사를 통과했다. 다른 화면의 미검증 범위는 남겨 둔다.
 - **완료 조건:** 실제 수정한 컴포넌트의 스크린샷·E2E·키보드 포커스 회귀. 사용자 디자인 승인·실기기 확인은 별도 게이트.
@@ -165,6 +166,7 @@ flowchart TB
 - [x] 기존 시간표 조회 경로·캐시를 재사용해 학교별 **교시 시작 시각 자동 입력 제안**을 설정 화면에 제공한다. 사용자의 직접 입력값·요일별 예외·`localStorage`·설정 백업은 우선 보존하며, 사용자 확인 없이 기존 저장값을 덮어쓰지 않는다. 원본 시각과 사용자 지정 시각을 구분하고 수동 편집·초기화 경로를 유지한다. — [#219](https://github.com/Transient-Onlooker/opencigan/pull/219) 제안·수동값/요일 예외 보호, 모의 학교 전환 검증. 실제 설정 백업/복원 왕복 별도.
 - [x] 필요한 경우에만 하위 호환 가능한 선택적 API 필드를 추가하고, 기존 `records`/`sourceUpdatedAt`·ICS 동작과 캐시 TTL 1,800초 및 상류 조회 횟수를 유지한다. 원본에 시작 시각만 있으면 종료 시각은 공란으로 두거나 사용자 확인을 거쳐 입력하도록 한다. 자료가 없거나 잘못됐을 때는 기존 수동 설정을 계속 사용할 수 있어야 한다. — [#219](https://github.com/Transient-Onlooker/opencigan/pull/219) 선택 필드·OpenAPI·캐시/프런트 회귀, 시각 미제공 시 수동 설정 유지. 실학교·기기 별도.
 - [x] **원본 시작 시각 기본 적용 및 사용자 재정의**: 2026-11-25 사용자 결정. 유효하고 신선한 동일 학교 원본 시작 시각은 별도 적용 버튼 없이 기본값으로 사용한다. 사용자가 직접 입력한 시각·요일별 예외·복원한 설정은 우선하고, 자동 적용을 끄거나 수정한 선택은 학교별로 유지한다. 원본으로 복귀할 수 있게 하며 자동값과 수동값을 구별한다. 원본 누락·오래된 응답·학교 전환 시 다른 학교의 시각을 가져오지 않고 원본에 없는 종료 시각은 추정하지 않는다. 기존 계산기와 수동 편집, API/캐시 계약을 유지한다. 새 학교 최초 조회·기존 설정 보호·자동 적용 해제 후 새로고침·원본 복귀·수동 편집·학교 전환 및 늦은 응답·종료 시각 미제공을 자동 회귀로 검증한다. 기존 사용자 확인 방식의 구현 기록은 유지한다. [#272](https://github.com/Transient-Onlooker/opencigan/pull/272)에서 자동 검증 및 CI 통과. 추가 학교의 실제 원본 형식 확인은 별도다.
+- [#277](https://github.com/Transient-Onlooker/opencigan/pull/277)은 원본 갱신 후 설정 입력창에 남던 이전 자동값을 갱신하고 수동 편집값을 유지한다. Chromium 대상 회귀와 PR CI가 통과했다.
 - **완료 조건:** 유효·누락·변형 자료 및 학교 전환, 사용자 설정 우선순위, 수동 저장·백업/복원, 캐시 응답 동등성을 자동 테스트로 검증한다. 실학교·실기기 시각 일치 여부는 별도 확인하고, 종료 시각을 추측해 정확한 값처럼 표시하지 않는다.
 - **운영 범위:** [#258](https://github.com/Transient-Onlooker/opencigan/pull/258) Pi 백엔드·공식 프런트 번들 코드 존재 확인. 실제 학교별 제공 범위·복원·실기기 검증은 남는다.
 
@@ -195,7 +197,7 @@ flowchart TB
 - [PR #179](https://github.com/Transient-Onlooker/opencigan/pull/179): 관리 링크 교체와 응답 유실 시 복구 안내를 추가하고 자동 검사를 통과했다. 운영 Webhook API와 발송 작업자는 별도 활성화하지 않았다.
 - 대기열이 가득 찬 상태에서 이미 큐에 있는 동일 관측을 다시 처리하면 실제 누락이 없는데 `dropped_events`가 증가하던 문제를 수정한다. 중복 관측과 신규 관측을 구분하는 격리 회귀를 추가하며 운영 발송은 비활성 상태를 유지한다.
 - [ ] 이미 있는 기본 비활성 API/큐/이력에서 빠진 구독 CRUD, 높은 엔트로피 관리 링크 인증·폐기, HMAC, 실패 재시도·멱등성·저장/큐 상한을 보강한다. **후속:** [#220](https://github.com/Transient-Onlooker/opencigan/pull/220)·[#221](https://github.com/Transient-Onlooker/opencigan/pull/221)·[#222](https://github.com/Transient-Onlooker/opencigan/pull/222)·[#223](https://github.com/Transient-Onlooker/opencigan/pull/223)·[#224](https://github.com/Transient-Onlooker/opencigan/pull/224)·[#226](https://github.com/Transient-Onlooker/opencigan/pull/226) 반영. #221의 소수 초 재시도 지연 처리는 격리 테스트를 통과했으며 운영 발송은 계속 비활성 상태다.
-- [ ] 학급/과목/교사/요일/교시/변경 유형 필터·방해 금지 시간, 테스트 발송, 최근 성공/실패/재시도 조회를 API·UI 양쪽에서 연결한다. **후속:** [#247](https://github.com/Transient-Onlooker/opencigan/pull/247) 교사 null 검증 완료, 전체 옵션·UI 잔여.
+- [x] 학급/과목/교사/요일/교시/변경 유형 필터·방해 금지 시간, 테스트 발송, 최근 성공/실패/재시도 조회를 API·UI 양쪽에서 연결한다. 기존 구현과 [#247](https://github.com/Transient-Onlooker/opencigan/pull/247) 교사 null 검증을 확인했고, 모의 API를 사용하는 Chromium 검사에서 필터 전체와 테스트 대기열·인증·상태 조회 연결을 검증했다. 실제 외부 발송은 OFF다.
 - **완료 조건:** 타 구독 접근 불가·토큰 유출 방지·중복/재시도·필터 회귀. 실제 Discord/Google Chat 발송 백엔드는 계속 OFF.
 - 원본: [P3 Webhook](automation-and-future.md), [Webhook 문서](../operations/webhooks.md).
 
@@ -227,8 +229,10 @@ flowchart TB
 
 - [x] 공개 API 버전 변경·하위 호환 정책을 문서화한다 ([#199](https://github.com/Transient-Onlooker/opencigan/pull/199)).
 - [ ] 기존 OpenAPI 3.1과 Worker/Pi/TypeScript/Python 클라이언트의 남은 오류·응답 계약을 대조하고 계약 회귀 테스트를 보강한다. **후속:** [#227](https://github.com/Transient-Onlooker/opencigan/pull/227)·[#232](https://github.com/Transient-Onlooker/opencigan/pull/232)·[#248](https://github.com/Transient-Onlooker/opencigan/pull/248) 완료 범위는 제외하고 나머지 계약 확인.
+- [#282](https://github.com/Transient-Onlooker/opencigan/pull/282)는 `Retry-After`의 초 단위 문자열과 HTTP 날짜를 허용하도록 OpenAPI 헤더 타입을 수정했다. API 계약 검사 8건과 PR CI가 통과했다. 전체 계약 대조는 별도다.
 - [#271](https://github.com/Transient-Onlooker/opencigan/pull/271)에서 이력 RSS의 저장소 비활성·장애 503 JSON 응답을 OpenAPI에 명시하고 실제 라우트 응답과 예제를 대조했다. `test_openapi_contract.py` 7건과 PR CI가 통과했다. 다른 경로와 클라이언트의 나머지 계약 확인은 별도다.
 - [ ] 관리자 관측에서 경로별 지연/오류/캐시·상류 실패를 구분하는 코드의 누락 부분만 보완한다. `status` 프로세스 생존과 상류 readiness를 섞지 않는다. **후속:** [#238](https://github.com/Transient-Onlooker/opencigan/pull/238)·[#240](https://github.com/Transient-Onlooker/opencigan/pull/240)·[#252](https://github.com/Transient-Onlooker/opencigan/pull/252) 계측 완료 범위 및 Pi HIT/MISS 내부 집계와 외부 종단을 구분.
+- [#276](https://github.com/Transient-Onlooker/opencigan/pull/276)은 학교 검색·급식 등 JSON의 오래된 캐시 대체 응답을 경로별 통계에서 `stale`로 구분한다. 분석 테스트 13건과 PR CI가 통과했다. 운영 경로 관측은 별도다.
 - **완료 조건:** 문서-테스트-실제 응답 일치, 민감한 요청 내용·토큰·IP 노출 추가 금지.
 - 원본: [P2 API 운영](api-operations.md).
 
@@ -272,6 +276,7 @@ flowchart TB
 - [#194](https://github.com/Transient-Onlooker/opencigan/pull/194): 요청한 학교·주차와 현재 선택을 대조해 늦은 성공/실패를 무시한다. [#201](https://github.com/Transient-Onlooker/opencigan/pull/201): 저장된 학교 객체와 정수 학년을 검증하며 기존 저장 키·정상 학급 복원 계약을 유지한다. 최신 main CI 성공. 저장 책임 전체 정리와 운영 QA는 별도다.
 
 - [ ] `App.svelte`의 현재 컴포넌트 분리/기존 CSS 정리·백엔드 라우팅 분리는 **이미 완료한 것으로 취급하고 중복 구현 금지**. 미완료인 선택/공유 복원, 늦은 응답 취소, `localStorage` 저장 순서의 소유권과 경합 테스트를 정리한다. **후속:** [#228](https://github.com/Transient-Onlooker/opencigan/pull/228)·[#234](https://github.com/Transient-Onlooker/opencigan/pull/234)·[#237](https://github.com/Transient-Onlooker/opencigan/pull/237)·[#259](https://github.com/Transient-Onlooker/opencigan/pull/259)·[#260](https://github.com/Transient-Onlooker/opencigan/pull/260) 공유·이력·토큰·부분 저장·검색 캐시 병합. 전체 소유권 정리 잔여.
+- [#281](https://github.com/Transient-Onlooker/opencigan/pull/281)은 학교 변경 중 늦게 끝난 급식 학교 검색이 로딩 상태를 남기는 문제를 수정했다. 이전 요청이 새 요청을 덮어쓰지 않는 회귀를 포함해 급식 세션 대상 검사 5건과 PR CI가 통과했다.
 - [ ] 시간표·급식 도메인 처리, 개인화, 공유·내보내기의 순수 로직·저장 책임을 명료하게 분리하되 이전 저장 키·백업 파일·요청 수·캐시 계약을 유지한다.
 - **완료 조건:** 동일 선택·공유·설정·오프라인 회귀 결과, 범위를 분리한 작은 PR.
 - 원본: [리팩터링 배치 7 단계 1~3](refactoring-and-release.md).
@@ -315,7 +320,7 @@ flowchart TB
 ## 현황 요약 (2026-11-25 갱신)
 
 - 작업 단위 16개: 구현·자동검증 완료 7개(ST-00/ST-02/ST-03/ST-05/ST-06/ST-08/ST-09), 부분 진행 9개, 미착수 0개. 7/16 (43.75%)는 항목 수 기준이며 공수·배포율이 아니다.
-- 세부 체크리스트: **26/43 (60.5%)**. 11/24 역사적 집계 18/42 및 6/16; 2026-11-26 #272의 원본 교시 시각 기본 적용을 완료했다.
+- 세부 체크리스트: **27/43 (62.8%)**. 11/24 역사적 집계 18/42 및 6/16; 2026-11-26 #272의 원본 교시 시각 기본 적용과 웹훅 필터 UI 연결 검증을 완료했다.
 - [#213](https://github.com/Transient-Onlooker/opencigan/pull/213)·[#245](https://github.com/Transient-Onlooker/opencigan/pull/245)·[#255](https://github.com/Transient-Onlooker/opencigan/pull/255) ST-03 완료, [#219](https://github.com/Transient-Onlooker/opencigan/pull/219) ST-04A 핵심 구현, [#229](https://github.com/Transient-Onlooker/opencigan/pull/229)·[#249](https://github.com/Transient-Onlooker/opencigan/pull/249) ST-11 집계 완료. #162는 대체 종료, #221은 그대로 유지.
 - 다음: 실제 공개 성능·요청 경계와 추가 학교 원본 형식은 운영 전용 검증으로 따로 남긴다. ST-07/10/11/12/13의 남은 개발 요구를 검토하고 ST-14에서 통합 회귀를 수행한다. 완료된 구현을 반복하지 않으며 수동 실기기 QA와 실제 캘린더 구독 검증은 이번 실행에서 제외한다. 운영·발송 활성화는 별도다.
 
