@@ -25,6 +25,41 @@ async function mockApi(page, delayedSearch, onSchoolSearch) {
   });
 }
 
+test('out-of-range timetable dates show an accessible error until restored', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(1));
+  const panel = page.locator('#timetable-panel');
+  const views = panel.getByRole('group', { name: '시간표 보기' });
+  for (const [view, id] of [['오늘', 'today-date'], ['1학년', 'grade-date']]) {
+    await views.getByRole('button', { name: view, exact: true }).click();
+    const input = page.locator(`#${id}`);
+    await expect(input).toHaveValue(week);
+    await input.fill('2026-11-30');
+    await expect(input).toHaveAttribute('aria-invalid', 'true');
+    await expect(input).toHaveAttribute('aria-describedby', `${id}-error`);
+    await expect(panel.getByText('선택한 주의 날짜를 입력해 주세요.')).toBeVisible();
+    await input.blur();
+    await expect(input).toHaveValue(week);
+    await expect(input).toHaveAttribute('aria-invalid', 'false');
+    await expect(panel.getByText('선택한 주의 날짜를 입력해 주세요.')).toHaveCount(0);
+    await input.fill('2026-11-10');
+    await expect(input).toHaveAttribute('aria-invalid', 'false');
+    await input.blur();
+    await expect(input).toHaveValue('2026-11-10');
+    await input.fill(week);
+    await input.blur();
+    await input.focus();
+    await input.evaluate((element) => {
+      const clipboard = new DataTransfer();
+      clipboard.setData('text/plain', '2026-11-30');
+      element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: clipboard, bubbles: true, cancelable: true }));
+    });
+    await expect(input).toHaveAttribute('aria-invalid', 'true');
+    await input.blur();
+    await expect(input).toHaveValue(week);
+  }
+});
+
 test('shared address follows class selection and browser history', async ({ page }) => {
   await mockApi(page);
   await page.goto('/?source=test' + sharedHash(1));

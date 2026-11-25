@@ -66,7 +66,8 @@
   export let selectClass: (event: Event) => void;
   export let changeWeek: (delta: number) => void;
   export let loadTimetable: (preserve?: boolean) => void;
-  export let selectTimetableDate: (event: Event) => void;
+  export let selectTimetableDate: (event: Event, editing?: boolean) => void;
+  export let timetableDateError: string;
   export let dateText: (value: string, options?: Intl.DateTimeFormatOptions) => string;
   export let shortDate: (value: string) => string;
   export let timeText: (value: string | null | undefined, withSeconds?: boolean) => string;
@@ -89,9 +90,9 @@
           {:else if tableLoading && !timetable}<div class="state-message" role="status"><strong>시간표를 불러오고 있어요.</strong></div>
           {:else if classError}<div class="state-message">{sharedClassState || '현재 선택은 유지했어요. 시간표에 등록된 반을 선택하거나 반 입력을 확인해 주세요.'}</div>
           {:else if timetable && timetableView === 'today'}
-            <TodayLessons {week} {selectedDay} {today} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} {lessonTimes} {selectTimetableDate} {dateText} {subjectStyle} />
+            <TodayLessons {week} {selectedDay} {today} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} {lessonTimes} {selectTimetableDate} {timetableDateError} {dateText} {subjectStyle} />
           {:else if timetable && timetableView === 'grade'}
-            <GradeComparison {school} {week} {selectedDay} {grade} {comparableClasses} {gradeRecords} {displaySettings} {selectTimetableDate} {dateText} {subjectStyle} />
+            <GradeComparison {school} {week} {selectedDay} {grade} {comparableClasses} {gradeRecords} {displaySettings} {selectTimetableDate} {timetableDateError} {dateText} {subjectStyle} />
            {:else if timetable && timetableView === 'teacher'}
              <TeacherTimetable bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {displaySettings} {week} {current} {today} {dateText} {subjectStyle} />
           {:else if timetable && timetableView === 'week' && filtered.length}

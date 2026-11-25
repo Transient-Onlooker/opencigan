@@ -84,6 +84,7 @@
   let enabledMealTypes = ['조식', '중식', '석식'];
   let showAllergenNumbers = true;
   let dateError = '';
+  let timetableDateError = '';
   let sharedClassState = '';
   let pendingSharedClass: PendingSharedClass | null = null;
   let sharedCandidateRequest: AbortSignal | null = null;
@@ -508,6 +509,7 @@
     });
   }
   function selectTimetableView(value: typeof timetableView) {
+    timetableDateError = '';
     timetableView = value;
     exportState = '';
     if (value === 'today' || value === 'grade') selectedDay = week === current ? today : week;
@@ -539,12 +541,13 @@
     }
   }
   function changeWeek(delta: number) {
+    timetableDateError = '';
     refreshCalendar(false); const next = addDays(week, delta * 7);
     if (next < current || next > addDays(current, 7)) return;
     if (next !== week) cancelSharedSelection();
     tableRefreshState = ''; exportState = ''; teacherQuery = ''; selectionState.update({ week: next }); selectedDay = week === current ? today : week; loadTimetable(false, true);
   }
-  function currentWeek() { refreshCalendar(false); const preserve = week === current; tableRefreshState = ''; if (!preserve) { cancelSharedSelection(); teacherQuery = ''; } selectionState.update({ week: current }); selectedDay = today; loadTimetable(preserve); }
+  function currentWeek() { timetableDateError = ''; refreshCalendar(false); const preserve = week === current; tableRefreshState = ''; if (!preserve) { cancelSharedSelection(); teacherQuery = ''; } selectionState.update({ week: current }); selectedDay = today; loadTimetable(preserve); }
   function changeMealDate(delta: number) {
     const next = addDays(mealDate, delta);
     if (!validMealDate(next)) { dateError = '1900년 이후의 올바른 날짜를 선택해 주세요.'; return; }
@@ -554,9 +557,11 @@
     const input = event.currentTarget as HTMLInputElement;
     const value = input.value;
     if (value && input.validity.valid && value >= week && value <= addDays(week, 6)) {
+      timetableDateError = '';
       if (selectedDay === value) return;
       selectedDay = value;
-    } else if (!editing) input.value = selectedDay;
+    } else if (editing) timetableDateError = '선택한 주의 날짜를 입력해 주세요.';
+    else { input.value = selectedDay; timetableDateError = ''; }
   }
   function todayMeals() { refreshCalendar(); mealDate = today; mealDateDraft = today; dateError = ''; loadMeals(); }
   function selectMealTimetableDate(value: string) {
@@ -851,7 +856,7 @@
     {/if}
     <CalendarNav {view} {inputFocused} selectView={(value) => view = value} />
     <div id="calendar" class="calendar-content" tabindex="-1">
-      <TimetablePanel {view} {timetableView} {school} {timetable} {week} {current} {today} {selectedDay} {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {tableState} {tableRefreshState} {timetableCheckedAt} {timetableFromDevice} {exportState} {exportBusy} {imageShareCancelled} {canExport} {weekendClasses} {classError} {sharedClassState} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} lessonTimes={selectedDayTimes} {comparableClasses} {gradeRecords} bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {dates} {periods} {filtered} {missingWeekdays} {observedClassCount} {teacherNames} {exportTimetable} {sharePng} {refreshTimetable} {currentWeek} {selectTimetableView} {selectGrade} {selectClass} {changeWeek} {loadTimetable} {selectTimetableDate} {dateText} {shortDate} {timeText} {subjectStyle} todayMeal={{ neis, neisLoading, neisSearchState, mealState, hasMeals, mealLoading, meals, mealsStale, visibleMealTypes, allergySelection, mealAllergyFilter, showAllergenNumbers, loadMeals, openAllergySettings }} />
+      <TimetablePanel {view} {timetableView} {school} {timetable} {week} {current} {today} {selectedDay} {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {tableState} {tableRefreshState} {timetableCheckedAt} {timetableFromDevice} {exportState} {exportBusy} {imageShareCancelled} {canExport} {weekendClasses} {classError} {sharedClassState} {selectedClassLessons} {shownClassLessons} {dayOverview} {displaySettings} lessonTimes={selectedDayTimes} {comparableClasses} {gradeRecords} bind:teacherQuery {selectedTeacherName} {selectedTeacherRecords} {teacherSuggestions} {teacherDates} {teacherPeriods} {dates} {periods} {filtered} {missingWeekdays} {observedClassCount} {teacherNames} {exportTimetable} {sharePng} {refreshTimetable} {currentWeek} {selectTimetableView} {selectGrade} {selectClass} {changeWeek} {loadTimetable} {selectTimetableDate} {timetableDateError} {dateText} {shortDate} {timeText} {subjectStyle} todayMeal={{ neis, neisLoading, neisSearchState, mealState, hasMeals, mealLoading, meals, mealsStale, visibleMealTypes, allergySelection, mealAllergyFilter, showAllergenNumbers, loadMeals, openAllergySettings }} />
         <MealsPanel {view} {mealDate} {today} {mealView} {mealDates} {mealDateDraft} {dateError} {neis} {school} {neisSearchState} {neisLoading} {neisResults} {mealState} {hasMeals} {mealLoading} {meals} {visibleMealTypes} {allergySelection} {mealAllergyFilter} {openAllergySettings} {showAllergenNumbers} {current} {mealsStale} {todayMeals} {setMealView} {changeMealDate} {dateText} {updateMealDateDraft} {selectMealDate} {chooseNeis} {connectMeals} {loadMeals} {selectMealTimetableDate} />
         <SettingsPanel {view} {school} {useClassDisplay} {classError} {grade} {classroom} {theme} {animationsEnabled} {displaySettings} {subjectNames} {teacherNames} {lessonTimePeriods} {lessonTimeDrafts} {weekdayTimeDrafts} {lessonTimeState} sourceLessonStarts={school && timetable?.schoolId === school.id && timetable.weekStart === week && !timetable.stale && !timetableFromDevice ? timetable.sourceLessonStarts : undefined} {applySourceStarts} {settingsBackupState} {mealTypes} {enabledMealTypes} {showAllergenNumbers} {allergySelection} {mealAllergyFilter} {setMealAllergyFilter} {openAllergySettingsRequest} {setClassDisplay} {setTheme} {setAnimationsEnabled} {setColorMode} {saveAlias} {saveSubjectColor} {clearSubjectColors} {saveDisplaySettings} {editLessonTime} {editWeekdayTime} {clearWeekdayTime} {applyLessonTimeRules} {saveLessonTimes} {clearLessonTimes} {downloadSettingsBackup} {importSettingsFile} {resetDisplaySettings} {toggleMealType} {setAllergenNumbersVisible} {toggleAllergy} />
     </div>
