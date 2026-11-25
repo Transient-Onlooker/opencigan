@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta, timezone
 from collections import Counter, OrderedDict
+import logging
 import re
 import threading
 import time
@@ -10,6 +11,7 @@ _protocol_expires = 0.0
 _protocol_content = None
 _protocol_lock = threading.Lock()
 _verified_schools = OrderedDict()
+logger = logging.getLogger("opensigan.timetable")
 
 
 def _source_lesson_starts(day_time):
@@ -163,6 +165,7 @@ def fetch_timetable(school_id, week, *, include_original=False):
                 timetable._initialize_from_data(data, verified[0], name, int(code), codes)
     except ValueError as exc:
         raise RuntimeError("시간표 제공자의 응답이 올바르지 않습니다") from exc
+    normalization_started = time.monotonic()
     records = []
     data = timetable.timetable
     if not isinstance(data, (list, tuple)) or len(data) > 20:
@@ -213,4 +216,5 @@ def fetch_timetable(school_id, week, *, include_original=False):
     starts = _source_lesson_starts(getattr(timetable, "day_time", None))
     if starts:
         result["sourceLessonStarts"] = starts
+    logger.info("timetable normalization duration_ms=%.1f", (time.monotonic() - normalization_started) * 1000)
     return result
