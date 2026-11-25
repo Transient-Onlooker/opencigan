@@ -82,15 +82,34 @@ test('anomaly review is opt-in and uses admin rate limiting and bearer forwardin
   const ip = '203.0.113.9';
   const headers = { 'CF-Connecting-IP': ip, Authorization: 'Bearer test-secret' };
   const disabled = setup();
-  assert.equal((await worker.fetch(req(path, { headers }), disabled.env)).status, 404);
+  const hidden = await worker.fetch(req(path, { headers }), disabled.env);
+  assert.equal(hidden.status, 404);
+  assert.deepEqual(await hidden.json(), {
+    code: 'not_found',
+    error: 'API 연결을 처리하지 못했어요.',
+    message: 'API 연결을 처리하지 못했어요.',
+  });
   assert.equal(disabled.calls.length, 0);
   const blocked = setup({ blockedKey: `admin:${ip}` });
   blocked.env.ACCESS_ANOMALIES_ENABLED = '1';
-  assert.equal((await worker.fetch(req(path, { headers }), blocked.env)).status, 429);
+  const limited = await worker.fetch(req(path, { headers }), blocked.env);
+  assert.equal(limited.status, 429);
+  assert.equal(limited.headers.get('retry-after'), '60');
+  assert.deepEqual(await limited.json(), {
+    code: 'edge_rate_limited',
+    error: 'API 연결을 처리하지 못했어요.',
+    message: 'API 연결을 처리하지 못했어요.',
+  });
   assert.equal(blocked.calls.length, 0);
   const enabled = setup();
   enabled.env.ACCESS_ANOMALIES_ENABLED = '1';
-  assert.equal((await worker.fetch(req(path, { method: 'POST', headers }), enabled.env)).status, 405);
+  const rejectedMethod = await worker.fetch(req(path, { method: 'POST', headers }), enabled.env);
+  assert.equal(rejectedMethod.status, 405);
+  assert.deepEqual(await rejectedMethod.json(), {
+    code: 'method_not_allowed',
+    error: 'API 연결을 처리하지 못했어요.',
+    message: 'API 연결을 처리하지 못했어요.',
+  });
   assert.equal((await worker.fetch(req(path, { headers }), enabled.env)).status, 200);
   assert.deepEqual(enabled.limits, [['general', ip], ['admin', ip]]);
   assert.equal(enabled.calls[0].headers.get('authorization'), 'Bearer test-secret');
@@ -98,7 +117,13 @@ test('anomaly review is opt-in and uses admin rate limiting and bearer forwardin
   const noLimiter = setup();
   noLimiter.env.ACCESS_ANOMALIES_ENABLED = '1';
   delete noLimiter.env.ADMIN_RATE;
-  assert.equal((await worker.fetch(req(path, { headers }), noLimiter.env)).status, 503);
+  const unconfigured = await worker.fetch(req(path, { headers }), noLimiter.env);
+  assert.equal(unconfigured.status, 503);
+  assert.deepEqual(await unconfigured.json(), {
+    code: 'gateway_unconfigured',
+    error: 'API 연결을 처리하지 못했어요.',
+    message: 'API 연결을 처리하지 못했어요.',
+  });
   assert.equal(noLimiter.calls.length, 0);
   const preflight = setup();
   preflight.env.ACCESS_ANOMALIES_ENABLED = '1';

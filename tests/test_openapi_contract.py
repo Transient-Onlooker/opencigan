@@ -51,6 +51,109 @@ class OpenApiContractTests(unittest.TestCase):
                                              'components': self.spec['components']})
             validator.validate({'code': code, 'error': 'unavailable', 'message': 'unavailable'})
 
+    def test_admin_access_anomaly_responses_match_openapi(self):
+        from backend.access_logs import AccessLogStore
+
+        path = '/api/v1/admin/access-anomalies'
+        auth = {'Authorization': 'Bearer synthetic-admin-token'}
+        store = AccessLogStore(':memory:')
+        self.addCleanup(store.close)
+        observed_at = datetime.now(timezone(timedelta(hours=9)))
+        synthetic_requests = (
+            [('192.0.2.10', 429 if index < 3 else 200, None) for index in range(20)]
+            + [('198.51.100.10', 200, None) for _ in range(21)]
+            + [('203.0.113.10', 400 if index < 8 else 200, None) for index in range(20)]
+            + [('192.0.2.20', 200, '1:Synthetic A' if index < 10 else '1:Synthetic B') for index in range(20)]
+        )
+        for index, (client_ip, response_status, school_id) in enumerate(synthetic_requests):
+            store.record(
+                {
+                    'client_ip': client_ip,
+                    'route': '/api/v1/timetable',
+                    'status': response_status,
+                    'duration_ms': 1.0,
+                    'origin_class': 'external',
+                    'school_id': school_id,
+                },
+                received_at=observed_at - timedelta(minutes=index),
+            )
+        query = urlencode({
+            'window_hours': 12,
+            'max_requests_per_ip': 20,
+            'max_error_ratio': 0.3,
+            'max_distinct_schools': 1,
+            'min_requests': 20,
+            'max_status_errors': 2,
+        })
+        with (
+            patch.dict('os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'synthetic-admin-token'}),
+            patch('backend.app._access_log_store', return_value=store),
+        ):
+            status, headers, body = dispatch_request('GET', path, query, request_headers=auth)
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers['Cache-Control'], 'no-store')
+        self.assert_json_response(path, status, headers, body)
+        response_schema = self.response_schema(path, 200, 'application/json')
+        Draft202012Validator(
+            {'$ref': '#/$defs/response', '$defs': {'response': response_schema},
+             'components': self.spec['components']},
+            format_checker=FormatChecker(),
+        ).validate(self.spec['paths'][path]['get']['responses']['200']['content']['application/json']['example'])
+        payload = json.loads(body)
+        self.assertEqual(payload['window_hours'], 12)
+        self.assertEqual(payload['thresholds'], {
+            'max_requests_per_ip': 20,
+            'max_error_ratio': 0.3,
+            'max_distinct_schools': 1,
+            'min_requests': 20,
+            'max_status_errors': 2,
+        })
+        findings_by_kind = {}
+        for finding in payload['findings']:
+            findings_by_kind.setdefault(finding['kind'], []).append(finding)
+        self.assertEqual(set(findings_by_kind), {
+            'status_errors', 'request_volume', 'error_ratio', 'school_scan',
+        })
+        status_finding = next(
+            finding for finding in findings_by_kind['status_errors']
+            if finding['status_group'] == '429'
+        )
+        self.assertEqual(status_finding['client_ip'], '192.0.2.10')
+        self.assertEqual(
+            (status_finding['observed'], status_finding['threshold'], status_finding['requests']),
+            (3, 2, 20),
+        )
+        documented_finding = self.spec['paths'][path]['get']['responses']['200']['content']['application/json']['example']['findings'][0]
+        self.assertEqual(
+            (documented_finding['kind'], documented_finding['observed'], documented_finding['threshold'], documented_finding['requests']),
+            (status_finding['kind'], status_finding['observed'], status_finding['threshold'], status_finding['requests']),
+        )
+
+    def test_admin_access_anomaly_error_responses_match_openapi(self):
+        path = '/api/v1/admin/access-anomalies'
+        auth = {'Authorization': 'Bearer synthetic-admin-token'}
+        with patch.dict('os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'synthetic-admin-token'}):
+            cases = (
+                ('GET', 'max_error_ratio=0', auth, 400, None),
+                ('GET', '', {}, 401, None),
+                ('GET', '', auth, 503, None),
+                ('GET', '', auth, 503, Mock(review_anomalies=Mock(side_effect=OSError('synthetic storage failure')))),
+            )
+            for method, query, request_headers, expected, store in cases:
+                with self.subTest(status=expected, store_failure=store is not None):
+                    with patch('backend.app._access_log_store', return_value=store):
+                        status, headers, body = dispatch_request(
+                            method, path, query, request_headers=request_headers
+                        )
+                    self.assertEqual(status, expected)
+                    self.assert_json_response(path, status, headers, body)
+                    self.assertIn(json.loads(body)['code'], {
+                        400: {'invalid_request'},
+                        401: {'unauthorized'},
+                        503: {'access_logs_disabled', 'access_logs_unavailable'},
+                    }[expected])
+
     def test_retry_after_headers_allow_sdk_supported_values(self):
         cases = (
             ('TooManyRequests', '30'),
