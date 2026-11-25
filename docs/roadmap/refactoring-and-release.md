@@ -106,3 +106,9 @@
 - **실제 교시 시각(bell-time) 게이트**: 학교별 교시 시각 검증 완료 후 캘린더 구독에 실제 수업 시작·종료 타임스탬프를 반영(20번).
 - **공개 도메인(public-domain) 게이트**: \`opencigan.mcv.kr\` 등 실제 공개 도메인에서 캘린더 구독 및 API의 외부 네트워크 접근 가능성 검증(U02, 39번).
 - **실기기(real-device) 게이트**: iOS Safari, Android Chrome, 모바일 캘린더 앱에서의 화면 렌더링 및 동기화 동작 검증(4, 5, 8, 23, 28번).
+
+### 2026-11-25 후속 상태 동기화
+
+- [#241](https://github.com/Transient-Onlooker/opencigan/pull/241)·[#250](https://github.com/Transient-Onlooker/opencigan/pull/250)·[#253](https://github.com/Transient-Onlooker/opencigan/pull/253) POST 복구·1.4.8 감시 배포/핀 동기화·테스트 호환성. 사용자 직접 개입 없는 복구 사례 확보(사용자 명시); 실제 롤백 및 릴리스 이벤트 전달은 잔여.
+- [#228](https://github.com/Transient-Onlooker/opencigan/pull/228)·[#234](https://github.com/Transient-Onlooker/opencigan/pull/234)·[#237](https://github.com/Transient-Onlooker/opencigan/pull/237)·[#259](https://github.com/Transient-Onlooker/opencigan/pull/259)·[#260](https://github.com/Transient-Onlooker/opencigan/pull/260) 공유 주소·탐색·토큰 경합·부분 저장 복구·검색 캐시 병합. 배치 7 단계 1~3의 남은 상태 소유권·도메인 저장 책임은 유지.
+- 3차 QA 결함 6건 수정 병합, 운영 QA 별도. [#231](https://github.com/Transient-Onlooker/opencigan/pull/231) #230 번들 실험 폐기. 최종 통합/실기기/롤백 게이트 유지. [최신 단기 로드맵](short-term-2026-11-21.md).

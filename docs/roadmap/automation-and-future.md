@@ -13,7 +13,7 @@
 
 
 
-- [ ] Webhook 구독·삭제·인증·HMAC 서명·재시도·중복 방지 (기본 비활성 API·이력 관측·별도 작업자 로컬 구현 및 모의 테스트. 저장 공간 상한·악용 방지·운영 검증 남음)
+- [ ] Webhook 구독·삭제·인증·HMAC 서명·재시도·중복 방지 (기본 비활성 API·이력 관측·별도 작업자 로컬 구현 및 모의 테스트. 저장 공간 상한·악용 방지·운영 검증 남음) [#220](https://github.com/Transient-Onlooker/opencigan/pull/220)·[#222](https://github.com/Transient-Onlooker/opencigan/pull/222)·[#223](https://github.com/Transient-Onlooker/opencigan/pull/223)·[#224](https://github.com/Transient-Onlooker/opencigan/pull/224)·[#226](https://github.com/Transient-Onlooker/opencigan/pull/226) 구현/격리 검증, 행 상한 50000(파일 바이트 상한 아님), #221 미병합.
 - [ ] 기존 [timetable-watcher](https://github.com/Transient-Onlooker/timetable-watcher)의 Google Chat 전송·변경 비교·메시지 생성·중복 알림 방지 로직을 OpenCigan에 재사용
 - [ ] 로그인 없이 비밀 관리 링크로 Webhook 구독 생성·수정·삭제하기 — 관리 링크 교체·응답 유실 복구는 [#179](https://github.com/Transient-Onlooker/opencigan/pull/179)에서 구현·검증; 전체 보안 요구와 운영 검증은 ST-07에 남김.
 - [x] **Webhook 사용자 지정 메시지 템플릿·미리보기 (격리 구현)** — 허용 변수, Discord Embed·Google Chat 포맷, 미리보기·초기화·입력 검증 및 개발자 메뉴 통합을 [#180](https://github.com/Transient-Onlooker/opencigan/pull/180)에서 구현·검증했다. 원래 변경 유형별 문구·테스트 발송 등 세부 요구와 실제 채널 발송/운영 검증은 ST-07/08에서 구분해 관리한다. 기본 OFF 유지.
@@ -23,14 +23,15 @@
 - [ ] 특정 과목·교사·요일·교시·변경 유형을 조합하여 필요한 시간표 변경만 알림받는 기능 (RSS·Webhook 필터 API 로컬 구현. 설정 화면·운영 검증 남음)
 - [ ] 같은 날 변경이 여러 번 발생하면 한 번의 요약 알림으로 묶어 보는 기능 (RSS 날짜별 요약 로컬 구현. Webhook 예약 하루 요약은 [#182](https://github.com/Transient-Onlooker/opencigan/pull/182)에서 격리 구현·검증; 실제 전송 미활성)
 - [x] 관리자 이상조회 검토 API: IP별 요청량·오류 비율·학교 수, 보존 기간·수신 시각·미확인 IP 제외를 [#198](https://github.com/Transient-Onlooker/opencigan/pull/198)·[#200](https://github.com/Transient-Onlooker/opencigan/pull/200)에서 구현·검증. 읽기 전용이며 자동 차단/알림 없음.
-- [ ] 동일 IP의 과도한 조회, 반복적인 404·429·5xx, 비정상적인 학교 순회 조회를 감지하고 관리자에게 알림 — 상태별 탐지·게이트웨이/관리 UI·운영 임계치/알림은 ST-11 잔여.
+- [ ] 동일 IP의 과도한 조회, 반복적인 404·429·5xx, 비정상적인 학교 순회 조회를 감지하고 관리자에게 알림 — 상태별 탐지·게이트웨이/관리 UI는 [#235](https://github.com/Transient-Onlooker/opencigan/pull/235)·[#236](https://github.com/Transient-Onlooker/opencigan/pull/236) 기본 OFF로 구현·검증, 운영 임계치/알림 잔여.
 
 - [ ] **P3 · ‘만들어주세요’ 공감·개발 상태·GitHub 연동 (MVP 후속)**: 승인된 제안에 한하여 공감 투표와 중복 투표 억제, 접수·검토 중·개발 예정·완료 상태를 공개하고 사용자에게 처리 상태를 안내한다. GitHub Issue 생성/연동은 **관리자 승인 후 서버 측에서만** 선택적으로 수행하며 비밀 토큰을 클라이언트에 제공하거나 제안이 GitHub에 자동 공개된다고 가정하지 않는다. 투표·상태 공개는 P2의 안전한 접수·검토가 운영 검증된 후 추가한다.
 
 ## P4 — 장기 확장
 
 - [x] 관측 시간표 변경 통계 기반 및 최근 스냅샷 과목별 학급 교시 수·교사 이름 겹침 확인 ([#175](https://github.com/Transient-Onlooker/opencigan/pull/175), [#195](https://github.com/Transient-Onlooker/opencigan/pull/195), [#196](https://github.com/Transient-Onlooker/opencigan/pull/196)). 미관측은 null로 구분하며 실제 충돌이나 개인 수강 시수로 확정하지 않는다.
-- [ ] 남은 변경 추이·갱신 주기 분석 및 운영 검증 (ST-11).
+- [x] 관측일별 변경 추이 및 원본 갱신 시각 간격 집계·표시 ([#229](https://github.com/Transient-Onlooker/opencigan/pull/229)·[#249](https://github.com/Transient-Onlooker/opencigan/pull/249)). 미관측 갱신은 추정하지 않는다.
+- [ ] 변경 추이·갱신 주기 통계 운영 검증 및 활성화 (ST-11).
 - [x] 급식 메뉴 검색·알레르기 필터 (조회한 메뉴 기준, 주의 정보는 이 기기에 저장)
 - [ ] 홈 위젯·QR 공유 등 외부 확장 검토 (별도 사용 시나리오 검증 후 착수). 개인 시간표·일정/시험 오버레이는 추가 개발 대상에서 제외하고 아래 아이디어 보관함에 둔다. 2026-11-15 로컬 저장·주간 표시·PNG 구현 기록은 보존한다.
 - [ ] **P4 · Jev 기반 급식 취향 하이라이트 (2026-11-25 기획, 미착수)**: 사용자가 좋아하는 메뉴(예: 돈육불고기)나 선호하는 종류(예: 고기반찬)를 등록하면 Jev를 활용해 급식 메뉴의 의미상 일치 여부를 분류하고 해당 메뉴를 강조한다. 정확한 메뉴명 일치는 일반 코드로 처리할 수 있으며 의미 기반 분류가 필요한 부분에 Jev 적용을 검토한다. 기존 급식 조회·알레르기 경고와 분리하고, Jev 실패 시에도 기본 급식 표시를 유지한다. 먼저 실제 API·비용·지연·분류 정확도와 결과 재사용 가능성을 검증한 뒤 구현한다. 알레르기 안전 여부를 AI 판단에 맡기지 않는다. 기존 아이디어 보관함에서 정식 장기 개발 백로그로 이동하며 단기 집중 개발 큐에는 포함하지 않는다.

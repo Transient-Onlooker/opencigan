@@ -49,3 +49,10 @@
 - QA 동안 코드·설정 변경 없음은 사용자 제공 보고 기준. 본 반영은 로드맵 문서만 변경하며 기존 코드·운영 환경 및 QA 원문 파일은 건드리지 않는다.
 
 [단기 실행 큐](short-term-2026-11-21.md) · [UX](user-experience.md) · [P0](core-quality.md) · [API](api-operations.md) · [릴리스](refactoring-and-release.md)
+
+## 2026-11-25 후속 병합 및 검증 상태
+
+- QA2-003 [#214](https://github.com/Transient-Onlooker/opencigan/pull/214), NEW-04/QA3-001 [#228](https://github.com/Transient-Onlooker/opencigan/pull/228)·[#234](https://github.com/Transient-Onlooker/opencigan/pull/234), QA3-002~005 [#215](https://github.com/Transient-Onlooker/opencigan/pull/215)~[#218](https://github.com/Transient-Onlooker/opencigan/pull/218) 수정 병합 완료. 발견 당시 기록은 보존하며 운영 재검증은 미완료.
+- #162는 [#213](https://github.com/Transient-Onlooker/opencigan/pull/213)·[#245](https://github.com/Transient-Onlooker/opencigan/pull/245)·[#255](https://github.com/Transient-Onlooker/opencigan/pull/255)로 대체되어 종료. Cache MISS 상류 3→1회, POST 이후 1596→488ms(단일 학교, 동일 826건, 검색 준비 제외). 공개 종단·다학교·HIT 별도.
+- [#233](https://github.com/Transient-Onlooker/opencigan/pull/233)·[#246](https://github.com/Transient-Onlooker/opencigan/pull/246)·[#257](https://github.com/Transient-Onlooker/opencigan/pull/257)·[#259](https://github.com/Transient-Onlooker/opencigan/pull/259)·[#260](https://github.com/Transient-Onlooker/opencigan/pull/260)·[#261](https://github.com/Transient-Onlooker/opencigan/pull/261) 날짜·주간 화면·저장 실패·검색 캐시·보기 아이콘 후속. 설정 복원·실기기·실캘린더·장애 UX 미검증.
+- 최신 집계는 [단기 로드맵](short-term-2026-11-21.md)을 따른다.

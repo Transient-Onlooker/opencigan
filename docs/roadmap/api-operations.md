@@ -27,7 +27,7 @@
 
 **우선순위 이동:** Cloudflare Tunnel 전환·WAF 봇 방어·공개 API/ICS 배포와 Tailscale 비교는 [P0 핵심 품질](core-quality.md#p0--cloudflare-tunnel-공개-api-전환엣지-봇-방어-2026-11-16-우선순위-상향)에서 관리합니다. 이 문서에는 일반 API 기능과 운영 통계 작업만 남깁니다.
 
-- [ ] **NEW-01 (가용성 계측): 프로세스 생존과 외부 의존성 구분**. `/api/v1/status`의 `scope=process liveness` 기존 계약을 보존한다. 관리자 통계에 시간대별 집계, 경로별 오류 분류와 프로세스별 최근 캐시 갱신 시도 관측을 추가했다. 크기 제한으로 캐시에 저장하지 못한 응답도 별도로 구분한다. 마지막 단일 관측은 제공자 전체의 readiness를 보장하지 않는다. API 요청 처리 중 예상 밖 오류 로그에는 허용된 경로 분류와 예외 종류만 남기고 예외 메시지·검색어를 기록하지 않도록 개선했다. 내장 HTTP 서버의 요청 로그도 메서드·상태만 기록한다. 실제 운영 배포와 별도 readiness 관측은 미완료다.
+- [ ] **NEW-01 (가용성 계측): 프로세스 생존과 외부 의존성 구분**. `/api/v1/status`의 `scope=process liveness` 기존 계약을 보존한다. 관리자 통계에 시간대별 집계, 경로별 오류 분류와 프로세스별 최근 캐시 갱신 시도 관측을 추가했다. 크기 제한으로 캐시에 저장하지 못한 응답도 별도로 구분한다. 마지막 단일 관측은 제공자 전체의 readiness를 보장하지 않는다. API 요청 처리 중 예상 밖 오류 로그에는 허용된 경로 분류와 예외 종류만 남기고 예외 메시지·검색어를 기록하지 않도록 개선했다. 내장 HTTP 서버의 요청 로그도 메서드·상태만 기록한다. 실제 운영 배포와 별도 readiness 관측은 미완료다. [#238](https://github.com/Transient-Onlooker/opencigan/pull/238)·[#240](https://github.com/Transient-Onlooker/opencigan/pull/240)·[#252](https://github.com/Transient-Onlooker/opencigan/pull/252) 잠금·원인·정규화 진단 추가, 실제 종단/readiness 잔여.
   - 자료 종류별 최근 성공·실패 시각을 각각 유지해 후속 성공이 실패 관측을 지우지 않도록 한다. 이 시각은 서로 다른 요청에서 나온 수동 관측이며 제공자 전체의 상태를 뜻하지 않는다.
 
 - [x] 시간표 필터 API (`grade`, `class`, `teacher`, 기존 학교·주간 캐시 재사용)
@@ -36,8 +36,8 @@
 - [x] TypeScript/Python 경량 클라이언트, 실행 예제 및 모의 HTTP 경계 회귀 (2026-11-15)
 - [x] AI Agent Skill(`agent-skill/SKILL.md`), `llms.txt` (실제 API 계약·식별자·조회 범위·개인정보 경계 안내)
 - [x] 공개 API 버전/하위 호환성 정책 문서화 ([정책 문서](../api-versioning.md), [#199](https://github.com/Transient-Onlooker/opencigan/pull/199)) — 경로 접두사 계약, 오류 코드, 캐시/조건부 요청, 호환성 규칙 정리
-- [x] 일부 오류/응답 계약: Webhook 템플릿·미리보기 및 분석 API 202/400/413/429/503 계약을 명세와 격리 라우트로 대조 ([#185](https://github.com/Transient-Onlooker/opencigan/pull/185), [#190](https://github.com/Transient-Onlooker/opencigan/pull/190)). 전체 계약 및 운영 관측은 ST-10 미완료.
-- [x] 관리자 읽기 전용 이상조회 API: 인증·IP별 요청량/오류 비율/학교 수·보존 기간·미확인 IP 제외·수신 시각 검사 ([#198](https://github.com/Transient-Onlooker/opencigan/pull/198), [#200](https://github.com/Transient-Onlooker/opencigan/pull/200)). 상태별 탐지/관리 UI·게이트웨이 연결·운영 알림 정책은 미완료이며 자동 차단이나 발송을 수행하지 않는다.
+- [x] 일부 오류/응답 계약: Webhook 템플릿·미리보기 및 분석 API 202/400/413/429/503 계약을 명세와 격리 라우트로 대조 ([#185](https://github.com/Transient-Onlooker/opencigan/pull/185), [#190](https://github.com/Transient-Onlooker/opencigan/pull/190)). 전체 계약 및 운영 관측은 ST-10 미완료. [#227](https://github.com/Transient-Onlooker/opencigan/pull/227)·[#232](https://github.com/Transient-Onlooker/opencigan/pull/232)·[#248](https://github.com/Transient-Onlooker/opencigan/pull/248) 이력 503·SDK Retry-After·게이트웨이 오류 계약 추가 검증 완료.
+- [x] 관리자 읽기 전용 이상조회 API: 인증·IP별 요청량/오류 비율/학교 수·보존 기간·미확인 IP 제외·수신 시각 검사 ([#198](https://github.com/Transient-Onlooker/opencigan/pull/198), [#200](https://github.com/Transient-Onlooker/opencigan/pull/200)). 상태별 탐지/관리 UI·게이트웨이 연결은 [#235](https://github.com/Transient-Onlooker/opencigan/pull/235)·[#236](https://github.com/Transient-Onlooker/opencigan/pull/236) 기본 OFF로 구현·검증 완료, 운영 임계치/알림 정책은 미완료이며 자동 차단이나 발송을 수행하지 않는다.
 
 - [ ] 요청량·지연·오류 모니터링과 임계치 정책
 - [x] 캘린더 구독(.ics)에 ETag·조건부 요청을 지원해 변경되지 않은 일정의 중복 다운로드 감소 (SHA-256 ETag 및 If-None-Match 304 구현; 11/25 3차 QA에서 공식 도메인 200/304 및 캐시 헤더 실측 보고. 실캘린더 구독/갱신은 별도)
