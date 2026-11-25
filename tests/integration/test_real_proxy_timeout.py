@@ -38,7 +38,7 @@ class RealProxyTimeoutTests(unittest.TestCase):
                 with self.assertLogs('opensigan.comcigan_proxy', level='INFO') as logs:
                     with self.assertRaises((TimeoutError, URLError)):
                         helpers.get_response_encoding('http://comci.net:4082/12345', 'UTF-8',
-                                                      request_token='test-token', data=b'test-body')
+                                                      request_token='test-token', body=b'test-body')
                 elapsed = time.monotonic() - started_at
             self.assertTrue(started.is_set())
             self.assertGreaterEqual(elapsed, 29)

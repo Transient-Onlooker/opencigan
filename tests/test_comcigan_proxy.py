@@ -101,7 +101,7 @@ class ComciganProxyTests(unittest.TestCase):
                 comcigan_proxy.configure_comcigan_proxy()
                 with self.assertLogs("opensigan.comcigan_proxy", level="INFO") as logs:
                     response = helpers.get_response_encoding("http://comci.net:4082/12345", "UTF-8",
-                                                             request_token="test-token", data=b"encoded-body")
+                                                             request_token="test-token", body=b"encoded-body")
             self.assertEqual(response.text, "{}")
             self.assertEqual(received, [("http://comci.net:4082/12345", "text/plain; charset=UTF-8",
                                          "test-token", b"encoded-body")])
