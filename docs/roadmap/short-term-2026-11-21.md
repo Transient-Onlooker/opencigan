@@ -4,6 +4,8 @@
 
 ## 최근 작업 현황 (2026-11-25)
 
+2026-11-26 추가: [#270](https://github.com/Transient-Onlooker/opencigan/pull/270)에서 제안 진입점을 설정의 오픈소스 영역으로 이동했다. main `8caefeb`의 검사 및 Cloudflare Pages 배포는 성공했으나 GitHub Pages 배포와 실패 작업 재실행 요청은 GitHub 서버 500 오류로 실패했다.
+
 기준: 2026-11-25 KST, main `d47fd7e`, 병합 PR #261 및 #221까지(#261은 시간표 보기 아이콘, #221은 웹훅 재시도 지연 개선). [#162](https://github.com/Transient-Onlooker/opencigan/pull/162)는 [#213](https://github.com/Transient-Onlooker/opencigan/pull/213)으로 대체되어 미병합 종료. [직전 성공 CI 45613810081](https://github.com/Transient-Onlooker/opencigan/actions/runs/45613810081) 및 이후 병합을 구분하며 최신 배포·운영·실기기 성공을 가정하지 않는다.
 
 | 작업 | 최근 병합 및 확인 범위 | 남은 일 |
@@ -185,6 +187,8 @@ flowchart TB
 
 ### ST-07 · Webhook 기반·비밀 관리 링크·관리 UI
 
+- 2026-11-26 코드 대조: 구독 관리·토큰 회전·필터·방해 금지·테스트 큐·전송 상태 UI는 이미 연결돼 있다. 건수 상한은 있으나 SQLite/WAL의 바이트 상한은 없으며, 수신 성공 직후 작업자가 중단되면 재전송될 수 있으므로 외부 수신 측까지의 정확히 한 번 전송은 보장하지 않는다. 실제 발송은 계속 OFF.
+
 - 관리 정보 편집 중 이전 구독의 늦은 응답이 관리 화면에 나타나지 않도록 요청을 취소한다. 서버에서 이미 처리했을 수 있는 변경은 결과 확인이 필요하다.
 - [PR #179](https://github.com/Transient-Onlooker/opencigan/pull/179): 관리 링크 교체와 응답 유실 시 복구 안내를 추가하고 자동 검사를 통과했다. 운영 Webhook API와 발송 작업자는 별도 활성화하지 않았다.
 - 대기열이 가득 찬 상태에서 이미 큐에 있는 동일 관측을 다시 처리하면 실제 누락이 없는데 `dropped_events`가 증가하던 문제를 수정한다. 중복 관측과 신규 관측을 구분하는 격리 회귀를 추가하며 운영 발송은 비활성 상태를 유지한다.
@@ -221,6 +225,7 @@ flowchart TB
 
 - [x] 공개 API 버전 변경·하위 호환 정책을 문서화한다 ([#199](https://github.com/Transient-Onlooker/opencigan/pull/199)).
 - [ ] 기존 OpenAPI 3.1과 Worker/Pi/TypeScript/Python 클라이언트의 남은 오류·응답 계약을 대조하고 계약 회귀 테스트를 보강한다. **후속:** [#227](https://github.com/Transient-Onlooker/opencigan/pull/227)·[#232](https://github.com/Transient-Onlooker/opencigan/pull/232)·[#248](https://github.com/Transient-Onlooker/opencigan/pull/248) 완료 범위는 제외하고 나머지 계약 확인.
+- [#271](https://github.com/Transient-Onlooker/opencigan/pull/271)에서 이력 RSS의 저장소 비활성·장애 503 JSON 응답을 OpenAPI에 명시하고 실제 라우트 응답과 예제를 대조했다. `test_openapi_contract.py` 7건과 PR CI가 통과했다. 다른 경로와 클라이언트의 나머지 계약 확인은 별도다.
 - [ ] 관리자 관측에서 경로별 지연/오류/캐시·상류 실패를 구분하는 코드의 누락 부분만 보완한다. `status` 프로세스 생존과 상류 readiness를 섞지 않는다. **후속:** [#238](https://github.com/Transient-Onlooker/opencigan/pull/238)·[#240](https://github.com/Transient-Onlooker/opencigan/pull/240)·[#252](https://github.com/Transient-Onlooker/opencigan/pull/252) 계측 완료 범위 및 Pi HIT/MISS 내부 집계와 외부 종단을 구분.
 - **완료 조건:** 문서-테스트-실제 응답 일치, 민감한 요청 내용·토큰·IP 노출 추가 금지.
 - 원본: [P2 API 운영](api-operations.md).
@@ -281,6 +286,8 @@ flowchart TB
 - 원본: [배치 7 단계 9](refactoring-and-release.md).
 
 ### ST-14 · 오늘의 최종 통합 회귀·릴리스 후보 정리
+
+- 2026-11-26 격리 Chromium PWA 자동 검사: 설치된 서비스 워커로 오프라인 재진입하고 같은 학교·주차의 저장 시간표와 오래된 자료 안내를 표시했다 (`classroom.spec.js`, installed shell 검사). 실제 모바일 기기 확인이나 전체 통합 회귀를 뜻하지 않는다.
 
 - 11/25 3차 QA는 CONDITIONAL PASS(사용자 제공): 핵심 운영 API, 학교 3곳, ICS 200/304 및 PNG/PDF/설정 JSON 내보내기 확인. 설정 가져오기·색상 변경·뷰포트/실기기/PWA/실캘린더·장애 UX 미검증. 5d3a17c→fb9ed13 배포 경계 명시, 최종 배포에서 재개방 결함 재현/수정 후 검증. [3차 QA 후속](qa3-followup-2026-11-25.md).
 

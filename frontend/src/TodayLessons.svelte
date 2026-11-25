@@ -34,7 +34,7 @@
               <div class="lesson-list" class:density-compact={displaySettings.density === 'compact'} class:density-relaxed={displaySettings.density === 'relaxed'} aria-label="선택한 날짜 시간표">
                 {#each shownClassLessons as item}
                   <article class:active-lesson={dayOverview.current?.period === Number(item.period)} class:completed-lesson={displaySettings.endedLessonMode === 'dim' && dayOverview.completed.includes(Number(item.period))} class:changed={displaySettings.showChangeHighlights && item.isChanged}>
-                    <span class="lesson-period">{item.period}교시{#if lessonTimes[Number(item.period)]}<small class="lesson-time">{lessonTimes[Number(item.period)].start}–{lessonTimes[Number(item.period)].end}</small>{/if}</span>
+                    <span class="lesson-period">{item.period}교시{#if lessonTimes[Number(item.period)]}<small class="lesson-time">{lessonTimes[Number(item.period)].start}{lessonTimes[Number(item.period)].end ? `–${lessonTimes[Number(item.period)].end}` : ' 시작'}</small>{/if}</span>
                     <strong style={subjectStyle(item.subject)}>{displaySubject(item.subject, displaySettings)}</strong>
                     {#if displaySettings.showTeachers && item.teacher}<span>{displayTeacher(item.teacher, displaySettings)}</span>{/if}
                     {#if item.isChanged && displaySettings.showChangeBadges}<span class="change-label">변동</span>{/if}

@@ -8,7 +8,23 @@ const source = await readFile(new URL('../src/lesson-times.ts', import.meta.url)
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const exports = {};
 runInNewContext(compiled, { exports, Intl });
-const { dailyLessonOverview, parseLessonTimes, koreaClockMinutes, calculateLessonTimes, lessonTimesForDate } = exports;
+const { dailyLessonOverview, parseLessonTimes, koreaClockMinutes, calculateLessonTimes, lessonTimesForDate, applySourceLessonStarts, parseSourceLessonPreference } = exports;
+
+test('원본 시작 시각은 유효한 빈 교시에만 기본 적용하고 교체 가능한 자동값만 갱신한다', () => {
+  const manual = { 1: { start: '08:50', end: '09:40' }, 2: { start: '09:50', end: '' } };
+  const result = applySourceLessonStarts(manual, { 1: '09:00', 2: '10:00', 3: '25:00', 4: '10:30' }, [1, 2, 3, 4]);
+  assert.equal(result[1].start, '08:50');
+  assert.equal(result[2].start, '09:50');
+  assert.deepEqual(JSON.parse(JSON.stringify(result[4])), { start: '10:30', end: '' });
+  const refreshed = applySourceLessonStarts({ 1: { start: '09:00', end: '' } }, { 1: '09:10' }, [1], [1]);
+  assert.deepEqual(JSON.parse(JSON.stringify(refreshed[1])), { start: '09:10', end: '' });
+  assert.equal(parseSourceLessonPreference({ enabled: false, applied: { 1: '09:10', 21: '09:20', 2: '25:00' } }).enabled, false);
+  assert.deepEqual(JSON.parse(JSON.stringify(parseSourceLessonPreference({ enabled: false, applied: { 1: '09:10', 21: '09:20', 2: '25:00' } }).applied)), { 1: '09:10' });
+  const previous = parseSourceLessonPreference({ applied: { 1: '09:10' }, previous: { 1: { start: '08:30', end: '09:20' }, 2: { start: '08:30', end: '' } } }).previous;
+  assert.deepEqual(JSON.parse(JSON.stringify(previous)), { 1: { start: '08:30', end: '09:20' } });
+  assert.deepEqual(JSON.parse(JSON.stringify(parseSourceLessonPreference({ applied: { 1: '09:10' } }).previous)), {});
+  assert.equal(parseSourceLessonPreference(null).enabled, true);
+});
 
 test('draft validation identifies missing, reversed and overlapping times including weekday overrides', () => {
   const validate = exports.validateLessonTimeDrafts;
@@ -80,6 +96,16 @@ test('요일별 예외는 해당 날짜에만 공통 교시 시각보다 우선�
   assert.equal(lessonTimesForDate(times, weekdays, '2026-11-09')[1].start, '09:00');
   assert.equal(lessonTimesForDate(times, weekdays, '2026-11-10')[1].start, '08:30');
   assert.equal(lessonTimesForDate(times, weekdays, '2026-11-10')[2].start, '10:00');
+});
+
+test('원본 시작 시각은 날짜별 실제 표시 기본값으로 쓰되 종료 시각이 없으면 계산하지 않는다', () => {
+  const sourceOnly = lessonTimesForDate({}, {}, '2026-11-09', { 1: '09:00', 2: '10:00' });
+  assert.equal(sourceOnly[1].start, '09:00');
+  assert.equal(sourceOnly[1].end, '');
+  assert.equal(dailyLessonOverview(records, sourceOnly, 10 * 60, true).timed, false);
+  const overridden = lessonTimesForDate({ 1: times[1] }, { 2: { 1: { start: '08:30', end: '09:20' } } }, '2026-11-10', { 1: '09:00', 2: '10:00' });
+  assert.equal(overridden[1].start, '08:30');
+  assert.equal(overridden[2].start, '10:00');
 });
 
 test('교시 규칙은 점심에 기본 쉬는 시간을 더하지 않고 입력과 하루 범위를 검증한다', () => {
