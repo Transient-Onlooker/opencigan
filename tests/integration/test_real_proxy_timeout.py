@@ -9,6 +9,11 @@ from urllib.error import URLError
 from backend import comcigan_proxy
 
 
+# Integration layer: unlike the proxy unit tests, this test intentionally
+# enters through pycomcigan's own call path, so it verifies that the
+# library actually routes through the configured proxy with its default
+# timeout. A change in the library's internal call surface is supposed
+# to surface here; the proxy unit tests must not depend on it.
 @unittest.skipUnless(os.environ.get('OPENCIGAN_SLOW_NETWORK_TESTS') == '1', 'opt-in 30-second socket test')
 class RealProxyTimeoutTests(unittest.TestCase):
     def test_default_post_timeout_against_unresponsive_local_proxy(self):
