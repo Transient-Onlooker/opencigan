@@ -72,6 +72,20 @@ test('locking during anomaly review prevents a late result from appearing', asyn
   await expect(page.getByLabel('관리자 토큰')).toHaveValue('');
 });
 
+test('anomaly review explains authentication, rate limit and availability failures', async ({ page }) => {
+  test.skip(process.env.VITE_ACCESS_ANOMALIES_ENABLED !== '1', 'Requires opt-in build');
+  let status = 401;
+  await page.route('**/api/v1/admin/access-anomalies**', route => route.fulfill({ status, json: { error: 'unavailable' } }));
+  await page.goto('/access-logs.html');
+  await page.getByLabel('관리자 토큰').fill('test-secret');
+  for (const [code, message] of [[401, '관리자 토큰을 확인'], [429, '요청이 많아요'], [503, '이상 조회 검토를 사용할 수 없습니다']]) {
+    status = code;
+    await page.getByRole('button', { name: '이상 조회 검토' }).click();
+    await expect(page.locator('#anomaly-state')).toContainText(message);
+    await expect(page.locator('#anomaly-results')).toBeEmpty();
+  }
+});
+
 test('filters, authenticated query, lock clears rows, and CSV uses authenticated fetch', async ({ page }) => {
   const requests = [];
   await page.route('**/api/v1/admin/access-logs**', async (route) => {
