@@ -70,7 +70,7 @@ test('pending shared school verification preserves the prior grade until a class
 
 test('selection persistence preserves keys, values and write order', () => {
   const writes = [];
-  const storage = { setItem: (key, value) => writes.push([key, value]) };
+  const storage = { getItem: () => null, setItem: (key, value) => writes.push([key, value]), removeItem: () => {} };
   const school = { id: '2:학교', name: '학교', region: '서울' };
   exports.saveSelection(storage, { school, grade: 2, classroom: 3 });
   exports.saveSelection(storage, { grade: 3, classroom: 4 });
@@ -83,14 +83,50 @@ test('selection persistence preserves keys, values and write order', () => {
 
 test('selection persistence tolerates blocked storage and stops subsequent writes', () => {
   const attempted = [];
-  const storage = { setItem: (key) => { attempted.push(key); throw new Error('blocked'); } };
+  const storage = { getItem: () => null, setItem: (key) => { attempted.push(key); throw new Error('blocked'); }, removeItem: () => {} };
   assert.doesNotThrow(() => exports.saveSelection(storage, { grade: 1, classroom: 2 }));
   assert.deepEqual(attempted, ['opensigan-grade']);
   assert.doesNotThrow(() => exports.saveSelection(storage, { classroom: 2 }));
   const partial = [];
-  const failsOnGrade = { setItem: (key) => { partial.push(key); if (key === 'opensigan-grade') throw new Error('blocked'); } };
+  const current = new Map();
+  const failsOnGrade = { getItem: (key) => current.get(key) ?? null, setItem: (key, value) => { partial.push(key); if (key === 'opensigan-grade') throw new Error('blocked'); current.set(key, value); }, removeItem: (key) => { partial.push(`remove:${key}`); current.delete(key); } };
   exports.saveSelection(failsOnGrade, { school: { id: 'school' }, grade: 1, classroom: 2 });
-  assert.deepEqual(partial, ['opensigan-school', 'opensigan-grade']);
+  assert.deepEqual(partial, ['opensigan-school', 'opensigan-grade', 'remove:opensigan-school']);
+});
+
+test('a failed write does not roll back a value changed by another tab', () => {
+  const values = new Map([['opensigan-school', 'old-school']]);
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => {
+      if (key === 'opensigan-grade') {
+        values.set('opensigan-school', 'other-tab-school');
+        throw new Error('quota');
+      }
+      values.set(key, value);
+    },
+    removeItem: (key) => values.delete(key),
+  };
+  exports.saveSelection(storage, { school: { id: 'new', name: 'new', region: 'r' }, grade: 2, classroom: 3 });
+  assert.equal(values.get('opensigan-school'), 'other-tab-school');
+});
+
+test('a failed selection write restores the previous keys and removes newly created keys', () => {
+  for (const failingKey of ['opensigan-grade', 'opensigan-class']) {
+    const initial = failingKey === 'opensigan-class' ? [['opensigan-school', 'old-school']] : [['opensigan-school', 'old-school'], ['opensigan-grade', '4']];
+    const values = new Map(initial);
+    let failed = false;
+    const storage = {
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => {
+        if (!failed && key === failingKey) { failed = true; throw new Error('quota'); }
+        values.set(key, value);
+      },
+      removeItem: (key) => values.delete(key),
+    };
+    exports.saveSelection(storage, { school: { id: 'new', name: 'new', region: 'r' }, grade: 2, classroom: 3 });
+    assert.deepEqual([...values], initial);
+  }
 });
 
 test('selection restoration preserves read order and applies valid values before a later failure', () => {

@@ -41,12 +41,26 @@ export function verifiedSharedSchool(shared: School, results: School[], stale: b
   return results.find((candidate) => candidate.id === shared.id && candidate.name === shared.name && candidate.region === shared.region);
 }
 
-export function saveSelection(storage: Pick<Storage, 'setItem'>, selection: { school?: School; grade?: number; classroom: number }): void {
+export function saveSelection(storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>, selection: { school?: School; grade?: number; classroom: number }): void {
+  const entries: [string, string][] = [];
+  if (selection.school) entries.push(['opensigan-school', JSON.stringify(selection.school)]);
+  if (selection.grade !== undefined) entries.push(['opensigan-grade', String(selection.grade)]);
+  entries.push(['opensigan-class', String(selection.classroom)]);
+  const previous: [string, string | null][] = [];
+  let written = 0;
   try {
-    if (selection.school) storage.setItem('opensigan-school', JSON.stringify(selection.school));
-    if (selection.grade !== undefined) storage.setItem('opensigan-grade', String(selection.grade));
-    storage.setItem('opensigan-class', String(selection.classroom));
-  } catch { /* Storage may be unavailable; the current selection remains usable. */ }
+    for (const [key] of entries) previous.push([key, storage.getItem(key)]);
+    for (const [key, value] of entries) { storage.setItem(key, value); written += 1; }
+  } catch {
+    for (let index = written - 1; index >= 0; index -= 1) {
+      const [key, value] = previous[index];
+      try {
+        if (storage.getItem(key) !== entries[index][1]) continue;
+        if (value === null) storage.removeItem(key); else storage.setItem(key, value);
+      }
+      catch { /* Storage can reject the rollback too. */ }
+    }
+  }
 }
 
 export function readSelection(storage: Pick<Storage, 'getItem'>, update: (change: Partial<SelectionState>) => void): School | null {
