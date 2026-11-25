@@ -46,6 +46,29 @@ test('editing the token cancels an in-flight log query and clears previous rows'
   await expect(page.getByRole('button', { name: '조회', exact: true })).toBeEnabled();
 });
 
+test('editing the token cancels an in-flight CSV download', async ({ page }) => {
+  let release, started;
+  const pending = new Promise(resolve => { release = resolve; });
+  const requested = new Promise(resolve => { started = resolve; });
+  await page.route('**/api/v1/admin/access-logs**', async route => {
+    started();
+    await pending;
+    try { await route.fulfill({ contentType: 'text/csv', body: 'client_ip\n203.0.113.9\n' }); } catch { /* Request may be canceled. */ }
+  });
+  let downloaded = false;
+  page.on('download', () => { downloaded = true; });
+  await page.goto('/access-logs.html');
+  await page.getByLabel('관리자 토큰').fill('first-token');
+  await page.getByRole('button', { name: 'CSV 다운로드' }).click();
+  await requested;
+  const canceled = page.waitForEvent('requestfailed', request => request.url().includes('/api/v1/admin/access-logs'));
+  await page.getByLabel('관리자 토큰').fill('second-token');
+  release();
+  await canceled;
+  await expect(page.getByRole('button', { name: 'CSV 다운로드' })).toBeEnabled();
+  expect(downloaded).toBe(false);
+});
+
 test('anomaly review remains hidden by default', async ({ page }) => {
   test.skip(process.env.VITE_ACCESS_ANOMALIES_ENABLED === '1', 'Only applies to the default build');
   await page.goto('/access-logs.html');
