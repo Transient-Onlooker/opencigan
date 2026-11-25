@@ -74,6 +74,45 @@ class ComciganProxyTests(unittest.TestCase):
                     self.assertNotIn("secret", logs.output[0])
                     self.assertNotIn("private", logs.output[0])
 
+    def test_post_body_and_token_pass_through_local_proxy(self):
+        import pycomcigan.helpers as helpers
+        original = helpers.urlopen
+        self.addCleanup(setattr, helpers, "urlopen", original)
+        received = []
+
+        class LocalProxy(BaseHTTPRequestHandler):
+            def do_POST(self):
+                received.append((self.path, self.headers.get("Content-Type"),
+                                 self.headers.get("X-Hour-Token"),
+                                 self.rfile.read(int(self.headers["Content-Length"]))))
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{}')
+
+            def log_message(self, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), LocalProxy)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            proxy = f"http://127.0.0.1:{server.server_port}"
+            with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": proxy, "no_proxy": "comci.net"}):
+                comcigan_proxy.configure_comcigan_proxy()
+                with self.assertLogs("opensigan.comcigan_proxy", level="INFO") as logs:
+                    response = helpers.get_response_encoding("http://comci.net:4082/12345", "UTF-8",
+                                                             request_token="test-token", data=b"encoded-body")
+            self.assertEqual(response.text, "{}")
+            self.assertEqual(received, [("http://comci.net:4082/12345", "text/plain; charset=UTF-8",
+                                         "test-token", b"encoded-body")])
+            self.assertIn("stage=data", logs.output[0])
+            self.assertNotIn("test-token", logs.output[0])
+            self.assertNotIn("encoded-body", logs.output[0])
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+
     def test_proxy_header_wait_obeys_connection_timeout(self):
         import pycomcigan.helpers as helpers
         original = helpers.urlopen
