@@ -195,6 +195,61 @@ class WebhookStoreTests(unittest.TestCase):
             self.assertIsNone(self.store.claim(now=100 + 30 * 24 * 60 * 60 + 1))
             self.assertTrue(self.store.enqueue(identifier, "new", b'{}', now=100 + 30 * 24 * 60 * 60 + 2))
 
+    def test_payload_budget_rejects_new_delivery_without_deleting_existing_rows(self):
+        identifier = self.subscription["id"]
+        self.assertTrue(self.store.enqueue(identifier, "existing", b'{}', now=100))
+        with patch("backend.webhook_store.MAX_DELIVERY_PAYLOAD_BYTES", 1):
+            self.assertFalse(self.store.enqueue(identifier, "existing", b'{"replacement":true}', now=101))
+            self.assertFalse(self.store.enqueue(identifier, "new", b'{"x":1}', now=101))
+        with closing(self.store._connect()) as db:
+            row = db.execute("SELECT event_id, body FROM webhook_deliveries").fetchone()
+            self.assertEqual((row["event_id"], row["body"]), ("existing", b'{}'))
+
+    def test_payload_budget_applies_to_test_notifications(self):
+        identifier, token = self.subscription["id"], self.subscription["token"]
+        with patch("backend.webhook_store.MAX_DELIVERY_PAYLOAD_BYTES", 1):
+            self.assertFalse(self.store.enqueue_test(identifier, token, now=100))
+        self.assertEqual(self.store.deliveries(identifier, token), [])
+        with closing(self.store._connect()) as db:
+            self.assertIsNone(db.execute("SELECT last_test_at FROM webhook_subscriptions WHERE id=?", (identifier,)).fetchone()[0])
+
+    def test_payload_budget_rejection_preserves_history_and_counts_dropped_event(self):
+        history = HistoryStore(self.path)
+        identifier, token = self.subscription["id"], self.subscription["token"]
+        base = datetime.now(timezone.utc)
+        lesson = {"grade": 2, "class": 3, "date": "2026-11-16", "period": 1, "subject": "수학", "teacher": "김"}
+        history.observe("2:예시학교", "2026-11-16", [lesson], base)
+        with patch("backend.webhook_store.MAX_DELIVERY_PAYLOAD_BYTES", 1):
+            history.observe("2:예시학교", "2026-11-16", [{**lesson, "subject": "과학"}], base + timedelta(seconds=1))
+        changes = history.list("2:예시학교", "2026-11-16")["changes"]
+        self.assertEqual(len(changes), 1)
+        self.assertEqual(changes[0]["after"]["subject"], "과학")
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute("SELECT subject FROM snapshot_lessons WHERE school=? AND week=?",
+                                        ("2:예시학교", "2026-11-16")).fetchone()[0], "과학")
+        self.assertEqual(self.store.get(identifier, token)["dropped_events"], 1)
+        self.assertEqual(self.store.deliveries(identifier, token), [])
+
+    def test_payload_budget_is_atomic_across_concurrent_insertions(self):
+        identifier = self.subscription["id"]
+        with patch("backend.webhook_store.MAX_DELIVERY_PAYLOAD_BYTES", 3), ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda event_id: self.store.enqueue(identifier, event_id, b'{}', now=100),
+                                    ("first", "second")))
+        self.assertEqual(sum(results), 1)
+        with closing(self.store._connect()) as db:
+            self.assertEqual(db.execute("SELECT SUM(length(body)) FROM webhook_deliveries").fetchone()[0], 2)
+
+    def test_payload_budget_recovers_after_expired_records_are_pruned(self):
+        identifier = self.subscription["id"]
+        with patch("backend.webhook_store.MAX_DELIVERY_PAYLOAD_BYTES", 2):
+            self.assertTrue(self.store.enqueue(identifier, "finished", b'{}', now=100))
+            claim = self.store.claim(now=100)
+            self.assertTrue(self.store.finish(claim["id"], claim["leaseToken"],
+                                              {"delivered": True, "retryable": False}, now=100))
+            self.assertFalse(self.store.enqueue(identifier, "new", b'{}', now=101))
+            self.assertIsNone(self.store.claim(now=100 + 30 * 24 * 60 * 60 + 1))
+            self.assertTrue(self.store.enqueue(identifier, "new", b'{}', now=100 + 30 * 24 * 60 * 60 + 2))
+
     def test_rejects_invalid_external_inputs(self):
         with self.assertRaises(ValueError):
             self.store.create("2:예시학교", True, 1, "https://discord.com/api/webhooks/123/secret")

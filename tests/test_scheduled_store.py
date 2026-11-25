@@ -104,6 +104,15 @@ class ScheduledStoreTests(unittest.TestCase):
         with closing(sqlite3.connect(self.path)) as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM scheduled_occurrences").fetchone()[0], 0)
 
+    def test_payload_budget_does_not_reserve_scheduled_occurrence(self):
+        identifier, token = self.subscription["id"], self.subscription["token"]
+        revision = self.store.set_schedule(identifier, token, "daily_summary", "07:30")["revision"]
+        with patch("backend.webhook_store.MAX_DELIVERY_PAYLOAD_BYTES", 1):
+            self.assertFalse(self.store.enqueue_due(identifier, revision, "2026-11-23", b"{}", 100))
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM webhook_deliveries").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM scheduled_occurrences").fetchone()[0], 0)
+
     def test_cancel_leased_prevents_retry_and_same_day_requeue(self):
         identifier, token = self.subscription["id"], self.subscription["token"]
         revision = self.store.set_schedule(identifier, token, "daily_summary", "07:30")["revision"]
