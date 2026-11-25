@@ -62,11 +62,15 @@ test('subscription management uses bearer token and keeps secrets out of storage
   await page.getByRole('button', { name: '구독 불러오기' }).click();
   await expect(page.getByText('2:예시학교 · 2학년 3반')).toBeVisible();
   await page.getByLabel('과목 포함').fill('수학');
+  await page.getByLabel('교사 포함').fill('김교사');
+  await page.locator('#weekday').selectOption('3');
+  await page.getByLabel('교시', { exact: true }).fill('4');
+  await page.getByLabel('변경 유형').selectOption('changed');
   await page.getByLabel('방해 금지 시작').fill('22:00');
   await page.getByLabel('방해 금지 종료').fill('07:00');
   await page.getByRole('button', { name: '조건 저장' }).click();
   await expect(page.getByRole('status')).toContainText('저장');
-  expect(calls.find((call) => call.method === 'PUT').body.filters).toEqual({ subject: '수학', quietHours: { start: '22:00', end: '07:00' } });
+  expect(calls.find((call) => call.method === 'PUT').body.filters).toEqual({ subject: '수학', teacher: '김교사', weekday: 3, period: 4, type: 'changed', quietHours: { start: '22:00', end: '07:00' } });
   await page.getByLabel('새 Webhook 주소').fill('https://discord.com/api/webhooks/456/new_secret');
   await page.getByRole('button', { name: '전송 주소 변경' }).click();
   await expect(page.getByRole('status')).toContainText('전송 주소를 변경했어요');
