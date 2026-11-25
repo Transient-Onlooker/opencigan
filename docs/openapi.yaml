@@ -560,6 +560,156 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { description: Missing or incorrect bearer token. }
         '503': { description: Analytics disabled or storage temporarily unavailable. }
+  /api/v1/admin/access-anomalies:
+    parameters:
+      - name: window_hours
+        in: query
+        description: Look-back window, bounded by the configured access-log retention period.
+        schema: { type: integer, minimum: 1, maximum: 720, default: 24 }
+      - name: max_requests_per_ip
+        in: query
+        description: Flag request volume strictly greater than this threshold.
+        schema: { type: integer, minimum: 1, maximum: 100000, default: 1000 }
+      - name: max_error_ratio
+        in: query
+        description: Flag an error ratio strictly greater than this threshold.
+        schema: { type: number, exclusiveMinimum: 0, maximum: 1, default: 0.5 }
+      - name: max_distinct_schools
+        in: query
+        description: Flag a distinct-school count strictly greater than this threshold.
+        schema: { type: integer, minimum: 1, maximum: 100000, default: 50 }
+      - name: min_requests
+        in: query
+        description: Minimum request count required for a client IP to be considered for any finding, including status_errors.
+        schema: { type: integer, minimum: 0, maximum: 1000000, default: 20 }
+      - name: max_status_errors
+        in: query
+        description: Optional threshold. When supplied, separately flag 404, 429, or 5xx counts strictly greater than this value.
+        schema: { type: integer, minimum: 1, maximum: 100000 }
+    get:
+      tags: [System]
+      summary: Review retained access logs for configured traffic patterns
+      description: >-
+        Read-only review of retained access-log data. This endpoint does not block
+        requests or send alerts. The Cloudflare gateway exposes this route only
+        when ACCESS_ANOMALIES_ENABLED is "1" and requires its general and admin
+        rate limiters. The backend separately requires the shared
+        OPENCIGAN_ADMIN_TOKEN bearer token. Without the gateway flag the edge
+        returns 404. Supports GET and HEAD.
+      security: [{ AnalyticsAdmin: [] }]
+      responses:
+        '200':
+          description: Findings computed from retained rows within the requested window and retention period.
+          headers:
+            Cache-Control:
+              description: Responses are not stored by caches.
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccessAnomalyReview' }
+              example:
+                findings:
+                  - client_ip: 192.0.2.10
+                    kind: status_errors
+                    status_group: '429'
+                    observed: 3
+                    threshold: 2
+                    requests: 20
+                    first_seen: '2026-11-26T09:00:00+09:00'
+                    last_seen: '2026-11-26T09:15:00+09:00'
+                    detail: Status error count exceeded the review threshold.
+                window_hours: 24
+                thresholds:
+                  max_requests_per_ip: 1000
+                  max_error_ratio: 0.5
+                  max_distinct_schools: 50
+                  min_requests: 20
+                  max_status_errors: 2
+        '400':
+          description: Unsupported, repeated, malformed, or out-of-range query parameter.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 숫자 형식이나 범위가 올바르지 않습니다, code: invalid_request }
+        '401':
+          description: OPENCIGAN_ADMIN_TOKEN is missing or does not match.
+          headers:
+            WWW-Authenticate:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 인증이 필요합니다, code: unauthorized }
+        '404':
+          description: The Cloudflare gateway route is not exposed when ACCESS_ANOMALIES_ENABLED is not "1".
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: API 연결을 처리하지 못했어요., code: not_found, message: API 연결을 처리하지 못했어요. }
+        '405':
+          description: When the route is enabled at the gateway, a method other than GET or HEAD is not supported. The backend and enabled Cloudflare route return different error text. When ACCESS_ANOMALIES_ENABLED is not "1", the edge returns 404 for every method.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                backend:
+                  value: { error: 지원하지 않는 메서드입니다, code: method_not_allowed }
+                edge:
+                  value: { error: API 연결을 처리하지 못했어요., code: method_not_allowed, message: API 연결을 처리하지 못했어요. }
+        '429':
+          description: Backend admin or Cloudflare general/admin request limit reached.
+          headers:
+            Retry-After:
+              description: Edge throttling retry delay in seconds, when supplied.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                backend:
+                  value: { error: 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요., code: rate_limited }
+                edge:
+                  value: { error: API 연결을 처리하지 못했어요., code: edge_rate_limited, message: API 연결을 처리하지 못했어요. }
+        '503':
+          description: Backend access-log storage is disabled or unavailable, a required gateway binding/rate limiter is missing, or the edge cannot reach the private API.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                storage_disabled:
+                  value: { error: 접속 로그가 비활성화되어 있습니다, code: access_logs_disabled }
+                storage_unavailable:
+                  value: { error: 접속 로그를 불러오지 못했습니다, code: access_logs_unavailable }
+                gateway_unconfigured:
+                  value: { error: API 연결을 처리하지 못했어요., code: gateway_unconfigured, message: API 연결을 처리하지 못했어요. }
+                gateway_unavailable:
+                  value: { error: API 연결을 처리하지 못했어요., code: gateway_unavailable, message: API 연결을 처리하지 못했어요. }
+    head:
+      tags: [System]
+      summary: Check the access-anomaly review response without a body
+      description: Uses the same authentication, query validation, analysis, and rate limits as GET. The response body is empty for every status.
+      security: [{ AnalyticsAdmin: [] }]
+      responses:
+        '200':
+          description: Findings were computed successfully. The response body is empty for HEAD.
+          headers:
+            Cache-Control:
+              description: Responses are not stored by caches.
+              schema: { type: string, const: no-store }
+        '400': { description: Unsupported, repeated, malformed, or out-of-range query parameter. No response body. }
+        '401':
+          description: OPENCIGAN_ADMIN_TOKEN is missing or does not match. No response body.
+          headers:
+            WWW-Authenticate:
+              schema: { type: string }
+        '404': { description: The Cloudflare gateway route is not exposed when ACCESS_ANOMALIES_ENABLED is not "1". No response body. }
+        '429':
+          description: Backend admin or Cloudflare general/admin request limit reached. No response body.
+          headers:
+            Retry-After:
+              description: Retry delay in seconds, when supplied by the backend or edge.
+              schema: { type: string }
+        '503': { description: Backend access-log storage or gateway configuration is unavailable. No response body. }
   /api/v1/status:
     get:
       tags: [System]
@@ -895,6 +1045,47 @@ components:
           description: Stable machine-readable error code; additional codes may be introduced without an API version change.
       additionalProperties: true
       example: { error: Invalid query parameter, code: invalid_request }
+    AccessAnomalyReview:
+      type: object
+      required: [findings, window_hours, thresholds]
+      properties:
+        findings:
+          type: array
+          items: { $ref: '#/components/schemas/AccessAnomalyFinding' }
+        window_hours: { type: integer, minimum: 1, maximum: 720 }
+        thresholds:
+          type: object
+          required: [max_requests_per_ip, max_error_ratio, max_distinct_schools, min_requests]
+          properties:
+            max_requests_per_ip: { type: integer, minimum: 1, maximum: 100000 }
+            max_error_ratio: { type: number, exclusiveMinimum: 0, maximum: 1 }
+            max_distinct_schools: { type: integer, minimum: 1, maximum: 100000 }
+            min_requests: { type: integer, minimum: 0, maximum: 1000000 }
+            max_status_errors: { type: integer, minimum: 1, maximum: 100000 }
+          additionalProperties: false
+      additionalProperties: false
+    AccessAnomalyFinding:
+      type: object
+      description: >-
+        Finding fields vary by kind. client_ip is present in retained access-log
+        data and must be handled as sensitive administrator data. status_group
+        is present only for status_errors. Other kind-specific counts and ratios
+        are present only when applicable.
+      required: [client_ip, kind, observed, threshold, first_seen, last_seen, detail]
+      properties:
+        client_ip: { type: string }
+        kind: { type: string, enum: [status_errors, request_volume, error_ratio, school_scan] }
+        status_group: { type: string, enum: ['404', '429', '5xx'] }
+        observed: { type: number, minimum: 0 }
+        threshold: { type: number, minimum: 0 }
+        requests: { type: integer, minimum: 0 }
+        errors: { type: integer, minimum: 0 }
+        error_ratio: { type: number, minimum: 0, maximum: 1 }
+        distinct_schools: { type: integer, minimum: 0 }
+        first_seen: { type: string, format: date-time }
+        last_seen: { type: string, format: date-time }
+        detail: { type: string }
+      additionalProperties: false
     Status:
       type: object
       required: [status, scope]
