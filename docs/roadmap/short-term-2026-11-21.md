@@ -165,6 +165,7 @@ flowchart TB
 - [x] 기존 시간표 조회 경로·캐시를 재사용해 학교별 **교시 시작 시각 자동 입력 제안**을 설정 화면에 제공한다. 사용자의 직접 입력값·요일별 예외·`localStorage`·설정 백업은 우선 보존하며, 사용자 확인 없이 기존 저장값을 덮어쓰지 않는다. 원본 시각과 사용자 지정 시각을 구분하고 수동 편집·초기화 경로를 유지한다. — [#219](https://github.com/Transient-Onlooker/opencigan/pull/219) 제안·수동값/요일 예외 보호, 모의 학교 전환 검증. 실제 설정 백업/복원 왕복 별도.
 - [x] 필요한 경우에만 하위 호환 가능한 선택적 API 필드를 추가하고, 기존 `records`/`sourceUpdatedAt`·ICS 동작과 캐시 TTL 1,800초 및 상류 조회 횟수를 유지한다. 원본에 시작 시각만 있으면 종료 시각은 공란으로 두거나 사용자 확인을 거쳐 입력하도록 한다. 자료가 없거나 잘못됐을 때는 기존 수동 설정을 계속 사용할 수 있어야 한다. — [#219](https://github.com/Transient-Onlooker/opencigan/pull/219) 선택 필드·OpenAPI·캐시/프런트 회귀, 시각 미제공 시 수동 설정 유지. 실학교·기기 별도.
 - [x] **원본 시작 시각 기본 적용 및 사용자 재정의**: 2026-11-25 사용자 결정. 유효하고 신선한 동일 학교 원본 시작 시각은 별도 적용 버튼 없이 기본값으로 사용한다. 사용자가 직접 입력한 시각·요일별 예외·복원한 설정은 우선하고, 자동 적용을 끄거나 수정한 선택은 학교별로 유지한다. 원본으로 복귀할 수 있게 하며 자동값과 수동값을 구별한다. 원본 누락·오래된 응답·학교 전환 시 다른 학교의 시각을 가져오지 않고 원본에 없는 종료 시각은 추정하지 않는다. 기존 계산기와 수동 편집, API/캐시 계약을 유지한다. 새 학교 최초 조회·기존 설정 보호·자동 적용 해제 후 새로고침·원본 복귀·수동 편집·학교 전환 및 늦은 응답·종료 시각 미제공을 자동 회귀로 검증한다. 기존 사용자 확인 방식의 구현 기록은 유지한다. [#272](https://github.com/Transient-Onlooker/opencigan/pull/272)에서 자동 검증 및 CI 통과. 추가 학교의 실제 원본 형식 확인은 별도다.
+- [#277](https://github.com/Transient-Onlooker/opencigan/pull/277)은 원본 갱신 후 설정 입력창에 남던 이전 자동값을 갱신하고 수동 편집값을 유지한다. Chromium 대상 회귀와 PR CI가 통과했다.
 - **완료 조건:** 유효·누락·변형 자료 및 학교 전환, 사용자 설정 우선순위, 수동 저장·백업/복원, 캐시 응답 동등성을 자동 테스트로 검증한다. 실학교·실기기 시각 일치 여부는 별도 확인하고, 종료 시각을 추측해 정확한 값처럼 표시하지 않는다.
 - **운영 범위:** [#258](https://github.com/Transient-Onlooker/opencigan/pull/258) Pi 백엔드·공식 프런트 번들 코드 존재 확인. 실제 학교별 제공 범위·복원·실기기 검증은 남는다.
 
@@ -229,6 +230,7 @@ flowchart TB
 - [ ] 기존 OpenAPI 3.1과 Worker/Pi/TypeScript/Python 클라이언트의 남은 오류·응답 계약을 대조하고 계약 회귀 테스트를 보강한다. **후속:** [#227](https://github.com/Transient-Onlooker/opencigan/pull/227)·[#232](https://github.com/Transient-Onlooker/opencigan/pull/232)·[#248](https://github.com/Transient-Onlooker/opencigan/pull/248) 완료 범위는 제외하고 나머지 계약 확인.
 - [#271](https://github.com/Transient-Onlooker/opencigan/pull/271)에서 이력 RSS의 저장소 비활성·장애 503 JSON 응답을 OpenAPI에 명시하고 실제 라우트 응답과 예제를 대조했다. `test_openapi_contract.py` 7건과 PR CI가 통과했다. 다른 경로와 클라이언트의 나머지 계약 확인은 별도다.
 - [ ] 관리자 관측에서 경로별 지연/오류/캐시·상류 실패를 구분하는 코드의 누락 부분만 보완한다. `status` 프로세스 생존과 상류 readiness를 섞지 않는다. **후속:** [#238](https://github.com/Transient-Onlooker/opencigan/pull/238)·[#240](https://github.com/Transient-Onlooker/opencigan/pull/240)·[#252](https://github.com/Transient-Onlooker/opencigan/pull/252) 계측 완료 범위 및 Pi HIT/MISS 내부 집계와 외부 종단을 구분.
+- [#276](https://github.com/Transient-Onlooker/opencigan/pull/276)은 학교 검색·급식 등 JSON의 오래된 캐시 대체 응답을 경로별 통계에서 `stale`로 구분한다. 분석 테스트 13건과 PR CI가 통과했다. 운영 경로 관측은 별도다.
 - **완료 조건:** 문서-테스트-실제 응답 일치, 민감한 요청 내용·토큰·IP 노출 추가 금지.
 - 원본: [P2 API 운영](api-operations.md).
 
