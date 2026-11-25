@@ -1467,6 +1467,26 @@ test('lesson time rules preview lunch and require explicit application and savin
   await expect(page.getByLabel('5교시 시작', { exact: true })).toHaveValue('');
 });
 
+test('source start drafts follow refresh while preserving manual edits', async ({ page }) => {
+  let starts = { '1': '09:00', '2': '10:00' };
+  await mockApi(page);
+  await page.route('**/api/v1/timetable?*', (route) => route.fulfill({ json: { ...timetable, sourceLessonStarts: starts } }));
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('#timetable-panel').getByRole('table')).toBeVisible();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('학교 교시 시각 설정', { exact: true }).click();
+  await page.getByText('상세 시간 설정하기', { exact: true }).click();
+  await expect(page.getByLabel('1교시 시작', { exact: true })).toHaveValue('09:00');
+  await page.getByLabel('2교시 시작', { exact: true }).fill('10:15');
+  await page.getByLabel('2교시 시작', { exact: true }).blur();
+  starts = { '1': '09:10', '2': '10:20' };
+  await page.getByRole('button', { name: '시간표', exact: true }).click();
+  await page.locator('#timetable-panel').getByRole('button', { name: /시간표 새로고침/ }).click();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await expect(page.getByLabel('1교시 시작', { exact: true })).toHaveValue('09:10');
+  await expect(page.getByLabel('2교시 시작', { exact: true })).toHaveValue('10:15');
+});
+
 test('source lesson starts apply by default, preserve manual times, and can be disabled per school', async ({ page }) => {
   await mockApi(page);
   await page.addInitScript((id) => localStorage.setItem('opensigan-lesson-times:' + id,

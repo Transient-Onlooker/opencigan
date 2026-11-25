@@ -141,8 +141,7 @@
   $: sourceLessonKey = sourceLessonAutoEnabled && activeSourceLessonStarts ? `${school?.id}:${week}:${JSON.stringify(activeSourceLessonStarts)}` : '';
   $: if (sourceLessonKey !== appliedSourceKey) {
     appliedSourceKey = sourceLessonKey;
-    autoSourceDraftPeriods = [];
-    if (sourceLessonKey && activeSourceLessonStarts) applyFreshSourceStarts(activeSourceLessonStarts);
+    applyFreshSourceStarts(sourceLessonKey && activeSourceLessonStarts ? activeSourceLessonStarts : {});
   }
   $: dayOverview = dailyLessonOverview(selectedClassLessons, selectedDayTimes, clockMinute, selectedDay === today);
   $: shownClassLessons = displaySettings.endedLessonMode === 'hide' ? selectedClassLessons.filter((item) => !dayOverview.completed.includes(Number(item.period))) : selectedClassLessons;
