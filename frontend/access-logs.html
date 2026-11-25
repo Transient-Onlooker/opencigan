@@ -68,6 +68,18 @@
 <button id="lock-btn" type="button">잠금</button>
 </form>
 <p id="state" role="status" aria-live="polite">토큰은 메모리에만 유지되며 저장소나 URL에 남지 않습니다.</p>
+<section id="anomaly-review" hidden aria-labelledby="anomaly-heading">
+<h2 id="anomaly-heading">이상 조회 검토</h2>
+<p>검토 신호이며 남용 확정이나 자동 차단이 아닙니다. 공용 IP에서는 여러 사용자가 합산될 수 있습니다.</p>
+<form id="anomaly-form">
+<label>조회 시간 (시간)<input id="anomaly-window" type="number" min="1" max="720" value="24" required></label>
+<label>최소 요청 수<input id="anomaly-minimum" type="number" min="0" max="1000000" value="20" required></label>
+<label>상태별 오류 기준 (선택)<input id="anomaly-status-limit" type="number" min="1" max="100000" placeholder="미입력 시 상태별 검토 안 함"></label>
+<button id="anomaly-submit" type="submit">이상 조회 검토</button>
+</form>
+<p id="anomaly-state" role="status" aria-live="polite"></p>
+<ul id="anomaly-results" aria-label="이상 조회 검토 결과"></ul>
+</section>
 <section id="results" hidden aria-label="접속 로그 목록">
 <div class="scroll" tabindex="0" role="region" aria-label="접속 로그 표">
 <table>

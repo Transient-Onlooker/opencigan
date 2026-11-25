@@ -22,6 +22,56 @@ const log = {
   user_agent: '<img src=x onerror=alert(1)>',
 };
 
+test('anomaly review remains hidden by default', async ({ page }) => {
+  test.skip(process.env.VITE_ACCESS_ANOMALIES_ENABLED === '1', 'Only applies to the default build');
+  await page.goto('/access-logs.html');
+  await expect(page.locator('#anomaly-review')).toBeHidden();
+});
+
+test('enabled anomaly review authenticates, safely renders and clears on lock', async ({ page }) => {
+  test.skip(process.env.VITE_ACCESS_ANOMALIES_ENABLED !== '1', 'Requires opt-in build');
+  let request;
+  await page.route('**/api/v1/admin/access-anomalies**', async route => {
+    request = route.request();
+    await route.fulfill({ json: { findings: [{ client_ip: '<img src=x onerror=alert(1)>', kind: 'status_errors', status_group: '429', observed: 5, threshold: 3 }] } });
+  });
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto('/access-logs.html');
+  await page.getByLabel('관리자 토큰').fill('test-secret');
+  await page.getByLabel('상태별 오류 기준 (선택)').fill('3');
+  await page.getByRole('button', { name: '이상 조회 검토' }).click();
+  await expect(page.locator('#anomaly-results')).toContainText('429');
+  await expect(page.locator('#anomaly-results img')).toHaveCount(0);
+  expect(request.headers().authorization).toBe('Bearer test-secret');
+  expect(request.url()).not.toContain('test-secret');
+  expect(new URL(request.url()).searchParams.get('max_status_errors')).toBe('3');
+  expect(await page.evaluate(() => JSON.stringify({ local: localStorage, session: sessionStorage, url: location.href }))).not.toContain('test-secret');
+  await page.getByRole('button', { name: '잠금' }).click();
+  await expect(page.locator('#anomaly-results')).toBeEmpty();
+  await expect(page.getByLabel('관리자 토큰')).toHaveValue('');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+});
+
+test('locking during anomaly review prevents a late result from appearing', async ({ page }) => {
+  test.skip(process.env.VITE_ACCESS_ANOMALIES_ENABLED !== '1', 'Requires opt-in build');
+  let release, started;
+  const pending = new Promise(resolve => { release = resolve; });
+  const requested = new Promise(resolve => { started = resolve; });
+  await page.route('**/api/v1/admin/access-anomalies**', async route => {
+    started();
+    await pending;
+    try { await route.fulfill({ json: { findings: [{ client_ip: '203.0.113.9', kind: 'request_volume', observed: 10, threshold: 5 }] } }); } catch { /* The request may be canceled. */ }
+  });
+  await page.goto('/access-logs.html');
+  await page.getByLabel('관리자 토큰').fill('test-secret');
+  await page.getByRole('button', { name: '이상 조회 검토' }).click();
+  await requested;
+  await page.getByRole('button', { name: '잠금' }).click();
+  release();
+  await expect(page.locator('#anomaly-results')).toBeEmpty();
+  await expect(page.getByLabel('관리자 토큰')).toHaveValue('');
+});
+
 test('filters, authenticated query, lock clears rows, and CSV uses authenticated fetch', async ({ page }) => {
   const requests = [];
   await page.route('**/api/v1/admin/access-logs**', async (route) => {
