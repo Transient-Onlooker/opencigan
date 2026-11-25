@@ -176,6 +176,54 @@ class CacheIntegrityTests(unittest.TestCase):
         for secret in ("example.test", "token", "secret", "private response", "private-school"):
             self.assertNotIn(secret, logs.output[0])
 
+    def test_wrapped_http_error_logs_cause_without_private_data(self):
+        cache = Cache(retry_delay=0)
+        error = HTTPError("https://private.test/?token=secret", 429, "private response", {}, None)
+        self.addCleanup(error.close)
+
+        def fail():
+            try:
+                raise error
+            except HTTPError as exc:
+                raise RuntimeError("private wrapper") from exc
+
+        with self.assertLogs("opensigan.cache", level="WARNING") as logs:
+            with self.assertRaises(RuntimeError):
+                cache.get(("school_search", "private-school"), fail)
+        self.assertIn("error_type=RuntimeError upstream_http_status=429 cause_type=HTTPError", logs.output[0])
+        for secret in ("private.test", "token", "secret", "private response", "private wrapper", "private-school"):
+            self.assertNotIn(secret, logs.output[0])
+
+    def test_wrapped_connection_error_is_classified_without_message(self):
+        cache = Cache(retry_delay=0)
+
+        def fail():
+            try:
+                raise ConnectionResetError("private connection")
+            except ConnectionResetError as exc:
+                raise RuntimeError("private wrapper") from exc
+
+        with self.assertLogs("opensigan.cache", level="WARNING") as logs:
+            with self.assertRaises(RuntimeError):
+                cache.get(("school_search", "private-school"), fail)
+        self.assertIn("cause_type=OSError", logs.output[0])
+        self.assertNotIn("private", logs.output[0])
+
+    def test_suppressed_error_is_not_inferred_from_context(self):
+        cache = Cache(retry_delay=0)
+
+        def fail():
+            try:
+                raise HTTPError("https://private.test", 403, "private", {}, None)
+            except HTTPError:
+                raise RuntimeError("private wrapper") from None
+
+        with self.assertLogs("opensigan.cache", level="WARNING") as logs:
+            with self.assertRaises(RuntimeError):
+                cache.get(("school_search", "private-school"), fail)
+        self.assertIn("upstream_http_status=None cause_type=RuntimeError", logs.output[0])
+        self.assertNotIn("private", logs.output[0])
+
     def test_eviction_during_failed_refresh_returns_inflight_stale_value(self):
         cache = Cache(ttl=0, max_entries=1, lock_stripes=2)
         cache.get(0, lambda: {"value": "old", "stale": False})
