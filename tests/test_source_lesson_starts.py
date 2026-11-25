@@ -18,11 +18,15 @@ class SourceLessonStartsTests(unittest.TestCase):
         table = SimpleNamespace(timetable=[], update_date=None, day_time=["1(09:10)"])
         with patch.object(timetable, "configure_comcigan_proxy"), \
              patch.object(timetable, "validate_timetable_week", return_value=0), \
-             patch("pycomcigan.TimeTable", return_value=table):
+             patch("pycomcigan.TimeTable", return_value=table), \
+             self.assertLogs("opensigan.timetable", level="INFO") as logs:
             result = timetable.fetch_timetable("1:School", "2026-11-23", include_original=True)
         self.assertEqual(result["sourceLessonStarts"], {"1": "09:10"})
         self.assertEqual(result["records"], [])
         self.assertIsNone(result["sourceUpdatedAt"])
+        self.assertIn("timetable normalization duration_ms=", logs.output[0])
+        self.assertNotIn("School", logs.output[0])
+        self.assertNotIn("2026-11-23", logs.output[0])
 
 
 if __name__ == "__main__":
