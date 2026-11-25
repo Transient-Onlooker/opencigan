@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+test.use({ serviceWorkers: 'block' });
+
 test('mobile timetable controls remain visible when viewing next week', async ({ page }) => {
   const school = { id: '2:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
   await page.clock.setFixedTime(new Date('2026-11-09T02:00:00Z'));
