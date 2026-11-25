@@ -367,7 +367,7 @@
 .settings-search{display:grid;gap:5px;margin:0 0 12px;font-size:13px;color:var(--muted)}
 .notification-link,.notification-link:visited{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;margin:0 0 12px;padding:10px 14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:14px;font-weight:650;line-height:1.4;text-decoration:none}.notification-link:hover{background:var(--soft);border-color:var(--ink)}.notification-link:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .personal-export{margin:16px 0;color:var(--muted);font-size:12px;line-height:1.6}.personal-export button{min-height:44px}
-.settings-search input{min-height:44px;max-width:100%;width:100%;border:1px solid var(--line);padding:8px;background:var(--surface);color:var(--ink)}
+.settings-search input{min-width:0;min-height:44px;max-width:100%;width:100%;border:1px solid var(--line);padding:8px;background:var(--surface);color:var(--ink)}
 .settings-results{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
 .settings-results button{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;min-height:44px;padding:10px 8px;border:0;border-bottom:1px solid var(--line);background:var(--surface);color:var(--ink);text-align:left;cursor:pointer}
 .settings-results button:hover{background:var(--soft)}.settings-results small{color:var(--muted);text-align:right}
