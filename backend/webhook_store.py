@@ -20,6 +20,7 @@ class SubscriptionLimitError(Exception):
 
 MAX_PENDING_PER_SUBSCRIPTION = 1000
 MAX_DELIVERY_RECORDS = 50000
+MAX_DELIVERY_PAYLOAD_BYTES = 16 * 1024 * 1024
 MAX_SUBSCRIPTIONS = 500
 MAX_DELIVERY_ATTEMPTS = 6
 DELIVERY_RETENTION_SECONDS = 30 * 24 * 60 * 60
@@ -27,6 +28,16 @@ DELIVERY_RETENTION_SECONDS = 30 * 24 * 60 * 60
 
 def delivery_capacity_available(db):
     return db.execute("SELECT COUNT(*) FROM webhook_deliveries").fetchone()[0] < MAX_DELIVERY_RECORDS
+
+
+def delivery_payload_capacity_available(db, body_size, transaction_bytes=None):
+    if transaction_bytes is not None and transaction_bytes:
+        stored_bytes = transaction_bytes[0]
+    else:
+        stored_bytes = db.execute("SELECT COALESCE(SUM(length(body)), 0) FROM webhook_deliveries").fetchone()[0]
+        if transaction_bytes is not None:
+            transaction_bytes.append(stored_bytes)
+    return stored_bytes + body_size <= MAX_DELIVERY_PAYLOAD_BYTES
 
 
 def validate_filters(filters):
@@ -64,7 +75,7 @@ def quiet_until(now, quiet_hours):
     return target.timestamp()
 
 
-def enqueue_observed_change(db, school, grade, classroom, date, period, kind, before, after, change_id, now):
+def enqueue_observed_change(db, school, grade, classroom, date, period, kind, before, after, change_id, now, transaction_bytes=None):
     columns = {row["name"] for row in db.execute("PRAGMA table_info(webhook_subscriptions)")}
     template_column = "template_json" if "template_json" in columns else "NULL"
     subscriptions = db.execute(f"SELECT id, provider, filters_json, {template_column} AS template_json "
@@ -102,10 +113,6 @@ def enqueue_observed_change(db, school, grade, classroom, date, period, kind, be
         event_id = f"change_{change_id}"
         if db.execute("SELECT 1 FROM webhook_deliveries WHERE subscription_id=? AND event_id=?", (subscription["id"], event_id)).fetchone():
             continue
-        if (db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')", (subscription["id"],)).fetchone()[0] >= MAX_PENDING_PER_SUBSCRIPTION
-                or not delivery_capacity_available(db)):
-            db.execute("UPDATE webhook_subscriptions SET dropped_events=dropped_events+1 WHERE id=?", (subscription["id"],))
-            continue
         raw_template = subscription["template_json"]
         template = json.loads(raw_template) if isinstance(raw_template, str) and raw_template else None
         if template:
@@ -117,8 +124,15 @@ def enqueue_observed_change(db, school, grade, classroom, date, period, kind, be
         else:
             payload = {"content": safe_text, "allowed_mentions": {"parse": []}} if subscription["provider"] == "discord" else {"text": safe_text}
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-        db.execute("INSERT OR IGNORE INTO webhook_deliveries(subscription_id, event_id, body, next_at) VALUES (?, ?, ?, ?)",
-                   (subscription["id"], event_id, body, now))
+        pending = db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')", (subscription["id"],)).fetchone()[0]
+        if (pending >= MAX_PENDING_PER_SUBSCRIPTION or not delivery_capacity_available(db)
+                or not delivery_payload_capacity_available(db, len(body), transaction_bytes)):
+            db.execute("UPDATE webhook_subscriptions SET dropped_events=dropped_events+1 WHERE id=?", (subscription["id"],))
+            continue
+        inserted = db.execute("INSERT OR IGNORE INTO webhook_deliveries(subscription_id, event_id, body, next_at) VALUES (?, ?, ?, ?)",
+                              (subscription["id"], event_id, body, now)).rowcount
+        if inserted and transaction_bytes is not None:
+            transaction_bytes[0] += len(body)
 
 
 class WebhookStore:
@@ -317,13 +331,17 @@ class WebhookStore:
                     return None
                 recent = row["last_test_at"] is not None and row["last_test_at"] > now - 60
                 pending = db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')", (identifier,)).fetchone()[0]
-                if recent or pending >= MAX_PENDING_PER_SUBSCRIPTION or not delivery_capacity_available(db):
+                if recent:
                     db.execute("COMMIT")
                     return False
                 event_id = "test_" + secrets.token_urlsafe(18)
                 text = "OpenCigan 테스트 알림입니다. 이 메시지는 시간표 변경이 아닙니다."
                 payload = {"content": text, "allowed_mentions": {"parse": []}} if row["provider"] == "discord" else {"text": text}
                 body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+                if (pending >= MAX_PENDING_PER_SUBSCRIPTION or not delivery_capacity_available(db)
+                        or not delivery_payload_capacity_available(db, len(body))):
+                    db.execute("COMMIT")
+                    return False
                 db.execute("INSERT INTO webhook_deliveries(subscription_id, event_id, body, next_at) VALUES (?, ?, ?, ?)", (identifier, event_id, body, now))
                 db.execute("UPDATE webhook_subscriptions SET last_test_at=? WHERE id=?", (now, identifier))
                 db.execute("COMMIT")
@@ -344,8 +362,14 @@ class WebhookStore:
         with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
             try:
+                existing = db.execute("SELECT 1 FROM webhook_deliveries WHERE subscription_id=? AND event_id=?",
+                                      (identifier, event_id)).fetchone()
+                if existing:
+                    db.execute("COMMIT")
+                    return False
                 if (db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')", (identifier,)).fetchone()[0] >= MAX_PENDING_PER_SUBSCRIPTION
-                        or not delivery_capacity_available(db)):
+                        or not delivery_capacity_available(db)
+                        or not delivery_payload_capacity_available(db, len(body))):
                     db.execute("COMMIT")
                     return False
                 inserted = db.execute("INSERT OR IGNORE INTO webhook_deliveries(subscription_id, event_id, body, next_at) VALUES (?, ?, ?, ?)",

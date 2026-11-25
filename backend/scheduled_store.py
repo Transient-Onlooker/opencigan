@@ -11,7 +11,11 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from backend.scheduled_lessons import scheduled_event_id
-from backend.webhook_store import MAX_PENDING_PER_SUBSCRIPTION, delivery_capacity_available
+from backend.webhook_store import (
+    MAX_PENDING_PER_SUBSCRIPTION,
+    delivery_capacity_available,
+    delivery_payload_capacity_available,
+)
 
 
 _MODES = {"immediate", "daily_summary", "subject_prep"}
@@ -270,7 +274,8 @@ class ScheduledStore:
                     return False
                 pending = db.execute("SELECT COUNT(*) FROM webhook_deliveries WHERE subscription_id=? AND state IN ('pending', 'leased')",
                                      (subscription_id,)).fetchone()[0]
-                if pending >= MAX_PENDING_PER_SUBSCRIPTION or not delivery_capacity_available(db):
+                if (pending >= MAX_PENDING_PER_SUBSCRIPTION or not delivery_capacity_available(db)
+                        or not delivery_payload_capacity_available(db, len(body))):
                     db.execute("COMMIT")
                     return False
                 inserted = db.execute("INSERT OR IGNORE INTO webhook_deliveries(subscription_id, event_id, body, next_at) VALUES (?, ?, ?, ?)",

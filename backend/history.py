@@ -141,6 +141,8 @@ class HistoryStore:
                     webhooks_enabled = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='webhook_subscriptions'").fetchone() is not None
                     if webhooks_enabled:
                         from backend.webhook_store import enqueue_observed_change
+                        # Reused only inside this write transaction, where no other writer can insert deliveries.
+                        transaction_bytes = []
                     for key in sorted(prior.keys() | current.keys()):
                         old = sorted(prior.get(key, []), key=lambda value: (value["subject"], value["teacher"]))
                         new = list(current.get(key, []))
@@ -160,7 +162,8 @@ class HistoryStore:
                              json.dumps(after, ensure_ascii=False) if after is not None else None))
                             if webhooks_enabled:
                                 enqueue_observed_change(db, school, key[0], key[1], key[2], key[3], kind,
-                                                        before, after, cursor.lastrowid, datetime.now(timezone.utc).timestamp())
+                                                        before, after, cursor.lastrowid, datetime.now(timezone.utc).timestamp(),
+                                                        transaction_bytes)
                 db.execute("DELETE FROM snapshot_lessons WHERE school=? AND week=?", (school, week))
                 db.execute("INSERT INTO observed_weeks VALUES (?, ?, ?, ?) ON CONFLICT(school, week) DO UPDATE SET observed_at=excluded.observed_at, started_at=excluded.started_at", (school, week, timestamp, request_started))
                 db.executemany("""INSERT INTO snapshot_lessons
