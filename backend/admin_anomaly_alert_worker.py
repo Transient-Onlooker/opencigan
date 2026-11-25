@@ -1,8 +1,7 @@
-"""Opt-in adapter from read-only access-log findings to an injected admin sink.
+"""Opt-in processing of access-log findings for administrator alerts.
 
-This module has no transport implementation. Deployments must provide an
-explicit receiver path and sender; successful finding keys are deduplicated
-only for this worker instance (no alert state is written to any database).
+The standalone worker uses a separate persistent outbox and requires explicit
+configuration. The injected adapter keeps its deduplication in memory.
 """
 
 import logging
