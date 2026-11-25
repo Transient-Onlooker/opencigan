@@ -12,7 +12,6 @@
   <a href="LICENSE"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/LICENSE-AGPL--3.0-2563eb?style=for-the-badge"></a>
   <a href="https://opencigan.mcv.kr/"><img alt="Web: OpenCigan" src="https://img.shields.io/badge/WEB-OPENCIGAN-238636?style=for-the-badge"></a>
   <a href="docs/api-guide.md"><img alt="API: v1" src="https://img.shields.io/badge/API-V1-007ec6?style=for-the-badge"></a>
-  <a href="CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-WELCOME-8250df?style=for-the-badge"></a>
 </p>
 
 <p align="center">
