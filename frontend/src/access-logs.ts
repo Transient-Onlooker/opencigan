@@ -105,10 +105,11 @@ anomalyForm.addEventListener('submit', (event) => {
       const data = await response.json();
       if (controller.signal.aborted || anomalyController !== controller || tokenInput.value !== token) return;
       if (!Array.isArray(data.findings)) throw new Error('서버의 검토 응답이 올바르지 않습니다.');
+      const kinds: Record<string, string> = { request_volume: '요청 수', error_ratio: '오류 비율', school_scan: '학교 조회 수', status_errors: '상태별 오류 수' };
       for (const item of data.findings) {
         if (!item || typeof item.client_ip !== 'string' || typeof item.kind !== 'string' || typeof item.observed !== 'number' || typeof item.threshold !== 'number') throw new Error('서버의 검토 응답이 올바르지 않습니다.');
         const row = document.createElement('li');
-        row.textContent = `${item.client_ip} · ${item.kind}${typeof item.status_group === 'string' ? ` (${item.status_group})` : ''} · ${item.observed} / 기준 ${item.threshold}`;
+        row.textContent = `${item.client_ip} · ${kinds[item.kind] ?? item.kind}${typeof item.status_group === 'string' ? ` (${item.status_group})` : ''} · ${item.observed} / 기준 ${item.threshold}`;
         anomalyResults.append(row);
       }
       anomalyState.textContent = data.findings.length ? `${data.findings.length}건의 검토 신호` : '기준을 초과한 검토 신호가 없습니다.';

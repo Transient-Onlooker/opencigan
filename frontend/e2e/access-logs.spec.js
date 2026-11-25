@@ -44,6 +44,7 @@ test('enabled anomaly review authenticates, safely renders and clears on lock', 
   await page.getByLabel('상태별 오류 기준 (선택)').fill('3');
   await page.getByRole('button', { name: '이상 조회 검토' }).click();
   await expect(page.locator('#anomaly-results')).toContainText('429');
+  await expect(page.locator('#anomaly-results')).toContainText('상태별 오류 수');
   await expect(page.locator('#anomaly-results img')).toHaveCount(0);
   expect(request.headers().authorization).toBe('Bearer test-secret');
   expect(request.url()).not.toContain('test-secret');
