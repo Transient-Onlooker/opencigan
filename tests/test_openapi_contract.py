@@ -50,6 +50,17 @@ class OpenApiContractTests(unittest.TestCase):
                                              'components': self.spec['components']})
             validator.validate({'code': code, 'error': 'unavailable', 'message': 'unavailable'})
 
+    def test_search_backoff_503_documents_retry_after(self):
+        path = '/api/v1/schools'
+        with patch('backend.app.search_schools', side_effect=TimeoutError('private upstream detail')):
+            status, headers, body = dispatch_request('GET', path, urlencode({'q': '예시'}), self.cache)
+        self.assertEqual(status, 503)
+        self.assertGreaterEqual(int(headers['Retry-After']), 1)
+        self.assertIn('Retry-After', self.spec['components']['responses']['UpstreamUnavailable']['headers'])
+        self.assert_json_response(path, status, headers, body)
+        self.assertEqual(json.loads(body)['code'], 'upstream_unavailable')
+        self.assertNotIn('private upstream detail', body.decode('utf-8'))
+
     def test_filtered_timetable_and_invalid_input_follow_schema(self):
         path = "/api/v1/timetable"
         week = self.start.isoformat()

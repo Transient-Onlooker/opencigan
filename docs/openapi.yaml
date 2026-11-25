@@ -978,6 +978,10 @@ components:
           example: { error: Rate limit exceeded, code: rate_limited }
     UpstreamUnavailable:
       description: Required provider, credentials, or cache is unavailable.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying when the cache is in backoff; omitted for other failures.
+          schema: { type: integer, minimum: 1 }
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
