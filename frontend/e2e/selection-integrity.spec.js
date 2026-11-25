@@ -1585,6 +1585,67 @@ test('editing an applied source start without saving keeps its restore pair acro
   await expect(page.getByLabel('1교시 종료', { exact: true })).toHaveValue('09:20');
 });
 
+test('source preference write failure rolls back saved bell times and explains the failure', async ({ page }) => {
+  const previousTimes = { '1': { start: '08:30', end: '09:20' } };
+  const previousPreference = JSON.stringify({ enabled: true, applied: {}, previous: {} });
+  await mockApi(page);
+  await page.addInitScript(({ id, preference }) => {
+    localStorage.setItem('opensigan-lesson-times:' + id, JSON.stringify({ '1': { start: '08:30', end: '09:20' } }));
+    localStorage.setItem('opensigan-source-lesson-preference:' + id, preference);
+    const originalSetItem = Storage.prototype.setItem;
+    let failed = false;
+    Storage.prototype.setItem = function (key, value) {
+      if (!failed && key === 'opensigan-source-lesson-preference:' + id) { failed = true; throw new DOMException('storage full', 'QuotaExceededError'); }
+      return originalSetItem.call(this, key, value);
+    };
+  }, { id: school.id, preference: previousPreference });
+  await page.route('**/api/v1/timetable?*', (route) => route.fulfill({ json: {
+    ...timetable, sourceLessonStarts: { '1': '09:00' },
+  } }));
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('#timetable-panel').getByRole('table')).toBeVisible();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('학교 교시 시각 설정', { exact: true }).click();
+  await page.getByText('상세 시간 설정하기', { exact: true }).click();
+  await page.getByRole('button', { name: '1교시 원본 시작 시각으로 되돌리기' }).click();
+  await page.getByRole('button', { name: '시각 저장', exact: true }).click();
+  await expect(page.getByText('브라우저 저장소에 설정을 저장하지 못했어요. 이전 저장값은 유지했어요.')).toBeVisible();
+  expect(JSON.parse(await page.evaluate((id) => localStorage.getItem('opensigan-lesson-times:' + id), school.id))).toEqual(previousTimes);
+  expect(await page.evaluate((id) => localStorage.getItem('opensigan-source-lesson-preference:' + id), school.id)).toBe(previousPreference);
+});
+
+test('disabling source starts keeps the enabled state and bell times when preference storage fails', async ({ page }) => {
+  const appliedTimes = { '1': { start: '09:00', end: '09:20' } };
+  const previousPreference = JSON.stringify({ enabled: true, applied: { '1': '09:00' }, previous: { '1': { start: '08:30', end: '09:20' } } });
+  await mockApi(page);
+  await page.addInitScript(({ id, preference }) => {
+    localStorage.setItem('opensigan-lesson-times:' + id, JSON.stringify({ '1': { start: '09:00', end: '09:20' } }));
+    localStorage.setItem('opensigan-source-lesson-preference:' + id, preference);
+    const originalSetItem = Storage.prototype.setItem;
+    let failed = false;
+    Storage.prototype.setItem = function (key, value) {
+      if (!failed && key === 'opensigan-source-lesson-preference:' + id) { failed = true; throw new DOMException('storage full', 'QuotaExceededError'); }
+      return originalSetItem.call(this, key, value);
+    };
+  }, { id: school.id, preference: previousPreference });
+  await page.route('**/api/v1/timetable?*', (route) => route.fulfill({ json: {
+    ...timetable, sourceLessonStarts: { '1': '09:00' },
+  } }));
+  await page.goto('/' + sharedHash(1));
+  await expect(page.locator('#timetable-panel').getByRole('table')).toBeVisible();
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('학교 교시 시각 설정', { exact: true }).click();
+  await page.getByLabel('원본 시작 시각 자동 적용').click();
+  await expect(page.getByText('브라우저 저장소에 설정을 저장하지 못했어요. 이전 저장값은 유지했어요.')).toBeVisible();
+  await expect(page.getByLabel('원본 시작 시각 자동 적용')).toBeChecked();
+  expect(JSON.parse(await page.evaluate((id) => localStorage.getItem('opensigan-lesson-times:' + id), school.id))).toEqual(appliedTimes);
+  expect(await page.evaluate((id) => localStorage.getItem('opensigan-source-lesson-preference:' + id), school.id)).toBe(previousPreference);
+  await page.getByLabel('원본 시작 시각 자동 적용').uncheck();
+  await expect(page.getByLabel('원본 시작 시각 자동 적용')).not.toBeChecked();
+  expect(JSON.parse(await page.evaluate((id) => localStorage.getItem('opensigan-lesson-times:' + id), school.id))).toEqual({ '1': { start: '08:30', end: '09:20' } });
+  expect(JSON.parse(await page.evaluate((id) => localStorage.getItem('opensigan-source-lesson-preference:' + id), school.id))).toEqual({ enabled: false, applied: {}, previous: {} });
+});
+
 test('source lesson starts follow the selected school', async ({ page }) => {
   const other = { id: '3:푸른중학교', name: '푸른중학교', region: '서울' };
   await mockApi(page);

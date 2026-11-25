@@ -44,7 +44,7 @@
   export let applyLessonTimeRules: (value: LessonTimes) => void;
   export let sourceLessonStarts: Record<string, string> | undefined;
   export let sourceLessonAutoEnabled: boolean;
-  export let setSourceLessonAuto: (enabled: boolean) => void;
+  export let setSourceLessonAuto: (enabled: boolean) => boolean;
   export let useSourceStart: (period: number) => void;
   export let saveLessonTimes: () => void;
   export let clearLessonTimes: () => void;
@@ -276,7 +276,7 @@
              <details class="lesson-time-settings" hidden={!settingsMatch('학교 교시 시각 시간 시작 종료', settingsQuery)} bind:open={settingsOpen.times}>
                <summary>학교 교시 시각 설정</summary>
                <p class="display-settings-hint">설정은 이 브라우저의 해당 학교에만 저장돼요. 원본에 시작 시각만 있으면 종료 시각은 비워 두며 추측하지 않아요.</p>
-               <label class="display-settings-hint"><input type="checkbox" checked={sourceLessonAutoEnabled} onchange={(event) => setSourceLessonAuto(event.currentTarget.checked)} /> 원본 시작 시각 자동 적용</label>
+               <label class="display-settings-hint"><input type="checkbox" checked={sourceLessonAutoEnabled} onchange={(event) => { if (!setSourceLessonAuto(event.currentTarget.checked)) event.currentTarget.checked = sourceLessonAutoEnabled; }} /> 원본 시작 시각 자동 적용</label>
                {#if sourceLessonStarts && Object.keys(sourceLessonStarts).length}
                  <div class="lesson-preview" aria-label="원본 교시 시작 시각">
                    <strong>원본 시작 시각</strong>

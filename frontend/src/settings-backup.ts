@@ -3,17 +3,34 @@ import { parseLessonTimes, parseWeekdayLessonTimes, type LessonTimes, type Weekd
 
 export const MAX_SETTINGS_BACKUP_BYTES = 64 * 1024;
 
-export function saveLessonTimePreferences(storage: Storage, schoolId: string, lessonTimes: LessonTimes, weekdayLessonTimes: WeekdayLessonTimes) {
+export function saveLessonTimePreferences(storage: Storage, schoolId: string, lessonTimes: LessonTimes, weekdayLessonTimes: WeekdayLessonTimes, sourcePreference?: unknown) {
   const key = 'opensigan-lesson-times:' + schoolId;
   const weekdayKey = 'opensigan-weekday-lesson-times:' + schoolId;
-  const previous = storage.getItem(key), previousWeekdays = storage.getItem(weekdayKey);
+  const preferenceKey = 'opensigan-source-lesson-preference:' + schoolId;
+  const keys = sourcePreference === undefined ? [key, weekdayKey] : [key, weekdayKey, preferenceKey];
+  const previous = new Map<string, string | null>(keys.map((storageKey): [string, string | null] => [storageKey, storage.getItem(storageKey)]));
+  const written: string[] = [];
   try {
     storage.setItem(key, JSON.stringify(lessonTimes));
+    written.push(key);
     storage.setItem(weekdayKey, JSON.stringify(weekdayLessonTimes));
+    written.push(weekdayKey);
+    if (sourcePreference !== undefined) {
+      storage.setItem(preferenceKey, JSON.stringify(sourcePreference));
+      written.push(preferenceKey);
+    }
   } catch {
-    try { if (previous === null) storage.removeItem(key); else storage.setItem(key, previous); } catch { /* 저장소가 계속 차단될 수 있습니다. */ }
-    try { if (previousWeekdays === null) storage.removeItem(weekdayKey); else storage.setItem(weekdayKey, previousWeekdays); } catch { /* 저장소가 계속 차단될 수 있습니다. */ }
-    throw new Error('브라우저 저장소에 설정을 저장하지 못했어요.');
+    let restored = true;
+    for (const storageKey of written.reverse()) {
+      try {
+        const previousValue = previous.get(storageKey);
+        if (previousValue == null) storage.removeItem(storageKey);
+        else storage.setItem(storageKey, previousValue);
+      } catch { restored = false; }
+    }
+    throw new Error(restored
+      ? '브라우저 저장소에 설정을 저장하지 못했어요. 이전 저장값은 유지했어요.'
+      : '설정 저장에 실패했고 일부 이전 값을 복구하지 못했어요. 브라우저 저장소를 확인해 주세요.');
   }
 }
 

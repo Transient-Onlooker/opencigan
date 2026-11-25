@@ -350,12 +350,14 @@
     lessonTimeDrafts = applySourceLessonStarts(lessonTimeDrafts, source, lessonTimePeriods, autoSourceDraftPeriods);
     autoSourceDraftPeriods = lessonTimePeriods.filter((period) => !editedSourcePeriods.has(period) && !lessonTimes[period]?.start && lessonTimeDrafts[period]?.start === source[String(period)] && !lessonTimeDrafts[period]?.end);
   }
-  function setSourceLessonAuto(enabled: boolean) {
-    if (!school || enabled === sourceLessonAutoEnabled) return;
-    sourceLessonAutoEnabled = enabled;
+  function setSourceLessonAuto(enabled: boolean): boolean {
+    if (!school || enabled === sourceLessonAutoEnabled) return true;
+    const nextTimes = { ...lessonTimes };
+    const nextDrafts = { ...lessonTimeDrafts };
+    const nextApplied = enabled ? sourceLessonApplied : {};
+    const nextPrevious = enabled ? sourceLessonPrevious : {};
+    const nextAutoDraftPeriods = enabled ? autoSourceDraftPeriods : [];
     if (!enabled) {
-      const nextTimes = { ...lessonTimes };
-      const nextDrafts = { ...lessonTimeDrafts };
       for (const [rawPeriod, start] of Object.entries(sourceLessonApplied)) {
         const period = Number(rawPeriod);
         if (nextTimes[period]?.start !== start) continue;
@@ -363,23 +365,22 @@
         if (previous) { nextTimes[period] = previous; nextDrafts[period] = previous; }
         else { delete nextTimes[period]; delete nextDrafts[period]; }
       }
-      lessonTimes = nextTimes;
-      lessonTimeDrafts = nextDrafts;
       for (const period of autoSourceDraftPeriods) {
-        const entry = { ...lessonTimeDrafts[period] };
-        if (!entry.end) { entry.start = ''; lessonTimeDrafts = { ...lessonTimeDrafts, [period]: entry }; }
-      }
-      autoSourceDraftPeriods = [];
-      if (Object.keys(sourceLessonApplied).length) {
-        try { saveLessonTimePreferences(localStorage, school.id, lessonTimes, weekdayLessonTimes); }
-        catch { lessonTimeState = '자동 원본 시각을 저장된 설정에서 지우지 못했어요. 다시 저장해 주세요.'; }
+        const entry = { ...nextDrafts[period] };
+        if (!entry.end) { entry.start = ''; nextDrafts[period] = entry; }
       }
     }
-    sourceLessonApplied = {};
-    sourceLessonPrevious = {};
-    editedSourcePeriods = new Set();
-    try { localStorage.setItem(`opensigan-source-lesson-preference:${school.id}`, JSON.stringify({ enabled, applied: {}, previous: {} })); }
-    catch { lessonTimeState = '자동 적용 설정을 저장하지 못했어요.'; }
+    try {
+      saveLessonTimePreferences(localStorage, school.id, nextTimes, weekdayLessonTimes, { enabled, applied: nextApplied, previous: nextPrevious });
+      sourceLessonAutoEnabled = enabled;
+      lessonTimes = nextTimes;
+      lessonTimeDrafts = nextDrafts;
+      sourceLessonApplied = nextApplied;
+      sourceLessonPrevious = nextPrevious;
+      autoSourceDraftPeriods = nextAutoDraftPeriods;
+      editedSourcePeriods = new Set();
+      return true;
+    } catch (error) { lessonTimeState = errorText(error); return false; }
   }
   function useSourceStart(period: number) {
     const start = activeSourceLessonStarts?.[String(period)];
@@ -431,8 +432,7 @@
       }
     }
     try {
-      saveLessonTimePreferences(localStorage, school.id, parsed, weekday);
-      localStorage.setItem(`opensigan-source-lesson-preference:${school.id}`, JSON.stringify({ enabled: sourceLessonAutoEnabled, applied: nextSourceLessonApplied, previous: nextSourceLessonPrevious }));
+      saveLessonTimePreferences(localStorage, school.id, parsed, weekday, { enabled: sourceLessonAutoEnabled, applied: nextSourceLessonApplied, previous: nextSourceLessonPrevious });
       lessonTimes = parsed;
       weekdayLessonTimes = weekday;
       sourceLessonApplied = nextSourceLessonApplied;
@@ -441,7 +441,7 @@
       editedSourcePeriods = new Set();
       lessonTimeState = '이 학교의 교시 시각을 저장했어요.';
       subscriptionUrl = ''; subscriptionPanelOpen = false; subscriptionTimesConsent = false;
-    } catch { lessonTimeState = '현재 화면에만 적용됐어요. 브라우저 저장소를 확인해 주세요.'; }
+    } catch (error) { lessonTimeState = errorText(error); }
   }
   function clearLessonTimes() {
     lessonTimeDrafts = {}; lessonTimes = {}; weekdayTimeDrafts = {}; weekdayLessonTimes = {}; lessonTimeState = '교시 시각을 초기화했어요.';
