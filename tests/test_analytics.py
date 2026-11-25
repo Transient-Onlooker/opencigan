@@ -82,6 +82,13 @@ class AnalyticsTests(unittest.TestCase):
             self.assertEqual(recorder.submit.call_args.args[:3], ("/api/v1/timetable", "GET", 503))
             self.assertEqual(recorder.submit.call_args.args[4:], (None, "service_overloaded"))
 
+    def test_stale_fallback_from_other_cached_route_is_recorded(self):
+        response = (200, {"Content-Type": "application/json; charset=utf-8"}, b'{"schools":[],"stale":true}')
+        with patch("backend.app._dispatch_request", return_value=response), patch("backend.app._api_recorder") as recorder, patch.dict("os.environ", {"OPENCIGAN_ANALYTICS_DB": "enabled"}):
+            dispatch_request("GET", "/api/v1/neis/schools", "q=example")
+            self.assertEqual(recorder.submit.call_args.args[:3], ("/api/v1/neis/schools", "GET", 200))
+            self.assertEqual(recorder.submit.call_args.args[4:], ("stale", None))
+
     def test_route_diagnostics_distinguish_overload_and_unclassified_errors(self):
         store = self.store()
         store.record_api("/api/v1/timetable", "GET", 503, 10, None, "upstream_unavailable")
