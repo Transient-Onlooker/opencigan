@@ -2,6 +2,32 @@ import { expect, test } from '@playwright/test';
 
 const school = { id: '2:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
 
+test('settings last allergy control stays above the fixed nav at 667x320', async ({ page }) => {
+  await page.setViewportSize({ width: 667, height: 320 });
+  await page.addInitScript((value) => localStorage.setItem('opensigan-school', JSON.stringify(value)), school);
+  await page.route('**/api/v1/**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/v1/timetable') return route.fulfill({ json: {
+      schoolId: school.id, weekStart: url.searchParams.get('week'), fetchedAt: '2026-11-09T01:00:00Z',
+      sourceUpdatedAt: null, stale: false, records: [{ grade: 1, class: 1, date: '2026-11-09', period: 1, subject: '수학', teacher: null, isChanged: false }],
+    } });
+    return route.fulfill({ json: { schools: [], meals: [], changes: [], stale: false } });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.locator('#settings-panel details.meal-preferences > summary').click();
+  await page.locator('#settings-panel details.allergy-settings > summary').click();
+
+  const finalControl = page.locator('#settings-panel .allergy-grid input[type="checkbox"]').last();
+  await finalControl.scrollIntoViewIfNeeded();
+  await expect(finalControl).toBeVisible();
+  const controlBox = await finalControl.boundingBox();
+  const menuBox = await page.getByRole('navigation', { name: '캘린더 메뉴' }).boundingBox();
+  expect(controlBox).not.toBeNull();
+  expect(menuBox).not.toBeNull();
+  expect(controlBox.y + controlBox.height).toBeLessThanOrEqual(menuBox.y);
+});
+
 for (const width of [320, 390, 700, 960]) {
   for (const theme of ['light', 'dark']) {
     test(`settings and selection fit ${width}px in ${theme} mode`, async ({ page }) => {
