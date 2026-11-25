@@ -25,6 +25,35 @@ async function mockApi(page, delayedSearch, onSchoolSearch) {
   });
 }
 
+test('school selection storage failure preserves the previous saved selection', async ({ page }) => {
+  const other = { id: '3:푸른중학교', name: '푸른중학교', region: '서울' };
+  await mockApi(page);
+  await page.addInitScript((previous) => {
+    localStorage.setItem('opensigan-school', JSON.stringify(previous));
+    localStorage.setItem('opensigan-grade', '1');
+    localStorage.setItem('opensigan-class', '2');
+  }, school);
+  await page.route('**/api/v1/schools?*', (route) => route.fulfill({ json: { schools: [other], stale: false } }));
+  await page.route('**/api/v1/timetable?*', (route) => route.fulfill({ json: {
+    ...timetable, schoolId: new URL(route.request().url()).searchParams.get('school'),
+  } }));
+  await page.goto('/');
+  await expect(page.locator('#timetable-panel').getByRole('table')).toBeVisible();
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'opensigan-grade') throw new DOMException('quota', 'QuotaExceededError');
+      return original.call(this, key, value);
+    };
+  });
+  await page.getByRole('button', { name: '학교/학년 변경', exact: true }).click();
+  await page.getByRole('searchbox', { name: '학교 찾기' }).fill('푸른');
+  await page.getByRole('button', { name: /푸른중학교/ }).click();
+  await expect(page.locator('#timetable-panel').getByRole('table')).toBeVisible();
+  const saved = await page.evaluate(() => [localStorage.getItem('opensigan-school'), localStorage.getItem('opensigan-grade'), localStorage.getItem('opensigan-class')]);
+  expect(saved).toEqual([JSON.stringify(school), '1', '2']);
+});
+
 test('out-of-range timetable dates show an accessible error until restored', async ({ page }) => {
   await mockApi(page);
   await page.goto('/' + sharedHash(1));
