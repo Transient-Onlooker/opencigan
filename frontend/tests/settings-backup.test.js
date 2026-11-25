@@ -54,6 +54,29 @@ test('요일별 저장 실패 시 공통 시각과 요일별 시각을 이전 �
   assert.equal(values.get(weekdayKey), 'old-weekdays');
 });
 
+test('원본 적용 기록 저장 실패 시 교시 시각도 함께 이전 값으로 되돌린다', () => {
+  const key = 'opensigan-lesson-times:' + schoolId;
+  const weekdayKey = 'opensigan-weekday-lesson-times:' + schoolId;
+  const preferenceKey = 'opensigan-source-lesson-preference:' + schoolId;
+  const values = new Map([[key, 'old-times'], [weekdayKey, 'old-weekdays'], [preferenceKey, 'old-source-preference']]);
+  let failed = false;
+  const storage = {
+    getItem: (storageKey) => values.get(storageKey) ?? null,
+    removeItem: (storageKey) => values.delete(storageKey),
+    setItem: (storageKey, value) => {
+      if (storageKey === preferenceKey && !failed) { failed = true; throw new Error('blocked'); }
+      values.set(storageKey, value);
+    },
+  };
+  assert.throws(
+    () => saveLessonTimePreferences(storage, schoolId, times, { 2: { 1: times[1] } }, { enabled: true, applied: { 1: '09:00' }, previous: {} }),
+    /이전 저장값은 유지했어요/,
+  );
+  assert.equal(values.get(key), 'old-times');
+  assert.equal(values.get(weekdayKey), 'old-weekdays');
+  assert.equal(values.get(preferenceKey), 'old-source-preference');
+});
+
 test('export and import round trip preserves school settings without allergy preferences', () => {
   const exported = createSettingsBackup(schoolId, display, times);
   const parsed = JSON.parse(exported);

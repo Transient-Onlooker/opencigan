@@ -2,9 +2,33 @@ import type { TimetableRecord } from './api';
 
 export type LessonTimes = Record<number, { start: string; end: string }>;
 export type WeekdayLessonTimes = Record<number, LessonTimes>;
+export type SourceLessonPreference = { enabled: boolean; applied: Record<string, string>; previous: LessonTimes };
 
-export function applySourceLessonStarts(drafts: LessonTimes, source: Record<string, string>, periods: number[]): LessonTimes {
+export function parseSourceLessonPreference(value: unknown): SourceLessonPreference {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return { enabled: true, applied: {}, previous: {} };
+  const saved = value as { enabled?: unknown; applied?: unknown; previous?: unknown };
+  const applied = saved.applied && typeof saved.applied === 'object' && !Array.isArray(saved.applied)
+    ? Object.fromEntries(Object.entries(saved.applied).filter(([period, start]) => /^([1-9]|1\d|20)$/.test(period) && typeof start === 'string' && minutes(start) !== null))
+    : {};
+  const previous: LessonTimes = {};
+  if (saved.previous && typeof saved.previous === 'object' && !Array.isArray(saved.previous)) {
+    for (const [period, value] of Object.entries(saved.previous)) {
+      if (!applied[period] || !value || typeof value !== 'object' || Array.isArray(value)) continue;
+      const entry = value as { start?: unknown; end?: unknown };
+      if (typeof entry.start === 'string' && typeof entry.end === 'string' && minutes(entry.start) !== null && minutes(entry.end) !== null && entry.start < entry.end) {
+        previous[Number(period)] = { start: entry.start, end: entry.end };
+      }
+    }
+  }
+  return { enabled: saved.enabled !== false, applied, previous };
+}
+
+export function applySourceLessonStarts(drafts: LessonTimes, source: Record<string, string>, periods: number[], replaceable: number[] = []): LessonTimes {
   const result = { ...drafts };
+  for (const period of replaceable) {
+    const existing = result[period];
+    if (existing && !existing.end) delete result[period];
+  }
   for (const period of periods) {
     const start = source[String(period)];
     const existing = result[period];
@@ -15,9 +39,16 @@ export function applySourceLessonStarts(drafts: LessonTimes, source: Record<stri
   return result;
 }
 
-export function lessonTimesForDate(common: LessonTimes, weekdays: WeekdayLessonTimes, date: string): LessonTimes {
+export function lessonTimesForDate(common: LessonTimes, weekdays: WeekdayLessonTimes, date: string, sourceStarts?: Record<string, string>): LessonTimes {
   const weekday = new Date(`${date}T00:00:00Z`).getUTCDay() || 7;
-  return { ...common, ...(weekdays[weekday] ?? {}) };
+  const times = { ...common };
+  for (const [rawPeriod, start] of Object.entries(sourceStarts ?? {})) {
+    const period = Number(rawPeriod);
+    if (Number.isInteger(period) && period >= 1 && period <= 20 && minutes(start) !== null && !times[period]?.start && !times[period]?.end) {
+      times[period] = { start, end: '' };
+    }
+  }
+  return { ...times, ...(weekdays[weekday] ?? {}) };
 }
 
 function minutes(value: string): number | null {

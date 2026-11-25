@@ -43,7 +43,9 @@
   export let clearWeekdayTime: (day: number, period: number) => void;
   export let applyLessonTimeRules: (value: LessonTimes) => void;
   export let sourceLessonStarts: Record<string, string> | undefined;
-  export let applySourceStarts: () => void;
+  export let sourceLessonAutoEnabled: boolean;
+  export let setSourceLessonAuto: (enabled: boolean) => boolean;
+  export let useSourceStart: (period: number) => void;
   export let saveLessonTimes: () => void;
   export let clearLessonTimes: () => void;
   export let downloadSettingsBackup: (classOnly?: boolean) => void;
@@ -273,13 +275,13 @@
              </details>
              <details class="lesson-time-settings" hidden={!settingsMatch('학교 교시 시각 시간 시작 종료', settingsQuery)} bind:open={settingsOpen.times}>
                <summary>학교 교시 시각 설정</summary>
-               <p class="display-settings-hint">학교에서 확인한 실제 시작·종료 시각을 입력해 주세요. 설정은 이 브라우저의 해당 학교에만 저장되며, 입력하지 않은 교시는 추측하지 않습니다.</p>
+               <p class="display-settings-hint">설정은 이 브라우저의 해당 학교에만 저장돼요. 원본에 시작 시각만 있으면 종료 시각은 비워 두며 추측하지 않아요.</p>
+               <label class="display-settings-hint"><input type="checkbox" checked={sourceLessonAutoEnabled} onchange={(event) => { if (!setSourceLessonAuto(event.currentTarget.checked)) event.currentTarget.checked = sourceLessonAutoEnabled; }} /> 원본 시작 시각 자동 적용</label>
                {#if sourceLessonStarts && Object.keys(sourceLessonStarts).length}
                  <div class="lesson-preview" aria-label="원본 교시 시작 시각">
                    <strong>원본 시작 시각</strong>
-                   <p>원본에서 제공한 시작 시각이에요. 빈 교시에만 입력하며 종료 시각은 직접 확인해야 해요. 저장 전에는 반영되지 않아요.</p>
+                   <p>현재 학교의 신선한 시간표 원본에서 확인한 시작 시각이에요. 종료 시각은 학교에서 확인해 입력해 주세요.</p>
                    <ol>{#each lessonTimePeriods.filter((period) => sourceLessonStarts?.[String(period)]) as period}<li>{period}교시 {sourceLessonStarts[String(period)]}</li>{/each}</ol>
-                   <button class="secondary-button" type="button" onclick={() => { timeError = null; lessonDetailsOpen = true; applySourceStarts(); }}>원본 시작 시각 입력란에 적용</button>
                  </div>
                {/if}
                <div class="lesson-rule-grid">
@@ -308,6 +310,7 @@
                      <strong>{period}교시</strong>
                      <label>시작 <input type="time" aria-label={`${period}교시 시작`} aria-invalid={timeError?.day === 0 && timeError.period === period} aria-describedby={timeError?.day === 0 && timeError.period === period ? 'lesson-time-error' : undefined} value={lessonTimeDrafts[period]?.start ?? ''} oninput={(event) => { timeError = null; editLessonTime(period, 'start', event.currentTarget.value); }} /></label>
                      <label>종료 <input type="time" aria-label={`${period}교시 종료`} aria-invalid={timeError?.day === 0 && timeError.period === period} aria-describedby={timeError?.day === 0 && timeError.period === period ? 'lesson-time-error' : undefined} value={lessonTimeDrafts[period]?.end ?? ''} oninput={(event) => { timeError = null; editLessonTime(period, 'end', event.currentTarget.value); }} /></label>
+                     {#if sourceLessonStarts?.[String(period)] && lessonTimeDrafts[period]?.start !== sourceLessonStarts[String(period)]}<button class="text-button lesson-time-revert" type="button" aria-label={`${period}교시 원본 시작 시각으로 되돌리기`} onclick={() => { timeError = null; useSourceStart(period); }}>원본 시작 시각 사용</button>{/if}
                      {#if timeError?.day === 0 && timeError.period === period}<p id="lesson-time-error" class="lesson-validation" role="alert">{timeError.message}</p>{/if}
                      {#if rulePreview}<button class="text-button lesson-time-revert" type="button" aria-label={`${period}교시 계산값으로 되돌리기`} onclick={() => { if (rulePreview) { timeError = null; editLessonTime(period, 'start', rulePreview[period].start); editLessonTime(period, 'end', rulePreview[period].end); } }}>계산값 복귀</button>{/if}
                    </div>
