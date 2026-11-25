@@ -19,6 +19,7 @@ test('mobile timetable controls remain visible when viewing next week', async ({
   await expect(panel.getByRole('button', { name: '이미지 저장·공유' })).toBeEnabled();
   await panel.getByRole('button', { name: '다음 주', exact: true }).click();
   await expect(panel.getByRole('button', { name: '이번 주로' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: '이미지 저장·공유' })).toBeEnabled();
   const bounds = await panel.locator('.heading-actions button').evaluateAll((buttons) => buttons.map((button) => {
     const { x, y, width, height } = button.getBoundingClientRect();
     return { x, y, width, height };
