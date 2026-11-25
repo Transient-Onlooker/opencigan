@@ -14,7 +14,7 @@
 | ST-04A 교시 시각 | [#219](https://github.com/Transient-Onlooker/opencigan/pull/219) 원본 시각 제안 및 기존 설정 보호 구현 | 학교별 원본 제공 범위와 실제 운영·기기 검증 |
 | ST-07 Webhook | [#220](https://github.com/Transient-Onlooker/opencigan/pull/220) 중복 이벤트 집계, [#223](https://github.com/Transient-Onlooker/opencigan/pull/223) 유휴 정리 검증, [#222](https://github.com/Transient-Onlooker/opencigan/pull/222) 인증된 목적지 수정 | 나머지 보안·운영 검증. 작업자와 실제 발송은 기본 OFF 유지 |
 
-진행 중인 [#221](https://github.com/Transient-Onlooker/opencigan/pull/221)·[#224](https://github.com/Transient-Onlooker/opencigan/pull/224)는 병합 전이므로 완료로 집계하지 않습니다. 아래 2026-11-24 현황과 실행 결과 표는 해당 시점의 기록입니다.
+[#221](https://github.com/Transient-Onlooker/opencigan/pull/221)은 병합 전이며, [#224](https://github.com/Transient-Onlooker/opencigan/pull/224)는 병합됐다. 아래 2026-11-24 현황과 실행 결과 표는 해당 시점의 기록이다.
 
 > **오늘 목표:** 기존 P0~P4에서 아직 **코드 구현·수정·자동검증이 필요한 일**만 모아, 에이전트가 의존성 순서대로 최대한 많이 완료한다. 기존 장기 로드맵을 삭제하거나 대체하지 않는 **오늘 전용 실행 큐**다.
 >
@@ -71,6 +71,9 @@ flowchart TB
 - 원본: [P0](core-quality.md), [릴리스 기준선](refactoring-and-release.md).
 
 ### ST-01 · 503 / 요청 타임아웃 경계 개선
+
+- 2026-11-25 12시경 KST 읽기 전용 Pi 확인: 공개·내부 API는 실행 중이었고 자동 릴리스 감시 타이머가 등록돼 있었다. 공개 API의 24시간 캐시 갱신 실패 로그 63건은 시간표 35건, 학교 검색 28건이며 이 중 27건은 이전 캐시로 대체했다. 06:18 이후에는 11건(시간표 6, 검색 5)이었다. 로그 건수는 방문자 수나 전체 503 건수가 아니다.
+- 확인 당시 Pi의 `current`는 `release-e11839f-recovery`, GitHub main은 `c5f546c`였다. 모든 실패의 표면 예외는 `RuntimeError`이나, 운영 pycomcigan은 상류 403·429도 `RuntimeError`로 변환하므로 이 집계로 원인이나 특정 HTTP 상태를 확정할 수 없다. 최신 진단의 운영 적용 및 경계별 확인은 미완료다.
 
 - 동일 캐시 키 갱신 대기가 끝난 시각과 대기 시간을 조회 종류별로 관측한다. 실제 갱신 시간과 다른 요청에서 수집될 수 있으며 학교명·키·요청 내용은 기록하지 않는다. 실제 운영 503 원인과 경로별 시간 예산은 아직 미확인이다.
 
