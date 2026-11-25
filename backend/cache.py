@@ -32,6 +32,7 @@ class Cache:
         self.bytes_used = 0
         self.entries = OrderedDict()
         self.refresh_observations = {}
+        self.wait_observations = {}
         self.guard = threading.Lock()
         self.locks = tuple(threading.Lock() for _ in range(lock_stripes))
         self._flights = tuple({} for _ in range(lock_stripes))
@@ -46,8 +47,20 @@ class Cache:
                 self._flights[stripe][key] = flight
             flight[1] += 1
         try:
-            with flight[0]:
+            acquired = flight[0].acquire(blocking=False)
+            if not acquired:
+                started_at = time.monotonic()
+                flight[0].acquire()
+            try:
+                if not acquired:
+                    resource = key[0] if isinstance(key, tuple) and key and key[0] in RESOURCE_TYPES else None
+                    if resource:
+                        elapsed = max(0, round((time.monotonic() - started_at) * 1000))
+                        with self.guard:
+                            self.wait_observations[resource] = {"waitMs": elapsed, "observedAt": datetime.now(timezone.utc).isoformat()}
                 yield
+            finally:
+                flight[0].release()
         finally:
             with self.locks[stripe]:
                 flight[1] -= 1
@@ -139,6 +152,10 @@ class Cache:
     def observations(self):
         with self.guard:
             return {resource: value.copy() for resource, value in self.refresh_observations.items()}
+
+    def waits(self):
+        with self.guard:
+            return {resource: value.copy() for resource, value in self.wait_observations.items()}
 
     @staticmethod
     def _stale(value):

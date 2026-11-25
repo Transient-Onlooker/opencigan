@@ -61,6 +61,7 @@ def analytics_summary(method, query_string, request_headers, headers, analytics_
         result = store.summary(days)
         result["droppedApiEvents"] = api_recorder.dropped
         result["refreshObservations"] = current_cache.observations()
+        result["cacheWaitObservations"] = current_cache.waits()
     except (ValueError, TypeError):
         return json_response(400, headers, {"error": "조회 기간은 1~90일이어야 합니다", "code": "invalid_request"})
     except (OSError, sqlite3.Error):

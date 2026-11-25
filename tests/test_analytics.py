@@ -120,6 +120,7 @@ class AnalyticsTests(unittest.TestCase):
             self.assertIn("refreshObservations", json.loads(body))
             observed_cache = Cache()
             observed_cache.get(("timetable", "private-school"), lambda: {"records": []})
+            observed_cache.wait_observations["timetable"] = {"waitMs": 321, "observedAt": "2026-11-25T00:00:00+00:00"}
             status, _, body = dispatch_request(
                 "GET", "/api/v1/admin/analytics", "days=30", cache_instance=observed_cache,
                 request_headers={"Authorization": "Bearer admin-secret"},
@@ -127,6 +128,7 @@ class AnalyticsTests(unittest.TestCase):
             self.assertEqual(status, 200)
             self.assertEqual(json.loads(body)["refreshObservations"]["timetable"]["result"], "success")
             self.assertGreaterEqual(json.loads(body)["refreshObservations"]["timetable"]["durationMs"], 0)
+            self.assertEqual(json.loads(body)["cacheWaitObservations"]["timetable"]["waitMs"], 321)
             self.assertNotIn(b"private-school", body)
 
     def test_invalid_pageview_and_invalid_period_are_rejected(self):

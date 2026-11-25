@@ -448,6 +448,15 @@ paths:
                         lastSuccessAt: { type: string, format: date-time }
                         lastFailureAt: { type: string, format: date-time }
                         durationMs: { type: integer, minimum: 0, description: Elapsed time of the latest completed refresh attempt in milliseconds; absent on older servers. }
+                  cacheWaitObservations:
+                    type: object
+                    description: Latest completed same-key cache refresh lock wait per resource in this process; separate from refresh attempts and absent on older servers.
+                    additionalProperties:
+                      type: object
+                      required: [waitMs, observedAt]
+                      properties:
+                        waitMs: { type: integer, minimum: 0 }
+                        observedAt: { type: string, format: date-time }
                   cacheStatuses:
                     type: object
                     description: Counts of recorded timetable cache outcomes; older events may have no outcome.

@@ -8,6 +8,43 @@ from backend.cache import Cache
 
 
 class CacheIntegrityTests(unittest.TestCase):
+    def test_singleflight_wait_observation_records_only_contention_without_key(self):
+        cache = Cache(lock_stripes=1)
+        key = ('timetable', 'private-school')
+        entered, release, waiting = threading.Event(), threading.Event(), threading.Event()
+        class TrackingLock:
+            def __init__(self, inner):
+                self.inner = inner
+            def acquire(self, blocking=True):
+                if blocking:
+                    waiting.set()
+                return self.inner.acquire(blocking)
+            def release(self):
+                self.inner.release()
+        def slow():
+            entered.set()
+            if not release.wait(3):
+                raise TimeoutError('fixture was not released')
+            return {'records': []}
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(cache.get, key, slow)
+            self.assertTrue(entered.wait(2))
+            with cache.locks[0]:
+                cache._flights[0][key][0] = TrackingLock(cache._flights[0][key][0])
+            second = pool.submit(cache.get, key, lambda: self.fail('duplicate fetch'))
+            try:
+                self.assertTrue(waiting.wait(2), 'second request did not wait for the flight')
+            finally:
+                release.set()
+            self.assertEqual(first.result(timeout=2), {'records': []})
+            self.assertEqual(second.result(timeout=2), {'records': []})
+        waits = cache.waits()
+        self.assertGreaterEqual(waits['timetable']['waitMs'], 0)
+        self.assertIn('observedAt', waits['timetable'])
+        self.assertNotIn('private-school', str(waits))
+        self.assertEqual(cache.get(key, lambda: self.fail('cache hit')), {'records': []})
+        self.assertEqual(cache.waits(), waits)
+
     def test_distinct_keys_do_not_block_when_lock_stripes_collide(self):
         cache = Cache(lock_stripes=1)
         started, release, fast_done = threading.Event(), threading.Event(), threading.Event()
