@@ -50,7 +50,7 @@ export function createMealSession(onChange: (state: MealState) => void) {
       } catch (error) {
         if (!controller.signal.aborted && currentSchoolId() === school.id) session.update({ searchState: errorText(error) });
       } finally {
-        if (!controller.signal.aborted && currentSchoolId() === school.id) session.update({ neisLoading: false });
+        if (!controller.signal.aborted && neisRequest === controller) session.update({ neisLoading: false });
       }
     },
     load(neisId: string, from: string, to: string, preserve: boolean, now: () => number, interval: number,
