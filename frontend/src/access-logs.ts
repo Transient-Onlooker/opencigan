@@ -54,10 +54,72 @@ const stateEl = document.querySelector<HTMLParagraphElement>('#state')!;
 const resultsSection = document.querySelector<HTMLElement>('#results')!;
 const logsBody = document.querySelector<HTMLTableSectionElement>('#logs-body')!;
 const pageInfo = document.querySelector<HTMLSpanElement>('#page-info')!;
+const anomalySection = document.querySelector<HTMLElement>('#anomaly-review')!;
+const anomalyForm = document.querySelector<HTMLFormElement>('#anomaly-form')!;
+const anomalyState = document.querySelector<HTMLElement>('#anomaly-state')!;
+const anomalyResults = document.querySelector<HTMLElement>('#anomaly-results')!;
+const anomalySubmit = document.querySelector<HTMLButtonElement>('#anomaly-submit')!;
+let anomalyController: AbortController | undefined;
+anomalySection.hidden = import.meta.env.VITE_ACCESS_ANOMALIES_ENABLED !== '1';
 
 let activeAbortController: AbortController | undefined;
 let nextCursor: string | null = null;
 let currentLoadedCount = 0;
+
+function clearAnomalies() {
+  anomalyController?.abort();
+  anomalyController = undefined;
+  anomalySubmit.disabled = false;
+  anomalyResults.replaceChildren();
+  anomalyState.textContent = '';
+}
+
+tokenInput.addEventListener('input', clearAnomalies);
+anomalyForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  clearAnomalies();
+  const token = tokenInput.value;
+  if (!token.trim()) { anomalyState.textContent = '관리자 토큰을 입력해 주세요.'; return; }
+  if (!base && location.hostname.endsWith('.github.io')) { anomalyState.textContent = 'API가 연결된 배포 주소에서 이용해 주세요.'; return; }
+  const params = new URLSearchParams({
+    window_hours: document.querySelector<HTMLInputElement>('#anomaly-window')!.value,
+    max_requests_per_ip: document.querySelector<HTMLInputElement>('#anomaly-volume')!.value,
+    max_error_ratio: document.querySelector<HTMLInputElement>('#anomaly-ratio')!.value,
+    max_distinct_schools: document.querySelector<HTMLInputElement>('#anomaly-schools')!.value,
+    min_requests: document.querySelector<HTMLInputElement>('#anomaly-minimum')!.value,
+  });
+  const statusLimit = document.querySelector<HTMLInputElement>('#anomaly-status-limit')!.value;
+  if (statusLimit) params.set('max_status_errors', statusLimit);
+  const controller = new AbortController();
+  anomalyController = controller;
+  anomalySubmit.disabled = true;
+  anomalyState.textContent = '검토 중…';
+  void (async () => {
+    try {
+      const response = await fetch(`${base}/api/v1/admin/access-anomalies?${params}`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer',
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]),
+      });
+      if (!response.ok) throw new Error(response.status === 401 ? '관리자 토큰을 확인해 주세요.' : response.status === 429 ? '요청이 많아요. 잠시 후 다시 시도해 주세요.' : response.status === 404 || response.status === 503 ? '이상 조회 검토를 사용할 수 없습니다.' : `검토에 실패했습니다. (${response.status})`);
+      const data = await response.json();
+      if (controller.signal.aborted || anomalyController !== controller || tokenInput.value !== token) return;
+      if (!Array.isArray(data.findings)) throw new Error('서버의 검토 응답이 올바르지 않습니다.');
+      const kinds: Record<string, string> = { request_volume: '요청 수', error_ratio: '오류 비율', school_scan: '학교 조회 수', status_errors: '상태별 오류 수' };
+      for (const item of data.findings) {
+        if (!item || typeof item.client_ip !== 'string' || typeof item.kind !== 'string' || typeof item.observed !== 'number' || typeof item.threshold !== 'number') throw new Error('서버의 검토 응답이 올바르지 않습니다.');
+        const row = document.createElement('li');
+        row.textContent = `${item.client_ip} · ${kinds[item.kind] ?? item.kind}${typeof item.status_group === 'string' ? ` (${item.status_group})` : ''} · ${item.observed} / 기준 ${item.threshold}`;
+        anomalyResults.append(row);
+      }
+      anomalyState.textContent = data.findings.length ? `${data.findings.length}건의 검토 신호` : '기준을 초과한 검토 신호가 없습니다.';
+    } catch (error) {
+      if (!controller.signal.aborted) { anomalyResults.replaceChildren(); anomalyState.textContent = error instanceof Error ? error.message : '검토에 실패했습니다.'; }
+    } finally {
+      if (anomalyController === controller) { anomalyController = undefined; anomalySubmit.disabled = false; }
+    }
+  })();
+});
 
 function formatKst(isoString: string): string {
   if (!isoString) return '';
@@ -319,6 +381,7 @@ nextBtn.addEventListener('click', () => {
 });
 
 lockBtn.addEventListener('click', () => {
+  clearAnomalies();
   activeAbortController?.abort();
   activeAbortController = undefined;
   searchBtn.disabled = false;

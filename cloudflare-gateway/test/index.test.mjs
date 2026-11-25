@@ -60,6 +60,35 @@ test('requires VPC service and existing core limiters', async () => {
   assert.equal((await response.json()).code, 'gateway_unconfigured');
 });
 
+test('anomaly review is opt-in and uses admin rate limiting and bearer forwarding', async () => {
+  const path = '/api/v1/admin/access-anomalies?max_status_errors=3';
+  const ip = '203.0.113.9';
+  const headers = { 'CF-Connecting-IP': ip, Authorization: 'Bearer test-secret' };
+  const disabled = setup();
+  assert.equal((await worker.fetch(req(path, { headers }), disabled.env)).status, 404);
+  assert.equal(disabled.calls.length, 0);
+  const blocked = setup({ blockedKey: `admin:${ip}` });
+  blocked.env.ACCESS_ANOMALIES_ENABLED = '1';
+  assert.equal((await worker.fetch(req(path, { headers }), blocked.env)).status, 429);
+  assert.equal(blocked.calls.length, 0);
+  const enabled = setup();
+  enabled.env.ACCESS_ANOMALIES_ENABLED = '1';
+  assert.equal((await worker.fetch(req(path, { method: 'POST', headers }), enabled.env)).status, 405);
+  assert.equal((await worker.fetch(req(path, { headers }), enabled.env)).status, 200);
+  assert.deepEqual(enabled.limits, [['general', ip], ['admin', ip]]);
+  assert.equal(enabled.calls[0].headers.get('authorization'), 'Bearer test-secret');
+  assert.equal(new URL(enabled.calls[0].url).searchParams.get('max_status_errors'), '3');
+  const noLimiter = setup();
+  noLimiter.env.ACCESS_ANOMALIES_ENABLED = '1';
+  delete noLimiter.env.ADMIN_RATE;
+  assert.equal((await worker.fetch(req(path, { headers }), noLimiter.env)).status, 503);
+  assert.equal(noLimiter.calls.length, 0);
+  const preflight = setup();
+  preflight.env.ACCESS_ANOMALIES_ENABLED = '1';
+  assert.equal((await worker.fetch(req(path, { method: 'OPTIONS', headers }), preflight.env)).status, 200);
+  assert.deepEqual(preflight.limits, [['general', `preflight:${ip}`]]);
+});
+
 test('meal, admin and webhook limits reject only their own category before forwarding', async () => {
   const ip = '203.0.113.9';
   const headers = {'CF-Connecting-IP': ip};

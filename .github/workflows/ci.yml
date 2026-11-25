@@ -48,6 +48,10 @@ jobs:
         working-directory: frontend
         env:
           VITE_HISTORY_STATS_ENABLED: '1'
+      - run: npx playwright test e2e/access-logs.spec.js --grep 'anomaly review'
+        working-directory: frontend
+        env:
+          VITE_ACCESS_ANOMALIES_ENABLED: '1'
       - run: npm run build
         working-directory: frontend
         env:
