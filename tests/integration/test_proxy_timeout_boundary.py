@@ -3,6 +3,7 @@ import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import patch
+from types import SimpleNamespace
 from urllib.request import Request
 
 from backend import app, comcigan_proxy
@@ -10,6 +11,61 @@ from backend.cache import Cache
 
 
 class ProxyTimeoutBoundaryTests(unittest.TestCase):
+    def test_upstream_503_backoff_then_recovery_removes_retry_after(self):
+        import pycomcigan.helpers as helpers
+
+        calls = []
+
+        class RecoveringProxy(BaseHTTPRequestHandler):
+            def do_GET(self):
+                calls.append(self.path)
+                self.send_response(503 if len(calls) == 1 else 200)
+                self.send_header("Content-Length", "2")
+                self.end_headers()
+                self.wfile.write(b"{}")
+
+            def log_message(self, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), RecoveringProxy)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(thread.join)
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+
+        def fetch(school, week):
+            with helpers.urlopen(Request("http://comci.net:4082/st"), timeout=1) as response:
+                response.read()
+            return {"schoolId": school, "weekStart": week, "records": [], "stale": False}
+
+        cache = Cache(ttl=60, retry_delay=10)
+        now = [100.0]
+        with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": f"http://127.0.0.1:{server.server_port}"}), \
+             patch("backend.cache.time", SimpleNamespace(monotonic=lambda: now[0])), \
+             patch.object(helpers, "urlopen", helpers.urlopen), \
+             patch.object(comcigan_proxy, "_configured", False), \
+             patch.object(app, "fetch_timetable", side_effect=fetch), \
+             patch.object(app, "validate_timetable_week"):
+            comcigan_proxy.configure_comcigan_proxy()
+
+            def request():
+                return app.dispatch_request("GET", "/api/v1/timetable", "school=1%3Atest&week=2026-11-09", cache_instance=cache)
+
+            status, headers, body = request()
+            self.assertEqual(status, 503)
+            self.assertEqual(json.loads(body)["code"], "upstream_unavailable")
+            self.assertGreater(int(headers["Retry-After"]), 0)
+            self.assertEqual(request()[0], 503)
+            self.assertEqual(len(calls), 1)
+            now[0] += 11
+            status, headers, body = request()
+            self.assertEqual(status, 200)
+            self.assertNotIn("Retry-After", headers)
+            self.assertEqual(json.loads(body)["cacheStatus"], "miss")
+            self.assertEqual(json.loads(request()[2])["cacheStatus"], "hit")
+            self.assertEqual(len(calls), 2)
+
     def test_body_timeout_after_headers_preserves_stale_and_backoff(self):
         import pycomcigan.helpers as helpers
 
