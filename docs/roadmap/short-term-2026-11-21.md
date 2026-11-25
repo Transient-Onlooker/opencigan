@@ -230,6 +230,7 @@ flowchart TB
 - [x] 공개 API 버전 변경·하위 호환 정책을 문서화한다 ([#199](https://github.com/Transient-Onlooker/opencigan/pull/199)).
 - [ ] 기존 OpenAPI 3.1과 Worker/Pi/TypeScript/Python 클라이언트의 남은 오류·응답 계약을 대조하고 계약 회귀 테스트를 보강한다. **후속:** [#227](https://github.com/Transient-Onlooker/opencigan/pull/227)·[#232](https://github.com/Transient-Onlooker/opencigan/pull/232)·[#248](https://github.com/Transient-Onlooker/opencigan/pull/248) 완료 범위는 제외하고 나머지 계약 확인.
 - [#282](https://github.com/Transient-Onlooker/opencigan/pull/282)는 `Retry-After`의 초 단위 문자열과 HTTP 날짜를 허용하도록 OpenAPI 헤더 타입을 수정했다. API 계약 검사 8건과 PR CI가 통과했다. 전체 계약 대조는 별도다.
+- Webhook 구독 생성의 비활성·구독 한도·저장소 오류 503과 관리 경로의 401·413·429·503 JSON 명세를 실제 라우트 응답과 대조했다. 실제 발송은 수행하지 않았다.
 - [#271](https://github.com/Transient-Onlooker/opencigan/pull/271)에서 이력 RSS의 저장소 비활성·장애 503 JSON 응답을 OpenAPI에 명시하고 실제 라우트 응답과 예제를 대조했다. `test_openapi_contract.py` 7건과 PR CI가 통과했다. 다른 경로와 클라이언트의 나머지 계약 확인은 별도다.
 - [ ] 관리자 관측에서 경로별 지연/오류/캐시·상류 실패를 구분하는 코드의 누락 부분만 보완한다. `status` 프로세스 생존과 상류 readiness를 섞지 않는다. **후속:** [#238](https://github.com/Transient-Onlooker/opencigan/pull/238)·[#240](https://github.com/Transient-Onlooker/opencigan/pull/240)·[#252](https://github.com/Transient-Onlooker/opencigan/pull/252) 계측 완료 범위 및 Pi HIT/MISS 내부 집계와 외부 종단을 구분.
 - [#276](https://github.com/Transient-Onlooker/opencigan/pull/276)은 학교 검색·급식 등 JSON의 오래된 캐시 대체 응답을 경로별 통계에서 `stale`로 구분한다. 분석 테스트 13건과 PR CI가 통과했다. 운영 경로 관측은 별도다.
@@ -257,7 +258,7 @@ flowchart TB
 - 기존 백엔드의 관리자 이상 조회 검토 API를 보완한다. 보존 기간과 조회 구간을 함께 적용하고 IP별 집계를 SQLite에서 수행하며, 미확인 IP를 하나의 클라이언트로 합산하지 않는다. 최초·최종 수신 시각과 임계치 경계 회귀 테스트를 추가한다. 기존 기능 플래그·인증·제한 정책은 유지한다.
 - [x] 관리자 토큰으로 보호된 읽기 전용 이상 조회 API에서 IP별 요청량·오류 비율·서로 다른 학교 수를 설정 가능한 임계치로 집계하고, 보존 기간·미확인 IP 제외·수신 시각·임계치 경계를 검증한다 ([#198](https://github.com/Transient-Onlooker/opencigan/pull/198), [#200](https://github.com/Transient-Onlooker/opencigan/pull/200)).
 - [ ] 상태별 반복 404/429/5xx 탐지, 공개 게이트웨이·관리 UI 연결 및 관리자 알림을 별도 검증한다. 자동 차단·발송 및 운영 임계치는 설정하지 않는다. **후속:** [#235](https://github.com/Transient-Onlooker/opencigan/pull/235)·[#236](https://github.com/Transient-Onlooker/opencigan/pull/236) 기본 OFF 읽기 전용 탐지·게이트웨이/UI 구현 검증 완료, 알림/운영 잔여.
-- [#274](https://github.com/Transient-Onlooker/opencigan/pull/274) 초안에서 별도 기본 OFF 관리자 알림 작업자·전용 상태 DB·제한된 수신지와 모의 발송 회귀를 구현 중이다. 실제 수신 성공 직후 중단되면 중복 수신 가능하며, 운영 임계치·발송은 설정하지 않았다. Linux CI와 최종 검토 후 상태를 확정한다.
+- [#274](https://github.com/Transient-Onlooker/opencigan/pull/274)에서 별도 기본 OFF 관리자 알림 작업자·전용 상태 DB·제한된 수신지와 모의 발송 회귀를 구현하고 Linux CI와 보안 검토를 마쳤다. 실제 수신 성공 직후 중단되면 중복 수신 가능하며, 운영 임계치·발송은 설정하지 않았다.
 - 관리자 관측 통계가 명시적으로 활성화된 동안 제공된 원본 갱신 시각을 학교·주차별로 최대 30일 관측해 서로 다른 표시 시각 사이의 간격을 계산한다. 과거 자료를 추정하지 않으며 수집 사이의 갱신은 누락될 수 있다.
 - **완료 조건:** 집계 단위·누락값·오탐 경계·권한·로그 보관 테스트. 실서비스 감지 임계치와 알림 발송은 임의로 켜지 않는다.
 - 원본: [P3 남용 탐지·P4 통계](automation-and-future.md).
