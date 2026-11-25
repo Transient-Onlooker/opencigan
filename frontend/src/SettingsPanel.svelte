@@ -2,7 +2,6 @@
   import { onMount, tick } from 'svelte';
   import Icon from './Icon.svelte';
   import BuildInfo from './BuildInfo.svelte';
-  import Suggestions from './Suggestions.svelte';
   import { allergens } from './allergens';
   import { calculateLessonTimes, validateLessonTimeDrafts, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
   import type { School } from './api';
@@ -177,7 +176,6 @@
 
 <section id="settings-panel" hidden={view !== 'settings'} aria-labelledby="settings-title">
           <h2 id="settings-title">설정</h2>
-          {#if view === 'settings' && import.meta.env.VITE_SUGGESTIONS_ENABLED !== '0'}<Suggestions />{/if}
           <label class="settings-search">설정 검색<input type="search" value={settingsQuery} oninput={(event) => updateSettingsSearch(event.currentTarget.value)} maxlength="60" placeholder="예: 교시, 알레르기, 백업" /></label>
           {#if settingsQuery.trim()}
             {#if searchResults.length}
