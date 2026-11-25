@@ -259,6 +259,18 @@ class WebhookStoreTests(unittest.TestCase):
         history.observe("2:예시학교", "2026-11-16", [modified], base + timedelta(seconds=2))
         self.assertIsNone(self.store.claim(now=base.timestamp() + 30))
 
+    def test_teacher_filter_accepts_null_and_matches_previous_teacher(self):
+        history = HistoryStore(self.path)
+        self.store.update_filters(self.subscription['id'], self.subscription['token'], {'teacher': '김'})
+        base = datetime.now(timezone.utc)
+        lesson = {"grade": 2, "class": 3, "date": "2026-11-16", "period": 1, "subject": "수학", "teacher": None}
+        history.observe("2:예시학교", "2026-11-16", [lesson], base)
+        history.observe("2:예시학교", "2026-11-16", [{**lesson, "teacher": "김"}], base + timedelta(seconds=1))
+        self.assertIsNotNone(self.store.claim(now=base.timestamp() + 30))
+        history.observe("2:예시학교", "2026-11-16", [lesson], base + timedelta(seconds=2))
+        self.assertIsNotNone(self.store.claim(now=base.timestamp() + 30))
+        self.assertEqual(len(history.list("2:예시학교", "2026-11-16")["changes"]), 2)
+
     def test_failed_enqueue_rolls_back_history_and_snapshot(self):
         history = HistoryStore(self.path)
         base = datetime.now(timezone.utc)
