@@ -182,6 +182,8 @@ flowchart TB
 
 ### ST-10 · API 호환성·가용성 계측 정리
 
+- Python·TypeScript SDK의 JSON 및 iCalendar HTTP 오류에 `Retry-After` 원문을 전달한다. 숫자와 HTTP 날짜를 그대로 제공하며 자동 재시도는 하지 않는다.
+
 - 시간표 이력 JSON 조회의 503 명세를 실제 `history_disabled` 및 저장소 오류 응답과 대조하고 각각의 회귀 검사를 추가한다. 다른 API 계약과 운영 관측은 별도다.
 - [PR #185](https://github.com/Transient-Onlooker/opencigan/pull/185): Webhook 템플릿 조회·저장·초기화와 두 제공자의 미리보기 성공 응답을 OpenAPI에 명시하고 격리 라우트 응답과 대조했다. 나머지 계약과 운영 관측은 미완료다.
 - [#190](https://github.com/Transient-Onlooker/opencigan/pull/190): 분석 API의 202/400/413/429/503 및 Retry-After 계약을 격리 라우트와 대조했다. [#199](https://github.com/Transient-Onlooker/opencigan/pull/199)에서 [공개 API 버전·하위 호환 정책](../api-versioning.md) 문서가 실제 병합됐다. 전체 응답 계약 대조와 경로별 운영 관측은 계속 미완료다.

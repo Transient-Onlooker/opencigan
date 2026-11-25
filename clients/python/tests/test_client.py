@@ -152,6 +152,21 @@ class TestOpensiganPythonClient(unittest.TestCase):
         self.assertEqual(ctx.exception.status, 502)
         self.assertIsNone(ctx.exception.code)
 
+    def test_retry_after_is_preserved_for_json_and_calendar_errors(self):
+        cases = [(429, '30', b'{"error":"limited","code":"rate_limited"}'),
+                 (503, 'Wed, 25 Nov 2026 12:00:00 GMT', b'upstream unavailable')]
+        for status, retry_after, body in cases:
+            for calendar in (False, True):
+                with self.subTest(status=status, calendar=calendar), patch.object(
+                    self.client, '_request', return_value=(status, {'Retry-After': retry_after}, body)
+                ), self.assertRaises(OpensiganError) as ctx:
+                    if calendar:
+                        self.client.get_timetable_ics('1:school', 1, 1)
+                    else:
+                        self.client.get_status()
+                self.assertEqual(ctx.exception.status, status)
+                self.assertEqual(ctx.exception.retry_after, retry_after)
+
     def test_timeout_and_sanitized_transport_error(self):
         with self.assertRaises(OpensiganError) as ctx:
             OpensiganClient(self.base_url + "/case/slow").get_status(timeout=0.03)

@@ -98,6 +98,18 @@ test('malformed success JSON is structured; HTTP error status survives invalid J
   await assert.rejects(client.getStatus(), { name: 'OpensiganError', status: 429 });
 });
 
+test('HTTP errors retain Retry-After for JSON and calendar requests', async () => {
+  for (const [status, retryAfter, body] of [
+    [429, '30', '{"error":"limited","code":"rate_limited"}'],
+    [503, 'Wed, 25 Nov 2026 12:00:00 GMT', 'unavailable'],
+  ] as const) {
+    const client = new OpensiganClient({ fetch: async () => new Response(body, { status, headers: { 'Retry-After': retryAfter } }) });
+    for (const request of [() => client.getStatus(), () => client.getTimetableIcs('1:school', 1, 1)]) {
+      await assert.rejects(request(), { name: 'OpensiganError', status, retryAfter });
+    }
+  }
+});
+
 test('configuration rejects invalid base URLs and deadlines without exposing them', async () => {
   for (const baseUrl of ['/relative', 'file:///tmp/feed', 'https://user:secret@example.com', 'https://example.com?token=secret', 'https://example.com#secret']) {
     assert.throws(() => new OpensiganClient({ baseUrl }), (error) => {
