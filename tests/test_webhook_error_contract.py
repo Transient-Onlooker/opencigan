@@ -1,7 +1,8 @@
 import json
+import os
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import yaml
 from jsonschema import Draft202012Validator
@@ -109,6 +110,33 @@ class WebhookErrorContractTests(unittest.TestCase):
                 self.assertIn("Retry-After", headers)
                 self.assertTrue(headers["Retry-After"].isdigit())
                 self.error_validator.validate(payload)
+
+    def test_management_operations_document_disabled_and_unauthorized_responses(self):
+        store = Mock()
+        for name in ("get", "update_filters", "delete", "rotate", "get_template",
+                     "update_template", "reset_template", "preview_template", "enqueue_test", "deliveries"):
+            getattr(store, name).return_value = None
+        bodies = {
+            ("/api/v1/webhooks/{id}", "put"): {"filters": {}},
+            ("/api/v1/webhooks/{id}/rotate", "post"): {"newToken": "x" * 43},
+            ("/api/v1/webhooks/{id}/template", "put"): {"template": "test", "discordEmbed": False},
+            ("/api/v1/webhooks/{id}/template/preview", "post"): {"template": "test", "discordEmbed": False},
+        }
+        for path, method in WEBHOOK_OPERATIONS[1:]:
+            with self.subTest(path=path, method=method):
+                responses = self.spec["paths"][path][method]["responses"]
+                body = json.dumps(bodies.get((path, method), {})).encode()
+                for store_value, status_code, code in ((None, 503, "webhooks_disabled"), (store, 401, "unauthorized")):
+                    with patch("backend.app._webhook_store", return_value=store_value), patch.dict(os.environ, {"OPENCIGAN_SCHEDULER_ENABLED": "1"}):
+                        status, _, result = dispatch_request(method.upper(), self.concrete_path(path), "", request_body=body,
+                                                             shutter_instance=Shutter(max_requests=0, max_load=0))
+                    self.assertEqual(status, status_code)
+                    payload = json.loads(result)
+                    self.assertEqual(payload["code"], code)
+                    ref = responses[str(status_code)]["$ref"].rsplit("/", 1)[-1]
+                    schema = self.spec["components"]["responses"][ref]["content"]["application/json"]["schema"]
+                    Draft202012Validator({"$ref": "#/$defs/response", "$defs": {"response": schema},
+                                          "components": self.spec["components"]}).validate(payload)
 
 
 if __name__ == "__main__":

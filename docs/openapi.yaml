@@ -76,9 +76,9 @@ paths:
       description: Supply this subscription's management token as a Bearer token, not the analytics administrator token.
       responses:
         '200': { description: Subscription scope and provider without destination or token. }
-        '401': { description: Invalid subscription or token. }
+        '401': { $ref: '#/components/responses/WebhookUnauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Feature disabled or storage unavailable. }
+        '503': { $ref: '#/components/responses/WebhookUnavailable' }
     put:
       tags: [System]
       summary: Replace subscription filters or its destination
@@ -120,9 +120,9 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-        '401': { description: Invalid subscription or token. }
+        '401': { $ref: '#/components/responses/WebhookUnauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Feature disabled or storage unavailable. }
+        '503': { $ref: '#/components/responses/WebhookUnavailable' }
     delete:
       tags: [System]
       summary: Delete an experimental webhook subscription
@@ -130,9 +130,9 @@ paths:
       description: Supply this subscription's management token as a Bearer token; in-flight requests cannot be recalled.
       responses:
         '200': { description: Subscription and queued deliveries deleted. }
-        '401': { description: Invalid subscription or token. }
+        '401': { $ref: '#/components/responses/WebhookUnauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Feature disabled or storage unavailable. }
+        '503': { $ref: '#/components/responses/WebhookUnavailable' }
   /api/v1/webhooks/{id}/rotate:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
@@ -159,9 +159,9 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-        '401': { description: Invalid subscription or token. }
+        '401': { $ref: '#/components/responses/WebhookUnauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Feature disabled or storage unavailable. }
+        '503': { $ref: '#/components/responses/WebhookUnavailable' }
   /api/v1/webhooks/{id}/schedule:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
@@ -194,9 +194,9 @@ paths:
                           - if: { properties: { mode: { const: subject_prep } } }
                             then: { properties: { subject: { type: string, minLength: 1, pattern: '\S' } } }
                             else: { properties: { subject: { type: 'null' } } }
-        '401': { description: Invalid subscription or token. }
+        '401': { $ref: '#/components/responses/WebhookUnauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Scheduler disabled or storage unavailable. }
+        '503': { $ref: '#/components/responses/WebhookUnavailable' }
     put:
       tags: [System]
       summary: Replace the subscription notification schedule
@@ -218,9 +218,9 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-        '401': { description: Invalid subscription or token. }
+        '401': { $ref: '#/components/responses/WebhookUnauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Scheduler disabled or storage unavailable. }
+        '503': { $ref: '#/components/responses/WebhookUnavailable' }
     delete:
       tags: [System]
       summary: Cancel the schedule and return to immediate notifications
@@ -235,9 +235,9 @@ paths:
                 required: [deleted]
                 additionalProperties: false
                 properties: { deleted: { type: boolean } }
-        '401': { description: Invalid subscription or token. }
+        '401': { $ref: '#/components/responses/WebhookUnauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Scheduler disabled or storage unavailable. }
+        '503': { $ref: '#/components/responses/WebhookUnavailable' }
   /api/v1/webhooks/{id}/template:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
@@ -258,9 +258,9 @@ paths:
                   template: { type: [string, 'null'], maxLength: 1200 }
                   discordEmbed: { type: boolean }
                   provider: { type: string, enum: [discord, google-chat] }
-        '401': { description: Invalid subscription or token. }
+        '401': { $ref: '#/components/responses/WebhookUnauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Feature disabled or storage unavailable. }
+        '503': { $ref: '#/components/responses/WebhookUnavailable' }
     put:
       tags: [System]
       summary: Save a subscription message template
@@ -288,9 +288,9 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-        '401': { description: Invalid subscription or token. }
+        '401': { $ref: '#/components/responses/WebhookUnauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Feature disabled or storage unavailable. }
+        '503': { $ref: '#/components/responses/WebhookUnavailable' }
     delete:
       tags: [System]
       summary: Restore the default subscription template
@@ -305,9 +305,9 @@ paths:
                 required: [reset]
                 additionalProperties: false
                 properties: { reset: { const: true } }
-        '401': { description: Invalid subscription or token. }
+        '401': { $ref: '#/components/responses/WebhookUnauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Feature disabled or storage unavailable. }
+        '503': { $ref: '#/components/responses/WebhookUnavailable' }
   /api/v1/webhooks/{id}/template/preview:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
@@ -366,9 +366,9 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-        '401': { description: Invalid subscription or token. }
+        '401': { $ref: '#/components/responses/WebhookUnauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Feature disabled or storage unavailable. }
+        '503': { $ref: '#/components/responses/WebhookUnavailable' }
   /api/v1/webhooks/{id}/test:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
@@ -386,14 +386,14 @@ paths:
                 type: object
                 required: [eventId]
                 properties: { eventId: { type: string } }
-        '401': { description: Invalid subscription or token. }
+        '401': { $ref: '#/components/responses/WebhookUnauthorized' }
         '413':
           description: Request body exceeds 4096 bytes.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Feature disabled or storage unavailable. }
+        '503': { $ref: '#/components/responses/WebhookUnavailable' }
   /api/v1/webhooks/{id}/deliveries:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
@@ -421,9 +421,9 @@ paths:
                         attempts: { type: integer, minimum: 0 }
                         next_at: { type: number, description: Unix timestamp in seconds. }
                         last_status: { type: [integer, 'null'] }
-        '401': { description: Invalid subscription or token. }
+        '401': { $ref: '#/components/responses/WebhookUnauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Feature disabled or storage unavailable. }
+        '503': { $ref: '#/components/responses/WebhookUnavailable' }
   /api/v1/analytics/pageview:
     post:
       tags: [System]
@@ -1017,6 +1017,21 @@ components:
         nextCursor: { type: [string, 'null'], description: Opaque cursor for the next page; null when exhausted. }
       additionalProperties: false
   responses:
+    WebhookUnauthorized:
+      description: Invalid subscription or management token.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: 인증이 필요합니다, code: unauthorized }
+    WebhookUnavailable:
+      description: Webhooks or the scheduler are disabled, storage is unavailable, or the service is temporarily overloaded.
+      headers:
+        Retry-After:
+          description: Retry delay when the service is temporarily overloaded.
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     BadRequest:
       description: Invalid or missing query parameter.
       content:
