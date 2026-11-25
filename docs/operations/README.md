@@ -10,6 +10,7 @@
 | 접속 기록 | [접속 로그](access-logs.md) · [관리자 UI](access-log-ui.md) | 수집 범위, 인증, 조회·내보내기 |
 | 사용 통계 | [이용 통계](analytics.md) | 가명 집계와 관리자 조회 |
 | 알림 | [Webhook](webhooks.md) | 현재 구현·비활성 상태·운영 전 조건 |
+| 관리자 알림 | [이상 접근 알림](admin-anomaly-alerts.md) | 기본 OFF·설정·중복 전달 한계 |
 | 배포 이력 | [Cloudflare 이전 검증](cloudflare-tunnel-rollout.md) | 특정 시점의 배포 관찰과 남은 검증 |
 
 현재 운영 상태는 문서에 적힌 과거 관찰만으로 단정하지 말고, 실제 배포 버전과 상태 점검 결과를 별도로 확인하세요.
