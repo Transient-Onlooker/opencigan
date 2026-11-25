@@ -11,7 +11,7 @@ from backend.http_core import json_response
 def access_log_admin(method, query_string, request_headers, headers, access_log_store, recorder):
     if method not in ('GET', 'HEAD'):
         return json_response(405, headers, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
-    token = os.environ.get('OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN', '')
+    token = os.environ.get('OPENCIGAN_ADMIN_TOKEN', '')
     supplied = (request_headers or {}).get('Authorization', '')
     if not token or not hmac.compare_digest(supplied.encode(), ('Bearer ' + token).encode()):
         headers['WWW-Authenticate'] = 'Bearer realm="Opencigan access logs"'
@@ -67,7 +67,7 @@ def access_anomaly_review(method, query_string, request_headers, headers, access
     if method not in ("GET", "HEAD"):
         return json_response(405, headers, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
 
-    token = os.environ.get("OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN", "")
+    token = os.environ.get("OPENCIGAN_ADMIN_TOKEN", "")
     supplied = (request_headers or {}).get("Authorization", "")
     if not token or not hmac.compare_digest(supplied.encode(), ("Bearer " + token).encode()):
         headers["WWW-Authenticate"] = 'Bearer realm="Opencigan access log anomalies"'

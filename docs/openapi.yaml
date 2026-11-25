@@ -820,7 +820,7 @@ components:
     AnalyticsAdmin:
       type: http
       scheme: bearer
-      description: Separate server-side OPENCIGAN_ANALYTICS_ADMIN_TOKEN. Never embed it in the frontend bundle.
+      description: Shared server-side OPENCIGAN_ADMIN_TOKEN. Never embed it in the frontend bundle.
   schemas:
     Error:
       type: object

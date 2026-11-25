@@ -42,7 +42,7 @@ def record_pageview(method, request_body, client, headers, analytics_store, rate
 def analytics_summary(method, query_string, request_headers, headers, analytics_store, api_recorder, current_cache):
     if method not in ("GET", "HEAD"):
         return json_response(405, headers, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
-    token = os.environ.get("OPENCIGAN_ANALYTICS_ADMIN_TOKEN", "")
+    token = os.environ.get("OPENCIGAN_ADMIN_TOKEN", "")
     supplied = (request_headers or {}).get("Authorization", "")
     if not token or not hmac.compare_digest(supplied.encode("utf-8"), f"Bearer {token}".encode("utf-8")):
         headers["WWW-Authenticate"] = 'Bearer realm="OpenSigan analytics"'

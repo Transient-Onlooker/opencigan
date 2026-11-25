@@ -16,7 +16,7 @@ def history_stats(method, query_string, request_headers, headers, history_store)
         return respond(503, "변경 통계가 비활성화되어 있습니다", "history_stats_disabled")
     if method not in ("GET", "HEAD"):
         return respond(405, "지원하지 않는 메서드입니다", "method_not_allowed")
-    token = os.environ.get("OPENCIGAN_ANALYTICS_ADMIN_TOKEN", "")
+    token = os.environ.get("OPENCIGAN_ADMIN_TOKEN", "")
     supplied = (request_headers or {}).get("Authorization", "")
     if not token or not hmac.compare_digest(supplied.encode(), ("Bearer " + token).encode()):
         headers["WWW-Authenticate"] = 'Bearer realm="OpenCigan analytics"'

@@ -8,6 +8,6 @@
 
 `sourceUpdateObservations`는 `OPENCIGAN_HISTORY_STATS_ENABLED=1`인 동안 정상 수집에서 제공된 원본 갱신 시각을 학교·주차별로 관측한 결과다. 같은 시각의 반복 수집은 한 번으로 세며, 마지막으로 본 지 30일이 지난 기록은 조회에서 제외하고 이력 정리 시 삭제한다. 시간대가 없거나 파싱할 수 없거나 수집 시각보다 미래인 원본 시각과, 더 늦게 시작한 요청에 밀린 응답은 기록하지 않는다. 관측된 서로 다른 원본 시각이 없으면 `null`이고 하나뿐이면 평균 간격도 `null`이다. 둘 이상이면 관측된 서로 다른 표시 시각 사이의 평균 초를 반환한다. 수집 사이에 지나간 원본 갱신은 알 수 없으므로 실제 갱신 주기를 보장하지 않는다. 기록은 이 기능을 켠 이후부터만 생기며 과거 이력을 임의로 생성하지 않는다.
 
-관리자용 이력 통계는 기본적으로 꺼져 있다. 격리 환경에서만 `OPENCIGAN_HISTORY_STATS_ENABLED=1`, 기존 `OPENCIGAN_HISTORY_DB`, 관리자 토큰 `OPENCIGAN_ANALYTICS_ADMIN_TOKEN`을 설정해 `/api/v1/admin/history-stats?school=...&week=YYYY-MM-DD`를 조회할 수 있다. 토큰은 `Authorization: Bearer ...` 헤더로 전달한다. 현재 공개 게이트웨이는 이 경로를 제공하지 않는다.
+관리자용 이력 통계는 기본적으로 꺼져 있다. 격리 환경에서만 `OPENCIGAN_HISTORY_STATS_ENABLED=1`, 기존 `OPENCIGAN_HISTORY_DB`, 공통 관리자 토큰 `OPENCIGAN_ADMIN_TOKEN`을 설정해 `/api/v1/admin/history-stats?school=...&week=YYYY-MM-DD`를 조회할 수 있다. 토큰은 `Authorization: Bearer ...` 헤더로 전달한다. 현재 공개 게이트웨이는 이 경로를 제공하지 않는다.
 
 응답은 최근 30일 동안 저장된 관측 변경만 집계한다. `observed=false`와 `totalChanges=null`은 유효한 최근 관측이 없음을 뜻한다. 기준선만 수집된 경우 저장된 변경은 0건일 수 있지만 실제 변경이 없었다는 의미는 아니다. 기존 이력에는 관측 횟수가 없어 기준선만 있는 경우와 반복 관측 후 변동이 없는 경우를 구분할 수 없으므로 `comparisonCoverage`는 `unknown`이다. `retainedSince`는 조회 시점 기준 보존 하한이며 최초 관측 시각이 아니다. 수집 사이의 변경이나 삭제된 이전 이력은 통계에 포함되지 않는다. 여러 변경은 다시 수집한 시점에 함께 발견될 수 있다. 컴시간 원본의 `isChanged`와 별개다.

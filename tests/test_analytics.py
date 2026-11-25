@@ -104,7 +104,7 @@ class AnalyticsTests(unittest.TestCase):
             "page": "/",
         }).encode()
         with patch("backend.app._analytics_store", return_value=store), patch.dict(
-            "os.environ", {"OPENCIGAN_ANALYTICS_ADMIN_TOKEN": "admin-secret"}
+            "os.environ", {"OPENCIGAN_ADMIN_TOKEN": "admin-secret"}
         ):
             status, _, body = dispatch_request("POST", "/api/v1/analytics/pageview", "", request_body=payload)
             self.assertEqual(status, 202)
@@ -134,7 +134,7 @@ class AnalyticsTests(unittest.TestCase):
     def test_invalid_pageview_and_invalid_period_are_rejected(self):
         store = self.store()
         with patch("backend.app._analytics_store", return_value=store), patch.dict(
-            "os.environ", {"OPENCIGAN_ANALYTICS_ADMIN_TOKEN": "admin-secret"}
+            "os.environ", {"OPENCIGAN_ADMIN_TOKEN": "admin-secret"}
         ):
             status, _, _ = dispatch_request("POST", "/api/v1/analytics/pageview", "", request_body=b"{}")
             self.assertEqual(status, 400)
@@ -194,7 +194,7 @@ class AnalyticsTests(unittest.TestCase):
         worker.start()
         try:
             with patch("backend.app._analytics_store", return_value=store), patch.dict(
-                "os.environ", {"OPENCIGAN_ANALYTICS_ADMIN_TOKEN": "admin-secret"}
+                "os.environ", {"OPENCIGAN_ADMIN_TOKEN": "admin-secret"}
             ):
                 for method in ("GET", "HEAD"):
                     conn = HTTPConnection("127.0.0.1", server.server_port, timeout=2)

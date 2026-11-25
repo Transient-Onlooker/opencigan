@@ -37,7 +37,7 @@ _MIN_ADMIN_TOKEN_LEN = 16
 
 def _check_admin_auth(request_headers, headers):
     """Verify the configured admin bearer token."""
-    admin_token = os.environ.get("OPENCIGAN_SUGGESTION_ADMIN_TOKEN", "").strip()
+    admin_token = os.environ.get("OPENCIGAN_ADMIN_TOKEN", "").strip()
     if not admin_token or len(admin_token) < _MIN_ADMIN_TOKEN_LEN:
         headers["WWW-Authenticate"] = 'Bearer realm="Suggestion admin"'
         return False

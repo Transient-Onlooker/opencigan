@@ -118,5 +118,5 @@ Cloudflare Pages → Private Worker → Workers VPC → Pi 환경에서 루프�
 
 1. 충분히 무작위인 32바이트 이상의 동일한 비밀키를 Pi의 OPENCIGAN_PROXY_IP_SIGNING_KEY에 먼저 설정하고, Worker의 PROXY_IP_SIGNING_KEY는 Wrangler secret으로 설정합니다. 키를 저장소나 프런트엔드 빌드 변수에 넣지 않습니다.
 2. 두 네트워크에서 API를 각각 한 번 호출하여 Pi의 IP별 Rate Limit 및 접속 로그가 실제 공인 IP와 일치하는지 확인합니다. 서명이 깨진 요청과 기존 Funnel 경로의 동작도 검증해야 합니다.
-3. 장기 접속 로그는 별도 OPENCIGAN_ACCESS_LOG_DB와 OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN이 있어야 활성화됩니다. 실제 값과 보존 설정은 운영 환경에서 확인합니다.
+3. 장기 접속 로그는 별도 OPENCIGAN_ACCESS_LOG_DB와 공통 관리자 토큰 OPENCIGAN_ADMIN_TOKEN이 있어야 활성화됩니다. 실제 값과 보존 설정은 운영 환경에서 확인합니다.
 4. 추가 외부망과 실제 제한 초과 상황의 검증은 기존 표본과 구분해 기록합니다.

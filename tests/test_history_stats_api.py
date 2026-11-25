@@ -23,17 +23,17 @@ class HistoryStatsApiTests(unittest.TestCase):
                                 request_headers={'Authorization': 'Bearer ' + (token or '')})
 
     def test_default_off_and_authorization(self):
-        with patch.dict('os.environ', {'OPENCIGAN_HISTORY_STATS_ENABLED': '', 'OPENCIGAN_ANALYTICS_ADMIN_TOKEN': self.token}), \
+        with patch.dict('os.environ', {'OPENCIGAN_HISTORY_STATS_ENABLED': '', 'OPENCIGAN_ADMIN_TOKEN': self.token}), \
              patch('backend.app._history_store') as store:
             self.assertEqual(self.request(token=self.token)[0], 503)
             store.assert_not_called()
-        with patch.dict('os.environ', {'OPENCIGAN_HISTORY_STATS_ENABLED': '1', 'OPENCIGAN_ANALYTICS_ADMIN_TOKEN': self.token}), \
+        with patch.dict('os.environ', {'OPENCIGAN_HISTORY_STATS_ENABLED': '1', 'OPENCIGAN_ADMIN_TOKEN': self.token}), \
              patch('backend.app._history_store') as store:
             self.assertEqual(self.request(token='wrong')[0], 401)
             store.assert_not_called()
 
     def test_validated_scope_and_unobserved_result(self):
-        with patch.dict('os.environ', {'OPENCIGAN_HISTORY_STATS_ENABLED': '1', 'OPENCIGAN_ANALYTICS_ADMIN_TOKEN': self.token}), \
+        with patch.dict('os.environ', {'OPENCIGAN_HISTORY_STATS_ENABLED': '1', 'OPENCIGAN_ADMIN_TOKEN': self.token}), \
              patch('backend.app._history_store', return_value=self.store):
             status, _, body = self.request(token=self.token)
             self.assertEqual(status, 200)
@@ -57,7 +57,7 @@ class HistoryStatsApiTests(unittest.TestCase):
             store.observe('1:Example', '2026-11-16', [{**lesson, 'subject': 'Science'}], base + timedelta(seconds=1))
             with patch.dict('os.environ', {'OPENCIGAN_HISTORY_STATS_ENABLED': '1',
                                           'OPENCIGAN_HISTORY_DB': path,
-                                          'OPENCIGAN_ANALYTICS_ADMIN_TOKEN': self.token}):
+                                          'OPENCIGAN_ADMIN_TOKEN': self.token}):
                 status, _, body = self.request(token=self.token)
             result = json.loads(body)
             self.assertEqual(status, 200)
@@ -76,7 +76,7 @@ class HistoryStatsApiTests(unittest.TestCase):
                    'REMOTE_ADDR': '127.0.0.1', 'HTTP_AUTHORIZATION': 'Bearer ' + self.token}
         statuses = []
         with patch.dict('os.environ', {'OPENCIGAN_HISTORY_STATS_ENABLED': '1',
-                                      'OPENCIGAN_ANALYTICS_ADMIN_TOKEN': self.token}), \
+                                      'OPENCIGAN_ADMIN_TOKEN': self.token}), \
              patch('backend.app._history_store', return_value=self.store):
             body = b''.join(make_app()(environ, lambda status, headers: statuses.append(status)))
         self.assertEqual(statuses, ['200 OK'])
