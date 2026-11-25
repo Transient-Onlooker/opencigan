@@ -109,6 +109,8 @@
 
 ### 2026-11-25 후속 상태 동기화
 
+> 2026-11-25 사용자 검증 범위 조정: 모바일은 현재 사용상 문제 제보 없음으로 취급하고 추가 수동 실기기 QA를 사용자에게 요구하지 않는다. PWA는 자동 브라우저 검사로 확인한다. 설정 JSON 백업/가져오기 왕복과 실제 Apple/Google Calendar 구독·갱신의 사용자 수동 검증은 이번 실행 범위에서 제외한다. 기존 기능과 자동 회귀 검사는 유지하며 미실행 검증을 통과로 표시하지 않는다. 새 결함이나 운영 필요가 생기면 별도 재검토한다.
+
 - [#241](https://github.com/Transient-Onlooker/opencigan/pull/241)·[#250](https://github.com/Transient-Onlooker/opencigan/pull/250)·[#253](https://github.com/Transient-Onlooker/opencigan/pull/253) POST 복구·1.4.8 감시 배포/핀 동기화·테스트 호환성. 사용자 직접 개입 없는 복구 사례 확보(사용자 명시); 실제 롤백 및 릴리스 이벤트 전달은 잔여.
 - [#228](https://github.com/Transient-Onlooker/opencigan/pull/228)·[#234](https://github.com/Transient-Onlooker/opencigan/pull/234)·[#237](https://github.com/Transient-Onlooker/opencigan/pull/237)·[#259](https://github.com/Transient-Onlooker/opencigan/pull/259)·[#260](https://github.com/Transient-Onlooker/opencigan/pull/260) 공유 주소·탐색·토큰 경합·부분 저장 복구·검색 캐시 병합. 배치 7 단계 1~3의 남은 상태 소유권·도메인 저장 책임은 유지.
 - 3차 QA 결함 6건 수정 병합, 운영 QA 별도. [#231](https://github.com/Transient-Onlooker/opencigan/pull/231) #230 번들 실험 폐기. 최종 통합/실기기/롤백 게이트 유지. [최신 단기 로드맵](short-term-2026-11-21.md).
