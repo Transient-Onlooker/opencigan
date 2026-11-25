@@ -58,6 +58,14 @@ class WebhookStoreTests(unittest.TestCase):
         self.store.finish(claim["id"], claim["leaseToken"], {"delivered": False, "retryable": False, "status": 400}, now=130)
         self.assertIsNone(self.store.claim(now=10000))
 
+    def test_retry_waits_for_provider_delay_above_backoff(self):
+        self.store.enqueue(self.subscription["id"], "rate_limited", b'{}', now=10)
+        claim = self.store.claim(now=10)
+        self.store.finish(claim["id"], claim["leaseToken"],
+                          {"delivered": False, "retryable": True, "status": 429, "retryAfter": 61}, now=10)
+        self.assertIsNone(self.store.claim(now=70))
+        self.assertEqual(self.store.claim(now=71)["attempt"], 2)
+
     def test_quiet_hours_defer_due_delivery_and_allow_test_messages(self):
         kst = timezone(timedelta(hours=9))
         instant = lambda day, hour, minute=0: datetime(2026, 11, day, hour, minute, tzinfo=kst).timestamp()

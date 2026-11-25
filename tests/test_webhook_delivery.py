@@ -47,3 +47,17 @@ class WebhookDeliveryTests(unittest.TestCase):
         context.__exit__ = Mock(return_value=False)
         result = send_webhook("https://discord.com/api/webhooks/123/token", b"{}", b"x" * 32, "id", lambda: context)
         self.assertEqual(result, {"delivered": False, "retryable": True, "status": None, "retryAfter": None})
+
+    def test_retry_after_fractional_seconds_are_rounded_up_and_bounded(self):
+        for value, expected in (("1.5", 2), ("60.01", 61), ("0.1", 1), ("99999.0", 3600),
+                                ("-1", None), ("nan", None), ("1e3", None), ("１", None), ("1.1234567", None)):
+            with self.subTest(value=value):
+                response = Mock(status_code=429, headers={"Retry-After": value})
+                session = Mock()
+                session.post.return_value = response
+                context = Mock()
+                context.__enter__ = Mock(return_value=session)
+                context.__exit__ = Mock(return_value=False)
+                result = send_webhook("https://discord.com/api/webhooks/123/token", b"{}", b"x" * 32, "id", lambda: context)
+                self.assertEqual(result["retryAfter"], expected)
+                response.close.assert_called_once()
