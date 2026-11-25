@@ -367,7 +367,7 @@
 .settings-search{display:grid;gap:5px;margin:0 0 12px;font-size:13px;color:var(--muted)}
 .notification-link,.notification-link:visited{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;margin:0 0 12px;padding:10px 14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:14px;font-weight:650;line-height:1.4;text-decoration:none}.notification-link:hover{background:var(--soft);border-color:var(--ink)}.notification-link:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .personal-export{margin:16px 0;color:var(--muted);font-size:12px;line-height:1.6}.personal-export button{min-height:44px}
-.settings-search input{min-width:0;min-height:44px;max-width:100%;width:100%;border:1px solid var(--line);padding:8px;background:var(--surface);color:var(--ink)}
+.settings-search input{min-height:44px;max-width:100%;width:100%;border:1px solid var(--line);padding:8px;background:var(--surface);color:var(--ink)}
 .settings-results{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
 .settings-results button{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;min-height:44px;padding:10px 8px;border:0;border-bottom:1px solid var(--line);background:var(--surface);color:var(--ink);text-align:left;cursor:pointer}
 .settings-results button:hover{background:var(--soft)}.settings-results small{color:var(--muted);text-align:right}
@@ -382,7 +382,7 @@
 .settings-backup{margin:0 0 14px;padding:0 14px 14px;border:1px solid var(--line)}
 .settings-backup summary{min-height:44px;align-content:center;cursor:pointer;font-size:14px;font-weight:650}
 .settings-backup .lesson-time-actions{margin-top:0}
-.settings-import{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:44px;font-size:14px;color:var(--ink)}
+.settings-import{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;max-width:100%;min-height:44px;font-size:14px;color:var(--ink)}
 .settings-import input{max-width:100%;min-width:0;font-size:13px}
 .settings-backup .state-inline{margin-top:10px}
 .lesson-time-settings{margin:0 0 14px;padding:0 14px 14px;border:1px solid var(--line)}.lesson-time-settings summary{min-height:44px;align-content:center;cursor:pointer;font-size:14px;font-weight:650}.lesson-time-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.lesson-time-row{display:grid;grid-template-columns:50px repeat(2,minmax(0,1fr));gap:8px;align-items:center;min-width:0;font-size:13px}.lesson-time-row>strong{font-size:13px;white-space:nowrap}.lesson-time-row label{display:grid;gap:4px;min-width:0;color:var(--muted)}.lesson-time-row input{min-width:0;width:100%;min-height:44px;padding:7px 8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:16px}.lesson-time-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 0}.lesson-time-settings .state-inline{margin-top:10px}
