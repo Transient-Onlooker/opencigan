@@ -979,8 +979,8 @@ components:
       description: Provider or deployment rate limit reached; retry later.
       headers:
         Retry-After:
-          description: Seconds to wait before retrying, when supplied by the server.
-          schema: { type: integer, minimum: 0 }
+          description: Original retry delay as delta-seconds or an HTTP-date, when supplied by the server.
+          schema: { type: string }
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -989,8 +989,8 @@ components:
       description: Required provider, credentials, or cache is unavailable.
       headers:
         Retry-After:
-          description: Seconds to wait before retrying when the cache is in backoff; omitted for other failures.
-          schema: { type: integer, minimum: 1 }
+          description: Original retry delay as delta-seconds or an HTTP-date when the cache is in backoff; omitted for other failures.
+          schema: { type: string }
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
