@@ -33,6 +33,25 @@ class WebhookStoreTests(unittest.TestCase):
         self.assertTrue(self.store.delete(identifier, token))
         self.assertIsNone(self.store.claim(now=100))
 
+    def test_observed_change_requires_every_filter_and_matching_class(self):
+        identifier, token = self.subscription["id"], self.subscription["token"]
+        matching = {"subject": "수학", "teacher": "김", "weekday": 1, "period": 1, "type": "changed"}
+        before = {"subject": "수학", "teacher": "박"}
+        after = {"subject": "과학", "teacher": "김"}
+        for index, (key, value) in enumerate((("subject", "영어"), ("teacher", "이"), ("weekday", 2), ("period", 2), ("type", "added")), 1):
+            with self.subTest(filter=key):
+                self.store.update_filters(identifier, token, {**matching, key: value})
+                with closing(self.store._connect()) as db:
+                    enqueue_observed_change(db, "2:예시학교", 2, 3, "2026-11-16", 1, "changed", before, after, index, 100)
+                self.assertEqual(self.store.deliveries(identifier, token), [])
+        self.store.update_filters(identifier, token, matching)
+        with closing(self.store._connect()) as db:
+            enqueue_observed_change(db, "2:예시학교", 2, 4, "2026-11-16", 1, "changed", before, after, 6, 100)
+            enqueue_observed_change(db, "2:다른학교", 2, 3, "2026-11-16", 1, "changed", before, after, 7, 100)
+            self.assertEqual(self.store.deliveries(identifier, token), [])
+            enqueue_observed_change(db, "2:예시학교", 2, 3, "2026-11-16", 1, "changed", before, after, 8, 100)
+        self.assertEqual([item["event_id"] for item in self.store.deliveries(identifier, token)], ["change_8"])
+
     def test_deduplication_concurrent_claim_and_expired_lease(self):
         identifier = self.subscription["id"]
         self.assertTrue(self.store.enqueue(identifier, "evt_1", b'{}', now=100))
