@@ -640,6 +640,15 @@ test('invalid shared classroom explains why the saved class is retained', async 
   await page.reload();
   await expect(page.locator('.quick-class select').nth(1)).toHaveValue('2');
   expect(await page.evaluate(() => localStorage.getItem('opensigan-class'))).toBe('2');
+  const classes = page.locator('.quick-class select').nth(1);
+  await classes.selectOption('1');
+  await expect.poll(() => new URLSearchParams(new URL(page.url()).hash.slice(1)).get('class')).toBe('1');
+  await page.goBack();
+  await expect(classes).toHaveValue('2');
+  expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('class')).toBe('2');
+  await page.goForward();
+  await expect(classes).toHaveValue('1');
+  expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('class')).toBe('1');
 });
 
 test('invalid shared classroom exposes an error and can be corrected without saving the forged class', async ({ page }) => {
