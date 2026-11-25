@@ -12,11 +12,13 @@
   export let displaySettings: DisplaySettings;
   export let lessonTimes: LessonTimes;
   export let selectTimetableDate: (event: Event, editing?: boolean) => void;
+  export let timetableDateError: string;
   export let dateText: (value: string, options?: Intl.DateTimeFormatOptions) => string;
   export let subjectStyle: (subject: string | null | undefined) => string | undefined;
 </script>
 
-<div class="day-picker"><label for="today-date">날짜</label><input id="today-date" type="date" min={week} max={addDays(week, 6)} value={selectedDay} onpaste={pasteDate} onchange={(event) => selectTimetableDate(event, true)} onblur={selectTimetableDate} onkeydown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} /><span>{selectedDay === today ? '오늘' : dateText(selectedDay, { weekday: 'long' })}</span></div>
+<div class="day-picker"><label for="today-date">날짜</label><input id="today-date" type="date" min={week} max={addDays(week, 6)} value={selectedDay} aria-invalid={!!timetableDateError} aria-describedby={timetableDateError ? 'today-date-error' : undefined} onpaste={pasteDate} oninput={(event) => selectTimetableDate(event, true)} onchange={(event) => selectTimetableDate(event, true)} onblur={selectTimetableDate} onkeydown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} /><span>{selectedDay === today ? '오늘' : dateText(selectedDay, { weekday: 'long' })}</span></div>
+            {#if timetableDateError}<p id="today-date-error" role="alert">{timetableDateError}</p>{/if}
             {#if selectedClassLessons.length}
               <div class="day-summary" aria-live="polite">
                 <span>총 {dayOverview.total}교시</span>
