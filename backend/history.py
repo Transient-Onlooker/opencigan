@@ -46,6 +46,13 @@ class HistoryStore:
                     PRIMARY KEY (school, week, grade, class_number, date, period, position)
                 );
                 CREATE TABLE IF NOT EXISTS history_migrations (name TEXT PRIMARY KEY);
+                CREATE TABLE IF NOT EXISTS source_update_observations (
+                    school TEXT NOT NULL, week TEXT NOT NULL, source_updated_at TEXT NOT NULL,
+                    first_observed_at TEXT NOT NULL, last_observed_at TEXT NOT NULL,
+                    PRIMARY KEY (school, week, source_updated_at)
+                );
+                CREATE INDEX IF NOT EXISTS source_update_observations_last_seen
+                    ON source_update_observations(last_observed_at);
             """)
             db.execute("BEGIN IMMEDIATE")
             try:
@@ -82,10 +89,20 @@ class HistoryStore:
             parsed = parsed.replace(tzinfo=timezone.utc)
         return parsed.astimezone(timezone.utc).isoformat()
 
-    def observe(self, school, week, records, observed_at=None, started_at=None):
+    def observe(self, school, week, records, observed_at=None, started_at=None, *, source_updated_at=None, track_source_updates=False):
         timestamp = self._timestamp(observed_at or datetime.now(timezone.utc))
         request_started = self._timestamp(started_at or timestamp)
         cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        source_timestamp = None
+        if track_source_updates and isinstance(source_updated_at, str):
+            try:
+                parsed_source = datetime.fromisoformat(source_updated_at.replace('Z', '+00:00'))
+                if parsed_source.tzinfo is not None:
+                    normalized = parsed_source.astimezone(timezone.utc).isoformat()
+                    if normalized <= timestamp and timestamp >= cutoff:
+                        source_timestamp = normalized
+            except (ValueError, OverflowError):
+                pass
         current = {}
         for record in records:
             key = (record["grade"], record["class"], record["date"], record["period"])
@@ -97,6 +114,7 @@ class HistoryStore:
             db.execute("BEGIN IMMEDIATE")
             try:
                 db.execute("DELETE FROM changes WHERE observed_at < ?", (cutoff,))
+                db.execute("DELETE FROM source_update_observations WHERE last_observed_at < ?", (cutoff,))
                 expired = db.execute("SELECT school, week FROM observed_weeks WHERE observed_at < ?", (cutoff,)).fetchall()
                 for old in expired:
                     db.execute("DELETE FROM snapshots WHERE school=? AND week=?", (old["school"], old["week"]))
@@ -150,6 +168,12 @@ class HistoryStore:
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     [(school, week, *key, position, value["subject"], value["teacher"])
                      for key, values in current.items() for position, value in enumerate(values)])
+                if source_timestamp is not None:
+                    db.execute("""INSERT INTO source_update_observations
+                        (school, week, source_updated_at, first_observed_at, last_observed_at)
+                        VALUES (?, ?, ?, ?, ?) ON CONFLICT(school, week, source_updated_at)
+                        DO UPDATE SET last_observed_at=MAX(last_observed_at, excluded.last_observed_at)""",
+                               (school, week, source_timestamp, timestamp, timestamp))
                 db.execute("COMMIT")
             except BaseException:
                 db.execute("ROLLBACK")
@@ -167,7 +191,7 @@ class HistoryStore:
                 return {"observed": False, "totalChanges": None, "byType": None,
                         "affectedClasses": None, "lastObservedAt": None, "retainedSince": cutoff,
                         "comparisonCoverage": "unknown", "subjectPeriods": None, "teacherOverlaps": None,
-                        "changesByObservedDay": None}
+                        "changesByObservedDay": None, "sourceUpdateObservations": None}
             rows = db.execute(
                 "SELECT type, COUNT(*) AS count FROM changes WHERE school=? AND week=? AND observed_at>=? GROUP BY type",
                 (school, week, cutoff),
@@ -209,12 +233,24 @@ class HistoryStore:
                     teacher_overlaps.append({"date": row["date"], "period": row["period"],
                                              "teacher": row["teacher"], "classes": []})
                 teacher_overlaps[-1]["classes"].append({"grade": row["grade"], "class": row["class_number"]})
+            source_rows = db.execute("""SELECT source_updated_at FROM source_update_observations
+                WHERE school=? AND week=? AND last_observed_at>=? ORDER BY source_updated_at""",
+                                     (school, week, cutoff)).fetchall()
+            source_times = [datetime.fromisoformat(row["source_updated_at"]) for row in source_rows]
+            intervals = [(end - start).total_seconds() for start, end in zip(source_times, source_times[1:])]
+            source_observations = None if not source_times else {
+                "distinctTimestamps": len(source_times), "intervalCount": len(intervals),
+                "meanIntervalSeconds": sum(intervals) / len(intervals) if intervals else None,
+                "firstSourceAt": source_rows[0]["source_updated_at"],
+                "lastSourceAt": source_rows[-1]["source_updated_at"],
+            }
             return {"observed": True, "totalChanges": sum(by_type.values()), "byType": by_type,
                     "affectedClasses": count, "lastObservedAt": observed["observed_at"], "retainedSince": cutoff,
                     "comparisonCoverage": "unknown",
                     "changesByObservedDay": [{"date": row["day"], "count": row["count"]} for row in observed_days],
                     "subjectPeriods": [{"subject": row["subject"], "classPeriods": row["periods"]}
-                                       for row in subject_periods], "teacherOverlaps": teacher_overlaps}
+                                       for row in subject_periods], "teacherOverlaps": teacher_overlaps,
+                    "sourceUpdateObservations": source_observations}
 
     def list(self, school, week, cursor=None, limit=50, grade=None, classroom=None, include_ids=False, filters=None):
         if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
@@ -234,6 +270,7 @@ class HistoryStore:
         with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
             db.execute("DELETE FROM changes WHERE observed_at < ?", (cutoff,))
+            db.execute("DELETE FROM source_update_observations WHERE last_observed_at < ?", (cutoff,))
             expired = db.execute("SELECT school, week FROM observed_weeks WHERE observed_at < ?", (cutoff,)).fetchall()
             for old in expired:
                 db.execute("DELETE FROM snapshots WHERE school=? AND week=?", (old["school"], old["week"]))
