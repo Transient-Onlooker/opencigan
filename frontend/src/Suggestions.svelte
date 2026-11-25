@@ -76,8 +76,8 @@
 {/if}
 
 <style>
-  .suggestions{border:1px solid var(--line);margin:12px 0;padding:12px;overflow-wrap:anywhere}
-  summary{cursor:pointer;font-weight:700;min-height:44px;align-content:center}
+  .suggestions{margin:4px 0 0;max-width:600px;min-width:0;overflow-wrap:anywhere}
+  summary{cursor:pointer;font-size:14px;font-weight:650;min-height:44px;align-content:center}
   form,label{display:grid;gap:8px} form{margin:12px 0} label{font-weight:600}
   input,textarea{box-sizing:border-box;width:100%;min-width:0;padding:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit}
   button{min-height:44px;padding:8px 12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;cursor:pointer}
