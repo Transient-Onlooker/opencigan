@@ -129,7 +129,8 @@ class Cache:
                         break
                     cause = cause.__cause__
                 status = cause.code if isinstance(cause, HTTPError) and type(cause.code) is int and 100 <= cause.code <= 599 else None
-                cause_type = type(cause).__name__ if type(cause) in (HTTPError, URLError, TimeoutError, OSError, ValueError, RuntimeError) else "other"
+                cause_type = next((cls.__name__ for cls in (HTTPError, URLError, TimeoutError, OSError, ValueError, RuntimeError)
+                                   if isinstance(cause, cls)), "other")
                 logger.warning("cache refresh failed resource=%s fallback=%s error_type=%s upstream_http_status=%s cause_type=%s",
                                resource or "other", "stale" if previous_value is not None else "none", type(exc).__name__, status, cause_type)
                 if previous_value is not None:

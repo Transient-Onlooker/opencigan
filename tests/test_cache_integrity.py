@@ -194,6 +194,21 @@ class CacheIntegrityTests(unittest.TestCase):
         for secret in ("private.test", "token", "secret", "private response", "private wrapper", "private-school"):
             self.assertNotIn(secret, logs.output[0])
 
+    def test_wrapped_connection_error_is_classified_without_message(self):
+        cache = Cache(retry_delay=0)
+
+        def fail():
+            try:
+                raise ConnectionResetError("private connection")
+            except ConnectionResetError as exc:
+                raise RuntimeError("private wrapper") from exc
+
+        with self.assertLogs("opensigan.cache", level="WARNING") as logs:
+            with self.assertRaises(RuntimeError):
+                cache.get(("school_search", "private-school"), fail)
+        self.assertIn("cause_type=OSError", logs.output[0])
+        self.assertNotIn("private", logs.output[0])
+
     def test_suppressed_error_is_not_inferred_from_context(self):
         cache = Cache(retry_delay=0)
 
