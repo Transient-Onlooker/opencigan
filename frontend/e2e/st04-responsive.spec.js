@@ -1,0 +1,54 @@
+import { expect, test } from '@playwright/test';
+
+const school = { id: '2:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
+
+for (const width of [320, 390, 700, 960]) {
+  for (const theme of ['light', 'dark']) {
+    test(`settings and selection fit ${width}px in ${theme} mode`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.addInitScript(({ school, theme }) => {
+        localStorage.setItem('opensigan-school', JSON.stringify(school));
+        localStorage.setItem('opensigan-theme', theme);
+      }, { school, theme });
+      await page.route('**/api/v1/**', async (route) => {
+        const url = new URL(route.request().url());
+        if (url.pathname === '/api/v1/timetable') return route.fulfill({ json: {
+          schoolId: school.id, weekStart: url.searchParams.get('week'), fetchedAt: '2026-11-09T01:00:00Z',
+          sourceUpdatedAt: null, stale: false, records: [{ grade: 1, class: 1, date: '2026-11-09', period: 1, subject: '수학', teacher: null, isChanged: false }],
+        } });
+        return route.fulfill({ json: { schools: [], meals: [], changes: [], stale: false } });
+      });
+      await page.goto('/');
+      await page.getByRole('button', { name: '설정', exact: true }).click();
+      await page.getByText('일반 설정', { exact: true }).click();
+      await page.getByLabel('테마').selectOption(theme);
+      if (theme === 'dark') await expect(page.locator('.app-shell')).toHaveClass(/dark/);
+      else await expect(page.locator('.app-shell')).not.toHaveClass(/dark/);
+      await page.getByText('시간표 표시 설정', { exact: true }).click();
+      await page.getByLabel('시간표 밀도').selectOption('relaxed');
+      await page.getByLabel('종료된 수업 표시').selectOption('hide');
+      const overflow = await page.evaluate(() => {
+        const width = document.documentElement.clientWidth;
+        return [...document.querySelectorAll('#settings-panel details[open], #settings-panel select, #settings-panel input')]
+          .filter((element) => {
+            const rect = element.getBoundingClientRect();
+            return rect.width && (rect.left < 0 || rect.right > width + 1);
+          })
+          .map((element) => ({ selector: element.tagName.toLowerCase() + (element.className ? '.' + String(element.className).trim().replaceAll(' ', '.') : ''), left: Math.round(element.getBoundingClientRect().left), right: Math.round(element.getBoundingClientRect().right) }));
+      });
+      expect(overflow, `settings overflow at ${width}px`).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      await page.getByRole('button', { name: '학교/학년 변경' }).click();
+      const selectionWidth = await page.locator('#school-settings').evaluate((element) => ({ right: element.getBoundingClientRect().right, width: element.getBoundingClientRect().width }));
+      expect(selectionWidth.right, `school selector overflow at ${width}px`).toBeLessThanOrEqual(width + 1);
+      for (const control of ['#school', '#grade', '#classroom']) {
+        const rect = await page.locator('#school-settings').locator(control).evaluate((element) => {
+          const { left, right } = element.getBoundingClientRect();
+          return { left, right };
+        });
+        expect(rect.left, `${control} left at ${width}px`).toBeGreaterThanOrEqual(-1);
+        expect(rect.right, `${control} right at ${width}px`).toBeLessThanOrEqual(width + 1);
+      }
+    });
+  }
+}
