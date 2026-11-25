@@ -114,6 +114,36 @@ class HistoryTests(unittest.TestCase):
         self.store.observe('s', 'w', [first], base + timedelta(seconds=1))
         self.assertEqual(self.store.change_stats('s', 'w')['teacherOverlaps'], [])
 
+    def test_source_update_observations_are_opt_in_deduplicated_and_bounded(self):
+        base = datetime.now(timezone.utc).replace(microsecond=0)
+        first = (base - timedelta(hours=2)).isoformat()
+        second = (base - timedelta(hours=1)).isoformat()
+        self.store.observe('s', 'w', [lesson()], base, source_updated_at=first)
+        self.assertIsNone(self.store.change_stats('s', 'w')['sourceUpdateObservations'])
+        self.store.observe('s', 'w', [lesson()], base, source_updated_at=first, track_source_updates=True)
+        self.store.observe('s', 'w', [lesson()], base + timedelta(seconds=1), source_updated_at=first, track_source_updates=True)
+        stats = self.store.change_stats('s', 'w')['sourceUpdateObservations']
+        self.assertEqual(stats['distinctTimestamps'], 1)
+        self.assertEqual(stats['intervalCount'], 0)
+        self.assertIsNone(stats['meanIntervalSeconds'])
+        self.store.observe('s', 'w', [lesson()], base + timedelta(seconds=2), source_updated_at=second, track_source_updates=True)
+        self.store.observe('s', 'w', [lesson()], base + timedelta(seconds=3), source_updated_at='not-a-date', track_source_updates=True)
+        self.store.observe('s', 'w', [lesson()], base + timedelta(seconds=4), source_updated_at=(base + timedelta(days=1)).isoformat(), track_source_updates=True)
+        self.store.observe('other', 'w', [lesson()], base + timedelta(seconds=4), source_updated_at=first, track_source_updates=True)
+        self.store.observe('s', 'w', [lesson()], base + timedelta(seconds=5), started_at=base - timedelta(seconds=1),
+                           source_updated_at=(base - timedelta(minutes=30)).isoformat(), track_source_updates=True)
+        stats = self.store.change_stats('s', 'w')['sourceUpdateObservations']
+        self.assertEqual((stats['distinctTimestamps'], stats['intervalCount'], stats['meanIntervalSeconds']), (2, 1, 3600))
+        self.assertEqual((stats['firstSourceAt'], stats['lastSourceAt']), (first, second))
+        with closing(sqlite3.connect(self.store.path)) as db:
+            db.execute('UPDATE source_update_observations SET last_observed_at=? WHERE school=?',
+                       ((base - timedelta(days=31)).isoformat(), 's'))
+            db.commit()
+        self.assertIsNone(self.store.change_stats('s', 'w')['sourceUpdateObservations'])
+        self.store.list('s', 'w')
+        with closing(sqlite3.connect(self.store.path)) as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM source_update_observations WHERE school=?', ('s',)).fetchone()[0], 0)
+
     def test_existing_snapshot_migrates_once_and_retains_baseline(self):
         path = Path(self.temp.name) / "legacy.sqlite"
         db = sqlite3.connect(path)

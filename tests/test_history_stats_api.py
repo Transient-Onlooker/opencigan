@@ -51,7 +51,9 @@ class HistoryStatsApiTests(unittest.TestCase):
             store = HistoryStore(path)
             base = datetime.now(timezone.utc)
             lesson = {'grade': 1, 'class': 1, 'date': '2026-11-16', 'period': 1, 'subject': 'Math', 'teacher': 'A'}
-            store.observe('1:Example', '2026-11-16', [lesson], base)
+            source_time = (base - timedelta(hours=1)).isoformat()
+            store.observe('1:Example', '2026-11-16', [lesson], base,
+                          source_updated_at=source_time, track_source_updates=True)
             store.observe('1:Example', '2026-11-16', [{**lesson, 'subject': 'Science'}], base + timedelta(seconds=1))
             with patch.dict('os.environ', {'OPENCIGAN_HISTORY_STATS_ENABLED': '1',
                                           'OPENCIGAN_HISTORY_DB': path,
@@ -66,6 +68,8 @@ class HistoryStatsApiTests(unittest.TestCase):
             self.assertEqual(result['changesByObservedDay'], [{'date': observed_day, 'count': 1}])
             self.assertEqual(result['subjectPeriods'], [{'subject': 'Science', 'classPeriods': 1}])
             self.assertEqual(result['teacherOverlaps'], [])
+            self.assertEqual(result['sourceUpdateObservations']['distinctTimestamps'], 1)
+            self.assertIsNone(result['sourceUpdateObservations']['meanIntervalSeconds'])
 
     def test_wsgi_forwards_admin_authentication(self):
         environ = {'REQUEST_METHOD': 'GET', 'PATH_INFO': self.path, 'QUERY_STRING': self.query,
