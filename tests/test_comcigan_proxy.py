@@ -99,10 +99,18 @@ class ComciganProxyTests(unittest.TestCase):
             proxy = f"http://127.0.0.1:{server.server_port}"
             with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": proxy, "no_proxy": "comci.net"}):
                 comcigan_proxy.configure_comcigan_proxy()
+                # This test verifies the proxy itself, so it builds a
+                # standard Request and calls the replaced transport
+                # directly instead of entering through a pycomcigan
+                # helper; internal helper signatures must not affect it.
+                request = Request("http://comci.net:4082/12345", data=b"encoded-body",
+                                  headers={"Content-Type": "text/plain; charset=UTF-8",
+                                           "X-Hour-Token": "test-token"})
                 with self.assertLogs("opensigan.comcigan_proxy", level="INFO") as logs:
-                    response = helpers.get_response_encoding("http://comci.net:4082/12345", "UTF-8",
-                                                             request_token="test-token", body=b"encoded-body")
-            self.assertEqual(response.text, "{}")
+                    response = helpers.urlopen(request, timeout=30)
+                    text = response.read().decode("UTF-8")
+                    response.close()
+            self.assertEqual(text, "{}")
             self.assertEqual(received, [("http://comci.net:4082/12345", "text/plain; charset=UTF-8",
                                          "test-token", b"encoded-body")])
             self.assertIn("stage=data", logs.output[0])
