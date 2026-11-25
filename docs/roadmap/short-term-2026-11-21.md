@@ -195,7 +195,7 @@ flowchart TB
 - [PR #179](https://github.com/Transient-Onlooker/opencigan/pull/179): 관리 링크 교체와 응답 유실 시 복구 안내를 추가하고 자동 검사를 통과했다. 운영 Webhook API와 발송 작업자는 별도 활성화하지 않았다.
 - 대기열이 가득 찬 상태에서 이미 큐에 있는 동일 관측을 다시 처리하면 실제 누락이 없는데 `dropped_events`가 증가하던 문제를 수정한다. 중복 관측과 신규 관측을 구분하는 격리 회귀를 추가하며 운영 발송은 비활성 상태를 유지한다.
 - [ ] 이미 있는 기본 비활성 API/큐/이력에서 빠진 구독 CRUD, 높은 엔트로피 관리 링크 인증·폐기, HMAC, 실패 재시도·멱등성·저장/큐 상한을 보강한다. **후속:** [#220](https://github.com/Transient-Onlooker/opencigan/pull/220)·[#221](https://github.com/Transient-Onlooker/opencigan/pull/221)·[#222](https://github.com/Transient-Onlooker/opencigan/pull/222)·[#223](https://github.com/Transient-Onlooker/opencigan/pull/223)·[#224](https://github.com/Transient-Onlooker/opencigan/pull/224)·[#226](https://github.com/Transient-Onlooker/opencigan/pull/226) 반영. #221의 소수 초 재시도 지연 처리는 격리 테스트를 통과했으며 운영 발송은 계속 비활성 상태다.
-- [ ] 학급/과목/교사/요일/교시/변경 유형 필터·방해 금지 시간, 테스트 발송, 최근 성공/실패/재시도 조회를 API·UI 양쪽에서 연결한다. **후속:** [#247](https://github.com/Transient-Onlooker/opencigan/pull/247) 교사 null 검증 완료, 전체 옵션·UI 잔여.
+- [x] 학급/과목/교사/요일/교시/변경 유형 필터·방해 금지 시간, 테스트 발송, 최근 성공/실패/재시도 조회를 API·UI 양쪽에서 연결한다. 기존 구현과 [#247](https://github.com/Transient-Onlooker/opencigan/pull/247) 교사 null 검증을 확인했고, 모의 API를 사용하는 Chromium 검사에서 필터 전체와 테스트 대기열·인증·상태 조회 연결을 검증했다. 실제 외부 발송은 OFF다.
 - **완료 조건:** 타 구독 접근 불가·토큰 유출 방지·중복/재시도·필터 회귀. 실제 Discord/Google Chat 발송 백엔드는 계속 OFF.
 - 원본: [P3 Webhook](automation-and-future.md), [Webhook 문서](../operations/webhooks.md).
 
@@ -315,7 +315,7 @@ flowchart TB
 ## 현황 요약 (2026-11-25 갱신)
 
 - 작업 단위 16개: 구현·자동검증 완료 7개(ST-00/ST-02/ST-03/ST-05/ST-06/ST-08/ST-09), 부분 진행 9개, 미착수 0개. 7/16 (43.75%)는 항목 수 기준이며 공수·배포율이 아니다.
-- 세부 체크리스트: **26/43 (60.5%)**. 11/24 역사적 집계 18/42 및 6/16; 2026-11-26 #272의 원본 교시 시각 기본 적용을 완료했다.
+- 세부 체크리스트: **27/43 (62.8%)**. 11/24 역사적 집계 18/42 및 6/16; 2026-11-26 #272의 원본 교시 시각 기본 적용과 웹훅 필터 UI 연결 검증을 완료했다.
 - [#213](https://github.com/Transient-Onlooker/opencigan/pull/213)·[#245](https://github.com/Transient-Onlooker/opencigan/pull/245)·[#255](https://github.com/Transient-Onlooker/opencigan/pull/255) ST-03 완료, [#219](https://github.com/Transient-Onlooker/opencigan/pull/219) ST-04A 핵심 구현, [#229](https://github.com/Transient-Onlooker/opencigan/pull/229)·[#249](https://github.com/Transient-Onlooker/opencigan/pull/249) ST-11 집계 완료. #162는 대체 종료, #221은 그대로 유지.
 - 다음: 실제 공개 성능·요청 경계와 추가 학교 원본 형식은 운영 전용 검증으로 따로 남긴다. ST-07/10/11/12/13의 남은 개발 요구를 검토하고 ST-14에서 통합 회귀를 수행한다. 완료된 구현을 반복하지 않으며 수동 실기기 QA와 실제 캘린더 구독 검증은 이번 실행에서 제외한다. 운영·발송 활성화는 별도다.
 
