@@ -38,6 +38,18 @@ class OpenApiContractTests(unittest.TestCase):
                                          "components": self.spec["components"]}, format_checker=FormatChecker())
         validator.validate(json.loads(body))
 
+    def test_status_documents_gateway_errors_and_retry_header(self):
+        operation = self.spec['paths']['/api/v1/status']['get']
+        self.assertIn('429', operation['responses'])
+        self.assertIn('503', operation['responses'])
+        response = self.spec['components']['responses']['TooManyRequests']
+        self.assertIn('Retry-After', response['headers'])
+        for status, code in ((429, 'edge_rate_limited'), (503, 'gateway_unavailable'), (503, 'gateway_unconfigured')):
+            schema = self.response_schema('/api/v1/status', status, 'application/json')
+            validator = Draft202012Validator({'$ref': '#/$defs/response', '$defs': {'response': schema},
+                                             'components': self.spec['components']})
+            validator.validate({'code': code, 'error': 'unavailable', 'message': 'unavailable'})
+
     def test_filtered_timetable_and_invalid_input_follow_schema(self):
         path = "/api/v1/timetable"
         week = self.start.isoformat()

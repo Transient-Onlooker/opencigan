@@ -60,6 +60,23 @@ test('requires VPC service and existing core limiters', async () => {
   assert.equal((await response.json()).code, 'gateway_unconfigured');
 });
 
+test('status may report gateway rate limiting or private connection failure', async () => {
+  const limited = setup({ general: false });
+  const blocked = await worker.fetch(req('/api/v1/status'), limited.env);
+  assert.equal(blocked.status, 429);
+  assert.equal(blocked.headers.get('retry-after'), '60');
+  assert.equal((await blocked.json()).code, 'edge_rate_limited');
+  assert.equal(limited.calls.length, 0);
+
+  const unavailable = setup({ failFetch: true });
+  const failed = await worker.fetch(req('/api/v1/status'), unavailable.env);
+  assert.equal(failed.status, 503);
+  const body = await failed.json();
+  assert.equal(body.code, 'gateway_unavailable');
+  assert.equal(typeof body.error, 'string');
+  assert.equal(unavailable.calls.length, 1);
+});
+
 test('anomaly review is opt-in and uses admin rate limiting and bearer forwarding', async () => {
   const path = '/api/v1/admin/access-anomalies?max_status_errors=3';
   const ip = '203.0.113.9';

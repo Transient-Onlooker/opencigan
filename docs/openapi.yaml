@@ -518,6 +518,13 @@ paths:
               schema: { $ref: '#/components/schemas/Status' }
               example: { status: ok, scope: process liveness }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: The public gateway is unconfigured or cannot reach the private API; this does not establish upstream provider health.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: API connection unavailable, code: gateway_unavailable }
   /api/v1/schools:
     get:
       tags: [Schools]
