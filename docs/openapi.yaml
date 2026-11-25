@@ -48,7 +48,11 @@ paths:
                   token: { type: string }
                   provider: { type: string, enum: [discord, google-chat] }
         '400': { description: Invalid request. }
-        '413': { description: Body exceeds 4096 bytes. }
+        '413':
+          description: Request body exceeds 4096 bytes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '503':
           description: Feature disabled, subscription limit reached, or storage unavailable.
@@ -73,6 +77,7 @@ paths:
       responses:
         '200': { description: Subscription scope and provider without destination or token. }
         '401': { description: Invalid subscription or token. }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { description: Feature disabled or storage unavailable. }
     put:
       tags: [System]
@@ -110,6 +115,11 @@ paths:
       responses:
         '200': { description: Filters or destination replaced. }
         '400': { description: Invalid filters or destination, or different destination provider. }
+        '413':
+          description: Request body exceeds 4096 bytes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '401': { description: Invalid subscription or token. }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { description: Feature disabled or storage unavailable. }
@@ -121,6 +131,7 @@ paths:
       responses:
         '200': { description: Subscription and queued deliveries deleted. }
         '401': { description: Invalid subscription or token. }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { description: Feature disabled or storage unavailable. }
   /api/v1/webhooks/{id}/rotate:
     parameters:
@@ -143,6 +154,11 @@ paths:
       responses:
         '200': { description: Token replaced; existing subscription and queued deliveries are preserved. }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '413':
+          description: Request body exceeds 4096 bytes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '401': { description: Invalid subscription or token. }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { description: Feature disabled or storage unavailable. }
@@ -179,6 +195,7 @@ paths:
                             then: { properties: { subject: { type: string, minLength: 1, pattern: '\S' } } }
                             else: { properties: { subject: { type: 'null' } } }
         '401': { description: Invalid subscription or token. }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { description: Scheduler disabled or storage unavailable. }
     put:
       tags: [System]
@@ -196,7 +213,13 @@ paths:
             application/json:
               schema: *scheduleResponse
         '400': { $ref: '#/components/responses/BadRequest' }
+        '413':
+          description: Request body exceeds 4096 bytes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '401': { description: Invalid subscription or token. }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { description: Scheduler disabled or storage unavailable. }
     delete:
       tags: [System]
@@ -213,6 +236,7 @@ paths:
                 additionalProperties: false
                 properties: { deleted: { type: boolean } }
         '401': { description: Invalid subscription or token. }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { description: Scheduler disabled or storage unavailable. }
   /api/v1/webhooks/{id}/template:
     parameters:
@@ -235,6 +259,7 @@ paths:
                   discordEmbed: { type: boolean }
                   provider: { type: string, enum: [discord, google-chat] }
         '401': { description: Invalid subscription or token. }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { description: Feature disabled or storage unavailable. }
     put:
       tags: [System]
@@ -258,7 +283,13 @@ paths:
             application/json:
               schema: *webhookTemplateResult
         '400': { $ref: '#/components/responses/BadRequest' }
+        '413':
+          description: Request body exceeds 4096 bytes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '401': { description: Invalid subscription or token. }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { description: Feature disabled or storage unavailable. }
     delete:
       tags: [System]
@@ -275,6 +306,7 @@ paths:
                 additionalProperties: false
                 properties: { reset: { const: true } }
         '401': { description: Invalid subscription or token. }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { description: Feature disabled or storage unavailable. }
   /api/v1/webhooks/{id}/template/preview:
     parameters:
@@ -329,7 +361,13 @@ paths:
                         additionalProperties: false
                         properties: { text: { type: string, maxLength: 1800 } }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '413':
+          description: Request body exceeds 4096 bytes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '401': { description: Invalid subscription or token. }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { description: Feature disabled or storage unavailable. }
   /api/v1/webhooks/{id}/test:
     parameters:
@@ -349,6 +387,11 @@ paths:
                 required: [eventId]
                 properties: { eventId: { type: string } }
         '401': { description: Invalid subscription or token. }
+        '413':
+          description: Request body exceeds 4096 bytes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { description: Feature disabled or storage unavailable. }
   /api/v1/webhooks/{id}/deliveries:
