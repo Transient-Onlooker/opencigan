@@ -137,6 +137,8 @@ class QueryAnomalyTests(unittest.TestCase):
             ('203.0.113.1', '404', 2), ('203.0.113.1', '429', 2), ('203.0.113.1', '5xx', 2),
         ])
         self.assertEqual(self.store.review_anomalies(**kwargs, max_status_errors=2), [])
+        kwargs['min_requests'] = 8
+        self.assertEqual(self.store.review_anomalies(**kwargs, max_status_errors=1), [])
 
 
 class QueryAnomalyEndpointTests(unittest.TestCase):
