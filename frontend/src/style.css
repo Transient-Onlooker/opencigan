@@ -22,6 +22,7 @@ main{width:min(960px,calc(100% - 40px));margin:0 auto}
 .personal-timetable-panel{margin:0 0 14px;border:1px solid var(--line);padding:0 14px;min-width:0}
 .personal-timetable-panel>summary{min-height:44px;align-content:center;cursor:pointer;font-weight:650}
 .secondary-button>.icon{width:17px;height:17px;margin-right:4px}
+.timetable-switch button>.icon{width:16px;height:16px;margin-right:3px}
 .context-help{position:relative;display:inline-block;vertical-align:middle;font-size:13px;font-weight:400}
 .context-help button{display:grid;place-items:center;width:44px;min-height:44px;cursor:pointer;color:var(--muted);background:var(--surface);border:0}
 .context-help p{display:none;position:absolute;z-index:8;inset:auto 0 auto auto;width:min(280px,70vw);padding:12px;margin:0;background:var(--surface);color:var(--ink);border:1px solid var(--ink);line-height:1.5;font-weight:400}
