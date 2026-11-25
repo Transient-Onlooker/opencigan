@@ -1,4 +1,28 @@
-# OpenCigan
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/opencigan-logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/opencigan-logo-light.svg">
+    <img alt="OpenCigan" src="docs/assets/opencigan-logo-light.svg" width="560">
+  </picture>
+</p>
+
+<p align="center"><strong>학교 시간표와 급식을 한곳에서 확인하는 오픈소스 웹앱</strong></p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/LICENSE-AGPL--3.0-2563eb?style=for-the-badge"></a>
+  <a href="https://opencigan.mcv.kr/"><img alt="Web: OpenCigan" src="https://img.shields.io/badge/WEB-OPENCIGAN-238636?style=for-the-badge"></a>
+  <a href="docs/api-guide.md"><img alt="API: v1" src="https://img.shields.io/badge/API-V1-007ec6?style=for-the-badge"></a>
+  <a href="CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-WELCOME-8250df?style=for-the-badge"></a>
+</p>
+
+<p align="center">
+  <a href="https://opencigan.mcv.kr/">공식 웹사이트</a> ·
+  <a href="docs/api-guide.md">API 문서</a> ·
+  <a href="docs/roadmap/README.md">개발 로드맵</a> ·
+  <a href="https://github.com/Transient-Onlooker/opencigan/issues">문제 제보</a>
+</p>
+
+---
 
 학교 **시간표와 급식**을 한곳에서 확인하는 웹앱입니다. 학교·학년·반을 선택해 시간표를 조회하고, NEIS 급식 정보와 캘린더 구독 기능을 사용할 수 있습니다. 기본 조회에는 로그인이 필요하지 않습니다.
 
@@ -12,7 +36,7 @@
 
 위 세 주소는 OpenCigan 웹앱의 접속 주소입니다. 두 Pages 주소는 **동일한 웹앱과 백엔드 경로를 공유**합니다. 보조 주소가 독립적인 API 서버나 완전한 장애 대비 경로를 의미하지는 않습니다.
 
-[문제 제보](https://github.com/Transient-Onlooker/opencigan/issues) · [개발 로드맵](docs/roadmap/README.md) · [단기 작업 기록](docs/roadmap/short-term-2026-11-21.md) · [기여 가이드](CONTRIBUTING.md)
+[단기 작업 기록](docs/roadmap/short-term-2026-11-21.md) · [기여 가이드](CONTRIBUTING.md)
 
 ## 주요 기능
 
