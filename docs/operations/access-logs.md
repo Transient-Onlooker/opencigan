@@ -6,7 +6,7 @@
 
 - `OPENCIGAN_ACCESS_LOG_DB`: SQLite 파일 경로. 미설정·빈 값이면 기록하지 않습니다.
 - `OPENCIGAN_ACCESS_LOG_RETENTION_DAYS`: 당일을 포함한 보관 일수. 기본 7일, API 설정 범위 1~90일입니다. 쓰기·조회 시 만료 자료를 정리합니다. 접근이 전혀 없으면 다음 접근 때 정리됩니다.
-- `OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN`: 조회 전용 Bearer 토큰. 통계 관리자 토큰과 별개이며 긴 무작위 값을 사용하세요. 미설정 시 조회할 수 없습니다.
+- `OPENCIGAN_ADMIN_TOKEN`: 조회 전용 Bearer 토큰. 분석·이력 통계·제안 관리와 공유하며 긴 무작위 값을 사용하세요. 미설정 시 조회할 수 없습니다.
 - `ALLOWED_ORIGIN`: 프런트 요청 분류에 사용하는 출처 목록. Origin/Referer는 조작 가능한 관측 신호이며 인증 수단이 아닙니다. 헤더가 없으면 `unknown`입니다.
 
 IP는 기존 신뢰 프록시 설정으로 확인한 클라이언트 값입니다. 실제 프록시의 전달 헤더와 신뢰 CIDR 검증은 [프록시 문서](proxy-client-ip.md)를 따릅니다. 누락된 IP는 `unknown`이며 임의 주소를 만들지 않습니다.

@@ -1,6 +1,6 @@
 # 이용 통계
 
-서버 환경에 `OPENCIGAN_ANALYTICS_DB`(SQLite 경로), 32자 이상의 무작위 `OPENCIGAN_ANALYTICS_SECRET`, 별도의 무작위 `OPENCIGAN_ANALYTICS_ADMIN_TOKEN`을 설정하면 활성화됩니다. DB와 키는 저장소 밖에 보관합니다. 미설정 상태에서도 시간표와 급식은 정상 동작합니다.
+서버 환경에 `OPENCIGAN_ANALYTICS_DB`(SQLite 경로), 32자 이상의 무작위 `OPENCIGAN_ANALYTICS_SECRET`, 공통 관리자 토큰 `OPENCIGAN_ADMIN_TOKEN`을 설정하면 활성화됩니다. DB와 키는 저장소 밖에 보관합니다. 미설정 상태에서도 시간표와 급식은 정상 동작합니다.
 
 `GET /api/v1/admin/analytics?days=30`에 `Authorization: Bearer <관리자 토큰>`을 보내 조회합니다. 기간은 1~90일이며 인증 정보와 응답은 캐시하지 않습니다. 토큰은 프런트엔드 빌드 변수에 넣지 마세요.
 

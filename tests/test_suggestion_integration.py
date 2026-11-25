@@ -52,7 +52,7 @@ class SuggestionIntegrationTests(unittest.TestCase):
     def test_wsgi_admin_approval_and_permissions(self):
         token = "admin-test-token-0123456789abcdef"
         with patch.dict("os.environ", {"OPENCIGAN_SUGGESTIONS_ENABLED": "1", "OPENCIGAN_SUGGESTION_DB": self.db,
-                                       "OPENCIGAN_SUGGESTION_ADMIN_TOKEN": token}):
+                                       "OPENCIGAN_ADMIN_TOKEN": token}):
             _, created = self.request("POST", "/api/v1/suggestions", {"title": "A", "description": "B"})
             path = "/api/v1/admin/suggestions/" + created["id"]
             self.assertEqual(self.request("PATCH", path, {"status": "approved"}, token="incorrect")[0], "401 Unauthorized")

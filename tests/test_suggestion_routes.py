@@ -68,9 +68,9 @@ class SuggestionRoutesTests(unittest.TestCase):
 
         env = {}
         if admin_token is not None:
-            env["OPENCIGAN_SUGGESTION_ADMIN_TOKEN"] = admin_token
+            env["OPENCIGAN_ADMIN_TOKEN"] = admin_token
         elif self.admin_token:
-            env["OPENCIGAN_SUGGESTION_ADMIN_TOKEN"] = self.admin_token
+            env["OPENCIGAN_ADMIN_TOKEN"] = self.admin_token
 
         with patch.dict(os.environ, env):
             return suggestion_api(

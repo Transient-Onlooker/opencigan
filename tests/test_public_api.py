@@ -262,7 +262,7 @@ class PublicApiTests(unittest.TestCase):
         )
         self.assertEqual(status, 401)
 
-        with patch.dict('os.environ', {'OPENCIGAN_ANALYTICS_ADMIN_TOKEN': 'secret-token-123'}):
+        with patch.dict('os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'secret-token-123'}):
             mock_store = Mock()
             mock_store.summary.return_value = {'totalViews': 10}
             with patch('backend.app._analytics_store', return_value=mock_store):

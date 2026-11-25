@@ -153,8 +153,7 @@ class WsGITests(unittest.TestCase):
         events = [(call.args[0]["client_ip"], call.args[0]["status"]) for call in recorder.submit.call_args_list]
         self.assertEqual(events, [("203.0.113.9", 404)] * 60 + [("203.0.113.9", 429), ("198.51.100.10", 404)])
 
-    @patch.dict(os.environ, {"OPENCIGAN_ANALYTICS_ADMIN_TOKEN": "test-token",
-                            "OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN": "test-token",
+    @patch.dict(os.environ, {"OPENCIGAN_ADMIN_TOKEN": "test-token",
                             "OPENCIGAN_PROXY_IP_SIGNING_KEY": ""})
     @patch("backend.app.shutter.check", return_value=(True, 0))
     def test_admin_auth_attempts_are_rate_limited_separately_per_client(self, _shutter):
@@ -171,7 +170,7 @@ class WsGITests(unittest.TestCase):
         self.assertEqual(self._call_app("GET", "/api/v1/unknown", remote_addr="203.0.113.9")[0], "404 Not Found")
         self.assertEqual(self._call_app("OPTIONS", paths[0], remote_addr="203.0.113.9")[0], "204 No Content")
 
-    @patch.dict(os.environ, {"OPENCIGAN_ANALYTICS_ADMIN_TOKEN": "test-token",
+    @patch.dict(os.environ, {"OPENCIGAN_ADMIN_TOKEN": "test-token",
                             "OPENCIGAN_PROXY_IP_SIGNING_KEY": "s" * 32})
     def test_admin_limit_keeps_verified_and_unsigned_clients_separate(self):
         path = "/api/v1/admin/analytics"

@@ -4,7 +4,7 @@
 
 ## 인증 및 개인정보
 
-- 인증은 `OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN`에 대응하는 Bearer 토큰을 사용합니다. 분석 관리자 토큰과 별도입니다.
+- 인증은 분석·이력 통계·제안 관리와 공유하는 `OPENCIGAN_ADMIN_TOKEN` Bearer 토큰을 사용합니다.
 - 토큰은 현재 페이지 메모리에서만 사용하며 local/session storage, 쿠키, URL에 저장하지 않습니다. 잠금 버튼은 진행 중인 요청을 취소하고 토큰과 로그 표시를 지웁니다.
 - API 요청은 `credentials: omit`, `cache: no-store`, `referrerPolicy: no-referrer`를 사용합니다. 화면에는 `/api/v1/admin/access-logs` 외 분석 요청이나 원격 자원이 없습니다.
 - 서버는 응답에 `Cache-Control: no-store`를 적용합니다. CSV도 사용자 입력 필터를 적용해 Bearer 인증 헤더와 함께 직접 요청하며, 서버 CSV 수출 한도는 최신 5,000건입니다.

@@ -150,7 +150,7 @@ class QueryAnomalyEndpointTests(unittest.TestCase):
         self.addCleanup(self.store.close)
 
         self.patches = [
-            patch.dict("os.environ", {"OPENCIGAN_ACCESS_LOG_DB": "test", "OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN": "secret", "OPENCIGAN_ACCESS_LOG_RETENTION_DAYS": "7"}),
+            patch.dict("os.environ", {"OPENCIGAN_ACCESS_LOG_DB": "test", "OPENCIGAN_ADMIN_TOKEN": "secret", "OPENCIGAN_ACCESS_LOG_RETENTION_DAYS": "7"}),
             patch("backend.app._access_log_store", return_value=self.store),
         ]
         for p in self.patches:
@@ -206,7 +206,7 @@ class QueryAnomalyEndpointTests(unittest.TestCase):
         self.assertEqual(status, 405)
 
         with patch("backend.app._access_log_store", return_value=None), \
-             patch.dict("os.environ", {"OPENCIGAN_ACCESS_LOG_DB": "test", "OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN": "secret"}):
+             patch.dict("os.environ", {"OPENCIGAN_ACCESS_LOG_DB": "test", "OPENCIGAN_ADMIN_TOKEN": "secret"}):
             status, _, body = dispatch_request("GET", "/api/v1/admin/access-anomalies", "", request_headers=auth)
             self.assertEqual(status, 503)
             self.assertEqual(__import__("json").loads(body)["code"], "access_logs_disabled")

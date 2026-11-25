@@ -8,7 +8,7 @@ from backend.access_logs import AccessLogRecorder, AccessLogStore
 
 class AccessLogApiTests(unittest.TestCase):
     def test_admin_errors_include_standard_error_and_code(self):
-        with patch.dict('os.environ', {'OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN': 'test-secret'}), \
+        with patch.dict('os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'test-secret'}), \
              patch('backend.app._access_log_store', return_value=None):
             for method, query, auth, expected in (
                 ('GET', '', '', 401),
@@ -30,7 +30,7 @@ class AccessLogApiTests(unittest.TestCase):
         recorder = AccessLogRecorder(lambda: store)
         self.addCleanup(store.close)
         self.addCleanup(recorder.close)
-        config = {'OPENCIGAN_ACCESS_LOG_DB': 'enabled', 'OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN': 'test-secret'}
+        config = {'OPENCIGAN_ACCESS_LOG_DB': 'enabled', 'OPENCIGAN_ADMIN_TOKEN': 'test-secret'}
         with patch.dict('os.environ', config), patch('backend.app._access_log_recorder', recorder), patch('backend.app._access_log_store', return_value=store):
             with patch('backend.app._dispatch_request', return_value=(200, {'Content-Type': 'application/json'}, b'{"cacheStatus":"hit"}')):
                 dispatch_request('GET', '/api/v1/timetable', 'school=2%3AExample&grade=2&class=3&week=2026-11-09&token=private', client='203.0.113.1', request_headers={'User-Agent': 'OpenCigan-Test/1.0'})
@@ -49,7 +49,7 @@ class AccessLogApiTests(unittest.TestCase):
         store = Mock()
         store.query.return_value = {'items': [], 'next_cursor': None}
         store.export_csv.return_value = 'timestamp,client_ip\r\n'
-        with patch.dict('os.environ', {'OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN': 'test-secret'}), patch('backend.app._access_log_store', return_value=store):
+        with patch.dict('os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'test-secret'}), patch('backend.app._access_log_store', return_value=store):
             for authorization in ['', 'Bearer wrong']:
                 status, headers, _ = dispatch_request('GET', '/api/v1/admin/access-logs', '', request_headers={'Authorization': authorization})
                 self.assertEqual(status, 401)
@@ -65,7 +65,7 @@ class AccessLogApiTests(unittest.TestCase):
             self.assertIn('text/csv', headers['Content-Type'])
 
     def test_invalid_admin_queries_and_disabled_storage(self):
-        with patch.dict('os.environ', {'OPENCIGAN_ACCESS_LOG_ADMIN_TOKEN': 'test-secret'}), patch('backend.app._access_log_store', return_value=None):
+        with patch.dict('os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'test-secret'}), patch('backend.app._access_log_store', return_value=None):
             auth = {'Authorization': 'Bearer test-secret'}
             for query in ['limit=101', 'limit=x', 'cursor=-2', 'grade=7', 'status=999', 'class=100',
                           'start_day=2026-02-30', 'start_day=2026-11-15&end_day=2026-11-01',
