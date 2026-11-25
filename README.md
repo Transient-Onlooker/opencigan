@@ -15,15 +15,15 @@
 </p>
 
 <p align="center">
-  <strong><a href="https://opencigan.mcv.kr/">opencigan.mcv.kr</a></strong> ·
-  <a href="https://opencigan.pages.dev/">opencigan.pages.dev</a> ·
-  <a href="https://xn--s39a564b8jcxrw.xn--hk3b17f.xn--3e0b707e/">오픈시간.서버.한국</a>
+  <a href="https://opencigan.mcv.kr/"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/links/primary-dark.svg"><source media="(prefers-color-scheme: light)" srcset="docs/assets/links/primary-light.svg"><img alt="opencigan.mcv.kr" src="docs/assets/links/primary-light.svg" width="184" height="36"></picture></a>
+  <a href="https://opencigan.pages.dev/"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/links/pages-dark.svg"><source media="(prefers-color-scheme: light)" srcset="docs/assets/links/pages-light.svg"><img alt="opencigan.pages.dev" src="docs/assets/links/pages-light.svg" width="167" height="36"></picture></a>
+  <a href="https://xn--s39a564b8jcxrw.xn--hk3b17f.xn--3e0b707e/"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/links/korean-dark.svg"><source media="(prefers-color-scheme: light)" srcset="docs/assets/links/korean-light.svg"><img alt="오픈시간.서버.한국" src="docs/assets/links/korean-light.svg" width="135" height="36"></picture></a>
 </p>
 
 <p align="center">
-  <a href="docs/api-guide.md">API 문서</a> ·
-  <a href="docs/roadmap/README.md">개발 로드맵</a> ·
-  <a href="https://github.com/Transient-Onlooker/opencigan/issues">문제 제보</a>
+  <a href="docs/api-guide.md"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/links/api-dark.svg"><source media="(prefers-color-scheme: light)" srcset="docs/assets/links/api-light.svg"><img alt="API 문서" src="docs/assets/links/api-light.svg" width="90" height="30"></picture></a>
+  <a href="docs/roadmap/README.md"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/links/roadmap-dark.svg"><source media="(prefers-color-scheme: light)" srcset="docs/assets/links/roadmap-light.svg"><img alt="개발 로드맵" src="docs/assets/links/roadmap-light.svg" width="105" height="30"></picture></a>
+  <a href="https://github.com/Transient-Onlooker/opencigan/issues"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/links/issues-dark.svg"><source media="(prefers-color-scheme: light)" srcset="docs/assets/links/issues-light.svg"><img alt="문제 제보" src="docs/assets/links/issues-light.svg" width="93" height="30"></picture></a>
 </p>
 
 ---
