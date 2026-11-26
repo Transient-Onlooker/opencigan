@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import Icon from './Icon.svelte';
   import { suggestionsEnabled } from './suggestions-config';
   import MealsPanel from './MealsPanel.svelte';
@@ -959,10 +959,27 @@
          target instanceof HTMLInputElement && !target.readOnly && ['search', 'text', 'number', 'date', 'time', 'url'].includes(target.type));
     };
     const onFocusOut = () => { inputFocused = false; };
+    const onNavBoundaryKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey || !inputFocused || typeof window.matchMedia !== 'function' || !window.matchMedia('(max-width: 700px)').matches) return;
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      const forward = !event.shiftKey && target.id === 'classroom';
+      const backward = event.shiftKey && !!target.closest('#settings-panel .settings-search');
+      if (!forward && !backward) return;
+      event.preventDefault();
+      inputFocused = false;
+      void tick().then(() => {
+        if (document.activeElement !== target) return;
+        const buttons = document.querySelectorAll<HTMLButtonElement>('.calendar-menu button');
+        (forward ? buttons[0] : buttons[buttons.length - 1])?.focus();
+        if (document.activeElement === target) inputFocused = true;
+      });
+    };
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('storage', onStorage);
     document.addEventListener('focusin', onFocusIn);
     document.addEventListener('focusout', onFocusOut);
+    document.addEventListener('keydown', onNavBoundaryKey);
     window.addEventListener('focus', onFocus);
     const themeMedia = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-color-scheme: dark)') : null;
     systemDark = themeMedia?.matches ?? false;
@@ -999,7 +1016,7 @@
     return () => {
       stopNavigation();
       sharedSelection.cancel();
-      clearInterval(calendarTimer); document.removeEventListener('visibilitychange', onVisibilityChange); window.removeEventListener('storage', onStorage); document.removeEventListener('focusin', onFocusIn); document.removeEventListener('focusout', onFocusOut); window.removeEventListener('focus', onFocus); themeMedia?.removeEventListener?.('change', onThemeMedia);
+      clearInterval(calendarTimer); document.removeEventListener('visibilitychange', onVisibilityChange); window.removeEventListener('storage', onStorage); document.removeEventListener('focusin', onFocusIn); document.removeEventListener('focusout', onFocusOut); document.removeEventListener('keydown', onNavBoundaryKey); window.removeEventListener('focus', onFocus); themeMedia?.removeEventListener?.('change', onThemeMedia);
       schoolSearchSession.cancel(); mealSession.cancel(); timetableSession.cancel();
     };
   });

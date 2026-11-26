@@ -196,6 +196,17 @@ test('week navigation hides unverified actions and keeps the last row and search
     expect(box.y + box.height).toBeLessThanOrEqual(nav.y);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
   }
+  const classroom = page.getByLabel('반', { exact: true });
+  await classroom.focus();
+  await expect(menu).toBeHidden();
+  await classroom.press('Tab');
+  await expect(menu.getByRole('button', { name: '시간표', exact: true })).toBeFocused();
+  await menu.getByRole('button', { name: '설정', exact: true }).click();
+  const settingsSearch = page.getByRole('searchbox', { name: '설정 검색' });
+  await settingsSearch.focus();
+  await expect(menu).toBeHidden();
+  await settingsSearch.press('Shift+Tab');
+  await expect(menu.getByRole('button', { name: '설정', exact: true })).toBeFocused();
 });
 
 test('a late response from a previous school cannot change the active class or links', async ({ page }) => {
