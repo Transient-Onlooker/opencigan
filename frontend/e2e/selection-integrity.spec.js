@@ -1512,6 +1512,8 @@ test('source lesson starts apply by default, preserve manual times, and can be d
   await expect(page.getByLabel('2교시 시작', { exact: true })).toHaveValue('10:00');
   expect(JSON.parse(await page.evaluate((id) => localStorage.getItem('opensigan-lesson-times:' + id), school.id))).toEqual({ '1': { start: '08:30', end: '09:20' } });
   await page.getByRole('button', { name: '시각 저장', exact: true }).click();
+  await expect(page.getByText('이 학교의 교시 시각을 저장했어요.')).toBeVisible();
+  expect(JSON.parse(await page.evaluate((id) => localStorage.getItem('opensigan-weekday-lesson-times:' + id), school.id))['2']['1']).toEqual({ start: '08:00', end: '08:45' });
   await page.getByLabel('2교시 종료', { exact: true }).fill('10:50');
   await page.getByRole('button', { name: '시각 저장', exact: true }).click();
   await expect(page.getByText('이 학교의 교시 시각을 저장했어요.')).toBeVisible();

@@ -20,6 +20,7 @@
   export let teacherNames: string[];
   export let lessonTimePeriods: number[];
   export let lessonTimeDrafts: Record<number, { start: string; end: string }>;
+  export let autoSourceDraftPeriods: number[];
   export let weekdayTimeDrafts: WeekdayLessonTimes;
   export let lessonTimeState: string;
   export let settingsBackupState: string;
@@ -123,7 +124,7 @@
     catch { /* 계산 입력은 현재 화면에 유지됩니다. */ }
   }
   function submitLessonTimes() {
-    timeError = validateLessonTimeDrafts(lessonTimeDrafts, weekdayTimeDrafts);
+    timeError = validateLessonTimeDrafts(lessonTimeDrafts, weekdayTimeDrafts, autoSourceDraftPeriods);
     if (timeError) {
       if (timeError.day) { weekdaySelection = timeError.day; weekdayDetailsOpen = true; }
       else lessonDetailsOpen = true;
