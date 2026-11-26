@@ -1,4 +1,5 @@
 import json
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -62,6 +63,21 @@ class OpenApiContractTests(unittest.TestCase):
                     self.assertEqual(status, 400)
                     self.assert_json_response(path, status, headers, body)
             self.assertTrue(validator.is_valid('  school  '))
+
+    def test_history_cursor_acceptance_and_errors_match_contract(self):
+        from backend.history import HistoryStore
+
+        path = '/api/v1/timetable/history'
+        params = {'school': '2:학교', 'week': self.start.isoformat()}
+        with tempfile.TemporaryDirectory() as temporary:
+            store = HistoryStore(Path(temporary) / 'history.sqlite')
+            with patch('backend.app._history_store', return_value=store):
+                for cursor, expected in ((' 42 ', 200), ('0', 400), ('01', 400),
+                                         ('9223372036854775808', 400), ('١', 400)):
+                    with self.subTest(cursor=cursor):
+                        status, headers, body = dispatch_request('GET', path, urlencode({**params, 'cursor': cursor}), Cache())
+                        self.assertEqual(status, expected)
+                        self.assert_json_response(path, status, headers, body)
 
     def test_meal_query_accepts_existing_date_formats_and_decimal_codes(self):
         path = '/api/v1/meals'
