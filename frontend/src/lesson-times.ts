@@ -57,7 +57,9 @@ function minutes(value: string): number | null {
   return hours * 60 + part;
 }
 
-export function validateLessonTimeDrafts(common: LessonTimes, weekdays: WeekdayLessonTimes): { day: number; period: number; message: string } | null {
+export function validateLessonTimeDrafts(common: LessonTimes, weekdays: WeekdayLessonTimes, autoSourcePeriods: number[] = []): { day: number; period: number; message: string } | null {
+  const sourcePeriods = new Set(autoSourcePeriods);
+  const completeCommon = Object.fromEntries(Object.entries(common).filter(([period, entry]) => !(sourcePeriods.has(Number(period)) && !entry.end)));
   const validate = (entries: LessonTimes, day: number, overrides?: LessonTimes) => {
     const ordered = Object.entries(entries).map(([period, entry]) => ({ period: Number(period), ...entry })).sort((a, b) => a.period - b.period);
     let previous: typeof ordered[number] | undefined;
@@ -73,9 +75,9 @@ export function validateLessonTimeDrafts(common: LessonTimes, weekdays: WeekdayL
     }
     return null;
   };
-  const commonError = validate(common, 0);
+  const commonError = validate(completeCommon, 0);
   if (commonError) return commonError;
-  const actual = Object.fromEntries(Object.entries(common).filter(([, entry]) => entry.start || entry.end));
+  const actual = Object.fromEntries(Object.entries(completeCommon).filter(([, entry]) => entry.start || entry.end));
   for (const [day, overrides] of Object.entries(weekdays)) {
     const error = validate({ ...actual, ...overrides }, Number(day), overrides);
     if (error) return { ...error, message: `${['', '월', '화', '수', '목', '금', '토', '일'][Number(day)]}요일 ${error.message}` };

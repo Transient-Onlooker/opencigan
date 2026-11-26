@@ -31,6 +31,10 @@ test('draft validation identifies missing, reversed and overlapping times includ
   const common = { 1: { start: '09:00', end: '09:50' }, 2: { start: '10:00', end: '10:50' } };
   assert.equal(validate(common, {}), null);
   assert.match(validate({ 1: { start: '09:00', end: '' } }, {}).message, /모두 입력/);
+  const autoIncomplete = { 1: { start: '09:00', end: '09:50' }, 2: { start: '10:00', end: '' } };
+  assert.equal(validate(autoIncomplete, { 2: { 1: { start: '08:30', end: '09:20' } } }, [2]), null);
+  assert.match(validate(autoIncomplete, {}, []).message, /모두 입력/);
+  assert.match(validate(autoIncomplete, { 2: { 2: { start: '09:40', end: '10:20' } } }, [2]).message, /겹치/);
   assert.match(validate({ 1: { start: '10:00', end: '09:00' } }, {}).message, /늦어야/);
   assert.equal(validate({ ...common, 2: { start: '09:40', end: '10:50' } }, {}).period, 2);
   const error = validate(common, { 2: { 1: { start: '09:30', end: '10:10' } } });
