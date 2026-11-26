@@ -47,6 +47,30 @@ class UpstreamRecoveryTests(unittest.TestCase):
                         release.set()
                     self.assertEqual(first.result(timeout=1)[0], 200)
 
+    def test_search_wait_timeout_returns_existing_stale_result(self):
+        cache = Cache(ttl=0)
+        entered, release = threading.Event(), threading.Event()
+        query = 'q=Example'
+        with patch('backend.app.search_schools', return_value=[{'id': '1:Example', 'name': 'Example', 'region': ''}]):
+            self.assertEqual(dispatch_request('GET', '/api/v1/schools', query, cache)[0], 200)
+        def slow(_):
+            entered.set()
+            if not release.wait(2):
+                raise AssertionError('fixture was not released')
+            return []
+        with patch('backend.comcigan_proxy.UPSTREAM_BUDGET_SECONDS', 0.05), \
+             patch('backend.app.search_schools', side_effect=slow), ThreadPoolExecutor(max_workers=2) as pool:
+            leader = pool.submit(dispatch_request, 'GET', '/api/v1/schools', query, cache)
+            self.assertTrue(entered.wait(1))
+            try:
+                status, _, body = pool.submit(dispatch_request, 'GET', '/api/v1/schools', query, cache).result(timeout=1)
+                self.assertEqual(status, 200)
+                self.assertTrue(json.loads(body)['stale'])
+                self.assertEqual(json.loads(body)['schools'][0]['id'], '1:Example')
+            finally:
+                release.set()
+            self.assertEqual(leader.result(timeout=1)[0], 200)
+
     def test_two_week_calendar_shares_budget_and_keeps_stale_weeks(self):
         cache = Cache(ttl=0, retry_delay=10)
         seen = []

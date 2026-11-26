@@ -9,6 +9,31 @@ from backend.comcigan_proxy import with_comcigan_budget
 
 
 class CacheIntegrityTests(unittest.TestCase):
+    def test_non_comcigan_wait_does_not_use_comcigan_budget(self):
+        cache = Cache(lock_stripes=1)
+        key = ('meals', 'school')
+        entered, release = threading.Event(), threading.Event()
+        def slow():
+            entered.set()
+            if not release.wait(2):
+                raise AssertionError('fixture was not released')
+            return {'meals': []}
+        @with_comcigan_budget
+        def follower():
+            return cache.get(key, lambda: self.fail('duplicate fetch'))
+        with patch('backend.comcigan_proxy.UPSTREAM_BUDGET_SECONDS', 0.01):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                first = pool.submit(cache.get, key, slow)
+                self.assertTrue(entered.wait(1))
+                second = pool.submit(follower)
+                try:
+                    threading.Event().wait(0.03)
+                    self.assertFalse(second.done())
+                finally:
+                    release.set()
+                self.assertEqual(first.result(timeout=1), {'meals': []})
+                self.assertEqual(second.result(timeout=1), {'meals': []})
+
     def test_waiter_releases_lock_if_deadline_expires_on_acquisition(self):
         cache = Cache(lock_stripes=1)
         key = ('timetable', 'school', 'week')
@@ -21,9 +46,8 @@ class CacheIntegrityTests(unittest.TestCase):
         lock = BoundaryLock()
         cache._flights[0][key] = [lock, 0]
         with patch('backend.cache.remaining_comcigan_budget', side_effect=[1.0, 0.0]):
-            with self.assertRaises(TimeoutError):
-                with cache._singleflight(key):
-                    self.fail('expired request entered the flight')
+            with cache._singleflight(key) as acquired:
+                self.assertFalse(acquired)
         self.assertTrue(lock.released)
         self.assertFalse(cache._flights[0])
 

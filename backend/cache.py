@@ -55,17 +55,19 @@ class Cache:
                 return
             if not acquired:
                 started_at = time.monotonic()
-                remaining = remaining_comcigan_budget()
+                resource = key[0] if isinstance(key, tuple) and key else None
+                remaining = remaining_comcigan_budget() if resource in ('timetable', 'school_search') else None
                 if remaining is None:
                     flight[0].acquire()
                 else:
                     if remaining <= 0 or not flight[0].acquire(timeout=remaining):
-                        raise TimeoutError("Comcigan request budget exhausted while waiting for cache")
-                    if remaining_comcigan_budget() <= 0:
-                        flight[0].release()
-                        raise TimeoutError("Comcigan request budget exhausted while waiting for cache")
+                        yield False
+                        return
             try:
                 if not acquired:
+                    if remaining is not None and remaining_comcigan_budget() <= 0:
+                        yield False
+                        return
                     resource = key[0] if isinstance(key, tuple) and key and key[0] in RESOURCE_TYPES else None
                     if resource:
                         elapsed = max(0, round((time.monotonic() - started_at) * 1000))
@@ -104,7 +106,16 @@ class Cache:
 
         with self._singleflight(key, wait=stale_while_refreshing is None) as acquired:
             if not acquired:
-                return output(self._stale(stale_while_refreshing), "stale")
+                if stale_while_refreshing is not None:
+                    return output(self._stale(stale_while_refreshing), "stale")
+                with self.guard:
+                    entry = self.entries.get(key)
+                    if entry is not None and entry[0] is not None:
+                        value, fetched_at, _ = entry
+                        if time.monotonic() - fetched_at < self.ttl:
+                            return output(json.loads(value), "hit")
+                        return output(self._stale(value), "stale")
+                raise TimeoutError("Comcigan request budget exhausted while waiting for cache")
             now = time.monotonic()
             previous_value = None
             previous_fetched_at = 0
