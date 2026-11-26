@@ -318,6 +318,7 @@ flowchart TB
 
 ### ST-14 · 오늘의 최종 통합 회귀·릴리스 후보 정리
 
+- 2026-11-26 `main` `3417aad`의 [통합 CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/45829812930)는 Python·SDK·Worker·Svelte·Chromium/WebKit 및 빌드 검사를 통과했고 GitHub Pages 배포가 성공했다. 이는 해당 커밋의 자동 검사이며 Pi 백엔드 배포, 실기기·실캘린더·운영 429 검증을 뜻하지 않는다.
 - 2026-11-26 격리 Chromium PWA 자동 검사: 설치된 서비스 워커로 오프라인 재진입하고 같은 학교·주차의 저장 시간표와 오래된 자료 안내를 표시했다 (`classroom.spec.js`, installed shell 검사). 실제 모바일 기기 확인이나 전체 통합 회귀를 뜻하지 않는다.
 
 - 11/25 3차 QA는 CONDITIONAL PASS(사용자 제공): 핵심 운영 API, 학교 3곳, ICS 200/304 및 PNG/PDF/설정 JSON 내보내기 확인. 설정 가져오기·색상 변경·뷰포트/실기기/PWA/실캘린더·장애 UX 미검증. 5d3a17c→fb9ed13 배포 경계 명시, 최종 배포에서 재개방 결함 재현/수정 후 검증. [3차 QA 후속](qa3-followup-2026-11-25.md).
