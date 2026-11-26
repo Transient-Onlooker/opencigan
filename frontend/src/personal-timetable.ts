@@ -27,12 +27,13 @@ export interface PersonalTimetableStore {
 
 export const MAX_STORE_ENTRIES = 200;
 export const MAX_STORE_BYTES = 256 * 1024;
+export const PERSONAL_STORAGE_PREFIX = 'personal_timetable_v1:';
 
 export function getPersonalStorageKey(schoolId: string, grade: number, classroom: number | string): string {
   const safeSchool = (schoolId || 'unknown').trim();
   const safeGrade = Number(grade) || 1;
   const safeClass = String(classroom ?? '1').trim() || '1';
-  return 'personal_timetable_v1:' + safeSchool + ':' + safeGrade + ':' + safeClass;
+  return PERSONAL_STORAGE_PREFIX + safeSchool + ':' + safeGrade + ':' + safeClass;
 }
 
 export function createEmptyPersonalStore(): PersonalTimetableStore {
