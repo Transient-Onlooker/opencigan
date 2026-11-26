@@ -6,10 +6,11 @@ from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from backend.webhook_store import WebhookStore, enqueue_observed_change, quiet_until
 from backend.webhook_worker import deliver_next, run_worker
+from backend.webhook_delivery import send_webhook
 from backend.history import HistoryStore
 
 
@@ -84,6 +85,27 @@ class WebhookStoreTests(unittest.TestCase):
                           {"delivered": False, "retryable": True, "status": 429, "retryAfter": 61}, now=10)
         self.assertIsNone(self.store.claim(now=70))
         self.assertEqual(self.store.claim(now=71)["attempt"], 2)
+
+    def test_worker_honors_http_date_retry_after(self):
+        instant = datetime(2026, 11, 26, 12, 0, tzinfo=timezone.utc)
+        now = instant.timestamp()
+        self.store.enqueue(self.subscription["id"], "http_date_retry", b'{}', now=now)
+        response = Mock(status_code=429, headers={"Retry-After": "Thu, 26 Nov 2026 12:01:30 GMT"})
+        session = Mock()
+        session.post.return_value = response
+        context = Mock()
+        context.__enter__ = Mock(return_value=session)
+        context.__exit__ = Mock(return_value=False)
+
+        def sender(url, body, secret, event_id):
+            return send_webhook(url, body, secret, event_id, lambda: context)
+
+        with patch('backend.webhook_delivery.datetime') as clock:
+            clock.now.return_value = instant
+            self.assertTrue(deliver_next(self.store, now=now, sender=sender))
+        self.assertIsNone(self.store.claim(now=now + 89))
+        self.assertEqual(self.store.claim(now=now + 90)["attempt"], 2)
+        response.close.assert_called_once()
 
     def test_quiet_hours_defer_due_delivery_and_allow_test_messages(self):
         kst = timezone(timedelta(hours=9))
