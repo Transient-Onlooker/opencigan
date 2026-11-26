@@ -88,7 +88,7 @@ for (const viewport of [{ width: 320, height: 700 }, { width: 375, height: 812 }
           expect((await element.boundingBox()).height).toBeGreaterThanOrEqual(44);
         }
         await page.getByRole('searchbox', { name: '학교 찾기' }).focus();
-        await expect(page.getByRole('navigation', { name: '캘린더 메뉴', includeHidden: true })).toBeHidden();
+        await expect(page.getByRole('navigation', { name: '캘린더 메뉴' })).toHaveCSS('position', 'static');
       }
     });
   }

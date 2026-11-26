@@ -187,9 +187,9 @@ test('week navigation hides unverified actions and keeps the last row and search
   for (const viewport of [{ width: 320, height: 600 }, { width: 667, height: 320 }]) {
     await page.setViewportSize(viewport);
     await input.focus();
-    await expect(menu).toHaveCSS('opacity', '0');
+    await expect(menu).toHaveCSS('position', 'static');
     await input.press('Tab');
-    await expect(menu).toHaveCSS('opacity', '1');
+    await expect(menu).toHaveCSS('position', 'fixed');
     await lastRow.evaluate((element) => element.scrollIntoView({ block: 'end', behavior: 'instant' }));
     const box = await lastRow.boundingBox();
     const nav = await menu.boundingBox();
@@ -198,17 +198,17 @@ test('week navigation hides unverified actions and keeps the last row and search
   }
   const classroom = page.getByLabel('반', { exact: true });
   await classroom.focus();
-  await expect(menu).toHaveCSS('opacity', '0');
+  await expect(menu).toHaveCSS('position', 'static');
   await classroom.press('Tab');
   await expect(menu.getByRole('button', { name: '시간표', exact: true })).toBeFocused();
-  await expect(menu).toHaveCSS('opacity', '1');
+  await expect(menu).toHaveCSS('position', 'fixed');
   await menu.getByRole('button', { name: '설정', exact: true }).click();
   const settingsSearch = page.getByRole('searchbox', { name: '설정 검색' });
   await settingsSearch.focus();
-  await expect(menu).toHaveCSS('opacity', '0');
+  await expect(menu).toHaveCSS('position', 'static');
   await settingsSearch.press('Shift+Tab');
   await expect(menu.getByRole('button', { name: '설정', exact: true })).toBeFocused();
-  await expect(menu).toHaveCSS('opacity', '1');
+  await expect(menu).toHaveCSS('position', 'fixed');
 });
 
 test('a late response from a previous school cannot change the active class or links', async ({ page }) => {

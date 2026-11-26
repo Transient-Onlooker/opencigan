@@ -22,7 +22,6 @@
 @media(max-width:700px){
   .calendar-menu{position:fixed;z-index:10;bottom:0;left:0;width:100%;margin:0;background:var(--surface);border-top:1px solid var(--ink);padding:0 env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
   .menu-label{display:none}.calendar-menu button{flex:1 1 0;min-width:0;min-height:62px;padding-inline:8px;border-left:0;font-size:16px}.calendar-menu button+button{border-left:1px solid var(--line)}
-  .calendar-menu.input-focused{opacity:0;pointer-events:none}
-  .calendar-menu.input-focused:focus-within{opacity:1;pointer-events:auto}
+  .calendar-menu.input-focused{position:static;width:auto;margin-bottom:16px}
 }
 </style>
