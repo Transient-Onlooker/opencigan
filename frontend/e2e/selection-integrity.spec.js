@@ -1392,6 +1392,14 @@ test('legacy favorites remain stored while settings search and keyboard help wor
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(320);
   await emptyPeriodHelp.press('Escape');
   await expect(popover).toBeHidden();
+  await emptyPeriodHelp.press('Enter');
+  await expect(popover).toBeVisible();
+  await emptyPeriodHelp.press('Tab');
+  await expect(popover).toBeHidden();
+  await emptyPeriodHelp.focus();
+  await emptyPeriodHelp.press('Enter');
+  await page.mouse.click(2, 2);
+  await expect(popover).toBeHidden();
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByRole('searchbox', { name: '설정 검색' }).fill('알레르기');
   await expect(page.getByRole('list', { name: '설정 검색 결과' }).getByRole('button', { name: /알레르기 관리/ })).toBeVisible();
