@@ -996,7 +996,8 @@ paths:
         - name: cursor
           in: query
           required: false
-          schema: { type: string, minLength: 1 }
+          description: Positive decimal change ID without leading zero, less than 9223372036854775808; surrounding whitespace is trimmed.
+          schema: { type: string, minLength: 1, maxLength: 100 }
           example: '42'
       responses:
         '200':
