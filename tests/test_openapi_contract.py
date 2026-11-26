@@ -63,6 +63,25 @@ class OpenApiContractTests(unittest.TestCase):
                     self.assert_json_response(path, status, headers, body)
             self.assertTrue(validator.is_valid('  school  '))
 
+    def test_meal_query_accepts_existing_date_formats_and_decimal_codes(self):
+        path = '/api/v1/meals'
+        cases = (
+            {'school': 'B１０:1234567', 'from': '2026-11-16', 'to': '2026-11-16'},
+            {'school': 'B10:1234567', 'from': '20261116', 'to': '2026-11-16'},
+            {'school': 'B10:1234567', 'from': '2026-W47-1', 'to': '20261116'},
+        )
+        schemas = {param['name']: param['schema'] for param in self.spec['paths'][path]['get']['parameters']}
+        with patch.dict('os.environ', {'NEIS_API_KEY': 'synthetic'}), \
+             patch('backend.app.NEISClient') as client:
+            client.from_environment.return_value.get_meals.return_value = []
+            for params in cases:
+                with self.subTest(params=params):
+                    for name, value in params.items():
+                        Draft202012Validator(schemas[name]).validate(value)
+                    status, headers, body = dispatch_request('GET', path, urlencode(params), cache_instance=Cache())
+                    self.assertEqual(status, 200)
+                    self.assert_json_response(path, status, headers, body)
+
     def test_admin_access_anomaly_responses_match_openapi(self):
         from backend.access_logs import AccessLogStore
 

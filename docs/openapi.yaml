@@ -908,18 +908,20 @@ paths:
         - name: school
           in: query
           required: true
-          schema: { type: string, pattern: '^[A-Z][0-9]{2}:[0-9]{7}$' }
+          description: An uppercase office letter followed by two decimal digits, a colon, and seven decimal digits. ASCII digits are recommended.
+          schema: { type: string, minLength: 11, maxLength: 11 }
           example: 'B10:1234567'
         - name: from
           in: query
           required: true
-          schema: { type: string, format: date }
+          description: ISO date accepted by Python date.fromisoformat, at most 10 characters. Prefer YYYY-MM-DD; compact calendar and ISO week dates are also accepted.
+          schema: { type: string, minLength: 1, maxLength: 10 }
           example: '2026-11-16'
         - name: to
           in: query
           required: true
-          description: Inclusive end date; range may cover at most seven days.
-          schema: { type: string, format: date }
+          description: Inclusive end date using the same format as from; range may cover at most seven days.
+          schema: { type: string, minLength: 1, maxLength: 10 }
           example: '2026-11-22'
       responses:
         '200':

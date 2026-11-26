@@ -239,6 +239,7 @@ flowchart TB
 - [ ] 기존 OpenAPI 3.1과 Worker/Pi/TypeScript/Python 클라이언트의 남은 오류·응답 계약을 대조하고 계약 회귀 테스트를 보강한다. **후속:** [#227](https://github.com/Transient-Onlooker/opencigan/pull/227)·[#232](https://github.com/Transient-Onlooker/opencigan/pull/232)·[#248](https://github.com/Transient-Onlooker/opencigan/pull/248) 완료 범위는 제외하고 나머지 계약 확인.
 - [#282](https://github.com/Transient-Onlooker/opencigan/pull/282)는 `Retry-After`의 초 단위 문자열과 HTTP 날짜를 허용하도록 OpenAPI 헤더 타입을 수정했다. API 계약 검사 8건과 PR CI가 통과했다. 전체 계약 대조는 별도다.
 - 컴시간·NEIS 학교 검색의 `q`에서 공백만 있는 값은 서버가 400으로 거부한다. OpenAPI에 비공백 필수 조건과 공백 제거 전 길이 제한을 명시하고 두 경로의 400 응답을 명세와 대조했다. 나머지 계약은 별도다.
+- 급식 API의 기존 호환 입력에는 ISO 기본 날짜·주차 날짜와 유니코드 십진 숫자가 포함된다. 명세가 이를 잘못 배제하지 않도록 입력 설명을 수정하고, 외부 NEIS 호출 없이 기존 수용 동작과 응답 계약을 검증했다. 일반 사용에는 ASCII 학교 코드와 YYYY-MM-DD를 권장한다.
 - Webhook 구독 생성의 비활성·구독 한도·저장소 오류 503과 관리 경로의 401·413·429·503 JSON 명세를 실제 라우트 응답과 대조했다. 실제 발송은 수행하지 않았다.
 - TypeScript SDK 식단 타입에 OpenAPI의 선택적 `calories`·`nutrition`·`origin` 문자열 또는 null을 반영하고 컴파일 검사와 기존 SDK 런타임 검사를 수행한다. 다른 API 계약은 별도다.
 - [#271](https://github.com/Transient-Onlooker/opencigan/pull/271)에서 이력 RSS의 저장소 비활성·장애 503 JSON 응답을 OpenAPI에 명시하고 실제 라우트 응답과 예제를 대조했다. `test_openapi_contract.py` 7건과 PR CI가 통과했다. 다른 경로와 클라이언트의 나머지 계약 확인은 별도다.
