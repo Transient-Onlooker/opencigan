@@ -1,17 +1,19 @@
 """Prepare, validate and activate one explicitly requested fork release."""
 import argparse
+import hashlib
 import json
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
 from deploy.activate_component import activate, installed_sha, retry_pin, write_atomic
-from deploy.fork_manifest import HEX40, TAG
+from deploy.fork_manifest import HEX40, TAG, load_release, validate_manifest
 from deploy.prepare_component import prepare
+from packaging.version import Version
 
 
-def preserve_pending_after_failure(root, status, previous):
-    if not previous.get("success") or previous.get("pinSync") not in ("pending", "failed"):
+def preserve_verified_after_failure(root, status, previous):
+    if not previous.get("success"):
         return
     verification = previous.get("verification", {})
     if not verification.get("internal") or not verification.get("public"):
@@ -28,7 +30,7 @@ def preserve_pending_after_failure(root, status, previous):
         return
 
 
-def deploy(tag, sha, root, release, school, week):
+def deploy(tag, sha, root, release, school, week, *, automatic=False):
     import fcntl
 
     if not TAG.fullmatch(tag) or not HEX40.fullmatch(sha):
@@ -52,6 +54,44 @@ def deploy(tag, sha, root, release, school, week):
                 if previous.get("pinSync") in ("pending", "failed"):
                     return retry_pin(root)
                 return {**previous, "skipped": True}
+        if automatic:
+            active_sha = installed_sha(root, Path.home())
+            verified = previous.get("verification", {})
+            if (not previous.get("success") or previous.get("activeSha") != active_sha
+                    or not verified.get("internal") or not verified.get("public")):
+                raise ValueError("Active component deployment is not verified")
+            component = root / active_sha
+            manifest_path = component / "deploy-manifest.json"
+            if component.is_symlink() or not component.is_dir() or manifest_path.is_symlink() or not manifest_path.is_file():
+                raise ValueError("Active component manifest is missing")
+            active = json.loads(manifest_path.read_text(encoding="utf-8"))
+            files = validate_manifest(active, active.get("tag", active.get("version", "")), active_sha)
+            package = component / "pycomcigan"
+            info = component / ("pycomcigan-" + active["version"] + ".dist-info")
+            if package.is_symlink() or info.is_symlink() or not info.is_dir():
+                raise ValueError("Unsafe active component metadata")
+            metadata = (info / "METADATA").read_text(encoding="utf-8")
+            expected_metadata = ("Metadata-Version: 2.1\nName: pycomcigan\nVersion: " + active["version"]
+                                 + "\nRequires-Dist: pycryptodomex>=3.23,<4\n")
+            direct = json.loads((info / "direct_url.json").read_text(encoding="utf-8"))
+            if (metadata != expected_metadata or direct.get("url") != "https://github.com/Transient-Onlooker/pycomcigan.git"
+                    or direct.get("vcs_info", {}).get("commit_id") != active_sha):
+                raise ValueError("Active component metadata mismatch")
+            if {p.name for p in package.glob("*.py")} != set(files):
+                raise ValueError("Active component file list mismatch")
+            for name, digest in files.items():
+                path = package / name
+                if path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+                    raise ValueError("Active component file hash mismatch")
+            candidate = load_release(tag, sha)
+            if Version(candidate["version"]) != Version(tag):
+                raise ValueError("Release tag and manifest version differ")
+            active_version, candidate_version = Version(active["version"]), Version(candidate["version"])
+            if candidate_version < active_version or (candidate_version == active_version and sha != active_sha):
+                if previous.get("pinSync") in ("pending", "failed"):
+                    return retry_pin(root)
+                return {"skipped": True, "reason": "older_release" if candidate_version < active_version else "version_sha_mismatch",
+                        "requestedSha": sha, "activeSha": active_sha}
         try:
             if (root / sha).exists() or (root / sha).is_symlink():
                 # Revalidate and retest even when a prior candidate is retained.
@@ -69,12 +109,12 @@ def deploy(tag, sha, root, release, school, week):
                       "phase": "prepare_failed", "errorType": type(error).__name__,
                       "timestamp": datetime.now(timezone.utc).isoformat()}
             write_atomic(status, json.dumps(result) + "\n")
-            preserve_pending_after_failure(root, status, previous)
+            preserve_verified_after_failure(root, status, previous)
             raise
         try:
             return activate(tag, sha, root, school, week)
         except Exception:
-            preserve_pending_after_failure(root, status, previous)
+            preserve_verified_after_failure(root, status, previous)
             raise
 
 

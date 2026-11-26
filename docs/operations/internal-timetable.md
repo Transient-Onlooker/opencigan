@@ -39,4 +39,6 @@ cd "$HOME/opensigan-releases/current"
 
 `opencigan-release-watch.timer`는 30분 간격으로 포크의 공개 정식 Release를 확인한다. 공식 신규 릴리스의 우선 채택은 기존대로 pycomcigan 에이전트가 포크 Release를 만드는 단계에서 담당한다. 감지 후에는 동일한 매니페스트·패키지 검증, 테스트, 실조회 및 배포 잠금을 거친다. 핀 동기화가 실패했더라도 새 Release 확인과 배포를 우선하며, 활성 SHA가 최신이면 핀 동기화만 재시도한다. 검증 학교는 Pi의 `~/.config/opencigan/release-watch.env`에 `OPENCIGAN_RELEASE_TEST_SCHOOL`로 지정한다. 서비스 전환에 실패한 SHA는 반복 재시작을 막기 위해 자동 재시도하지 않으며, 원인 확인 후 수동 배포하거나 새 Release를 기다린다. 확인 결과와 오류는 `journalctl --user -u opencigan-release-watch.service`에서 볼 수 있다.
 
+감시기는 게시 순서나 `releases/latest` 대신 게시된 정식 Release 목록에서 PEP 440 버전이 가장 높은 후보를 선택한다. 예를 들어 `1.4.8+autofix.1` 다음에는 `1.4.9`를 채택하고, 같은 공식 버전의 `1.4.9+autofix.1`도 이후에 채택할 수 있다. 자동 전환 직전 배포 잠금 안에서 실제 활성 컴포넌트의 SHA·매니페스트와 내부·공개 검증 상태를 확인하고, 더 오래된 버전 또는 같은 버전의 다른 SHA는 건너뛴다. 같은 버전에 서로 다른 SHA가 게시됐거나 활성 상태를 검증할 수 없으면 자동 전환을 중단하고 로그에 오류를 남긴다. 이전에 검증된 배포 상태는 새 후보 준비 실패나 성공적인 롤백 후에도 보존한다. 수동으로 선택한 복구 명령에는 이 자동 버전 제한을 적용하지 않는다. 새 릴리스의 감시기에는 `backend/requirements.txt`의 `packaging` 의존성이 필요하다.
+
 운영 감시는 인증된 `/api/v1/admin/analytics` 응답의 `refreshObservations`, `cacheStatuses`, `failureKinds`에서 각각 갱신 실패, stale 응답 및 상류 조회 오류를 확인한다. 이 집계는 요청이 관측된 범위만 나타내며 기존 로그 보존 정책을 따른다.

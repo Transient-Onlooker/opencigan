@@ -12,8 +12,32 @@ from deploy.watch_release import latest_release, poll
 class WatchReleaseTests(unittest.TestCase):
     @patch("deploy.watch_release.load_release")
     @patch("deploy.watch_release.api")
+    def test_release_list_uses_version_not_publication_order(self, api, load):
+        tags = ["1.4.8+autofix.2", "1.4.9", "1.4.8", "1.4.9+autofix.1"]
+        def response(path):
+            if path.startswith("releases?"):
+                return [{"tag_name": tag} for tag in tags]
+            return {"object": {"type": "commit", "sha": "b" * 40}}
+        api.side_effect = response
+        load.return_value = {"version": "1.4.9+autofix.1"}
+        self.assertEqual(latest_release(), ("1.4.9+autofix.1", "b" * 40))
+
+    @patch("deploy.watch_release.load_release")
+    @patch("deploy.watch_release.api")
+    def test_equivalent_version_tags_with_different_commits_are_rejected(self, api, load):
+        def response(path):
+            if path.startswith("releases?"):
+                return [{"tag_name": "1.4.9"}, {"tag_name": "v1.4.9"}]
+            return {"object": {"type": "commit", "sha": ("a" if path.endswith("/1.4.9") else "b") * 40}}
+        api.side_effect = response
+        load.side_effect = lambda tag, sha: {"version": tag}
+        with self.assertRaisesRegex(ValueError, "Conflicting release"):
+            latest_release()
+
+    @patch("deploy.watch_release.load_release", return_value={"version": "1.4.6+autofix.1"})
+    @patch("deploy.watch_release.api")
     def test_resolves_tag_and_validates_manifest(self, api, load):
-        api.side_effect = [{"tag_name": "1.4.6+autofix.1", "draft": False, "prerelease": False},
+        api.side_effect = [[{"tag_name": "1.4.6+autofix.1", "draft": False, "prerelease": False}],
                            {"object": {"type": "tag", "sha": "b" * 40}},
                            {"object": {"type": "commit", "sha": "a" * 40}}]
         self.assertEqual(latest_release(), ("1.4.6+autofix.1", "a" * 40))
@@ -69,7 +93,7 @@ class WatchReleaseTests(unittest.TestCase):
     def test_new_release_uses_existing_deploy_path(self, latest, deploy):
         with tempfile.TemporaryDirectory() as temporary:
             self.assertTrue(poll(temporary, "/release", "1:A", "2026-11-23")["success"])
-            deploy.assert_called_once_with("1.4.6", "a" * 40, Path(temporary), "/release", "1:A", "2026-11-23")
+            deploy.assert_called_once_with("1.4.6", "a" * 40, Path(temporary), "/release", "1:A", "2026-11-23", automatic=True)
 
     @patch("deploy.watch_release.deploy")
     @patch("deploy.watch_release.latest_release", return_value=("1.4.6", "a" * 40))
