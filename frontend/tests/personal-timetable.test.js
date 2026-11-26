@@ -27,6 +27,7 @@ function getModule(localStorageMock = {}) {
 
 test('getPersonalStorageKey formats key safely', () => {
   const pt = getModule();
+  assert.equal(pt.PERSONAL_STORAGE_PREFIX, 'personal_timetable_v1:');
   assert.equal(pt.getPersonalStorageKey('B10:1234', 2, 3), 'personal_timetable_v1:B10:1234:2:3');
   assert.equal(pt.getPersonalStorageKey('', 0, ''), 'personal_timetable_v1:unknown:1:1');
 });
