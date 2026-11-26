@@ -56,3 +56,20 @@ test('uses a valid Retry-After delay without trusting malformed or excessive val
   const disabled = Response.json({ code: 'history_disabled' }, { status: 503, headers: { 'Retry-After': '10' } });
   assert.doesNotMatch((await apiError(disabled)).message, /10초/);
 });
+
+test('supports HTTP-date Retry-After without accepting past or excessive dates', async () => {
+  const header = (offset) => new Date(Date.now() + offset * 1000).toUTCString();
+  const response = (value) => Response.json({ code: 'upstream_unavailable' }, { status: 503, headers: { 'Retry-After': value } });
+  assert.match((await apiError(response(header(60)))).message, /(?:59|60)초 후/);
+  const future = new Date(Date.now() + 60_000);
+  const weekday = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][future.getUTCDay()];
+  const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][future.getUTCMonth()];
+  const pad = (n) => String(n).padStart(2, '0');
+  const clock = `${pad(future.getUTCHours())}:${pad(future.getUTCMinutes())}:${pad(future.getUTCSeconds())}`;
+  const rfc850 = `${weekday}, ${pad(future.getUTCDate())}-${month}-${String(future.getUTCFullYear()).slice(-2)} ${clock} GMT`;
+  const asctime = `${weekday.slice(0, 3)} ${month} ${String(future.getUTCDate()).padStart(2, ' ')} ${clock} ${future.getUTCFullYear()}`;
+  for (const value of [rfc850, asctime]) assert.match((await apiError(response(value))).message, /(?:59|60)초 후/);
+  assert.match((await apiError(response(header(-60)))).message, /잠시 후/);
+  assert.match((await apiError(response(header(172800)))).message, /잠시 후/);
+  assert.match((await apiError(response('1.5'))).message, /잠시 후/);
+});
