@@ -282,6 +282,7 @@ flowchart TB
 
 - [ ] `App.svelte`의 현재 컴포넌트 분리/기존 CSS 정리·백엔드 라우팅 분리는 **이미 완료한 것으로 취급하고 중복 구현 금지**. 미완료인 선택/공유 복원, 늦은 응답 취소, `localStorage` 저장 순서의 소유권과 경합 테스트를 정리한다. **후속:** [#228](https://github.com/Transient-Onlooker/opencigan/pull/228)·[#234](https://github.com/Transient-Onlooker/opencigan/pull/234)·[#237](https://github.com/Transient-Onlooker/opencigan/pull/237)·[#259](https://github.com/Transient-Onlooker/opencigan/pull/259)·[#260](https://github.com/Transient-Onlooker/opencigan/pull/260) 공유·이력·토큰·부분 저장·검색 캐시 병합. 전체 소유권 정리 잔여.
 - [#281](https://github.com/Transient-Onlooker/opencigan/pull/281)은 학교 변경 중 늦게 끝난 급식 학교 검색이 로딩 상태를 남기는 문제를 수정했다. 이전 요청이 새 요청을 덮어쓰지 않는 회귀를 포함해 급식 세션 대상 검사 5건과 PR CI가 통과했다.
+- 같은 학교·학급의 표시 설정을 다른 탭에서 바꾸면 저장소 이벤트로 현재 화면과 학급 임시값을 갱신한다. 저장에 실패한 현재 탭의 임시값은 보존한다. Chromium 두 탭의 순차 변경과 저장 실패·삭제 경계를 검사했다. localStorage는 원자적 병합을 지원하지 않아 거의 동시에 저장하면 마지막 쓰기가 이길 수 있다.
 - [ ] 시간표·급식 도메인 처리, 개인화, 공유·내보내기의 순수 로직·저장 책임을 명료하게 분리하되 이전 저장 키·백업 파일·요청 수·캐시 계약을 유지한다.
 - **완료 조건:** 동일 선택·공유·설정·오프라인 회귀 결과, 범위를 분리한 작은 PR.
 - 원본: [리팩터링 배치 7 단계 1~3](refactoring-and-release.md).

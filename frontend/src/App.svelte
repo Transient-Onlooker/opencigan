@@ -8,7 +8,7 @@
   import ShareTools from './ShareTools.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import TimetablePanel from './TimetablePanel.svelte';
-  import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readMealAllergyFilter, saveMealAllergyFilter, readSchoolPreference, writeSchoolPreference, readTheme, writeTheme, readAnimations, writeAnimations, readMealSchool, writeMealSchool } from './preferences';
+  import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readMealAllergyFilter, saveMealAllergyFilter, readSchoolPreference, readTheme, writeTheme, readAnimations, writeAnimations, readMealSchool, writeMealSchool } from './preferences';
   import type { MealAllergyFilter } from './meal-filter';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
   import { saveSelection, readSelection, gradesInTimetable, classesInGrade, createSelectionState, createSharedSelectionSession, validateSharedCandidate, type PendingSharedClass } from './selection';
@@ -22,7 +22,7 @@
   import { createSchoolSearchSession } from './school-search-session';
   import { classLessons, teacherLessons, teacherNamesInTimetable, teacherSuggestions as findTeacherSuggestions, selectedTeacherName as findSelectedTeacherName, gradeLessons, comparisonClasses, missingWeekdayDates, observedClassCount as countObservedClasses, subjectNamesInTimetable } from './timetable-view';
   import { applySourceLessonStarts, dailyLessonOverview, koreaClockMinutes, parseLessonTimes, parseWeekdayLessonTimes, parseSourceLessonPreference, lessonTimesForDate, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
-  import { createClassDisplayPreferences, defaultDisplaySettings, parseDisplaySettings, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
+  import { createClassDisplayPreferences, createSchoolDisplayPreferences, defaultDisplaySettings, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
   import { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, saveLessonTimePreferences, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
   import { apiNotConfigured, getMeals, getTimetable, searchSchools, searchNeisSchools, timetableSubscriptionUrl, type Meal, type NeisSchool, type School, type TimetableRecord, type TimetableResponse } from './api';
 
@@ -48,6 +48,7 @@
   let schoolDisplaySettings: DisplaySettings = defaultDisplaySettings();
   let useClassDisplay = false;
   const classDisplayPreferences = createClassDisplayPreferences(() => localStorage);
+  const schoolDisplayPreferences = createSchoolDisplayPreferences(() => localStorage);
   let lessonTimes: LessonTimes = {};
   let weekdayLessonTimes: WeekdayLessonTimes = {};
   let weekdayTimeDrafts: WeekdayLessonTimes = {};
@@ -281,7 +282,7 @@
       classDisplayPreferences.set(classDisplayKey, next);
     } else {
       schoolDisplaySettings = next;
-      try { writeSchoolPreference(localStorage, 'opensigan-display:', school.id, next); }
+      try { schoolDisplayPreferences.set(school.id, next); }
       catch { /* 현재 설정은 페이지에서 유지됩니다. */ }
     }
   }
@@ -348,6 +349,7 @@
       const restoredWeekdays = parseWeekdayLessonTimes(backup.weekdayLessonTimes ?? weekdayLessonTimes, backup.lessonTimes);
       if (!restoredWeekdays) throw new Error('기존 요일별 시각이 백업의 공통 시각과 겹쳐 복원하지 않았어요.');
       saveSchoolSettingsBackup(localStorage, schoolId, backup.displaySettings, backup.lessonTimes, restoredWeekdays);
+      schoolDisplayPreferences.markSaved(schoolId);
       schoolDisplaySettings = backup.displaySettings;
       lessonTimes = backup.lessonTimes;
       sourceLessonApplied = {};
@@ -528,8 +530,7 @@
     schoolSearchSession.cancel(); mealSession.cancel();
     selectionState.update({ school: value }); schoolQuery = value.name; schoolResults = []; schoolSearchState = ''; schoolSearchRetryable = false; schoolEditorOpen = false;
     teacherQuery = '';
-    try { schoolDisplaySettings = readSchoolPreference(localStorage, 'opensigan-display:', value.id, parseDisplaySettings, defaultDisplaySettings); }
-    catch { schoolDisplaySettings = defaultDisplaySettings(); }
+    schoolDisplaySettings = schoolDisplayPreferences.read(value.id, defaultDisplaySettings());
     try { lessonTimes = readSchoolPreference(localStorage, 'opensigan-lesson-times:', value.id, parseLessonTimes, () => ({})); }
     catch { lessonTimes = {}; }
     try { weekdayLessonTimes = readSchoolPreference(localStorage, 'opensigan-weekday-lesson-times:', value.id, (raw) => parseWeekdayLessonTimes(raw, lessonTimes) ?? {}, () => ({})); }
@@ -909,6 +910,33 @@
     refreshCalendar();
     const calendarTimer = setInterval(refreshCalendar, 60_000);
     const onVisibilityChange = () => { if (document.visibilityState === 'visible') refreshCalendar(); };
+    const onStorage = (event: StorageEvent) => {
+      let storage: Storage;
+      try { storage = localStorage; } catch { return; }
+      if (event.storageArea !== storage) return;
+      if (!school) return;
+      const schoolDisplayKey = `opensigan-display:${school.id}`;
+      if (event.key === null || event.key === schoolDisplayKey) {
+        try {
+          schoolDisplaySettings = schoolDisplayPreferences.syncFromStorage(school.id, schoolDisplaySettings);
+          if (!useClassDisplay) displaySettings = schoolDisplaySettings;
+        } catch { /* Keep the current in-memory settings when storage is unavailable or unreadable. */ }
+      }
+      const classDisplayPrefix = `opensigan-class-display:${school.id}:`;
+      if (event.key === null) {
+        if (classDisplayKey) {
+          const saved = classDisplayPreferences.syncFromStorage(classDisplayKey);
+          useClassDisplay = saved.enabled;
+          displaySettings = saved.settings ?? schoolDisplaySettings;
+        }
+      } else if (event.key.startsWith(classDisplayPrefix)) {
+        const saved = classDisplayPreferences.syncFromStorage(event.key);
+        if (event.key === classDisplayKey) {
+          useClassDisplay = saved.enabled;
+          displaySettings = saved.settings ?? schoolDisplaySettings;
+        }
+      }
+    };
     const onFocus = () => refreshCalendar();
     const onFocusIn = (event: FocusEvent) => {
       const target = event.target;
@@ -918,6 +946,7 @@
     };
     const onFocusOut = () => { inputFocused = false; };
     document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('storage', onStorage);
     document.addEventListener('focusin', onFocusIn);
     document.addEventListener('focusout', onFocusOut);
     window.addEventListener('focus', onFocus);
@@ -950,7 +979,7 @@
     return () => {
       stopNavigation();
       sharedSelection.cancel();
-      clearInterval(calendarTimer); document.removeEventListener('visibilitychange', onVisibilityChange); document.removeEventListener('focusin', onFocusIn); document.removeEventListener('focusout', onFocusOut); window.removeEventListener('focus', onFocus); themeMedia?.removeEventListener?.('change', onThemeMedia);
+      clearInterval(calendarTimer); document.removeEventListener('visibilitychange', onVisibilityChange); window.removeEventListener('storage', onStorage); document.removeEventListener('focusin', onFocusIn); document.removeEventListener('focusout', onFocusOut); window.removeEventListener('focus', onFocus); themeMedia?.removeEventListener?.('change', onThemeMedia);
       schoolSearchSession.cancel(); mealSession.cancel(); timetableSession.cancel();
     };
   });
