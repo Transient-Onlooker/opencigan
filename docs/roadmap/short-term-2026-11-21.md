@@ -124,6 +124,7 @@ flowchart TB
 
 - [ ] 현재 시간표·학교 검색 프런트 요청 제한(45초), 시간표·캘린더 Worker 제한(40초), 컴시간 전체 예산(35초)과 단일 연결 기본값(30초)을 대조하고 Worker/Pi의 실제 요청 경계와 경로별 계측을 확인한다. 다른 프런트 API 요청은 15초 제한이다.
 - 2026-11-27 로컬 모의 상류 통합 검사: `OPENCIGAN_SLOW_NETWORK_TESTS=1`로 `test_frontend_client_against_local_backend`를 실행해 실제 40초 Worker 제한, 프런트 오류 전달, 다른 학교 요청의 독립 처리 및 이후 캐시 재사용을 확인했다(41.126초, 통과). 상류는 모의이며 Pi·Cloudflare 운영 경로나 실제 35초 상류 예산의 벽시계 검증은 아니다.
+- 2026-11-27 로컬 모의 HTTP 프록시 검사: requirements에 고정된 pycomcigan `65f4a820`의 호출 경로로 무응답 프록시에 요청해 기본 30초 소켓 제한과 안전한 타임아웃 로그를 확인했다(30.511초, 통과). 임시 설치를 사용했으며 실제 컴시간·WARP 경로를 검증한 것은 아니다.
 - [x] 오류가 **재현된 경우에만** 전체 요청 시간 예산·취소·재시도·캐시 대체와 `Retry-After`, 502/503/504 안내를 수정한다. 단순히 타임아웃 숫자를 바꾸지 않는다. **완료 근거:** [#292](https://github.com/Transient-Onlooker/opencigan/pull/292) 운영 배포 및 [#295](https://github.com/Transient-Onlooker/opencigan/pull/295)~[#297](https://github.com/Transient-Onlooker/opencigan/pull/297) 헤더·본문·잠금 마감의 재현 기반 수정과 격리 회귀. 후속 Pi 운영 적용, 전체 벽시계 상한 및 취소 전파는 별도이며 첫 체크 항목에 남긴다.
 - [x] 상류 403/429/네트워크 지연·캐시 없음/오래됨·다음 주/타 학교 조회·급식 독립 동작을 모의 오류 복구 테스트로 확인한다. `/api/v1/status`의 process-liveness 의미는 유지한다. [#164](https://github.com/Transient-Onlooker/opencigan/pull/164)의 격리 검증 및 ST-01의 후속 모의 통합 검증에 한하며, 실제 운영 503 원인과 시간 예산은 미확정이다.
 - **완료 조건:** 원인/재현/수정 전후 비교와 자동 회귀. 근본 원인이 확인되지 않으면 추측성 패치를 하지 않고 테스트·관측만 병합한 뒤 미완료 표시.
