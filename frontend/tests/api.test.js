@@ -63,7 +63,7 @@ test('client deadline can expire before an upstream response arrives', async (t)
   try {
     const api = await server.ssrLoadModule('/src/api.ts');
     const pending = api.searchSchools('서울');
-    assert.equal(budget, 15_000);
+    assert.equal(budget, 45_000);
     deadline.abort();
     await assert.rejects(pending, /서버 응답이 늦어요/);
     finishUpstream();

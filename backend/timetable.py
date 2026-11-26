@@ -4,7 +4,7 @@ import logging
 import re
 import threading
 import time
-from backend.comcigan_proxy import configure_comcigan_proxy
+from backend.comcigan_proxy import configure_comcigan_proxy, with_comcigan_budget
 
 _protocol = None
 _protocol_expires = 0.0
@@ -76,6 +76,7 @@ def _search_with_cached_protocol(query, *, retry=True, with_protocol=False):
         raise
 
 
+@with_comcigan_budget
 def search_schools(query):
     schools = []
     rows, searched_protocol = _search_with_cached_protocol(query, with_protocol=True)
@@ -118,6 +119,7 @@ def validate_timetable_week(week):
     return offset
 
 
+@with_comcigan_budget
 def fetch_timetable(school_id, week, *, include_original=False):
     global _protocol, _protocol_expires, _protocol_content
     configure_comcigan_proxy()
