@@ -1118,6 +1118,28 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: API connection unavailable, code: gateway_unavailable }
   /api/v1/schools:
+    head:
+      tags: [Schools]
+      summary: Check Comcigan school search without a response body
+      description: Performs the same query and cache lookup as GET; the response has no body.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Must contain a non-whitespace character; leading and trailing whitespace is trimmed after the 50-character limit is checked.
+          schema: { type: string, minLength: 1, maxLength: 50, pattern: '\S' }
+      responses:
+        '200': { description: Search completed. }
+        '400': { description: Invalid search query. }
+        '404': { description: Route not found. }
+        '429':
+          description: Request rate limit reached.
+          headers:
+            Retry-After: { description: Retry delay when supplied by the server., schema: { type: string } }
+        '503':
+          description: Search data or gateway unavailable.
+          headers:
+            Retry-After: { description: Retry delay when supplied by the server., schema: { type: string } }
     get:
       tags: [Schools]
       summary: Search Comcigan schools
@@ -1142,6 +1164,28 @@ paths:
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
   /api/v1/neis/schools:
+    head:
+      tags: [Schools]
+      summary: Check NEIS school search without a response body
+      description: Performs the same query and cache lookup as GET; the response has no body.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Must contain a non-whitespace character; leading and trailing whitespace is trimmed after the 50-character limit is checked.
+          schema: { type: string, minLength: 1, maxLength: 50, pattern: '\S' }
+      responses:
+        '200': { description: Search completed. }
+        '400': { description: Invalid search query. }
+        '404': { description: Route not found. }
+        '429':
+          description: Request rate limit reached.
+          headers:
+            Retry-After: { description: Retry delay when supplied by the server., schema: { type: string } }
+        '503':
+          description: Search data or gateway unavailable.
+          headers:
+            Retry-After: { description: Retry delay when supplied by the server., schema: { type: string } }
     get:
       tags: [Schools]
       summary: Search NEIS schools
