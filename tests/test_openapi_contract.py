@@ -84,6 +84,16 @@ class OpenApiContractTests(unittest.TestCase):
             self.assertEqual(status, 503)
             self.assert_json_response(path, status, response_headers, body)
 
+    def test_analytics_error_responses_match_contract(self):
+        path = '/api/v1/admin/analytics'
+        token = 'x' * 32
+        with patch.dict('os.environ', {'OPENCIGAN_ADMIN_TOKEN': token}), \
+             patch('backend.app._analytics_store', return_value=None):
+            for request_headers, expected in (({}, 401), ({'Authorization': 'Bearer ' + token}, 503)):
+                status, headers, body = dispatch_request('GET', path, '', self.cache, request_headers=request_headers)
+                self.assertEqual(status, expected)
+                self.assert_json_response(path, status, headers, body)
+
     def test_access_logs_json_csv_and_errors_match_contract(self):
         from backend.access_logs import AccessLogStore
         path = '/api/v1/admin/access-logs'
