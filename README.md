@@ -51,11 +51,13 @@
 
 **알레르기 주의:** 필터는 화면 표시를 돕는 기능입니다. NEIS 식단에 알레르기 항목이 없다고 해서 안전하다는 뜻은 아닙니다. 알레르기 설정은 브라우저에 보관합니다.
 
+**오프라인 사용:** 홈 화면에 추가하거나 설치한 앱에서 최근 시간표를 오프라인으로 다시 볼 수 있습니다. 같은 기기에서 미리 조회한 학교·주차에 한하며, 화면에서 저장된 데이터임을 확인할 수 있습니다. 급식과 새 시간표 조회에는 연결이 필요합니다.
+
 **이전 개인 일정:** 개인 시간표·시험 일정 편집 화면은 종료됐지만 기존 브라우저 데이터는 삭제하지 않았습니다. 해당 데이터가 있으면 설정에서 원본 JSON을 내보낼 수 있으며, 현재 앱에서 그 파일을 다시 불러오는 기능은 없습니다.
 
 ## 서비스 구조
 
-기본 접속 주소는 Cloudflare Pages 사용자 지정 도메인 `opencigan.mcv.kr`이며, `opencigan.pages.dev`는 동일한 웹앱의 기본 도메인입니다. 한글 도메인도 웹앱 접속에 사용할 수 있습니다. 두 Pages 주소는 **동일한 웹앱과 백엔드 경로를 공유**하므로 보조 주소가 독립적인 API 서버나 완전한 장애 대비 경로를 의미하지는 않습니다.
+OpenCigan은 [opencigan.mcv.kr](https://opencigan.mcv.kr/)에서 이용할 수 있습니다. [opencigan.pages.dev](https://opencigan.pages.dev/)와 [오픈시간.서버.한국](https://xn--s39a564b8jcxrw.xn--hk3b17f.xn--3e0b707e/)에서도 접속할 수 있습니다.
 
 ```mermaid
 flowchart LR
@@ -66,11 +68,41 @@ flowchart LR
     Client -.-> Local["브라우저 설정"]
 ```
 
-API는 `/api/v1/*`에서 제공되며 시간표·급식 원본에 의존합니다. 서비스 운영 상세 구성은 공개 안내에 포함하지 않습니다.
+API는 `/api/v1/*`에서 제공됩니다.
 
 [상세 아키텍처](docs/architecture.md) · [API 가이드](docs/api-guide.md)
 
 ## 문서 및 개발
+
+### 로컬에서 시작하기
+
+Python 3.13, Node.js 22 이상과 Git이 필요합니다. 저장소 루트에서 백엔드를 실행합니다.
+
+Linux/macOS:
+
+```bash
+python -m venv .venv
+.venv/bin/python -m pip install -r backend/requirements.txt
+.venv/bin/python -m backend.app
+```
+
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r backend\requirements.txt
+.\.venv\Scripts\python -m backend.app
+```
+
+다른 터미널에서 프런트엔드를 실행하고 표시된 주소를 엽니다.
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+개발 서버는 API 요청을 로컬 백엔드로 전달합니다. 급식 조회에는 `NEIS_API_KEY` 환경 변수가 필요하며, 설정하지 않으면 급식 API는 사용할 수 없습니다. Windows 실행 경로, 환경 변수와 테스트 방법은 [개발 가이드](docs/development.md)를 참고하세요. 일반 테스트는 합성 데이터를 사용합니다.
 
 | 목적 | 문서 |
 | --- | --- |
