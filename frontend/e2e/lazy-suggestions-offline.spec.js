@@ -19,6 +19,15 @@ test('offline settings remain usable and suggestions recover after reconnecting'
   await context.setOffline(false);
   await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(true);
   await page.getByRole('button', { name: '새로고침 후 다시 시도', exact: true }).click();
-  await expect(page.getByText('만들어주세요', { exact: true })).toBeVisible({ timeout: 5000 });
+  try {
+    await expect(page.getByText('만들어주세요', { exact: true })).toBeVisible({ timeout: 5000 });
+  } catch (error) {
+    console.log('Retry diagnostics:', await page.evaluate(() => ({
+      url: location.href, online: navigator.onLine,
+      retryMarker: sessionStorage.getItem('opencigan-retry-suggestions'),
+      body: document.body.innerText.slice(-1800),
+    })));
+    throw error;
+  }
   expect(errors).toEqual([]);
 });
