@@ -19,14 +19,16 @@ export interface DisplaySettings {
 
 export function createClassDisplayPreferences(storage: () => Storage) {
   const drafts = new Map<string, DisplaySettings | null>();
+  const unsaved = new Set<string>();
   return {
     read(key: string, fallback: DisplaySettings) {
       let saved = drafts.get(key);
-      if (saved === undefined) {
+      if (!unsaved.has(key)) {
         try {
           const raw = storage().getItem(key);
           saved = raw ? parseDisplaySettings(JSON.parse(raw)) : null;
-        } catch { saved = null; }
+          drafts.set(key, saved);
+        } catch { saved = drafts.get(key) ?? null; /* Keep the last known preference when storage cannot be read. */ }
       }
       return { enabled: saved !== null, settings: saved ?? fallback };
     },
@@ -35,11 +37,57 @@ export function createClassDisplayPreferences(storage: () => Storage) {
       try {
         if (settings) storage().setItem(key, JSON.stringify(settings));
         else storage().removeItem(key);
-      } catch { /* Keep changes in memory when storage is unavailable. */ }
+        unsaved.delete(key);
+      } catch { unsaved.add(key); /* Keep changes in memory when storage is unavailable. */ }
+    },
+    syncFromStorage(key: string) {
+      const current = drafts.get(key) ?? null;
+      if (unsaved.has(key)) return { enabled: current !== null, settings: current };
+      try {
+        const raw = storage().getItem(key);
+        const settings = raw ? parseDisplaySettings(JSON.parse(raw)) : null;
+        drafts.set(key, settings);
+        return { enabled: settings !== null, settings };
+      } catch {
+        return { enabled: current !== null, settings: current };
+      }
     },
     restore(key: string, settings: DisplaySettings) {
       storage().setItem(key, JSON.stringify(settings));
       drafts.set(key, settings);
+      unsaved.delete(key);
+    },
+  };
+}
+
+export function createSchoolDisplayPreferences(storage: () => Storage) {
+  const unsaved = new Map<string, DisplaySettings>();
+  const keyFor = (schoolId: string) => `opensigan-display:${schoolId}`;
+  return {
+    read(schoolId: string, fallback: DisplaySettings) {
+      const pending = unsaved.get(schoolId);
+      if (pending) return pending;
+      try {
+        const raw = storage().getItem(keyFor(schoolId));
+        return raw ? parseDisplaySettings(JSON.parse(raw)) : defaultDisplaySettings();
+      } catch { return fallback; }
+    },
+    set(schoolId: string, settings: DisplaySettings) {
+      try {
+        storage().setItem(keyFor(schoolId), JSON.stringify(settings));
+        unsaved.delete(schoolId);
+      } catch { unsaved.set(schoolId, settings); }
+    },
+    markSaved(schoolId: string) {
+      unsaved.delete(schoolId);
+    },
+    syncFromStorage(schoolId: string, fallback: DisplaySettings) {
+      const pending = unsaved.get(schoolId);
+      if (pending) return pending;
+      try {
+        const raw = storage().getItem(keyFor(schoolId));
+        return raw ? parseDisplaySettings(JSON.parse(raw)) : defaultDisplaySettings();
+      } catch { return fallback; }
     },
   };
 }

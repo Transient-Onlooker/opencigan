@@ -102,6 +102,114 @@ test('class display preferences remain isolated by school and class when storage
   assert.equal(prefs.read('school-a:1:1', fallback).enabled, false);
 });
 
+test('class display storage events refresh another tab draft and removal disables only that class', () => {
+  const fallback = helpers.defaultDisplaySettings();
+  const values = new Map();
+  const storage = () => ({
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
+  });
+  const firstTab = helpers.createClassDisplayPreferences(storage);
+  const secondTab = helpers.createClassDisplayPreferences(storage);
+  const classKey = 'opensigan-class-display:school-a:1:2';
+  firstTab.read(classKey, fallback);
+  secondTab.set(classKey, { ...fallback, density: 'compact' });
+
+  let saved = firstTab.syncFromStorage(classKey);
+  assert.equal(saved.enabled, true);
+  assert.equal(saved.settings.density, 'compact');
+
+  values.delete(classKey);
+  saved = firstTab.syncFromStorage(classKey);
+  assert.equal(saved.enabled, false);
+  assert.equal(firstTab.read(classKey, fallback).settings, fallback);
+  assert.equal(firstTab.read('opensigan-class-display:school-b:1:2', fallback).enabled, false);
+
+  secondTab.set(classKey, { ...fallback, density: 'relaxed' });
+  values.clear();
+  assert.equal(firstTab.syncFromStorage(classKey).enabled, false);
+});
+
+test('class display synchronization reads the latest value and preserves local fallback on storage failure', () => {
+  const fallback = helpers.defaultDisplaySettings();
+  const values = new Map();
+  let writesBlocked = false;
+  const prefs = helpers.createClassDisplayPreferences(() => ({
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => { if (writesBlocked) throw new Error('blocked'); values.set(key, value); },
+    removeItem: (key) => values.delete(key),
+  }));
+  const key = 'opensigan-class-display:school-a:1:1';
+  const earlier = { ...fallback, density: 'compact' };
+  const latest = { ...fallback, density: 'relaxed' };
+  prefs.read(key, fallback);
+  values.set(key, JSON.stringify(earlier));
+  values.set(key, JSON.stringify(latest));
+  assert.equal(prefs.syncFromStorage(key).settings.density, 'relaxed');
+
+  writesBlocked = true;
+  const localDraft = { ...fallback, showTeachers: false };
+  prefs.set(key, localDraft);
+  values.delete(key);
+  assert.equal(prefs.syncFromStorage(key).settings.showTeachers, false);
+  assert.equal(prefs.read(key, fallback).settings.showTeachers, false);
+
+  writesBlocked = false;
+  const restored = { ...fallback, density: 'compact' };
+  prefs.restore(key, restored);
+  values.set(key, JSON.stringify(latest));
+  assert.equal(prefs.syncFromStorage(key).settings.density, 'relaxed');
+});
+
+test('school display preferences synchronize across tabs and retain failed local writes', () => {
+  const fallback = helpers.defaultDisplaySettings();
+  const values = new Map();
+  let writesBlocked = false;
+  const storage = () => ({
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => { if (writesBlocked) throw new Error('blocked'); values.set(key, value); },
+  });
+  const firstTab = helpers.createSchoolDisplayPreferences(storage);
+  const secondTab = helpers.createSchoolDisplayPreferences(storage);
+  firstTab.read('school-a', fallback);
+  secondTab.set('school-a', { ...fallback, showTeachers: false });
+  assert.equal(firstTab.syncFromStorage('school-a', fallback).showTeachers, false);
+  assert.equal(firstTab.syncFromStorage('school-b', fallback).showTeachers, true);
+
+  values.clear();
+  assert.equal(firstTab.syncFromStorage('school-a', fallback).showTeachers, true);
+
+  writesBlocked = true;
+  const localDraft = { ...fallback, density: 'compact' };
+  firstTab.set('school-a', localDraft);
+  values.clear();
+  assert.equal(firstTab.syncFromStorage('school-a', fallback).density, 'compact');
+  assert.equal(firstTab.read('school-a', fallback).density, 'compact');
+
+  values.set('opensigan-display:school-a', JSON.stringify({ ...fallback, density: 'relaxed' }));
+  firstTab.markSaved('school-a');
+  values.clear();
+  assert.equal(firstTab.syncFromStorage('school-a', fallback).density, 'normal');
+});
+
+test('missing and malformed class storage keeps the disabled default or last valid draft', () => {
+  const fallback = helpers.defaultDisplaySettings();
+  const values = new Map();
+  const prefs = helpers.createClassDisplayPreferences(() => ({
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
+  }));
+  const missingKey = 'opensigan-class-display:school-a:1:1';
+  assert.equal(prefs.read(missingKey, fallback).enabled, false);
+
+  const saved = { ...fallback, density: 'compact' };
+  prefs.set(missingKey, saved);
+  values.set(missingKey, '{invalid');
+  assert.equal(prefs.syncFromStorage(missingKey).settings.density, 'compact');
+});
+
 test('restoring class settings updates the draft only after persistent storage succeeds', () => {
   const fallback = helpers.defaultDisplaySettings();
   const previous = { ...fallback, showTeachers: false };
@@ -118,6 +226,6 @@ test('restoring class settings updates the draft only after persistent storage s
   assert.equal(prefs.read('school:1:1', fallback).settings, previous);
   blocked = false;
   prefs.restore('school:1:1', restored);
-  assert.equal(prefs.read('school:1:1', fallback).settings, restored);
+  assert.equal(prefs.read('school:1:1', fallback).settings.density, 'compact');
   assert.equal(JSON.parse(values.get('school:1:1')).density, 'compact');
 });
