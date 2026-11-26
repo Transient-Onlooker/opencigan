@@ -251,16 +251,18 @@ class TestOpensiganPythonClient(unittest.TestCase):
         self.assertEqual(query["teacher"], ["김&Lee"])
         self.assertEqual(query["mode"], ["summary"])
         timed_url = self.client.get_timetable_ics_url(
-            "1234:학교", 1, 2, mode="timed", times="1:0900-0950,2:1000-1050"
+            "1234:학교", 1, 2, mode="timed", times="1:0900-0950,2:1000-1050", weekday_times="2.1:1000-1050"
         )
         self.assertEqual(parse_qs(urlsplit(timed_url).query)["mode"], ["timed"])
         self.assertEqual(parse_qs(urlsplit(timed_url).query)["times"], ["1:0900-0950,2:1000-1050"])
+        self.assertEqual(parse_qs(urlsplit(timed_url).query)["weekday_times"], ["2.1:1000-1050"])
         self.client.get_timetable_ics(
-            "1234:학교", 1, 2, mode="timed", times="1:0900-0950,2:1000-1050"
+            "1234:학교", 1, 2, mode="timed", times="1:0900-0950,2:1000-1050", weekday_times="2.1:1000-1050"
         )
         query = parse_qs(urlsplit(MockServerHandler.last_request_path).query)
         self.assertEqual(query["mode"], ["timed"])
         self.assertEqual(query["times"], ["1:0900-0950,2:1000-1050"])
+        self.assertEqual(query["weekday_times"], ["2.1:1000-1050"])
         self.assertIn("times=1%3A0900-0950%2C2%3A1000-1050", MockServerHandler.last_request_path)
 
     def test_error_handling(self):

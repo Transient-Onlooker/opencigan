@@ -108,18 +108,18 @@ class OpensiganClient:
             "grade": grade, "class": classroom, "teacher": teacher,
         }, timeout=timeout)
 
-    def get_timetable_ics_url(self, school, grade, classroom, weeks=1, mode="periods", teacher=None, times=None):
+    def get_timetable_ics_url(self, school, grade, classroom, weeks=1, mode="periods", teacher=None, times=None, weekday_times=None):
         return self._build_url("/api/v1/timetable.ics", {
             "school": school.strip(), "grade": grade, "class": classroom,
-            "weeks": weeks, "mode": mode, "teacher": teacher, "times": times,
+            "weeks": weeks, "mode": mode, "teacher": teacher, "times": times, "weekday_times": weekday_times,
         })
 
     def get_timetable_ics(
         self, school, grade, classroom, weeks=1, mode="periods",
-        teacher=None, if_none_match=None, timeout=None, times=None,
+        teacher=None, if_none_match=None, timeout=None, times=None, weekday_times=None,
     ):
         """Return (UTF-8 calendar text or None, not_modified, etag)."""
-        url = self.get_timetable_ics_url(school, grade, classroom, weeks, mode, teacher, times=times)
+        url = self.get_timetable_ics_url(school, grade, classroom, weeks, mode, teacher, times=times, weekday_times=weekday_times)
         headers = {"Accept": "text/calendar"}
         if if_none_match:
             headers["If-None-Match"] = if_none_match

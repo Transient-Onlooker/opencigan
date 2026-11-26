@@ -73,6 +73,7 @@ test('OpensiganClient query encoding and URL construction', async () => {
     weeks: 2,
     mode: 'timed',
     times: '1:0900-0950,2:1000-1050',
+    weekdayTimes: '2.1:1000-1050,3.2:1100-1150',
   });
   const parsedIcsPeriods = new URL(icsPeriods);
   assert.equal(parsedIcsPeriods.searchParams.get('mode'), 'periods');
@@ -85,6 +86,7 @@ test('OpensiganClient query encoding and URL construction', async () => {
   assert.equal(parsedIcsTimed.searchParams.get('mode'), 'timed');
   assert.equal(parsedIcsTimed.searchParams.get('weeks'), '2');
   assert.equal(parsedIcsTimed.searchParams.get('times'), '1:0900-0950,2:1000-1050');
+  assert.equal(parsedIcsTimed.searchParams.get('weekday_times'), '2.1:1000-1050,3.2:1100-1150');
 });
 
 test('malformed success JSON is structured; HTTP error status survives invalid JSON', async () => {
