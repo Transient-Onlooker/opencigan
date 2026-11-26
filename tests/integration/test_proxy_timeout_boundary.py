@@ -91,9 +91,10 @@ class ProxyTimeoutBoundaryTests(unittest.TestCase):
         self.addCleanup(server.shutdown)
         self.addCleanup(release.set)
 
+        @comcigan_proxy.with_comcigan_budget
         def fetch(school, week):
             calls.append(school)
-            with helpers.urlopen(Request("http://comci.net:4082/st"), timeout=0.15) as response:
+            with helpers.urlopen(Request("http://comci.net:4082/st"), timeout=1) as response:
                 response.read()
             return {"schoolId": school, "weekStart": week, "records": [], "stale": False}
 
@@ -103,6 +104,7 @@ class ProxyTimeoutBoundaryTests(unittest.TestCase):
         with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": f"http://127.0.0.1:{server.server_port}"}), \
              patch.object(helpers, "urlopen", helpers.urlopen), \
              patch.object(comcigan_proxy, "_configured", False), \
+             patch.object(comcigan_proxy, "UPSTREAM_BUDGET_SECONDS", 0.15), \
              patch.object(app, "fetch_timetable", side_effect=fetch), \
              patch.object(app, "validate_timetable_week"):
             comcigan_proxy.configure_comcigan_proxy()

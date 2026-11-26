@@ -80,7 +80,7 @@ class ComciganProxyTests(unittest.TestCase):
             server.server_close()
             thread.join()
 
-    def test_slow_body_can_exceed_budget_before_next_request_is_stopped(self):
+    def test_slow_body_is_interrupted_at_shared_deadline(self):
         import pycomcigan.helpers as helpers
         original = helpers.urlopen
         self.addCleanup(setattr, helpers, "urlopen", original)
@@ -90,10 +90,13 @@ class ComciganProxyTests(unittest.TestCase):
                 self.send_response(200)
                 self.send_header("Content-Length", "6")
                 self.end_headers()
-                for _ in range(6):
-                    self.wfile.write(b"x")
-                    self.wfile.flush()
-                    time.sleep(0.08)
+                try:
+                    for _ in range(6):
+                        self.wfile.write(b"x")
+                        self.wfile.flush()
+                        time.sleep(0.08)
+                except ConnectionError:
+                    pass
 
             def log_message(self, *args):
                 pass
@@ -108,15 +111,13 @@ class ComciganProxyTests(unittest.TestCase):
 
                 @comcigan_proxy.with_comcigan_budget
                 def lookup():
-                    started = time.monotonic()
                     with helpers.urlopen(Request("http://comci.net:4082/st")) as response:
-                        self.assertEqual(response.read(), b"xxxxxx")
-                    elapsed = time.monotonic() - started
-                    with self.assertRaises(TimeoutError):
-                        helpers.urlopen(Request("http://comci.net:4082/data"))
-                    return elapsed
+                        response.read()
 
-                self.assertGreater(lookup(), 0.2)
+                started = time.monotonic()
+                with self.assertRaises(TimeoutError):
+                    lookup()
+                self.assertLess(time.monotonic() - started, 0.8)
         finally:
             server.shutdown()
             server.server_close()
@@ -137,6 +138,42 @@ class ComciganProxyTests(unittest.TestCase):
             self.assertEqual(opener.open.call_args.args[0].host, "127.0.0.1:18084")
             with self.assertRaises(ValueError):
                 helpers.urlopen(Request("http://example.org/"))
+
+    def test_budgeted_response_preserves_status_and_chunked_body(self):
+        import pycomcigan.helpers as helpers
+        original = helpers.urlopen
+        self.addCleanup(setattr, helpers, "urlopen", original)
+
+        class ChunkedResponse(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Transfer-Encoding", "chunked")
+                self.end_headers()
+                self.wfile.write(b"3\r\nabc\r\n2\r\nde\r\n0\r\n\r\n")
+
+            def log_message(self, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), ChunkedResponse)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": f"http://127.0.0.1:{server.server_port}"}):
+                comcigan_proxy.configure_comcigan_proxy()
+
+                @comcigan_proxy.with_comcigan_budget
+                def lookup():
+                    with helpers.urlopen(Request("http://comci.net:4082/st")) as response:
+                        status = response.status
+                        first = response.read(3)
+                        rest = response.read()
+                        return status, first + rest, response.read()
+
+                self.assertEqual(lookup(), (200, b"abcde", b""))
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
 
     def test_remote_proxy_is_rejected(self):
         with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": "http://example.org:8080"}):
