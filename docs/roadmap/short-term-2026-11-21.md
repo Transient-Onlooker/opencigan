@@ -2,7 +2,21 @@
 
 > **단기 실행 큐:** 작성 당시의 '오늘'과 과거 집계는 역사적 기록입니다. 이후 작업의 병합·검증 상태는 바로 아래 현황을 확인하세요. 체크박스는 전체 완료 조건을 충족한 경우에만 표시하며 운영 배포를 뜻하지 않습니다.
 
-## 최근 작업 현황 (2026-11-26)
+## 최근 작업 현황 (2026-11-27)
+
+**기준:** main `8da3c21`까지 병합. 체크리스트 34/43 완료, 9개 미완료; 숫자는 항목 수이며 작업량이나 운영 배포율이 아니다. #333 개인 데이터 저장 키 정리는 CI 통과 후 문서 충돌을 해결하고 재검증 중이다. 이후 병합 결과는 GitHub에서 확인한다.
+
+| 범위 | 완료된 구현·검증 | 남은 범위 |
+| --- | --- | --- |
+| ST-01 | [#308](https://github.com/Transient-Onlooker/opencigan/pull/308)·[#312](https://github.com/Transient-Onlooker/opencigan/pull/312) 공유 예산·캐시 대기 제한, [#328](https://github.com/Transient-Onlooker/opencigan/pull/328) 40초 모의 종단 검증, [#329](https://github.com/Transient-Onlooker/opencigan/pull/329) 고정 파서 30초 모의 프록시 검증 | 실제 운영 경계·후속 코드의 Pi 적용 여부 확인 |
+| ST-04·04A | [#309](https://github.com/Transient-Onlooker/opencigan/pull/309) 자동 시각 저장, [#313](https://github.com/Transient-Onlooker/opencigan/pull/313)·[#316](https://github.com/Transient-Onlooker/opencigan/pull/316) 모바일 조작, [#325](https://github.com/Transient-Onlooker/opencigan/pull/325) 원본 시각 모의 형식, [#331](https://github.com/Transient-Onlooker/opencigan/pull/331) 오늘 화면 320px 검사 | 화면 전체 시각 비교, 추가 학교의 실제 원본 형식 |
+| ST-10 | [#310](https://github.com/Transient-Onlooker/opencigan/pull/310)·[#311](https://github.com/Transient-Onlooker/opencigan/pull/311)·[#317](https://github.com/Transient-Onlooker/opencigan/pull/317)·[#319](https://github.com/Transient-Onlooker/opencigan/pull/319)·[#324](https://github.com/Transient-Onlooker/opencigan/pull/324)·[#327](https://github.com/Transient-Onlooker/opencigan/pull/327) API 계약, [#322](https://github.com/Transient-Onlooker/opencigan/pull/322)·[#323](https://github.com/Transient-Onlooker/opencigan/pull/323) 갱신 관측 | 나머지 API 계약 및 운영 관측 |
+| ST-12 | [#320](https://github.com/Transient-Onlooker/opencigan/pull/320) 설정 복구, [#330](https://github.com/Transient-Onlooker/opencigan/pull/330) 반 입력 경합, [#332](https://github.com/Transient-Onlooker/opencigan/pull/332) 교시 시각 복원 일관성 | 나머지 상태·저장 책임 검토; localStorage 동시 쓰기의 원자성은 보장되지 않음 |
+| ST-14 | [#326](https://github.com/Transient-Onlooker/opencigan/pull/326) 저장소 기준 DB·기본 동작 점검, PWA 오프라인 자동 검사 | 최종 후보의 통합 CI와 PR별 배포 상태, 운영 롤백 확인 |
+
+**운영 로그 확인 (2026-11-27 08:36 KST):** Pi의 공개·내부 API와 터널은 실행 중이고 공개 API 프로세스 생존 응답은 정상이다. 최근 6시간 해당 API 저널에서 실패·예외는 검색되지 않았다. 직전 24시간에는 11/26 18:00의 시간표 상류 타임아웃(캐시 없음), 17:16·17:37의 stale 대체 타임아웃, 16:24 학교 검색 상류 HTTP 502가 기록됐다. 프로세스 생존은 상류 실조회 성공을 뜻하지 않으며, 저널 검색에 나타난 범위만 확인했다. 웹훅 발송 설정이나 다른 서비스는 변경하지 않았다.
+
+### 과거 작업 현황 (2026-11-26)
 
 2026-11-27: 자동 Release 역행 방지 [#293](https://github.com/Transient-Onlooker/opencigan/pull/293)를 Pi `release-autoguard-a907ce3`에 적용했다. 격리된 활성 컴포넌트 사본의 구버전 차단, 관련 회귀 테스트 24건, 전환 후 내부 실조회·공개 조회와 동일 SHA 감시 서비스 정상 종료를 확인했다. 이전 릴리스는 보존했다.
 
