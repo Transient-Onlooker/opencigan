@@ -306,6 +306,8 @@ class CacheTests(unittest.TestCase):
                     cache.get(("timetable", "school", "week"), lambda: (_ for _ in ()).throw(error))
             self.assertIn("failure_kind=" + kind, logs.output[0])
             self.assertNotIn("private", logs.output[0])
+            self.assertEqual(cache.observations()["timetable"]["lastFailureKind"], kind)
+            self.assertNotIn("private", str(cache.observations()))
 
     def test_overlapping_refresh_returns_stale_without_another_upstream_call(self):
         cache = cache_module.Cache(ttl=0)

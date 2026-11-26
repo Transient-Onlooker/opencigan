@@ -22,3 +22,7 @@
 - SQLite WAL을 사용하고 잠금 대기는 최대 50ms입니다. 페이지 수집이나 통계 조회가 실패하면 해당 분석 API만 503으로 응답합니다.
 
 분석 DB는 서비스 프로세스별로 따로 설정하면 조회도 분리됩니다. 여러 프로세스가 같은 DB와 같은 HMAC 키를 사용하면 저장된 수치는 합쳐지지만 큐·누락 수는 프로세스별입니다.
+
+## 최근 갱신 실패 분류
+
+관리자 API의 `refreshObservations`에서 `lastFailureKind`는 최근 갱신 실패의 예외 유형을 `timeout`, `http`, `network`, `provider_response`, `other`로 대략 구분합니다. 이후 갱신에 성공해도 최근 실패 시각과 함께 유지되며 프로세스 재시작 시 초기화됩니다. `provider_response`에는 일반적인 RuntimeError도 포함되므로 원본 서버의 잘못이라고 단정할 수 없습니다. 오류 메시지나 요청 내용은 포함하지 않습니다.
