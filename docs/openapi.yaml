@@ -776,6 +776,7 @@ paths:
                         observedAt: { type: string, format: date-time }
                         lastSuccessAt: { type: string, format: date-time }
                         lastFailureAt: { type: string, format: date-time }
+                        lastFailureKind: { type: string, enum: [timeout, http, network, provider_response, other], description: Coarse exception category of the most recent failed refresh, retained after later success; provider_response includes RuntimeError and does not prove an upstream fault. }
                         durationMs: { type: integer, minimum: 0, description: Elapsed time of the latest completed refresh attempt in milliseconds; absent on older servers. }
                         origin: { type: [string, 'null'], enum: [timetable, calendar, null], description: Route that initiated the latest refresh when known; shared cache hits do not update it. }
                   cacheWaitObservations:

@@ -146,15 +146,6 @@ class Cache:
                 raise
             except Exception as exc:
                 now = time.monotonic()
-                with self.guard:
-                    self._store(key, previous_value, previous_fetched_at, now + self.retry_delay)
-                    if resource:
-                        observed_at = datetime.now(timezone.utc).isoformat()
-                        self.refresh_observations[resource] = {**self.refresh_observations.get(resource, {}),
-                                                               "result": "failure", "observedAt": observed_at,
-                                                               "origin": refresh_origin,
-                                                               "durationMs": max(0, round((now - started_at) * 1000)),
-                                                               "lastFailureAt": observed_at}
                 cause = exc
                 for _ in range(8):
                     if cause.__cause__ is None:
@@ -168,6 +159,15 @@ class Cache:
                                 "http" if isinstance(cause, HTTPError) else
                                 "network" if isinstance(cause, (URLError, OSError)) else
                                 "provider_response" if isinstance(cause, (ValueError, RuntimeError)) else "other")
+                with self.guard:
+                    self._store(key, previous_value, previous_fetched_at, now + self.retry_delay)
+                    if resource:
+                        observed_at = datetime.now(timezone.utc).isoformat()
+                        self.refresh_observations[resource] = {**self.refresh_observations.get(resource, {}),
+                                                               "result": "failure", "observedAt": observed_at,
+                                                               "origin": refresh_origin,
+                                                               "durationMs": max(0, round((now - started_at) * 1000)),
+                                                               "lastFailureAt": observed_at, "lastFailureKind": failure_kind}
                 logger.warning("cache refresh failed resource=%s fallback=%s error_type=%s upstream_http_status=%s cause_type=%s failure_kind=%s",
                                resource or "other", "stale" if previous_value is not None else "none", type(exc).__name__, status, cause_type, failure_kind)
                 if previous_value is not None:

@@ -1,7 +1,7 @@
 import unittest
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from unittest.mock import patch
 
 from backend.cache import Cache, CacheBackoffError
@@ -9,6 +9,21 @@ from backend.comcigan_proxy import with_comcigan_budget
 
 
 class CacheIntegrityTests(unittest.TestCase):
+    def test_last_failure_kind_distinguishes_network_and_http_without_private_details(self):
+        for error, kind in ((URLError('secret'), 'network'),
+                            (HTTPError('https://private.invalid', 403, 'secret', {}, None), 'http'),
+                            (URLError(TimeoutError('secret')), 'timeout'),
+                            (TypeError('secret'), 'other')):
+            with self.subTest(kind=kind):
+                cache = Cache(retry_delay=0)
+                with self.assertLogs('opensigan.cache', level='WARNING'):
+                    with self.assertRaises(type(error)):
+                        cache.get(('timetable', 'private-school', 'week'), lambda: (_ for _ in ()).throw(error))
+                observation = cache.observations()['timetable']
+                self.assertEqual(observation['lastFailureKind'], kind)
+                self.assertNotIn('secret', str(observation))
+                self.assertNotIn('private', str(observation))
+
     def test_non_comcigan_wait_does_not_use_comcigan_budget(self):
         cache = Cache(lock_stripes=1)
         key = ('meals', 'school')
@@ -244,12 +259,14 @@ class CacheIntegrityTests(unittest.TestCase):
         self.assertEqual(failure["school_search"]["result"], "failure")
         self.assertEqual(failure["school_search"]["lastSuccessAt"], first["school_search"]["lastSuccessAt"])
         self.assertEqual(failure["school_search"]["lastFailureAt"], failure["school_search"]["observedAt"])
+        self.assertEqual(failure["school_search"]["lastFailureKind"], "provider_response")
         self.assertNotIn("private", str(failure))
         failure["school_search"]["result"] = "tampered"
         self.assertEqual(cache.observations()["school_search"]["result"], "failure")
         cache.get(key, lambda: {"schools": []})
         self.assertEqual(cache.observations()["school_search"]["result"], "success")
         self.assertEqual(cache.observations()["school_search"]["lastFailureAt"], failure["school_search"]["lastFailureAt"])
+        self.assertEqual(cache.observations()["school_search"]["lastFailureKind"], "provider_response")
 
     def test_failed_refresh_logs_resource_and_fallback_without_request_data(self):
         cache = Cache(ttl=0, retry_delay=60)
