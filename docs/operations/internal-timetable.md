@@ -33,7 +33,9 @@ cd "$HOME/opensigan-releases/current"
   --school '학교코드:학교명' --week YYYY-MM-DD
 ```
 
-태그와 SHA는 실행 시점에 검증된 포크 Release를 확인해 입력한다. 이미 검증된 활성 SHA는 전환 없이 건너뛴다. 이전에 준비된 검증 컴포넌트로 되돌리려면 먼저 `systemctl --user stop opencigan-release-watch.timer`로 자동 감시를 중지한 뒤 해당 태그·SHA로 `python -m deploy.activate_component --tag <태그> --sha <SHA> --root <컴포넌트 루트> --school <학교 ID> --week <월요일>`을 실행한다. 이 명령도 양쪽 서비스를 순서대로 검증하고 핀을 동기화한다. 감시를 다시 시작하면 현재 최신 Release를 재배포할 수 있다.
+태그와 SHA는 실행 시점에 검증된 포크 Release를 확인해 입력한다. 이미 검증된 활성 SHA는 전환 없이 건너뛴다. 이전에 준비된 검증 컴포넌트로 되돌리려면 먼저 `systemctl --user stop opencigan-release-watch.timer`로 자동 감시를 중지한 뒤 해당 태그·SHA로 `python -m deploy.activate_component --tag <태그> --sha <SHA> --root <컴포넌트 루트> --school <학교 ID> --week <월요일>`을 실행한다. 이 명령도 양쪽 서비스를 순서대로 검증하고 핀을 동기화한다. 감시를 재개하면 검증된 활성 버전보다 높은 Release는 다시 자동 배포될 수 있다. 구버전과 동일 버전의 다른 SHA는 자동 채택하지 않는다.
+
+2026-11-27 Pi `release-autoguard-a907ce3`에 자동 버전 역행 방지를 적용했다. 운영 컴포넌트 사본에서 1.4.9 → 1.4.8 차단과 회귀 테스트 24건을 확인하고, 전환 후 내부 API 실조회와 공개 API 조회 및 동일 SHA 감시 서비스의 정상 종료를 확인했다. 이전 릴리스 `release-resilience-4dc3304`는 복구용으로 보존한다.
 
 결과는 컴포넌트 루트의 `deployment-status.json`에 `requestedSha`, `activeSha`, `success`, `verification`, `rollback`, `pinSync`, `phase`, `timestamp`로 기록된다. 성공 후 OpenCigan `backend/requirements.txt`의 포크 SHA 한 줄만 갱신하고 자동 커밋·푸시를 최대 세 번 시도한다. 핀 동기화만 실패했다면 `python -m deploy.release_deploy --root <컴포넌트 루트> --retry-pin`으로 재시도한다. 파일 상태에 `pinSync: failed`가 남으며 검증된 활성 컴포넌트는 유지한다. Pi의 첫 자동 전환에서는 핀이 이미 일치해 `pinSync: already_synced`로 기록됐으며 실제 핀 변경 커밋은 발생하지 않았다.
 

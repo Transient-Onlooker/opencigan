@@ -4,6 +4,8 @@
 
 ## 최근 작업 현황 (2026-11-26)
 
+2026-11-27: 자동 Release 역행 방지 [#293](https://github.com/Transient-Onlooker/opencigan/pull/293)를 Pi `release-autoguard-a907ce3`에 적용했다. 격리된 활성 컴포넌트 사본의 구버전 차단, 관련 회귀 테스트 24건, 전환 후 내부 실조회·공개 조회와 동일 SHA 감시 서비스 정상 종료를 확인했다. 이전 릴리스는 보존했다.
+
 2026-11-26 최종 확인: main `9e952604`, [CI 45831857839](https://github.com/Transient-Onlooker/opencigan/actions/runs/45831857839) check/deploy 성공. [#293](https://github.com/Transient-Onlooker/opencigan/pull/293) 자동 릴리스 다운그레이드 방지 구현·35개 격리 테스트 완료(운영 적용 미확인). #295~306 후속 병합. 아래 11/25 표는 역사적 기록이며 최신 체크와 실행 결과는 하단을 따른다.
 
 2026-11-26 추가: main `f1787b1` 기준 [#270](https://github.com/Transient-Onlooker/opencigan/pull/270)에서 제안 진입점을 설정의 오픈소스 영역으로 이동하고, [#271](https://github.com/Transient-Onlooker/opencigan/pull/271)에서 RSS 오류 계약을 보완하고, [#272](https://github.com/Transient-Onlooker/opencigan/pull/272)에서 원본 교시 시작 시각의 기본 적용을 구현했다. `8caefeb`의 GitHub Pages 배포와 재실행 요청은 서버 500 오류로 실패했으나 후속 `f1787b1`에서는 [검사와 GitHub Pages 배포](https://github.com/Transient-Onlooker/opencigan/actions/runs/45658165407) 및 Cloudflare Pages 배포가 성공했다. Pi 운영 상태는 이 기록으로 확정하지 않는다.
