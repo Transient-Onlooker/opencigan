@@ -8,6 +8,8 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
 
+from backend.comcigan_proxy import remaining_comcigan_budget
+
 logger = logging.getLogger("opensigan.cache")
 RESOURCE_TYPES = frozenset(("timetable", "school_search", "neis_school_search", "meals"))
 
@@ -53,7 +55,15 @@ class Cache:
                 return
             if not acquired:
                 started_at = time.monotonic()
-                flight[0].acquire()
+                remaining = remaining_comcigan_budget()
+                if remaining is None:
+                    flight[0].acquire()
+                else:
+                    if remaining <= 0 or not flight[0].acquire(timeout=remaining):
+                        raise TimeoutError("Comcigan request budget exhausted while waiting for cache")
+                    if remaining_comcigan_budget() <= 0:
+                        flight[0].release()
+                        raise TimeoutError("Comcigan request budget exhausted while waiting for cache")
             try:
                 if not acquired:
                     resource = key[0] if isinstance(key, tuple) and key and key[0] in RESOURCE_TYPES else None

@@ -18,6 +18,11 @@ _deadline = ContextVar("comcigan_deadline", default=None)
 UPSTREAM_BUDGET_SECONDS = 35
 
 
+def remaining_comcigan_budget():
+    deadline = _deadline.get()
+    return None if deadline is None else max(0.0, deadline - time.monotonic())
+
+
 @contextmanager
 def acquire_with_comcigan_budget(lock):
     deadline = _deadline.get()

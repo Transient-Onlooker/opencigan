@@ -1,5 +1,7 @@
 import re
 
+from backend.comcigan_proxy import comcigan_budget
+
 
 def search_timetable_schools(query, cache, query_param, search_schools):
     name = query_param(query, "q", 50)
@@ -10,7 +12,8 @@ def search_timetable_schools(query, cache, query_param, search_schools):
         except ValueError as exc:
             raise RuntimeError("school search failed") from exc
 
-    return cache.get(("school_search", name), fetch)
+    with comcigan_budget():
+        return cache.get(("school_search", name), fetch)
 
 
 def get_timetable(query, cache, query_param, validate_week, filters, cached_timetable):
@@ -20,7 +23,8 @@ def get_timetable(query, cache, query_param, validate_week, filters, cached_time
     week = query_param(query, "week", 10)
     validate_week(week)
     grade_filter, class_filter, teacher_filter = filters(query)
-    timetable, cache_status = cached_timetable(school, week, cache)
+    with comcigan_budget():
+        timetable, cache_status = cached_timetable(school, week, cache)
     result = {**timetable, "cacheStatus": cache_status}
     if grade_filter is not None or class_filter is not None or teacher_filter is not None:
         result["records"] = [

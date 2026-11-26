@@ -5,9 +5,58 @@ from urllib.error import HTTPError
 from unittest.mock import patch
 
 from backend.cache import Cache, CacheBackoffError
+from backend.comcigan_proxy import with_comcigan_budget
 
 
 class CacheIntegrityTests(unittest.TestCase):
+    def test_waiter_releases_lock_if_deadline_expires_on_acquisition(self):
+        cache = Cache(lock_stripes=1)
+        key = ('timetable', 'school', 'week')
+        class BoundaryLock:
+            released = False
+            def acquire(self, blocking=True, timeout=-1):
+                return blocking
+            def release(self):
+                self.released = True
+        lock = BoundaryLock()
+        cache._flights[0][key] = [lock, 0]
+        with patch('backend.cache.remaining_comcigan_budget', side_effect=[1.0, 0.0]):
+            with self.assertRaises(TimeoutError):
+                with cache._singleflight(key):
+                    self.fail('expired request entered the flight')
+        self.assertTrue(lock.released)
+        self.assertFalse(cache._flights[0])
+
+    def test_budgeted_waiter_times_out_without_poisoning_inflight_result(self):
+        cache = Cache(lock_stripes=1)
+        key = ('timetable', 'school', 'week')
+        entered, release = threading.Event(), threading.Event()
+
+        def slow():
+            entered.set()
+            if not release.wait(2):
+                raise AssertionError('fixture was not released')
+            return {'records': []}
+
+        @with_comcigan_budget
+        def follower():
+            return cache.get(key, lambda: self.fail('duplicate fetch'))
+
+        with patch('backend.comcigan_proxy.UPSTREAM_BUDGET_SECONDS', 0.05):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                leader = pool.submit(cache.get, key, slow)
+                self.assertTrue(entered.wait(1))
+                try:
+                    waiter = pool.submit(follower)
+                    with self.assertRaises(TimeoutError):
+                        waiter.result(timeout=1)
+                    self.assertNotIn(key, cache.entries)
+                finally:
+                    release.set()
+                self.assertEqual(leader.result(timeout=1), {'records': []})
+        self.assertEqual(cache.get(key, lambda: self.fail('cache hit')), {'records': []})
+        self.assertFalse(cache._flights[0])
+
     def test_singleflight_wait_observation_records_only_contention_without_key(self):
         cache = Cache(lock_stripes=1)
         key = ('timetable', 'private-school')
