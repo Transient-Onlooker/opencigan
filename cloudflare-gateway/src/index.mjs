@@ -173,7 +173,7 @@ export default {
         body,
         duplex: 'half',
         redirect: 'manual',
-        signal: path === '/api/v1/timetable' || path === '/api/v1/schools'
+        signal: path === '/api/v1/timetable' || path === '/api/v1/timetable.ics' || path === '/api/v1/schools'
           ? AbortSignal.timeout(40_000) : undefined,
       });
       return await env.PRIVATE_API.fetch(outbound);

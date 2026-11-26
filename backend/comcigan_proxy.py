@@ -122,16 +122,23 @@ class _DeadlineResponse:
         return _run_with_deadline(self._response, self._deadline, lambda: self._response.read(*args, **kwargs))
 
 
+@contextmanager
+def comcigan_budget():
+    if _deadline.get() is not None:
+        yield
+        return
+    token = _deadline.set(time.monotonic() + UPSTREAM_BUDGET_SECONDS)
+    try:
+        yield
+    finally:
+        _deadline.reset(token)
+
+
 def with_comcigan_budget(function):
     @wraps(function)
     def wrapped(*args, **kwargs):
-        if _deadline.get() is not None:
+        with comcigan_budget():
             return function(*args, **kwargs)
-        token = _deadline.set(time.monotonic() + UPSTREAM_BUDGET_SECONDS)
-        try:
-            return function(*args, **kwargs)
-        finally:
-            _deadline.reset(token)
     return wrapped
 
 
