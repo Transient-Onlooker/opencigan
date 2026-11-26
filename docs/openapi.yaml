@@ -17,6 +17,95 @@ tags:
   - name: Meals
   - name: History
 paths:
+  /api/v1/suggestions:
+    get:
+      tags: [System]
+      summary: Search approved feature suggestions
+      description: Only approved suggestions are returned. Availability depends on the deployment's suggestion store.
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: Optional keyword; blank searches all approved suggestions. }
+        - { name: cursor, in: query, schema: { type: string, pattern: '^[0-9]{1,19}$' }, description: Positive signed 64-bit cursor returned by a previous page. }
+        - { name: limit, in: query, schema: { type: string }, description: Decimal page size from 1 to 100; defaults to 20. }
+      responses:
+        '200':
+          description: Approved suggestions and the cursor for the next page, if any.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [suggestions, nextCursor]
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, title, description, context, createdAt]
+                      properties:
+                        id: { type: string }
+                        title: { type: string }
+                        description: { type: string }
+                        context: { type: [string, 'null'] }
+                        createdAt: { type: string, format: date-time }
+                  nextCursor: { type: [string, 'null'] }
+        '400':
+          description: Invalid query.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: Suggestion store disabled or unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      tags: [System]
+      summary: Submit a feature suggestion
+      description: No login is required. The author token is returned once; retain it to check the submission. The JSON body must not exceed 4096 bytes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description]
+              additionalProperties: false
+              properties:
+                title: { type: string, description: Nonblank; at most 100 characters after trimming. }
+                description: { type: string, description: Nonblank; at most 2000 characters after trimming. }
+                context: { type: [string, 'null'], description: Optional; at most 500 characters after trimming. }
+      responses:
+        '201':
+          description: Accepted for review; the author token is returned only once.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, token]
+                properties:
+                  id: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' }
+                  token: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+        '400':
+          description: Invalid submission.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: A similar suggestion was submitted recently.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '413':
+          description: Request body exceeds 4096 bytes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: Suggestion store disabled, full, or unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /api/v1/webhooks:
     post:
       tags: [System]
