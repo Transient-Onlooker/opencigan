@@ -2,6 +2,30 @@ import { expect, test } from '@playwright/test';
 
 const school = { id: '2:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
 
+test('meal source link remains accessible above mobile navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 600 });
+  await page.clock.setFixedTime(new Date('2026-11-09T02:00:00Z'));
+  await page.addInitScript((value) => localStorage.setItem('opensigan-school', JSON.stringify(value)), school);
+  await page.route('**/api/v1/**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/v1/neis/schools') return route.fulfill({ json: { schools: [{ id: 'B10:1234567', name: school.name, region: '서울', address: '서울' }] } });
+    if (url.pathname === '/api/v1/meals') return route.fulfill({ json: { meals: [{ date: '2026-11-09', type: '중식', dishes: ['밥'] }], stale: false } });
+    if (url.pathname === '/api/v1/timetable') return route.fulfill({ json: { schoolId: school.id, weekStart: url.searchParams.get('week'), records: [], stale: false } });
+    return route.fulfill({ json: { schools: [], meals: [], changes: [] } });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: '급식', exact: true }).click();
+  const source = page.getByRole('link', { name: '나이스 교육정보 개방 포털' });
+  await expect(source).toBeVisible();
+  await source.evaluate((element) => element.scrollIntoView({ block: 'end', behavior: 'instant' }));
+  const linkBox = await source.boundingBox();
+  const navBox = await page.getByRole('navigation', { name: '캘린더 메뉴' }).boundingBox();
+  expect(linkBox.y + linkBox.height).toBeLessThanOrEqual(navBox.y);
+  await source.focus();
+  await expect(source).toBeFocused();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+});
+
 test('settings last allergy control stays above the fixed nav at 667x320', async ({ page }) => {
   await page.setViewportSize({ width: 667, height: 320 });
   await page.addInitScript((value) => localStorage.setItem('opensigan-school', JSON.stringify(value)), school);
