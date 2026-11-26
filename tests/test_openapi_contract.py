@@ -81,6 +81,26 @@ class OpenApiContractTests(unittest.TestCase):
                 check('POST', 400, body=b'{}')
                 check('POST', 413, body=b'x' * 4097)
 
+    def test_suggestion_author_contract_matches_route(self):
+        from backend.suggestion_store import SuggestionStore
+
+        path = '/api/v1/suggestions/{id}'
+        with tempfile.TemporaryDirectory() as temporary:
+            store = SuggestionStore(Path(temporary) / 'suggestions.sqlite')
+            created = store.create('기능 제안', '내용')
+            target = path.replace('{id}', created['id'])
+            with patch('backend.app._suggestion_store', return_value=store):
+                status, headers, body = dispatch_request('GET', target, '', self.cache,
+                    request_headers={'Authorization': 'Bearer ' + created['token']})
+                self.assertEqual(status, 200)
+                self.assertEqual(headers['Cache-Control'], 'no-store')
+                self.assert_json_response(path, status, headers, body)
+                self.assertNotIn('token_hash', json.loads(body))
+                status, headers, body = dispatch_request('GET', target, '', self.cache)
+                self.assertEqual(status, 401)
+                self.assertEqual(headers['WWW-Authenticate'], 'Bearer realm="Suggestion author"')
+                self.assert_json_response(path, status, headers, body)
+
     def test_school_query_validation_matches_openapi(self):
         for path in ('/api/v1/schools', '/api/v1/neis/schools'):
             schema = self.spec['paths'][path]['get']['parameters'][0]['schema']

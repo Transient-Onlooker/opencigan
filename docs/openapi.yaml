@@ -106,6 +106,45 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/suggestions/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
+    get:
+      tags: [System]
+      summary: Read your submitted feature suggestion
+      description: Use the author token returned at submission. A nonexistent identifier and an invalid token both return 401.
+      security: [{ SuggestionAuthor: [] }]
+      responses:
+        '200':
+          description: Author-visible suggestion; sensitive token hashes and reviewer notes are omitted.
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthorSuggestion' }
+        '401':
+          description: Missing or invalid author token, or unknown identifier.
+          headers:
+            WWW-Authenticate: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: Suggestion store or gateway unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    head:
+      tags: [System]
+      summary: Check access to your submitted feature suggestion
+      description: Returns the corresponding GET status and headers without a response body.
+      security: [{ SuggestionAuthor: [] }]
+      responses:
+        '200': { description: Suggestion accessible. }
+        '401': { description: Missing or invalid author token, or unknown identifier. }
+        '429': { description: Rate limit reached. }
+        '503': { description: Suggestion store or gateway unavailable. }
   /api/v1/webhooks:
     post:
       tags: [System]
@@ -1120,6 +1159,10 @@ paths:
                   value: { error: 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요., code: upstream_unavailable }
 components:
   securitySchemes:
+    SuggestionAuthor:
+      type: http
+      scheme: bearer
+      description: The author token returned once when the suggestion is submitted.
     WebhookManagement:
       type: http
       scheme: bearer
@@ -1139,6 +1182,19 @@ components:
           description: Stable machine-readable error code; additional codes may be introduced without an API version change.
       additionalProperties: true
       example: { error: Invalid query parameter, code: invalid_request }
+    AuthorSuggestion:
+      type: object
+      required: [id, title, description, context, status, created_at, reviewed_at, merged_into]
+      additionalProperties: false
+      properties:
+        id: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' }
+        title: { type: string }
+        description: { type: string }
+        context: { type: [string, 'null'] }
+        status: { type: string, enum: [pending, approved, rejected, merged] }
+        created_at: { type: string, format: date-time }
+        reviewed_at: { type: [string, 'null'], format: date-time }
+        merged_into: { type: [string, 'null'], pattern: '^[A-Za-z0-9_-]{24}$' }
     AccessAnomalyReview:
       type: object
       required: [findings, window_hours, thresholds]
