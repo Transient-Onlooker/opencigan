@@ -49,7 +49,8 @@ class ComciganProxyTests(unittest.TestCase):
                 with self.assertRaises(TimeoutError):
                     helpers.urlopen(Request("http://comci.net:4082/data"))
 
-            lookup()
+            with self.assertRaises(TimeoutError):
+                lookup()
         self.assertEqual([call.kwargs["timeout"] for call in opener.open.call_args_list], [30, 10])
         self.assertIsNone(comcigan_proxy._deadline.get())
 
