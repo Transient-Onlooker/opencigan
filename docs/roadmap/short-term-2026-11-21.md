@@ -290,7 +290,7 @@ flowchart TB
 
 ### ST-13 · 번들 실측·경량화
 
-- [#289](https://github.com/Transient-Onlooker/opencigan/pull/289) 후속: 제안 화면 청크 복구 시 새로고침 후 설정 화면으로 돌아가며 저장하지 않은 교시 시각이 있으면 새로고침을 막고 이유를 표시한다. Chromium 오프라인 복구 및 입력 보존을 검증했다. Linux WebKit에서 복구 후 청크는 200으로 로드됐으나 테스트 API가 500을 반환해 API 응답을 격리했으며, 수정 후 CI 검증이 남았다.
+- [#289](https://github.com/Transient-Onlooker/opencigan/pull/289) 후속: 제안 화면 청크 복구 시 새로고침 후 설정 화면으로 돌아가며 저장하지 않은 교시 시각이 있으면 새로고침을 막고 이유를 표시한다. Chromium 입력 보존과 오프라인 복구를 확인했고, 테스트 API를 격리한 뒤 [Linux Chromium·WebKit CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/45803580216)가 통과했다.
 - [#230](https://github.com/Transient-Onlooker/opencigan/pull/230) 이미지 내보내기 분리 실험은 서비스 워커 설치까지 포함한 로컬 첫 방문 JS 전송이 625바이트 증가해 병합하지 않았다. [측정과 한계](../qa/bundle-baseline-2026-11-23.md#이미지-내보내기-분리-실험--2026-11-25)를 참고하고 다른 최적화 후보를 찾는다.
 
 - [번들 기준선](../qa/bundle-baseline-2026-11-23.md)에 초기 HTML이 참조하는 JS/CSS, 전체 자산 및 선택 PDF 청크 크기를 기록했다. 실제 전송·로딩 시간과 최적화는 아직 미검증이다.
