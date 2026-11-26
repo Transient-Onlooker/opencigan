@@ -14,6 +14,71 @@ class ComciganProxyTests(unittest.TestCase):
         comcigan_proxy._configured = False
         self.addCleanup(setattr, comcigan_proxy, "_configured", self.original_configured)
 
+    def test_shared_budget_limits_subsequent_requests_and_stops_at_deadline(self):
+        import pycomcigan.helpers as helpers
+        original = helpers.urlopen
+        self.addCleanup(setattr, helpers, "urlopen", original)
+        opener = Mock()
+        clock = [100.0]
+        with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": "http://127.0.0.1:18084"}), \
+             patch.object(comcigan_proxy, "build_opener", return_value=opener), \
+             patch.object(comcigan_proxy.time, "monotonic", side_effect=lambda: clock[0]):
+            comcigan_proxy.configure_comcigan_proxy()
+
+            @comcigan_proxy.with_comcigan_budget
+            def lookup():
+                helpers.urlopen(Request("http://comci.net:4082/st"))
+                clock[0] += 25
+                helpers.urlopen(Request("http://comci.net:4082/data"))
+                clock[0] += 10
+                with self.assertRaises(TimeoutError):
+                    helpers.urlopen(Request("http://comci.net:4082/data"))
+
+            lookup()
+        self.assertEqual([call.kwargs["timeout"] for call in opener.open.call_args_list], [30, 10])
+        self.assertIsNone(comcigan_proxy._deadline.get())
+
+    def test_shared_budget_limits_a_delayed_second_proxy_response(self):
+        import pycomcigan.helpers as helpers
+        original = helpers.urlopen
+        self.addCleanup(setattr, helpers, "urlopen", original)
+        release = threading.Event()
+        calls = []
+
+        class SlowSecondResponse(BaseHTTPRequestHandler):
+            def do_GET(self):
+                calls.append(self.path)
+                if len(calls) == 2:
+                    release.wait(1)
+                self.send_response(200)
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), SlowSecondResponse)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": f"http://127.0.0.1:{server.server_port}"}), \
+                 patch.object(comcigan_proxy, "UPSTREAM_BUDGET_SECONDS", 0.2):
+                comcigan_proxy.configure_comcigan_proxy()
+
+                @comcigan_proxy.with_comcigan_budget
+                def lookup():
+                    with helpers.urlopen(Request("http://comci.net:4082/st")) as response:
+                        response.read()
+                    helpers.urlopen(Request("http://comci.net:4082/data"))
+
+                with self.assertRaises((TimeoutError, URLError)):
+                    lookup()
+            self.assertEqual(len(calls), 2)
+        finally:
+            release.set()
+            server.shutdown()
+            server.server_close()
+            thread.join()
+
     def test_proxy_is_scoped_to_comcigan_and_never_falls_back(self):
         import pycomcigan.helpers as helpers
         original = helpers.urlopen

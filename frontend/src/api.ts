@@ -14,7 +14,7 @@ const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 export const apiNotConfigured = !base && location.hostname.endsWith('.github.io');
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   if (apiNotConfigured) throw new Error('API 서버 주소가 설정되지 않았어요. 빌드 시 VITE_API_BASE_URL을 지정해 주세요.');
-  const timeout = AbortSignal.timeout(15_000);
+  const timeout = AbortSignal.timeout(path.startsWith('/api/v1/timetable?') || path.startsWith('/api/v1/schools?') ? 45_000 : 15_000);
   try {
     const response = await fetch(`${base}${path}`, {
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,

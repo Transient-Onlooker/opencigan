@@ -79,7 +79,7 @@ const assert = require('node:assert/strict');
     };
     const realDeadline = process.env.OPENCIGAN_SLOW_NETWORK_TESTS === '1';
     AbortSignal.timeout = (milliseconds) => {
-      assert.equal(milliseconds, 15_000);
+      assert.ok(milliseconds === 45_000 || milliseconds === 40_000);
       if (realDeadline) return originalTimeout(milliseconds);
       const deadline = new AbortController();
       deadlines.push(deadline);
@@ -100,10 +100,10 @@ const assert = require('node:assert/strict');
       assert.equal(slowStarted, true, 'the local backend should enter its delayed upstream fetch');
 
       if (!realDeadline) deadlines[0].abort(new DOMException('Synthetic client deadline', 'TimeoutError'));
-      await assert.rejects(slowRequest, /서버 응답이 늦어요/);
-      if (realDeadline) assert.ok(performance.now() - startedAt >= 14_900, 'the real client deadline must elapse');
+      await assert.rejects(slowRequest, realDeadline ? /API 서버에 연결하지 못했어요/ : /서버 응답이 늦어요/);
+      if (realDeadline) assert.ok(performance.now() - startedAt >= 39_900, 'the gateway deadline must elapse');
       assert.equal(forwarded.length, 1, 'the slow request should pass through the gateway');
-      assert.equal(forwarded[0].signal.aborted, false, 'the mocked gateway should not abort the private request');
+      assert.equal(forwarded[0].signal.aborted, realDeadline, 'only the gateway deadline aborts the private request');
       const afterCancel = await fetch(`${process.env.VITE_API_BASE_URL}/__test__/state`).then(response => response.json());
       assert.equal(afterCancel.slowCompleted, false, 'client cancellation must not cancel backend work');
 
@@ -143,7 +143,7 @@ class FrontendHttpTests(unittest.TestCase):
         def fetch_timetable(school, week):
             if school == "2:ST01-slow":
                 upstream_started.set()
-                if not upstream_release.wait(30):
+                if not upstream_release.wait(60):
                     raise RuntimeError("synthetic upstream gate was not released")
                 upstream_completed.set()
             return {**timetable, "schoolId": school, "weekStart": week}
@@ -192,7 +192,7 @@ class FrontendHttpTests(unittest.TestCase):
                 env.update(VITE_API_BASE_URL=f"http://127.0.0.1:{server.server_port}",
                            TEST_TEMP_DIR=temp_dir, ST01_FAST_SCHOOL=fast_school, TEMP=temp_dir, TMP=temp_dir)
                 result = subprocess.run(["node", "-e", NODE_TEST], cwd=ROOT / "frontend", env=env,
-                                        capture_output=True, text=True, encoding="utf-8", timeout=45)
+                                        capture_output=True, text=True, encoding="utf-8", timeout=60)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual([call.args[0] for call in search.call_args_list], ["서울 학교", "failure"])
                 neis.return_value.search_schools.assert_called_once_with("서울 학교")
