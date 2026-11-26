@@ -1,8 +1,10 @@
 import unittest
+import threading
+import time
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from backend import timetable
+from backend import comcigan_proxy, timetable
 
 
 class ProtocolReuseTests(unittest.TestCase):
@@ -20,6 +22,39 @@ class ProtocolReuseTests(unittest.TestCase):
         timetable._protocol, timetable._protocol_content, timetable._protocol_expires, schools = self.saved
         timetable._verified_schools.clear()
         timetable._verified_schools.update(schools)
+
+    def test_protocol_lock_wait_respects_request_budget(self):
+        timetable._protocol = SimpleNamespace(endpoint="fixture")
+        timetable._protocol_expires = time.monotonic() + 1000
+        started = threading.Event()
+        finished = threading.Event()
+        errors = []
+
+        def search():
+            started.set()
+            try:
+                timetable.search_schools("School")
+            except Exception as error:
+                errors.append(error)
+            finally:
+                finished.set()
+
+        with patch.object(comcigan_proxy, "UPSTREAM_BUDGET_SECONDS", 0.1), \
+             patch.object(timetable, "configure_comcigan_proxy"), \
+             patch("pycomcigan.helpers.school_search", return_value=[]) as search_upstream:
+            timetable._protocol_lock.acquire()
+            worker = threading.Thread(target=search)
+            try:
+                worker.start()
+                self.assertTrue(started.wait(1))
+                self.assertTrue(finished.wait(0.5))
+            finally:
+                timetable._protocol_lock.release()
+                worker.join(1)
+            self.assertTrue(finished.is_set())
+            self.assertEqual(len(errors), 1)
+            self.assertIsInstance(errors[0], TimeoutError)
+            search_upstream.assert_not_called()
 
     def test_unique_search_reuses_protocol_and_preserves_original_lessons(self):
         events = []
