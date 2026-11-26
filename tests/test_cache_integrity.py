@@ -5,7 +5,7 @@ from urllib.error import HTTPError
 from unittest.mock import patch
 
 from backend.cache import Cache, CacheBackoffError
-from backend.comcigan_proxy import with_comcigan_budget
+from backend.comcigan_proxy import comcigan_budget, with_comcigan_budget
 
 
 class CacheIntegrityTests(unittest.TestCase):
@@ -18,9 +18,9 @@ class CacheIntegrityTests(unittest.TestCase):
             if not release.wait(2):
                 raise AssertionError('fixture was not released')
             return {'meals': []}
-        @with_comcigan_budget
         def follower():
-            return cache.get(key, lambda: self.fail('duplicate fetch'))
+            with comcigan_budget():
+                return cache.get(key, lambda: self.fail('duplicate fetch'))
         with patch('backend.comcigan_proxy.UPSTREAM_BUDGET_SECONDS', 0.01):
             with ThreadPoolExecutor(max_workers=2) as pool:
                 first = pool.submit(cache.get, key, slow)

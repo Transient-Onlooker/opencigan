@@ -143,7 +143,10 @@ def with_comcigan_budget(function):
     @wraps(function)
     def wrapped(*args, **kwargs):
         with comcigan_budget():
-            return function(*args, **kwargs)
+            result = function(*args, **kwargs)
+            if remaining_comcigan_budget() <= 0:
+                raise TimeoutError("Comcigan request budget exhausted during processing")
+            return result
     return wrapped
 
 

@@ -17,6 +17,28 @@ class UpstreamRecoveryTests(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+    def test_late_processing_does_not_replace_stale_cache(self):
+        cache = Cache(ttl=0, retry_delay=10)
+        query = 'school=1%3AExample&week=2026-11-23'
+        old = {'schoolId': '1:Example', 'weekStart': '2026-11-23', 'records': [{'subject': 'old'}], 'stale': False}
+        new = {**old, 'records': [{'subject': 'late'}]}
+
+        @with_comcigan_budget
+        def delayed_result(*_):
+            time.sleep(0.03)
+            return new
+
+        with patch('backend.app.validate_timetable_week'), patch('backend.app._history_store', return_value=None):
+            with patch('backend.app.fetch_timetable', return_value=old):
+                self.assertEqual(dispatch_request('GET', '/api/v1/timetable', query, cache)[0], 200)
+            with patch('backend.comcigan_proxy.UPSTREAM_BUDGET_SECONDS', 0.01), \
+                 patch('backend.app.fetch_timetable', side_effect=delayed_result):
+                status, _, body = dispatch_request('GET', '/api/v1/timetable', query, cache)
+                self.assertEqual(status, 200)
+                data = json.loads(body)
+                self.assertTrue(data['stale'])
+                self.assertEqual(data['records'][0]['subject'], 'old')
+
     def test_same_key_wait_is_bounded_for_timetable_and_search(self):
         for path, query, target in (
             ('/api/v1/schools', 'q=Example', 'backend.app.search_schools'),
