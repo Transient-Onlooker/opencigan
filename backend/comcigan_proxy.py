@@ -4,6 +4,7 @@ import http.client
 import socket
 import threading
 import time
+from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import wraps
 from urllib.error import HTTPError, URLError
@@ -15,6 +16,22 @@ _configured = False
 logger = logging.getLogger("opensigan.comcigan_proxy")
 _deadline = ContextVar("comcigan_deadline", default=None)
 UPSTREAM_BUDGET_SECONDS = 35
+
+
+@contextmanager
+def acquire_with_comcigan_budget(lock):
+    deadline = _deadline.get()
+    if deadline is None:
+        acquired = lock.acquire()
+    else:
+        remaining = deadline - time.monotonic()
+        acquired = remaining > 0 and lock.acquire(timeout=remaining)
+    if not acquired:
+        raise TimeoutError("Comcigan request budget exhausted while waiting for protocol")
+    try:
+        yield
+    finally:
+        lock.release()
 
 
 def _run_with_deadline(response, deadline, operation):

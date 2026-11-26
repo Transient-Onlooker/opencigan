@@ -4,7 +4,7 @@ import logging
 import re
 import threading
 import time
-from backend.comcigan_proxy import configure_comcigan_proxy, with_comcigan_budget
+from backend.comcigan_proxy import acquire_with_comcigan_budget, configure_comcigan_proxy, with_comcigan_budget
 
 _protocol = None
 _protocol_expires = 0.0
@@ -45,7 +45,7 @@ def _search_with_cached_protocol(query, *, retry=True, with_protocol=False):
     from pycomcigan.service_protocol import parse_service_protocol
 
     global _protocol, _protocol_expires, _protocol_content
-    with _protocol_lock:
+    with acquire_with_comcigan_budget(_protocol_lock):
         now = time.monotonic()
         reused = _protocol is not None and now < _protocol_expires
         if not reused:
@@ -65,7 +65,7 @@ def _search_with_cached_protocol(query, *, retry=True, with_protocol=False):
         )
         rejected = 'HTTP 403' in message
         if invalid_protocol or rejected:
-            with _protocol_lock:
+            with acquire_with_comcigan_budget(_protocol_lock):
                 if _protocol is protocol:
                     _protocol = None
                     _protocol_expires = 0.0
@@ -89,7 +89,7 @@ def search_schools(query):
         schools.append({"id": f"{row[3]}:{row[2]}", "name": row[2], "region": row[1]})
     counts = Counter(school["id"] for school in schools)
     code_counts = Counter(row[3] for row in rows)
-    with _protocol_lock:
+    with acquire_with_comcigan_budget(_protocol_lock):
         if _protocol is not searched_protocol or _protocol_expires <= time.monotonic():
             return schools
         for school, row in zip(schools, rows):
@@ -137,7 +137,7 @@ def fetch_timetable(school_id, week, *, include_original=False):
     offset = validate_timetable_week(week)
     start = date.fromisoformat(week)
     try:
-        with _protocol_lock:
+        with acquire_with_comcigan_budget(_protocol_lock):
             verified = _verified_schools.get(school_id)
             reusable = (verified and verified[1] > time.monotonic() and _protocol is not None
                         and _protocol_content is not None and _protocol_expires > time.monotonic())
@@ -153,7 +153,7 @@ def fetch_timetable(school_id, week, *, include_original=False):
                 rejected = "HTTP 403" in str(exc)
                 if not (invalid or rejected):
                     raise
-                with _protocol_lock:
+                with acquire_with_comcigan_budget(_protocol_lock):
                     if _protocol is protocol:
                         _protocol = None
                         _protocol_expires = 0.0
