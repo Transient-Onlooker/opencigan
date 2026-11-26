@@ -41,6 +41,41 @@ test('school settings import restores prior values if the second write fails', (
   assert.equal(values.get('opensigan-lesson-times:' + schoolId), 'old-times');
 });
 
+test('failed import preserves another writer and does not revert unwritten keys', () => {
+  const displayKey = 'opensigan-display:' + schoolId, timesKey = 'opensigan-lesson-times:' + schoolId;
+  const values = new Map([[displayKey, 'old-display'], [timesKey, 'old-times']]);
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => {
+      if (key === timesKey) {
+        values.set(displayKey, 'newer-display');
+        values.set(timesKey, 'newer-times');
+        throw new Error('blocked');
+      }
+      values.set(key, value);
+    },
+    removeItem: (key) => values.delete(key),
+  };
+  assert.throws(() => saveSchoolSettingsBackup(storage, schoolId, display, times), /저장하지 못했어요/);
+  assert.equal(values.get(displayKey), 'newer-display');
+  assert.equal(values.get(timesKey), 'newer-times');
+});
+
+test('failed lesson preference save preserves a newer value', () => {
+  const key = 'opensigan-lesson-times:' + schoolId, weekdayKey = 'opensigan-weekday-lesson-times:' + schoolId;
+  const values = new Map([[key, 'old-times'], [weekdayKey, 'old-weekdays']]);
+  const storage = {
+    getItem: (name) => values.get(name) ?? null,
+    setItem: (name, value) => {
+      if (name === weekdayKey) { values.set(key, 'newer-times'); throw new Error('blocked'); }
+      values.set(name, value);
+    },
+    removeItem: (name) => values.delete(name),
+  };
+  assert.throws(() => saveLessonTimePreferences(storage, schoolId, times, {}), /복구하지 못했어요/);
+  assert.equal(values.get(key), 'newer-times');
+});
+
 test('요일별 저장 실패 시 공통 시각과 요일별 시각을 이전 값으로 되돌린다', () => {
   const key = 'opensigan-lesson-times:' + schoolId, weekdayKey = 'opensigan-weekday-lesson-times:' + schoolId;
   const values = new Map([[key, 'old-times'], [weekdayKey, 'old-weekdays']]);

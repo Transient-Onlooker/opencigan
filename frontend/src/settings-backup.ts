@@ -3,31 +3,39 @@ import { parseLessonTimes, parseWeekdayLessonTimes, type LessonTimes, type Weekd
 
 export const MAX_SETTINGS_BACKUP_BYTES = 64 * 1024;
 
+function rollbackWritten(storage: Storage, written: Array<[string, string]>, previous: Map<string, string | null>): boolean {
+  let restored = true;
+  for (const [key, value] of written.reverse()) {
+    try {
+      if (storage.getItem(key) !== value) { restored = false; continue; }
+      const old = previous.get(key);
+      if (old == null) storage.removeItem(key);
+      else storage.setItem(key, old);
+    } catch { restored = false; }
+  }
+  return restored;
+}
+
 export function saveLessonTimePreferences(storage: Storage, schoolId: string, lessonTimes: LessonTimes, weekdayLessonTimes: WeekdayLessonTimes, sourcePreference?: unknown) {
   const key = 'opensigan-lesson-times:' + schoolId;
   const weekdayKey = 'opensigan-weekday-lesson-times:' + schoolId;
   const preferenceKey = 'opensigan-source-lesson-preference:' + schoolId;
   const keys = sourcePreference === undefined ? [key, weekdayKey] : [key, weekdayKey, preferenceKey];
   const previous = new Map<string, string | null>(keys.map((storageKey): [string, string | null] => [storageKey, storage.getItem(storageKey)]));
-  const written: string[] = [];
+  const written: Array<[string, string]> = [];
   try {
-    storage.setItem(key, JSON.stringify(lessonTimes));
-    written.push(key);
-    storage.setItem(weekdayKey, JSON.stringify(weekdayLessonTimes));
-    written.push(weekdayKey);
+    const value = JSON.stringify(lessonTimes), weekdayValue = JSON.stringify(weekdayLessonTimes);
+    storage.setItem(key, value);
+    written.push([key, value]);
+    storage.setItem(weekdayKey, weekdayValue);
+    written.push([weekdayKey, weekdayValue]);
     if (sourcePreference !== undefined) {
-      storage.setItem(preferenceKey, JSON.stringify(sourcePreference));
-      written.push(preferenceKey);
+      const preferenceValue = JSON.stringify(sourcePreference);
+      storage.setItem(preferenceKey, preferenceValue);
+      written.push([preferenceKey, preferenceValue]);
     }
   } catch {
-    let restored = true;
-    for (const storageKey of written.reverse()) {
-      try {
-        const previousValue = previous.get(storageKey);
-        if (previousValue == null) storage.removeItem(storageKey);
-        else storage.setItem(storageKey, previousValue);
-      } catch { restored = false; }
-    }
+    const restored = rollbackWritten(storage, written, previous);
     throw new Error(restored
       ? '브라우저 저장소에 설정을 저장하지 못했어요. 이전 저장값은 유지했어요.'
       : '설정 저장에 실패했고 일부 이전 값을 복구하지 못했어요. 브라우저 저장소를 확인해 주세요.');
@@ -37,18 +45,20 @@ export function saveLessonTimePreferences(storage: Storage, schoolId: string, le
 export function saveSchoolSettingsBackup(storage: Storage, schoolId: string, displaySettings: DisplaySettings, lessonTimes: LessonTimes, weekdayLessonTimes?: WeekdayLessonTimes) {
   const displayKey = 'opensigan-display:' + schoolId;
   const timesKey = 'opensigan-lesson-times:' + schoolId;
-  const previousDisplay = storage.getItem(displayKey);
-  const previousTimes = storage.getItem(timesKey);
   const weekdayKey = 'opensigan-weekday-lesson-times:' + schoolId;
-  const previousWeekdays = weekdayLessonTimes === undefined ? null : storage.getItem(weekdayKey);
+  const keys = weekdayLessonTimes === undefined ? [displayKey, timesKey] : [displayKey, timesKey, weekdayKey];
+  const previous = new Map<string, string | null>(keys.map((key): [string, string | null] => [key, storage.getItem(key)]));
+  const written: Array<[string, string]> = [];
   try {
-    storage.setItem(displayKey, JSON.stringify(displaySettings));
-    storage.setItem(timesKey, JSON.stringify(lessonTimes));
-    if (weekdayLessonTimes !== undefined) storage.setItem(weekdayKey, JSON.stringify(weekdayLessonTimes));
+    const display = JSON.stringify(displaySettings), times = JSON.stringify(lessonTimes);
+    storage.setItem(displayKey, display); written.push([displayKey, display]);
+    storage.setItem(timesKey, times); written.push([timesKey, times]);
+    if (weekdayLessonTimes !== undefined) {
+      const weekdays = JSON.stringify(weekdayLessonTimes);
+      storage.setItem(weekdayKey, weekdays); written.push([weekdayKey, weekdays]);
+    }
   } catch {
-    try { if (previousDisplay === null) storage.removeItem(displayKey); else storage.setItem(displayKey, previousDisplay); } catch { /* 저장소가 계속 차단될 수 있습니다. */ }
-    try { if (previousTimes === null) storage.removeItem(timesKey); else storage.setItem(timesKey, previousTimes); } catch { /* 저장소가 계속 차단될 수 있습니다. */ }
-    if (weekdayLessonTimes !== undefined) { try { if (previousWeekdays === null) storage.removeItem(weekdayKey); else storage.setItem(weekdayKey, previousWeekdays); } catch { /* 저장소가 계속 차단될 수 있습니다. */ } }
+    rollbackWritten(storage, written, previous);
     throw new Error('브라우저 저장소에 설정을 저장하지 못했어요.');
   }
 }
