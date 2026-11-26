@@ -56,3 +56,12 @@ test('uses a valid Retry-After delay without trusting malformed or excessive val
   const disabled = Response.json({ code: 'history_disabled' }, { status: 503, headers: { 'Retry-After': '10' } });
   assert.doesNotMatch((await apiError(disabled)).message, /10초/);
 });
+
+test('supports HTTP-date Retry-After without accepting past or excessive dates', async () => {
+  const header = (offset) => new Date(Date.now() + offset * 1000).toUTCString();
+  const response = (value) => Response.json({ code: 'upstream_unavailable' }, { status: 503, headers: { 'Retry-After': value } });
+  assert.match((await apiError(response(header(60)))).message, /(?:59|60)초 후/);
+  assert.match((await apiError(response(header(-60)))).message, /잠시 후/);
+  assert.match((await apiError(response(header(172800)))).message, /잠시 후/);
+  assert.match((await apiError(response('1.5'))).message, /잠시 후/);
+});
