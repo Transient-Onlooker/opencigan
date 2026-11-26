@@ -362,13 +362,13 @@
       }
       const restoredWeekdays = parseWeekdayLessonTimes(backup.weekdayLessonTimes ?? weekdayLessonTimes, backup.lessonTimes);
       if (!restoredWeekdays) throw new Error('기존 요일별 시각이 백업의 공통 시각과 겹쳐 복원하지 않았어요.');
-      saveSchoolSettingsBackup(localStorage, schoolId, backup.displaySettings, backup.lessonTimes, restoredWeekdays);
+      saveSchoolSettingsBackup(localStorage, schoolId, backup.displaySettings, backup.lessonTimes, restoredWeekdays,
+        { enabled: sourceLessonAutoEnabled, applied: {}, previous: {} });
       schoolDisplayPreferences.markSaved(schoolId);
       schoolDisplaySettings = backup.displaySettings;
       lessonTimes = backup.lessonTimes;
       sourceLessonApplied = {};
       sourceLessonPrevious = {};
-      try { localStorage.setItem(`opensigan-source-lesson-preference:${schoolId}`, JSON.stringify({ enabled: sourceLessonAutoEnabled, applied: {}, previous: {} })); } catch { /* 복원된 설정은 현재 화면에 적용합니다. */ }
       weekdayLessonTimes = restoredWeekdays;
       weekdayTimeDrafts = { ...weekdayLessonTimes };
       lessonTimeDrafts = { ...backup.lessonTimes };
@@ -490,7 +490,7 @@
     lessonTimeDrafts = {}; lessonTimes = {}; weekdayTimeDrafts = {}; weekdayLessonTimes = {}; lessonTimeState = '교시 시각을 초기화했어요.';
     sourceLessonApplied = {}; sourceLessonPrevious = {}; autoSourceDraftPeriods = []; editedSourcePeriods = new Set();
     subscriptionUrl = ''; subscriptionPanelOpen = false; subscriptionTimesConsent = false;
-    if (school) { try { saveLessonTimePreferences(localStorage, school.id, {}, {}); localStorage.setItem(`opensigan-source-lesson-preference:${school.id}`, JSON.stringify({ enabled: sourceLessonAutoEnabled, applied: {}, previous: {} })); } catch { lessonTimeState = '현재 화면에만 적용됐어요. 브라우저 저장소를 확인해 주세요.'; } }
+    if (school) { try { saveLessonTimePreferences(localStorage, school.id, {}, {}, { enabled: sourceLessonAutoEnabled, applied: {}, previous: {} }); } catch { lessonTimeState = '현재 화면에만 적용됐어요. 브라우저 저장소를 확인해 주세요.'; } }
   }
 
   function toggleAllergy(id: number, checked: boolean) {

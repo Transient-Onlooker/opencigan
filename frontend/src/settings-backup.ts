@@ -42,11 +42,12 @@ export function saveLessonTimePreferences(storage: Storage, schoolId: string, le
   }
 }
 
-export function saveSchoolSettingsBackup(storage: Storage, schoolId: string, displaySettings: DisplaySettings, lessonTimes: LessonTimes, weekdayLessonTimes?: WeekdayLessonTimes) {
+export function saveSchoolSettingsBackup(storage: Storage, schoolId: string, displaySettings: DisplaySettings, lessonTimes: LessonTimes, weekdayLessonTimes?: WeekdayLessonTimes, sourcePreference?: unknown) {
   const displayKey = 'opensigan-display:' + schoolId;
   const timesKey = 'opensigan-lesson-times:' + schoolId;
   const weekdayKey = 'opensigan-weekday-lesson-times:' + schoolId;
-  const keys = weekdayLessonTimes === undefined ? [displayKey, timesKey] : [displayKey, timesKey, weekdayKey];
+  const preferenceKey = 'opensigan-source-lesson-preference:' + schoolId;
+  const keys = [displayKey, timesKey, ...(weekdayLessonTimes === undefined ? [] : [weekdayKey]), ...(sourcePreference === undefined ? [] : [preferenceKey])];
   const previous = new Map<string, string | null>(keys.map((key): [string, string | null] => [key, storage.getItem(key)]));
   const written: Array<[string, string]> = [];
   try {
@@ -56,6 +57,10 @@ export function saveSchoolSettingsBackup(storage: Storage, schoolId: string, dis
     if (weekdayLessonTimes !== undefined) {
       const weekdays = JSON.stringify(weekdayLessonTimes);
       storage.setItem(weekdayKey, weekdays); written.push([weekdayKey, weekdays]);
+    }
+    if (sourcePreference !== undefined) {
+      const preference = JSON.stringify(sourcePreference);
+      storage.setItem(preferenceKey, preference); written.push([preferenceKey, preference]);
     }
   } catch {
     const restored = rollbackWritten(storage, written, previous);

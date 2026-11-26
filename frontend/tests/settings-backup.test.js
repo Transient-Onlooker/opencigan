@@ -41,6 +41,33 @@ test('school settings import restores prior values if the second write fails', (
   assert.equal(values.get('opensigan-lesson-times:' + schoolId), 'old-times');
 });
 
+test('failed source marker write rolls back imported school settings', () => {
+  const displayKey = 'opensigan-display:' + schoolId;
+  const timesKey = 'opensigan-lesson-times:' + schoolId;
+  const weekdayKey = 'opensigan-weekday-lesson-times:' + schoolId;
+  const sourceKey = 'opensigan-source-lesson-preference:' + schoolId;
+  const values = new Map([[displayKey, 'old-display'], [timesKey, 'old-times'], [weekdayKey, 'old-weekdays'], [sourceKey, 'old-source']]);
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    removeItem: (key) => values.delete(key),
+    setItem: (key, value) => { if (key === sourceKey) throw new Error('blocked'); values.set(key, value); },
+  };
+  assert.throws(() => saveSchoolSettingsBackup(storage, schoolId, display, times, {}, { enabled: true, applied: {}, previous: {} }), /저장하지 못했어요/);
+  assert.equal(values.get(displayKey), 'old-display');
+  assert.equal(values.get(timesKey), 'old-times');
+  assert.equal(values.get(weekdayKey), 'old-weekdays');
+  assert.equal(values.get(sourceKey), 'old-source');
+});
+
+test('successful import saves the source marker alongside school settings', () => {
+  const values = new Map();
+  const storage = { getItem: (key) => values.get(key) ?? null, removeItem: (key) => values.delete(key), setItem: (key, value) => values.set(key, value) };
+  const source = { enabled: false, applied: {}, previous: {} };
+  saveSchoolSettingsBackup(storage, schoolId, display, times, {}, source);
+  assert.deepEqual(JSON.parse(values.get('opensigan-source-lesson-preference:' + schoolId)), source);
+  assert.deepEqual(JSON.parse(values.get('opensigan-lesson-times:' + schoolId)), times);
+});
+
 test('failed import preserves another writer and does not revert unwritten keys', () => {
   const displayKey = 'opensigan-display:' + schoolId, timesKey = 'opensigan-lesson-times:' + schoolId;
   const values = new Map([[displayKey, 'old-display'], [timesKey, 'old-times']]);
