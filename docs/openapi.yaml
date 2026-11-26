@@ -908,13 +908,13 @@ paths:
         - name: school
           in: query
           required: true
-          description: An uppercase office letter followed by two decimal digits, a colon, and seven decimal digits. ASCII digits are recommended.
-          schema: { type: string, minLength: 11, maxLength: 11 }
+          description: After trimming whitespace, an uppercase office letter followed by two decimal digits, a colon, and seven decimal digits. The raw input is limited to 20 characters. ASCII digits are recommended.
+          schema: { type: string, minLength: 1, maxLength: 20 }
           example: 'B10:1234567'
         - name: from
           in: query
           required: true
-          description: ISO date accepted by Python date.fromisoformat, at most 10 characters. Prefer YYYY-MM-DD; compact calendar and ISO week dates are also accepted.
+          description: After trimming whitespace, a valid ISO date accepted by Python date.fromisoformat. Raw input is limited to 10 characters. Prefer YYYY-MM-DD; compact calendar and ISO week dates are also accepted.
           schema: { type: string, minLength: 1, maxLength: 10 }
           example: '2026-11-16'
         - name: to

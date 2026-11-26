@@ -67,6 +67,7 @@ class OpenApiContractTests(unittest.TestCase):
         path = '/api/v1/meals'
         cases = (
             {'school': 'B１０:1234567', 'from': '2026-11-16', 'to': '2026-11-16'},
+            {'school': ' B10:1234567 ', 'from': ' 20261116 ', 'to': '2026-11-16'},
             {'school': 'B10:1234567', 'from': '20261116', 'to': '2026-11-16'},
             {'school': 'B10:1234567', 'from': '2026-W47-1', 'to': '20261116'},
         )
