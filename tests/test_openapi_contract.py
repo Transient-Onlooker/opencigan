@@ -52,6 +52,35 @@ class OpenApiContractTests(unittest.TestCase):
                                              'components': self.spec['components']})
             validator.validate({'code': code, 'error': 'unavailable', 'message': 'unavailable'})
 
+    def test_public_suggestions_contract_matches_routes(self):
+        from backend.suggestion_store import SuggestionStore
+
+        path = '/api/v1/suggestions'
+        with tempfile.TemporaryDirectory() as temporary:
+            store = SuggestionStore(Path(temporary) / 'suggestions.sqlite')
+            with patch('backend.app._suggestion_store', return_value=store):
+                def check(method, status, query='', body=None):
+                    result, headers, response = dispatch_request(method, path, query, self.cache, request_body=body)
+                    self.assertEqual(result, status)
+                    self.assertTrue(headers['Content-Type'].startswith('application/json'))
+                    schema = self.spec['paths'][path][method.lower()]['responses'][str(status)]
+                    if '$ref' in schema:
+                        schema = self.spec['components']['responses'][schema['$ref'].rsplit('/', 1)[-1]]
+                    schema = schema['content']['application/json']['schema']
+                    Draft202012Validator({'$ref': '#/$defs/response', '$defs': {'response': schema},
+                                         'components': self.spec['components']}, format_checker=FormatChecker()).validate(json.loads(response))
+                    return json.loads(response)
+
+                payload = json.dumps({'title': '새 기능', 'description': '기능 제안'}).encode()
+                created = check('POST', 201, body=payload)
+                self.assertEqual(check('GET', 200)['suggestions'], [])
+                store.admin_transition(created['id'], 'approved')
+                self.assertEqual(check('GET', 200, 'q=%EC%83%88')['suggestions'][0]['id'], created['id'])
+                check('GET', 400, 'cursor=0')
+                check('POST', 409, body=payload)
+                check('POST', 400, body=b'{}')
+                check('POST', 413, body=b'x' * 4097)
+
     def test_school_query_validation_matches_openapi(self):
         for path in ('/api/v1/schools', '/api/v1/neis/schools'):
             schema = self.spec['paths'][path]['get']['parameters'][0]['schema']
