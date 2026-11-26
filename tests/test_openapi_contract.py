@@ -52,6 +52,38 @@ class OpenApiContractTests(unittest.TestCase):
                                              'components': self.spec['components']})
             validator.validate({'code': code, 'error': 'unavailable', 'message': 'unavailable'})
 
+    def test_private_history_stats_contract_for_observed_and_unobserved_weeks(self):
+        path = '/api/v1/admin/history-stats'
+        headers = {'Authorization': 'Bearer ' + 'x' * 32}
+        query = 'school=1%3AExample&week=2026-11-16'
+        base = {'retainedSince': '2026-11-01T00:00:00+00:00', 'comparisonCoverage': 'unknown'}
+        unobserved = {**base, 'observed': False, 'totalChanges': None, 'byType': None,
+                      'affectedClasses': None, 'lastObservedAt': None, 'subjectPeriods': None,
+                      'teacherOverlaps': None, 'changesByObservedDay': None, 'sourceUpdateObservations': None}
+        observed = {**base, 'observed': True, 'totalChanges': 1, 'byType': {'added': 0, 'changed': 1, 'deleted': 0},
+                    'affectedClasses': 1, 'lastObservedAt': '2026-11-16T00:00:00+00:00',
+                    'subjectPeriods': [{'subject': 'Math', 'classPeriods': 1}],
+                    'teacherOverlaps': [{'date': '2026-11-16', 'period': 1, 'teacher': 'Kim', 'classes': [{'grade': 1, 'class': 1}]}],
+                    'changesByObservedDay': [{'date': '2026-11-16', 'count': 1}],
+                    'sourceUpdateObservations': {'distinctTimestamps': 1, 'intervalCount': 0, 'meanIntervalSeconds': None,
+                                                 'firstSourceAt': '2026-11-16T00:00:00+00:00', 'lastSourceAt': '2026-11-16T00:00:00+00:00'}}
+        store = Mock()
+        with patch.dict('os.environ', {'OPENCIGAN_HISTORY_STATS_ENABLED': '1', 'OPENCIGAN_ADMIN_TOKEN': 'x' * 32}), \
+             patch('backend.app._history_store', return_value=store):
+            for data in (unobserved, observed):
+                store.change_stats.return_value = data
+                status, response_headers, body = dispatch_request('GET', path, query, self.cache, request_headers=headers)
+                self.assertEqual(status, 200)
+                self.assert_json_response(path, status, response_headers, body)
+            for params, auth, expected in [('week=bad', headers, 400), (query, {}, 401)]:
+                status, response_headers, body = dispatch_request('GET', path, params, self.cache, request_headers=auth)
+                self.assertEqual(status, expected)
+                self.assert_json_response(path, status, response_headers, body)
+        with patch.dict('os.environ', {'OPENCIGAN_HISTORY_STATS_ENABLED': '0'}):
+            status, response_headers, body = dispatch_request('GET', path, query, self.cache, request_headers=headers)
+            self.assertEqual(status, 503)
+            self.assert_json_response(path, status, response_headers, body)
+
     def test_access_logs_json_csv_and_errors_match_contract(self):
         from backend.access_logs import AccessLogStore
         path = '/api/v1/admin/access-logs'
