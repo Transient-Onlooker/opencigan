@@ -180,6 +180,19 @@
       }
     }
   }
+  function retrySuggestionsAfterReload() {
+    if (JSON.stringify(lessonTimeDrafts) !== JSON.stringify(lessonTimes) ||
+        JSON.stringify(weekdayTimeDrafts) !== JSON.stringify(weekdayLessonTimes)) {
+      lessonTimeState = '작성 중인 교시 시각을 저장하거나 초기화한 뒤 다시 시도해 주세요.';
+      return;
+    }
+    try {
+      sessionStorage.setItem('opencigan-retry-suggestions', '1');
+      window.location.reload();
+    } catch {
+      lessonTimeState = '다시 시도하려면 설정을 저장한 뒤 페이지를 새로고침해 주세요.';
+    }
+  }
   $: selectedTeacherName = findSelectedTeacherName(teacherNames, teacherQuery, (name) => displayTeacher(name, displaySettings));
   $: selectedTeacherRecords = teacherLessons(timetable?.records ?? [], selectedTeacherName);
   $: classActionsReady = !!school && timetable?.schoolId === school.id && timetable.weekStart === week && filtered.length > 0 && !classError && !pendingSharedClass && !sharedSchoolChecking;
@@ -970,6 +983,12 @@
     if (typeof window.history?.replaceState === 'function') {
       const savedNavigation = !shared ? getNavigationFromHistory(current) : null;
       if (savedNavigation) applyNavigation(savedNavigation);
+      try {
+        if (sessionStorage.getItem('opencigan-retry-suggestions') === '1') {
+          sessionStorage.removeItem('opencigan-retry-suggestions');
+          view = 'settings';
+        }
+      } catch { /* Navigation remains usable without session storage. */ }
       if (new URLSearchParams(window.location.search).get('view') === 'settings') view = 'settings';
       replaceNavigationState({ version: 1, view, timetableView, school, grade: Number(grade), classroom: Number(classroom), week, selectedDay, mealDate });
       navigationReady = true;
@@ -1011,7 +1030,7 @@
     <ShareTools {view} {school} {classActionsReady} {apiNotConfigured} {shareUrl} {shareState} {subscriptionUrl} {subscriptionState} {subscriptionPanelOpen} {subscriptionMode} {subscriptionTimesConsent} {canExport} {exportBusy} {shareClass} {subscribeTimetable} {exportTimetable} {changeSubscriptionMode} setSubscriptionTimesConsent={(value) => { subscriptionTimesConsent = value; updateSubscriptionUrl(); }} {copySubscription} />
     <footer><div class="footer-open"><svg class="github-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .75a11.25 11.25 0 0 0-3.56 21.92c.56.1.77-.24.77-.54v-2.1c-3.13.68-3.79-1.33-3.79-1.33-.51-1.3-1.25-1.64-1.25-1.64-1.02-.7.08-.69.08-.69 1.13.08 1.72 1.16 1.72 1.16 1 1.72 2.63 1.22 3.27.93.1-.72.39-1.22.7-1.5-2.5-.28-5.13-1.25-5.13-5.56 0-1.23.44-2.24 1.16-3.03-.12-.28-.5-1.43.11-2.98 0 0 .95-.3 3.1 1.16A10.8 10.8 0 0 1 12 6.17c.96 0 1.92.13 2.82.38 2.15-1.46 3.1-1.16 3.1-1.16.61 1.55.23 2.7.11 2.98.72.79 1.16 1.8 1.16 3.03 0 4.32-2.63 5.27-5.14 5.55.4.35.76 1.03.76 2.08v3.1c0 .3.2.65.78.54A11.25 11.25 0 0 0 12 .75Z"/></svg><div><strong>함께 만드는 오픈소스</strong><p>Opencigan은 오픈소스 프로젝트예요. GitHub에서 함께 기여해 주세요.</p><div class="footer-links"><a href="https://github.com/Transient-Onlooker/opencigan">Opencigan GitHub ↗</a><a href="https://github.com/hegelty/pycomcigan">pycomcigan ↗</a><a href="https://opencigan.mcv.kr/">Opencigan 사이트 ↗</a><a href="/api-docs.html">API 문서</a></div>{#if view === 'settings' && import.meta.env.VITE_SUGGESTIONS_ENABLED !== '0' && SuggestionsComponent}<SuggestionsComponent />{/if}</div></div></footer>
     {#if view === 'settings' && suggestionsEnabled && suggestionsLoadFailed && !suggestionsLoading && !SuggestionsComponent}
-      <p role="status">제안 기능을 불러오지 못했어요. <button class="secondary-button" onclick={() => window.location.reload()}>새로고침 후 다시 시도</button></p>
+      <p role="status">제안 기능을 불러오지 못했어요. <button class="secondary-button" onclick={retrySuggestionsAfterReload}>새로고침 후 다시 시도</button></p>
     {/if}
   </main>
 </div>
