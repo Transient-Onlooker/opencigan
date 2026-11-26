@@ -6,6 +6,18 @@ from backend import timetable
 
 
 class SourceLessonStartsTests(unittest.TestCase):
+    def test_labelled_periods_are_not_inferred_from_array_position(self):
+        cases = (
+            ([None, '3(11:05)', '', '1(09:10)'], {'1': '09:10', '3': '11:05'}),
+            (['09:00', '10:00', '11:00'], {}),
+            (['2(10:00)', '1(09:10)', '2(10:00)'], {'1': '09:10'}),
+            (['1 (09:10)', '2(10:00) extra', '3(11:05)', '4(9:10)'], {'3': '11:05'}),
+            ((None, ' 1(09:10) ', '30(23:59)'), {'1': '09:10', '30': '23:59'}),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                self.assertEqual(timetable._source_lesson_starts(source), expected)
+
     def test_only_unambiguous_labelled_valid_times_are_used(self):
         source = ["1(09:10)", "3(11:05)", "2(24:00)", "4(10:60)", "09:00", "5(10:00)",
                   "5(10:05)", "0(08:00)", "31(12:00)", "6(8:00)", None]
