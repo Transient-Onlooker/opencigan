@@ -2,6 +2,19 @@ import { expect, test } from '@playwright/test';
 
 test.use({ serviceWorkers: 'block' });
 
+async function observeAccessLogAbort(page) {
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch;
+    window.__accessLogSignals = [];
+    window.fetch = (input, init) => {
+      const url = input instanceof Request ? input.url : String(input);
+      const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+      if (url.includes('/api/v1/admin/access-logs') && signal) window.__accessLogSignals.push(signal);
+      return originalFetch(input, init);
+    };
+  });
+}
+
 const log = {
   id: 42,
   timestamp: '2026-11-15T13:45:00+09:00',
@@ -23,6 +36,7 @@ const log = {
 };
 
 test('editing the token cancels an in-flight log query and clears previous rows', async ({ page }) => {
+  await observeAccessLogAbort(page);
   let release, started, count = 0;
   const pending = new Promise(resolve => { release = resolve; });
   const requested = new Promise(resolve => { started = resolve; });
@@ -37,16 +51,16 @@ test('editing the token cancels an in-flight log query and clears previous rows'
   await expect(page.locator('#logs-body')).toContainText(log.client_ip);
   await page.getByRole('button', { name: '조회', exact: true }).click();
   await requested;
-  const canceled = page.waitForEvent('requestfailed', request => request.url().includes('/api/v1/admin/access-logs'));
   await page.getByLabel('관리자 토큰').fill('second-token');
+  await expect.poll(() => page.evaluate(() => window.__accessLogSignals.at(-1)?.aborted)).toBe(true);
   release();
-  await canceled;
   await expect(page.locator('#results')).toBeHidden();
   await expect(page.locator('#logs-body')).toBeEmpty();
   await expect(page.getByRole('button', { name: '조회', exact: true })).toBeEnabled();
 });
 
 test('editing the token cancels an in-flight CSV download', async ({ page }) => {
+  await observeAccessLogAbort(page);
   let release, started;
   const pending = new Promise(resolve => { release = resolve; });
   const requested = new Promise(resolve => { started = resolve; });
@@ -61,10 +75,9 @@ test('editing the token cancels an in-flight CSV download', async ({ page }) => 
   await page.getByLabel('관리자 토큰').fill('first-token');
   await page.getByRole('button', { name: 'CSV 다운로드' }).click();
   await requested;
-  const canceled = page.waitForEvent('requestfailed', request => request.url().includes('/api/v1/admin/access-logs'));
   await page.getByLabel('관리자 토큰').fill('second-token');
+  await expect.poll(() => page.evaluate(() => window.__accessLogSignals.at(-1)?.aborted)).toBe(true);
   release();
-  await canceled;
   await expect(page.getByRole('button', { name: 'CSV 다운로드' })).toBeEnabled();
   expect(downloaded).toBe(false);
 });

@@ -75,6 +75,8 @@ flowchart TB
 
 ### ST-00 · 테스트 가능한 기준선 및 자동 QA
 
+- 접속 로그의 토큰 변경 취소 검사가 WebKit에서 `requestfailed` 이벤트를 받지 못해 간헐적으로 시간 초과되는 상황을 확인했다. 실제 fetch에 전달된 AbortSignal의 취소와 늦은 응답의 화면 반영 방지를 직접 확인하도록 회귀 검사를 보완한다.
+
 - [x] 최신 `main`의 Python/Worker/프런트 테스트, Svelte 검사, 빌드, Chromium/WebKit 필수 플로우 실행 결과를 남긴다. 실행하지 못한 것은 실행했다고 쓰지 않는다.
 - [x] 누락된 자동 시나리오를 보강한다: 학교·학급·주차 변경 중 늦은 응답, 검색/캐시 장애와 복구, 급식 독립성, ICS 200/304, 공유 링크, 429/503 오류 표시. 모의 상류를 우선 사용한다.
 - 기준선: `9ce1a34`의 [CI 실행 44908297694](https://github.com/Transient-Onlooker/opencigan/actions/runs/44908297694)에서 Python·Worker·프런트 단위/통합 검사, Svelte 검사, Chromium/WebKit 및 빌드 통과. 기존 테스트는 선택 변경·공유 링크·저장본 복구·급식 독립성·ICS 304·503 안내를 포함한다. 429 응답의 대기 시간·급식 독립성·복구 시나리오는 [PR #157](https://github.com/Transient-Onlooker/opencigan/pull/157)의 로컬 Chromium과 [원격 Chromium/WebKit CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/44916120859)에서 통과했다.
