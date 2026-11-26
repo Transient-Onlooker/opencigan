@@ -737,7 +737,8 @@ paths:
         - name: q
           in: query
           required: true
-          schema: { type: string, minLength: 1, maxLength: 50 }
+          description: Must contain a non-whitespace character; leading and trailing whitespace is trimmed after the 50-character limit is checked.
+          schema: { type: string, minLength: 1, maxLength: 50, pattern: '\S' }
           example: 봄빛고등학교
       responses:
         '200':
@@ -760,7 +761,8 @@ paths:
         - name: q
           in: query
           required: true
-          schema: { type: string, minLength: 1, maxLength: 50 }
+          description: Must contain a non-whitespace character; leading and trailing whitespace is trimmed after the 50-character limit is checked.
+          schema: { type: string, minLength: 1, maxLength: 50, pattern: '\S' }
           example: 봄빛고등학교
       responses:
         '200':
