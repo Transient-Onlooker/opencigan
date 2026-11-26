@@ -615,10 +615,13 @@
       if (school) persistSelection({ school, grade, classroom });
       return;
     }
+    const hasClassroomDraft = classroomDraft !== String(classroom);
     const changed = selectionState.reconcile(timetable?.records ?? [], school && /(?:중학교|고등학교)/.test(school.name) ? 3 : 6);
-    classroomDraft = String(classroom);
+    if (hasClassroomDraft) {
+      classError = !selectionState.validClass(Number(classroomDraft), classesInGrade(timetable?.records ?? [], Number(grade)));
+    } else classroomDraft = String(classroom);
     if (!changed) return;
-    classError = false;
+    if (!hasClassroomDraft) classError = false;
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
     persistSelection({ grade, classroom });
   }
