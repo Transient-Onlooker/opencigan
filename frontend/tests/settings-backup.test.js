@@ -56,7 +56,7 @@ test('failed import preserves another writer and does not revert unwritten keys'
     },
     removeItem: (key) => values.delete(key),
   };
-  assert.throws(() => saveSchoolSettingsBackup(storage, schoolId, display, times), /저장하지 못했어요/);
+  assert.throws(() => saveSchoolSettingsBackup(storage, schoolId, display, times), /복구하지 못했어요/);
   assert.equal(values.get(displayKey), 'newer-display');
   assert.equal(values.get(timesKey), 'newer-times');
 });

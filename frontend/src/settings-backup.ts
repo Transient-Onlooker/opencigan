@@ -58,8 +58,10 @@ export function saveSchoolSettingsBackup(storage: Storage, schoolId: string, dis
       storage.setItem(weekdayKey, weekdays); written.push([weekdayKey, weekdays]);
     }
   } catch {
-    rollbackWritten(storage, written, previous);
-    throw new Error('브라우저 저장소에 설정을 저장하지 못했어요.');
+    const restored = rollbackWritten(storage, written, previous);
+    throw new Error(restored
+      ? '브라우저 저장소에 설정을 저장하지 못했어요.'
+      : '설정 저장에 실패했고 일부 이전 값을 복구하지 못했어요. 브라우저 저장소를 확인해 주세요.');
   }
 }
 
