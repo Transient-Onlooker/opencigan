@@ -1,5 +1,6 @@
 import unittest
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import Mock, patch
 from urllib.error import HTTPError, URLError
@@ -75,6 +76,48 @@ class ComciganProxyTests(unittest.TestCase):
             self.assertEqual(len(calls), 2)
         finally:
             release.set()
+            server.shutdown()
+            server.server_close()
+            thread.join()
+
+    def test_slow_body_can_exceed_budget_before_next_request_is_stopped(self):
+        import pycomcigan.helpers as helpers
+        original = helpers.urlopen
+        self.addCleanup(setattr, helpers, "urlopen", original)
+
+        class SlowBody(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Length", "6")
+                self.end_headers()
+                for _ in range(6):
+                    self.wfile.write(b"x")
+                    self.wfile.flush()
+                    time.sleep(0.08)
+
+            def log_message(self, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), SlowBody)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": f"http://127.0.0.1:{server.server_port}"}), \
+                 patch.object(comcigan_proxy, "UPSTREAM_BUDGET_SECONDS", 0.2):
+                comcigan_proxy.configure_comcigan_proxy()
+
+                @comcigan_proxy.with_comcigan_budget
+                def lookup():
+                    started = time.monotonic()
+                    with helpers.urlopen(Request("http://comci.net:4082/st")) as response:
+                        self.assertEqual(response.read(), b"xxxxxx")
+                    elapsed = time.monotonic() - started
+                    with self.assertRaises(TimeoutError):
+                        helpers.urlopen(Request("http://comci.net:4082/data"))
+                    return elapsed
+
+                self.assertGreater(lookup(), 0.2)
+        finally:
             server.shutdown()
             server.server_close()
             thread.join()
