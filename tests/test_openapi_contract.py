@@ -52,6 +52,29 @@ class OpenApiContractTests(unittest.TestCase):
                                              'components': self.spec['components']})
             validator.validate({'code': code, 'error': 'unavailable', 'message': 'unavailable'})
 
+    def test_access_logs_json_csv_and_errors_match_contract(self):
+        from backend.access_logs import AccessLogStore
+        path = '/api/v1/admin/access-logs'
+        store = AccessLogStore(':memory:')
+        self.addCleanup(store.close)
+        store.record({'route': '/api/v1/timetable'})
+        headers = {'Authorization': 'Bearer ' + 'x' * 32}
+        with patch.dict('os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'x' * 32}), \
+             patch('backend.app._access_log_store', return_value=store):
+            status, response_headers, body = dispatch_request('GET', path, '', self.cache, request_headers=headers)
+            self.assertEqual(status, 200)
+            self.assertEqual(response_headers['Cache-Control'], 'no-store')
+            self.assert_json_response(path, status, response_headers, body)
+            self.assertEqual(len(json.loads(body)['items']), 1)
+            status, response_headers, body = dispatch_request('GET', path, 'format=csv', self.cache, request_headers=headers)
+            self.assertEqual(status, 200)
+            self.assertTrue(response_headers['Content-Type'].startswith('text/csv'))
+            self.assertTrue(body.startswith(b'\xef\xbb\xbf'))
+            for query, auth, expected in [('limit=0', headers, 400), ('', {}, 401)]:
+                status, response_headers, body = dispatch_request('GET', path, query, self.cache, request_headers=auth)
+                self.assertEqual(status, expected)
+                self.assert_json_response(path, status, response_headers, body)
+
     def test_public_suggestions_contract_matches_routes(self):
         from backend.suggestion_store import SuggestionStore
 
