@@ -94,6 +94,7 @@ export interface IcsOptions {
   weeks?: 1 | 2;
   mode?: SubscriptionMode;
   times?: string;
+  weekdayTimes?: string;
   teacher?: string;
 }
 
@@ -240,6 +241,7 @@ export class OpensiganClient {
     if (options?.weeks !== undefined) params.set('weeks', String(options.weeks));
     if (options?.mode !== undefined) params.set('mode', options.mode);
     if (options?.times !== undefined) params.set('times', options.times);
+    if (options?.weekdayTimes !== undefined) params.set('weekday_times', options.weekdayTimes);
     if (options?.teacher !== undefined) params.set('teacher', options.teacher);
     return `${this.baseUrl}/api/v1/timetable.ics?${params.toString()}`;
   }
