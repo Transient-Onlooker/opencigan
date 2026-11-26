@@ -1,5 +1,6 @@
 import os
 import logging
+import http.client
 import socket
 import threading
 import time
@@ -7,13 +8,76 @@ from contextvars import ContextVar
 from functools import wraps
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
+from urllib.request import HTTPHandler, HTTPRedirectHandler, ProxyHandler, build_opener
 
 _lock = threading.Lock()
 _configured = False
 logger = logging.getLogger("opensigan.comcigan_proxy")
 _deadline = ContextVar("comcigan_deadline", default=None)
 UPSTREAM_BUDGET_SECONDS = 35
+
+
+def _run_with_deadline(response, deadline, operation):
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError("Comcigan request budget exhausted")
+    try:
+        sock = response.fp.raw._sock
+    except AttributeError as error:
+        raise RuntimeError("Cannot enforce Comcigan response deadline") from error
+    if not isinstance(sock, socket.socket):
+        raise RuntimeError("Cannot enforce Comcigan response deadline")
+    expired = threading.Event()
+    finished = threading.Event()
+    timer_lock = threading.Lock()
+
+    def interrupt():
+        with timer_lock:
+            if finished.is_set():
+                return
+            expired.set()
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+
+    timer = threading.Timer(remaining, interrupt)
+    timer.daemon = True
+    timer.start()
+    try:
+        result = operation()
+    except BaseException as error:
+        with timer_lock:
+            finished.set()
+            timer.cancel()
+            timed_out = expired.is_set()
+        if timed_out and isinstance(error, Exception):
+            raise TimeoutError("Comcigan request budget exhausted") from error
+        raise
+    with timer_lock:
+        finished.set()
+        timer.cancel()
+        timed_out = expired.is_set() or time.monotonic() >= deadline
+    if timed_out:
+        raise TimeoutError("Comcigan request budget exhausted")
+    return result
+
+
+class _DeadlineHTTPResponse(http.client.HTTPResponse):
+    def begin(self):
+        deadline = _deadline.get()
+        if deadline is None:
+            return super().begin()
+        return _run_with_deadline(self, deadline, super().begin)
+
+
+class _DeadlineHTTPConnection(http.client.HTTPConnection):
+    response_class = _DeadlineHTTPResponse
+
+
+class _DeadlineHTTPHandler(HTTPHandler):
+    def http_open(self, request):
+        return self.do_open(_DeadlineHTTPConnection, request)
 
 
 class _DeadlineResponse:
@@ -36,49 +100,7 @@ class _DeadlineResponse:
     def read(self, *args, **kwargs):
         if self._response.fp is None:
             return self._response.read(*args, **kwargs)
-        remaining = self._deadline - time.monotonic()
-        if remaining <= 0:
-            raise TimeoutError("Comcigan request budget exhausted")
-        try:
-            sock = self._response.fp.raw._sock
-        except AttributeError as error:
-            raise RuntimeError("Cannot enforce Comcigan response deadline") from error
-        if not isinstance(sock, socket.socket):
-            raise RuntimeError("Cannot enforce Comcigan response deadline")
-        expired = threading.Event()
-        finished = threading.Event()
-        timer_lock = threading.Lock()
-
-        def interrupt():
-            with timer_lock:
-                if finished.is_set():
-                    return
-                expired.set()
-                try:
-                    sock.shutdown(socket.SHUT_RDWR)
-                except OSError:
-                    pass
-
-        timer = threading.Timer(remaining, interrupt)
-        timer.daemon = True
-        timer.start()
-        try:
-            result = self._response.read(*args, **kwargs)
-        except BaseException as error:
-            with timer_lock:
-                finished.set()
-                timer.cancel()
-                timed_out = expired.is_set()
-            if timed_out and isinstance(error, Exception):
-                raise TimeoutError("Comcigan request budget exhausted") from error
-            raise
-        with timer_lock:
-            finished.set()
-            timer.cancel()
-            timed_out = expired.is_set() or time.monotonic() >= self._deadline
-        if timed_out:
-            raise TimeoutError("Comcigan request budget exhausted")
-        return result
+        return _run_with_deadline(self._response, self._deadline, lambda: self._response.read(*args, **kwargs))
 
 
 def with_comcigan_budget(function):
@@ -114,7 +136,7 @@ def configure_comcigan_proxy():
             return
         import pycomcigan.helpers as helpers
 
-        opener = build_opener(ProxyHandler({}), _NoRedirect())
+        opener = build_opener(ProxyHandler({}), _NoRedirect(), _DeadlineHTTPHandler())
 
         def open_comcigan(request, timeout=30):
             target = urlsplit(request.full_url)

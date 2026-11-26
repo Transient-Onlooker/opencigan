@@ -115,9 +115,54 @@ class ComciganProxyTests(unittest.TestCase):
                         response.read()
 
                 started = time.monotonic()
-                with self.assertRaises(TimeoutError):
-                    lookup()
+                with self.assertLogs("opensigan.comcigan_proxy", level="INFO") as logs:
+                    with self.assertRaises(TimeoutError):
+                        lookup()
                 self.assertLess(time.monotonic() - started, 0.8)
+                self.assertIn("result=success", logs.output[0])
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+
+    def test_trickled_headers_are_interrupted_at_shared_deadline(self):
+        import pycomcigan.helpers as helpers
+        original = helpers.urlopen
+        self.addCleanup(setattr, helpers, "urlopen", original)
+
+        class SlowHeaders(BaseHTTPRequestHandler):
+            def do_GET(self):
+                try:
+                    self.connection.sendall(b"HTTP/1.1 200 OK\r\nX-Probe: ")
+                    for _ in range(6):
+                        time.sleep(0.08)
+                        self.connection.sendall(b"x")
+                    self.connection.sendall(b"\r\nContent-Length: 0\r\n\r\n")
+                except ConnectionError:
+                    pass
+
+            def log_message(self, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), SlowHeaders)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": f"http://127.0.0.1:{server.server_port}"}), \
+                 patch.object(comcigan_proxy, "UPSTREAM_BUDGET_SECONDS", 0.3):
+                comcigan_proxy.configure_comcigan_proxy()
+
+                @comcigan_proxy.with_comcigan_budget
+                def lookup():
+                    with helpers.urlopen(Request("http://comci.net:4082/st")) as response:
+                        response.read()
+
+                started = time.monotonic()
+                with self.assertLogs("opensigan.comcigan_proxy", level="INFO") as logs:
+                    with self.assertRaises(TimeoutError):
+                        lookup()
+                self.assertLess(time.monotonic() - started, 0.8)
+                self.assertIn("result=timeout", logs.output[0])
         finally:
             server.shutdown()
             server.server_close()
@@ -179,6 +224,40 @@ class ComciganProxyTests(unittest.TestCase):
         with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": "http://example.org:8080"}):
             with self.assertRaises(ValueError):
                 comcigan_proxy.configure_comcigan_proxy()
+
+    def test_budgeted_http_error_preserves_status(self):
+        import pycomcigan.helpers as helpers
+        original = helpers.urlopen
+        self.addCleanup(setattr, helpers, "urlopen", original)
+
+        class Rejected(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(403)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Rejected)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with patch.dict("os.environ", {"OPENCIGAN_COMCIGAN_PROXY": f"http://127.0.0.1:{server.server_port}"}):
+                comcigan_proxy.configure_comcigan_proxy()
+
+                @comcigan_proxy.with_comcigan_budget
+                def lookup():
+                    return helpers.urlopen(Request("http://comci.net:4082/st"))
+
+                with self.assertRaises(HTTPError) as raised:
+                    lookup()
+                self.addCleanup(raised.exception.close)
+                self.assertEqual(raised.exception.code, 403)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
 
     def test_header_timing_records_only_stage_and_duration_on_success_and_failure(self):
         import pycomcigan.helpers as helpers
@@ -251,10 +330,15 @@ class ComciganProxyTests(unittest.TestCase):
                 request = Request("http://comci.net:4082/12345", data=b"encoded-body",
                                   headers={"Content-Type": "text/plain; charset=UTF-8",
                                            "X-Hour-Token": "test-token"})
-                with self.assertLogs("opensigan.comcigan_proxy", level="INFO") as logs:
+                @comcigan_proxy.with_comcigan_budget
+                def send():
                     response = helpers.urlopen(request, timeout=30)
                     text = response.read().decode("UTF-8")
                     response.close()
+                    return text
+
+                with self.assertLogs("opensigan.comcigan_proxy", level="INFO") as logs:
+                    text = send()
             self.assertEqual(text, "{}")
             self.assertEqual(received, [("http://comci.net:4082/12345", "text/plain; charset=UTF-8",
                                          "test-token", b"encoded-body")])
