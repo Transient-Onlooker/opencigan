@@ -291,10 +291,12 @@ flowchart TB
 
 ### ST-13 · 번들 실측·경량화
 
+- [#289](https://github.com/Transient-Onlooker/opencigan/pull/289) 후속: 제안 화면 청크 복구 시 새로고침 후 설정 화면으로 돌아가며 저장하지 않은 교시 시각이 있으면 새로고침을 막고 이유를 표시한다. Chromium 입력 보존과 오프라인 복구를 확인했고, 테스트 API를 격리한 뒤 [Linux Chromium·WebKit CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/45803580216)가 통과했다.
 - [#230](https://github.com/Transient-Onlooker/opencigan/pull/230) 이미지 내보내기 분리 실험은 서비스 워커 설치까지 포함한 로컬 첫 방문 JS 전송이 625바이트 증가해 병합하지 않았다. [측정과 한계](../qa/bundle-baseline-2026-11-23.md#이미지-내보내기-분리-실험--2026-11-25)를 참고하고 다른 최적화 후보를 찾는다.
 
 - [번들 기준선](../qa/bundle-baseline-2026-11-23.md)에 초기 HTML이 참조하는 JS/CSS, 전체 자산 및 선택 PDF 청크 크기를 기록했다. 실제 전송·로딩 시간과 최적화는 아직 미검증이다.
 - 2026-11-26 `f1787b1` 프런트 빌드의 기존 로컬 측정 스크립트 결과: 390/1366px 모두 최초 JS 76,175바이트, CSS 22,872바이트, WOFF2 333,884바이트(각 encoded body, 서비스 워커·외부/API 차단). 이전 측정과 기능 구성이 달라 최적화 전후 비교가 아니다.
+- 설정 전용 제안 컴포넌트 지연 로딩 실험의 로컬 Chromium 비교에서 최초 JS 76,157→74,977바이트였다. 이후 경합 수정이 추가됐으며 최종 빌드의 설치 자산 gzip 합계는 JS 75,131→74,050바이트였다. [측정 조건과 오프라인 동작](../qa/bundle-baseline-2026-11-23.md#제안-기능-지연-로딩-실험--2026-11-26). 운영 전송량·체감 시간 검증은 별도다.
 - [x] 초기 JS/CSS·전체 자산·선택 PDF 청크의 원본/압축 크기 및 격리 Chromium 최초 자산 요청 기준선을 기록한다 ([#193](https://github.com/Transient-Onlooker/opencigan/pull/193), [측정 기록](../qa/bundle-baseline-2026-11-23.md)).
 - [ ] 중복 의존성이나 초기 화면에 불필요한 선택 기능을 찾고 실제 전송·로딩 측정 및 개선 전후 비교를 보완한다.
 - [ ] 근거가 있는 부분만 지연 로딩·의존성 정리로 개선한다. PDF 내보내기 **파일 크기** 최적화와 혼동하지 않는다.
