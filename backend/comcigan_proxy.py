@@ -29,6 +29,8 @@ def acquire_with_comcigan_budget(lock):
     if not acquired:
         raise TimeoutError("Comcigan request budget exhausted while waiting for protocol")
     try:
+        if deadline is not None and time.monotonic() >= deadline:
+            raise TimeoutError("Comcigan request budget exhausted while waiting for protocol")
         yield
     finally:
         lock.release()

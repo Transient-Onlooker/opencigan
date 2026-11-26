@@ -15,6 +15,20 @@ class ComciganProxyTests(unittest.TestCase):
         comcigan_proxy._configured = False
         self.addCleanup(setattr, comcigan_proxy, "_configured", self.original_configured)
 
+    def test_lock_acquired_after_deadline_is_released_without_entering(self):
+        lock = Mock()
+        lock.acquire.return_value = True
+        token = comcigan_proxy._deadline.set(10.0)
+        try:
+            with patch.object(comcigan_proxy.time, "monotonic", side_effect=[9.0, 10.0]):
+                with self.assertRaises(TimeoutError):
+                    with comcigan_proxy.acquire_with_comcigan_budget(lock):
+                        self.fail("expired request entered protected block")
+            lock.acquire.assert_called_once_with(timeout=1.0)
+            lock.release.assert_called_once()
+        finally:
+            comcigan_proxy._deadline.reset(token)
+
     def test_shared_budget_limits_subsequent_requests_and_stops_at_deadline(self):
         import pycomcigan.helpers as helpers
         original = helpers.urlopen
