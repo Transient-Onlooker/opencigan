@@ -20,8 +20,11 @@ export async function apiError(response: Response): Promise<Error> {
     if (retryAfter) {
       let seconds = 0;
       if (/^\d{1,5}$/.test(retryAfter)) seconds = Number(retryAfter);
-      else if (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/.test(retryAfter)) {
-        seconds = Math.ceil((Date.parse(retryAfter) - Date.now()) / 1000);
+      else if (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/.test(retryAfter)
+          || /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), \d{2}-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{2} \d{2}:\d{2}:\d{2} GMT$/.test(retryAfter)
+          || /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (?: \d|\d{2}) \d{2}:\d{2}:\d{2} \d{4}$/.test(retryAfter)) {
+        const utcDate = retryAfter.endsWith(' GMT') ? retryAfter : `${retryAfter} GMT`;
+        seconds = Math.ceil((Date.parse(utcDate) - Date.now()) / 1000);
       }
       if (seconds > 0 && seconds <= 86400) message = message.replace('잠시 후', `${seconds}초 후`);
     }
