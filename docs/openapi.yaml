@@ -17,6 +17,65 @@ tags:
   - name: Meals
   - name: History
 paths:
+  /api/v1/admin/access-logs:
+    parameters:
+      - { name: client_ip, in: query, schema: { type: string, maxLength: 255 } }
+      - { name: school_id, in: query, schema: { type: string, maxLength: 255 } }
+      - { name: grade, in: query, schema: { type: string }, description: Decimal grade from 1 to 6. }
+      - { name: class, in: query, schema: { type: string }, description: Decimal class from 1 to 99. }
+      - { name: start_day, in: query, schema: { type: string, format: date } }
+      - { name: end_day, in: query, schema: { type: string, format: date } }
+      - { name: route, in: query, schema: { type: string, maxLength: 255 } }
+      - { name: status, in: query, schema: { type: string }, description: Decimal HTTP status from 100 to 599. }
+      - { name: origin_class, in: query, schema: { type: string, enum: [frontend, external, unknown, ''] } }
+      - { name: cache_status, in: query, schema: { type: string, maxLength: 255 } }
+      - { name: cursor, in: query, schema: { type: string }, description: Positive decimal page cursor from a previous JSON response. }
+      - { name: limit, in: query, schema: { type: string }, description: JSON page size from 1 to 100, default 50. }
+      - { name: format, in: query, schema: { type: string, enum: [json, csv], default: json }, description: CSV exports at most 5000 matching records and ignores page cursor and limit for export size. }
+    get:
+      tags: [System]
+      summary: Query retained access logs
+      description: Administrator-only data. Availability and retention depend on deployment configuration. Repeated or unknown query parameters are rejected.
+      security: [{ AnalyticsAdmin: [] }]
+      responses:
+        '200':
+          description: Paginated JSON or a UTF-8 CSV attachment with a byte-order mark.
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
+            Content-Disposition: { schema: { type: string }, description: Present for CSV exports. }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor, limit, has_more, dropped]
+                properties:
+                  items: { type: array, items: { type: object } }
+                  next_cursor: { type: [string, 'null'] }
+                  limit: { type: integer, minimum: 1, maximum: 100 }
+                  has_more: { type: boolean }
+                  dropped: { type: integer, minimum: 0 }
+            text/csv:
+              schema: { type: string }
+        '400': { $ref: '#/components/responses/SuggestionAdminBadRequest' }
+        '401': { $ref: '#/components/responses/SuggestionAdminUnauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: Access log store or gateway unavailable, or service overloaded.
+          headers:
+            Retry-After: { description: Present when the service is overloaded., schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    head:
+      tags: [System]
+      summary: Check access to retained access logs
+      security: [{ AnalyticsAdmin: [] }]
+      responses:
+        '200': { description: Query successful; no response body. }
+        '400': { description: Invalid query. }
+        '401': { description: Invalid administrator token. }
+        '429': { description: Rate limit reached. }
+        '503': { description: Access log store or gateway unavailable. }
   /api/v1/suggestions:
     get:
       tags: [System]
