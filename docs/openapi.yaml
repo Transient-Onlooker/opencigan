@@ -146,17 +146,19 @@ paths:
         '429': { description: Rate limit reached. }
         '503': { description: Suggestion store or gateway unavailable. }
   /api/v1/admin/suggestions:
+    parameters:
+      - { name: status, in: query, schema: { type: string, enum: [pending, approved, rejected, merged] } }
+      - { name: cursor, in: query, schema: { type: string, pattern: '^[0-9]{1,19}$' }, description: Positive ASCII decimal cursor within signed 64-bit range. }
+      - { name: limit, in: query, schema: { type: string }, description: Decimal page size from 1 to 100; defaults to 50. }
     get:
       tags: [System]
       summary: List feature suggestions for review
       security: [{ AnalyticsAdmin: [] }]
-      parameters:
-        - { name: status, in: query, schema: { type: string, enum: [pending, approved, rejected, merged] } }
-        - { name: cursor, in: query, schema: { type: string }, description: Positive ASCII decimal cursor within signed 64-bit range. }
-        - { name: limit, in: query, schema: { type: string }, description: Decimal page size from 1 to 100; defaults to 50. }
       responses:
         '200':
           description: Suggestions and next-page cursor.
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
           content:
             application/json:
               schema:
@@ -174,8 +176,9 @@ paths:
       summary: Check access to the suggestion review list
       security: [{ AnalyticsAdmin: [] }]
       responses:
-        '200': { description: List accessible; no response body. }
-        '401': { description: Invalid administrator token. }
+        '200': { description: List accessible; no response body, headers: { Cache-Control: { schema: { type: string, const: no-store } } } }
+        '400': { description: Invalid query. }
+        '401': { description: Invalid administrator token, headers: { WWW-Authenticate: { schema: { type: string } } } }
         '429': { description: Rate limit reached. }
         '503': { description: Store or gateway unavailable. }
   /api/v1/admin/suggestions/{id}:
@@ -201,6 +204,8 @@ paths:
       responses:
         '200':
           description: Updated suggestion.
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AdminSuggestion' }
@@ -217,12 +222,15 @@ paths:
       responses:
         '200':
           description: Deleted.
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
           content:
             application/json:
               schema: { type: object, required: [deleted], properties: { deleted: { const: true } } }
         '400': { $ref: '#/components/responses/SuggestionAdminBadRequest' }
         '401': { $ref: '#/components/responses/SuggestionAdminUnauthorized' }
         '404': { $ref: '#/components/responses/SuggestionAdminNotFound' }
+        '413': { $ref: '#/components/responses/SuggestionAdminTooLarge' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { $ref: '#/components/responses/SuggestionAdminUnavailable' }
   /api/v1/webhooks:
@@ -1278,15 +1286,16 @@ components:
     AdminSuggestion:
       type: object
       required: [id, title, description, context, status, created_at, reviewed_at, merged_into, reviewer_note]
+      additionalProperties: false
       properties:
-        id: { type: string }
+        id: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' }
         title: { type: string }
         description: { type: string }
         context: { type: [string, 'null'] }
         status: { type: string, enum: [pending, approved, rejected, merged] }
         created_at: { type: string, format: date-time }
         reviewed_at: { type: [string, 'null'], format: date-time }
-        merged_into: { type: [string, 'null'] }
+        merged_into: { type: [string, 'null'], pattern: '^[A-Za-z0-9_-]{24}$' }
         reviewer_note: { type: [string, 'null'] }
     AccessAnomalyReview:
       type: object
@@ -1475,6 +1484,8 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     SuggestionAdminUnavailable:
       description: Suggestion store or gateway unavailable.
+      headers:
+        Retry-After: { description: Present when the service is overloaded., schema: { type: string } }
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
