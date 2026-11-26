@@ -51,6 +51,18 @@ class OpenApiContractTests(unittest.TestCase):
                                              'components': self.spec['components']})
             validator.validate({'code': code, 'error': 'unavailable', 'message': 'unavailable'})
 
+    def test_school_query_validation_matches_openapi(self):
+        for path in ('/api/v1/schools', '/api/v1/neis/schools'):
+            schema = self.spec['paths'][path]['get']['parameters'][0]['schema']
+            validator = Draft202012Validator(schema)
+            for value in ('', '   ', 'x' * 51):
+                with self.subTest(path=path, value=value):
+                    self.assertFalse(validator.is_valid(value))
+                    status, headers, body = dispatch_request('GET', path, urlencode({'q': value}), cache_instance=Cache())
+                    self.assertEqual(status, 400)
+                    self.assert_json_response(path, status, headers, body)
+            self.assertTrue(validator.is_valid('  school  '))
+
     def test_admin_access_anomaly_responses_match_openapi(self):
         from backend.access_logs import AccessLogStore
 
