@@ -4,7 +4,10 @@ test('offline settings remain usable and suggestions recover after reconnecting'
   test.skip(process.env.VITE_SUGGESTIONS_ENABLED === '0', 'Explicitly disabled build does not load suggestions');
   test.skip(browserName === 'webkit' && process.platform === 'win32', 'Playwright WebKit does not consistently emulate service-worker offline requests on Windows.');
   const errors = [];
+  const requests = [];
   page.on('pageerror', error => errors.push(error.message));
+  page.on('response', response => { if (/Suggestions-.*\.js|\/api\/v1\/suggestions/.test(response.url())) requests.push(`response ${response.status()} ${response.url()}`); });
+  page.on('requestfailed', request => { if (/Suggestions-.*\.js|\/api\/v1\/suggestions/.test(request.url())) requests.push(`failed ${request.failure()?.errorText} ${request.url()}`); });
   await page.route('**/api/v1/**', route => route.fulfill({ json: { suggestions: [], schools: [], meals: [] } }));
   await page.goto('/');
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
@@ -22,6 +25,7 @@ test('offline settings remain usable and suggestions recover after reconnecting'
   try {
     await expect(page.getByText('만들어주세요', { exact: true })).toBeVisible({ timeout: 5000 });
   } catch (error) {
+    console.log('Retry requests:', requests, 'page errors:', errors);
     console.log('Retry diagnostics:', await page.evaluate(() => ({
       url: location.href, online: navigator.onLine,
       retryMarker: sessionStorage.getItem('opencigan-retry-suggestions'),
