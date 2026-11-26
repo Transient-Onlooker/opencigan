@@ -269,7 +269,7 @@ flowchart TB
 - [#190](https://github.com/Transient-Onlooker/opencigan/pull/190): 분석 API의 202/400/413/429/503 및 Retry-After 계약을 격리 라우트와 대조했다. [#199](https://github.com/Transient-Onlooker/opencigan/pull/199)에서 [공개 API 버전·하위 호환 정책](../api-versioning.md) 문서가 실제 병합됐다. 전체 응답 계약 대조와 경로별 운영 관측은 계속 미완료다.
 
 - [x] 공개 API 버전 변경·하위 호환 정책을 문서화한다 ([#199](https://github.com/Transient-Onlooker/opencigan/pull/199)).
-- [ ] 기존 OpenAPI 3.1과 Worker/Pi/TypeScript/Python 클라이언트의 남은 오류·응답 계약을 대조하고 계약 회귀 테스트를 보강한다. **후속:** [#227](https://github.com/Transient-Onlooker/opencigan/pull/227)·[#232](https://github.com/Transient-Onlooker/opencigan/pull/232)·[#248](https://github.com/Transient-Onlooker/opencigan/pull/248) 완료 범위는 제외하고 나머지 계약 확인.
+- [ ] 기존 OpenAPI 3.1과 Worker/Pi/TypeScript/Python 클라이언트의 남은 오류·응답 계약을 대조하고 계약 회귀 테스트를 보강한다. **후속:** [#227](https://github.com/Transient-Onlooker/opencigan/pull/227)·[#232](https://github.com/Transient-Onlooker/opencigan/pull/232)·[#248](https://github.com/Transient-Onlooker/opencigan/pull/248) 완료 범위는 제외하고 나머지 계약 확인. Pi 전용 관리자 이력 통계의 응답과 오류 계약도 문서화하고 관측·미관측 응답을 검증한다.
 - [#282](https://github.com/Transient-Onlooker/opencigan/pull/282)는 `Retry-After`의 초 단위 문자열과 HTTP 날짜를 허용하도록 OpenAPI 헤더 타입을 수정했다. API 계약 검사 8건과 PR CI가 통과했다. 전체 계약 대조는 별도다.
 - 컴시간·NEIS 학교 검색의 `q`에서 공백만 있는 값은 서버가 400으로 거부한다. OpenAPI에 비공백 필수 조건과 공백 제거 전 길이 제한을 명시하고 두 경로의 400 응답을 명세와 대조했다. 나머지 계약은 별도다.
 - 시간표 이력 커서의 양의 ASCII 정수·선행 0 금지·64비트 범위와 원문 길이 제한을 명시했다. 격리 SQLite에서 공백 처리 및 잘못된 커서의 400 응답을 대조했다.

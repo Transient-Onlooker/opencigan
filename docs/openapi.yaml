@@ -737,6 +737,98 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+  /api/v1/admin/history-stats:
+    get:
+      tags: [System]
+      summary: Read private observed timetable history statistics
+      description: Pi backend route only; the public Cloudflare gateway does not forward it. Disabled unless OPENCIGAN_HISTORY_STATS_ENABLED is 1. Statistics cover retained observations, not all historical changes; matching teacher names do not establish teacher identity.
+      security: [{ AnalyticsAdmin: [] }]
+      parameters:
+        - name: school
+          in: query
+          required: true
+          description: School identifier in code:name form.
+          schema: { type: string, maxLength: 100 }
+        - name: week
+          in: query
+          required: true
+          description: Monday of the requested week in ISO date format.
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Observed statistics; null values mean the week has not been observed in the retention window.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [observed, totalChanges, byType, affectedClasses, lastObservedAt, retainedSince, comparisonCoverage, subjectPeriods, teacherOverlaps, changesByObservedDay, sourceUpdateObservations]
+                properties:
+                  observed: { type: boolean }
+                  totalChanges: { type: [integer, 'null'], minimum: 0 }
+                  byType:
+                    type: [object, 'null']
+                    required: [added, changed, deleted]
+                    properties:
+                      added: { type: integer, minimum: 0 }
+                      changed: { type: integer, minimum: 0 }
+                      deleted: { type: integer, minimum: 0 }
+                  affectedClasses: { type: [integer, 'null'], minimum: 0 }
+                  lastObservedAt: { type: [string, 'null'], format: date-time }
+                  retainedSince: { type: string, format: date-time }
+                  comparisonCoverage: { const: unknown }
+                  changesByObservedDay:
+                    type: [array, 'null']
+                    items:
+                      type: object
+                      required: [date, count]
+                      properties:
+                        date: { type: string, format: date }
+                        count: { type: integer, minimum: 0 }
+                  subjectPeriods:
+                    type: [array, 'null']
+                    items:
+                      type: object
+                      required: [subject, classPeriods]
+                      properties:
+                        subject: { type: string }
+                        classPeriods: { type: integer, minimum: 0 }
+                  teacherOverlaps:
+                    type: [array, 'null']
+                    items:
+                      type: object
+                      required: [date, period, teacher, classes]
+                      properties:
+                        date: { type: string, format: date }
+                        period: { type: integer }
+                        teacher: { type: string }
+                        classes:
+                          type: array
+                          items:
+                            type: object
+                            required: [grade, class]
+                            properties:
+                              grade: { type: integer }
+                              class: { type: integer }
+                  sourceUpdateObservations:
+                    type: [object, 'null']
+                    required: [distinctTimestamps, intervalCount, meanIntervalSeconds, firstSourceAt, lastSourceAt]
+                    properties:
+                      distinctTimestamps: { type: integer, minimum: 1 }
+                      intervalCount: { type: integer, minimum: 0 }
+                      meanIntervalSeconds: { type: [number, 'null'], minimum: 0 }
+                      firstSourceAt: { type: string, format: date-time }
+                      lastSourceAt: { type: string, format: date-time }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401':
+          description: Missing or invalid administrator token.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: History statistics disabled or storage unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /api/v1/admin/analytics:
     get:
       tags: [System]
