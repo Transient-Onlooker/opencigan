@@ -2,6 +2,8 @@ import hashlib
 import re
 from datetime import datetime, timedelta, timezone
 
+from backend.comcigan_proxy import comcigan_budget
+
 
 def timetable_calendar(query, current_cache, request_headers, headers, query_param, timetable_filters, cached_timetable, render_ics):
     school = query_param(query, "school", 100)
@@ -56,13 +58,14 @@ def timetable_calendar(query, current_cache, request_headers, headers, query_par
     now = datetime.now(timezone(timedelta(hours=9))).date()
     monday = now - timedelta(days=now.weekday())
     timetables = []
-    for offset in range(int(weeks)):
-        week = (monday + timedelta(days=offset * 7)).isoformat()
-        timetable, _ = cached_timetable(school, week, current_cache)
-        if teacher_filter is not None:
-            timetable = {**timetable, "records": [r for r in timetable["records"]
-                         if teacher_filter in (r.get("teacher") or "").casefold()]}
-        timetables.append(timetable)
+    with comcigan_budget():
+        for offset in range(int(weeks)):
+            week = (monday + timedelta(days=offset * 7)).isoformat()
+            timetable, _ = cached_timetable(school, week, current_cache)
+            if teacher_filter is not None:
+                timetable = {**timetable, "records": [r for r in timetable["records"]
+                             if teacher_filter in (r.get("teacher") or "").casefold()]}
+            timetables.append(timetable)
     if weekday_times:
         body = render_ics(school, grade_filter, class_filter, timetables, mode=mode, lesson_times=lesson_times, weekday_times=weekday_times)
     else:

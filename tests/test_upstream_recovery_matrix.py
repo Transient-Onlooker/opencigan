@@ -1,10 +1,12 @@
 import json
+import time
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from backend.app import dispatch_request
 from backend.cache import Cache
+from backend.comcigan_proxy import _deadline, with_comcigan_budget
 
 
 class UpstreamRecoveryTests(unittest.TestCase):
@@ -12,6 +14,34 @@ class UpstreamRecoveryTests(unittest.TestCase):
         patcher = patch('backend.app.shutter.check', return_value=(True, 0))
         patcher.start()
         self.addCleanup(patcher.stop)
+
+    def test_two_week_calendar_shares_budget_and_keeps_stale_weeks(self):
+        cache = Cache(ttl=0, retry_delay=10)
+        seen = []
+
+        def cached_data(school, week):
+            return {'schoolId': school, 'weekStart': week, 'records': [], 'stale': False}
+
+        @with_comcigan_budget
+        def delayed_failure(school, week):
+            seen.append((_deadline.get(), time.monotonic()))
+            if len(seen) == 1:
+                time.sleep(0.03)
+            raise TimeoutError('simulated upstream timeout')
+
+        query = 'school=1%3AExample&grade=1&class=1&weeks=2'
+        with patch('backend.app.fetch_timetable', side_effect=cached_data), \
+             patch('backend.app._history_store', return_value=None):
+            self.assertEqual(dispatch_request('GET', '/api/v1/timetable.ics', query, cache)[0], 200)
+        with patch('backend.app.fetch_timetable', side_effect=delayed_failure), \
+             patch('backend.app._history_store', return_value=None):
+            status, _, body = dispatch_request('GET', '/api/v1/timetable.ics', query, cache)
+        self.assertEqual(status, 200)
+        self.assertIn(b'BEGIN:VCALENDAR', body)
+        self.assertEqual(len(seen), 2)
+        self.assertEqual(seen[0][0], seen[1][0])
+        self.assertLess(seen[1][0] - seen[1][1], seen[0][0] - seen[0][1])
+        self.assertIsNone(_deadline.get())
 
     def test_timetable_search_failure_does_not_block_neis_meals_or_other_searches(self):
         for error in (RuntimeError('HTTP 403'), RuntimeError('HTTP 429'), TimeoutError('delay')):
