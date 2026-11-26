@@ -1,7 +1,8 @@
 import hashlib
 import hmac
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
+from datetime import datetime, timezone
 
 import requests
 
@@ -9,6 +10,24 @@ from backend.webhook_delivery import send_webhook, signature, validate_destinati
 
 
 class WebhookDeliveryTests(unittest.TestCase):
+    def test_retry_after_http_date_is_bounded(self):
+        now = datetime(2026, 11, 26, 12, 0, tzinfo=timezone.utc)
+        for value, expected in (("Thu, 26 Nov 2026 12:01:30 GMT", 90),
+                                ("Thu, 26 Nov 2026 14:00:00 GMT", 3600),
+                                ("Thu, 26 Nov 2026 11:59:00 GMT", 0),
+                                ("invalid", None)):
+            with self.subTest(value=value), patch('backend.webhook_delivery.datetime') as clock:
+                clock.now.return_value = now
+                response = Mock(status_code=429, headers={"Retry-After": value})
+                session = Mock()
+                session.post.return_value = response
+                context = Mock()
+                context.__enter__ = Mock(return_value=session)
+                context.__exit__ = Mock(return_value=False)
+                result = send_webhook("https://discord.com/api/webhooks/123/token", b"{}", b"x" * 32, "id", lambda: context)
+                self.assertEqual(result["retryAfter"], expected)
+                response.close.assert_called_once()
+
     def test_destination_allowlist_rejects_tricks_and_redacts_secrets(self):
         self.assertEqual(validate_destination("https://discord.com/api/webhooks/123/token_ABC"), "discord")
         self.assertEqual(validate_destination("https://chat.googleapis.com/v1/spaces/abc/messages?key=K&token=T"), "google-chat")
