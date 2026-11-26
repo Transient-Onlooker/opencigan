@@ -1,3 +1,3 @@
-pycomcigan @ git+https://github.com/Transient-Onlooker/pycomcigan.git@ae92a144a67e857ebd31a4c7ba7223cfaa6f9047
+pycomcigan @ git+https://github.com/Transient-Onlooker/pycomcigan.git@65f4a820e4c3cf9e94da55becc7d6cacaefa10e0
 requests>=2.32.0
 waitress>=3.0.0
