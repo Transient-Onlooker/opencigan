@@ -960,7 +960,7 @@
     };
     const onFocusOut = () => { inputFocused = false; };
     const onNavBoundaryKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey || !inputFocused || !window.matchMedia('(max-width: 700px)').matches) return;
+      if (event.defaultPrevented || event.isComposing || event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey || !inputFocused || typeof window.matchMedia !== 'function' || !window.matchMedia('(max-width: 700px)').matches) return;
       const target = event.target;
       if (!(target instanceof HTMLInputElement)) return;
       const forward = !event.shiftKey && target.id === 'classroom';
@@ -972,6 +972,7 @@
         if (document.activeElement !== target) return;
         const buttons = document.querySelectorAll<HTMLButtonElement>('.calendar-menu button');
         (forward ? buttons[0] : buttons[buttons.length - 1])?.focus();
+        if (document.activeElement === target) inputFocused = true;
       });
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
