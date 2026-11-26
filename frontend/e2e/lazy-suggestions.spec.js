@@ -13,9 +13,11 @@ test('retry protects unsaved lesson-time drafts', async ({ page }) => {
   await page.getByText('학교 교시 시각 설정', { exact: true }).click();
   await page.getByText('상세 시간 설정하기', { exact: true }).click();
   await page.getByLabel('1교시 시작', { exact: true }).fill('08:30');
+  await page.getByText('학교 교시 시각 설정', { exact: true }).click();
   await page.getByRole('button', { name: '새로고침 후 다시 시도' }).click();
-  await expect(page.getByLabel('1교시 시작', { exact: true })).toHaveValue('08:30');
   await expect(page.getByText('작성 중인 교시 시각을 저장하거나 초기화한 뒤 다시 시도해 주세요.')).toBeVisible();
+  await page.getByText('학교 교시 시각 설정', { exact: true }).click();
+  await expect(page.getByLabel('1교시 시작', { exact: true })).toHaveValue('08:30');
 });
 
 test('suggestions recover after a failed chunk fetch', async ({ page }) => {
