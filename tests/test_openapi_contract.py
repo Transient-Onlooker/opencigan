@@ -101,6 +101,39 @@ class OpenApiContractTests(unittest.TestCase):
                 self.assertEqual(headers['WWW-Authenticate'], 'Bearer realm="Suggestion author"')
                 self.assert_json_response(path, status, headers, body)
 
+    def test_suggestion_admin_contract_matches_routes(self):
+        from backend.suggestion_store import SuggestionStore
+
+        collection = '/api/v1/admin/suggestions'
+        item = collection + '/{id}'
+        with tempfile.TemporaryDirectory() as temporary:
+            store = SuggestionStore(Path(temporary) / 'suggestions.sqlite')
+            created = store.create('제안', '내용')
+            headers = {'Authorization': 'Bearer ' + 'x' * 32}
+            with patch.dict('os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'x' * 32}), \
+                 patch('backend.app._suggestion_store', return_value=store):
+                def check(method, path, expected, *, query='', body=None, auth=headers):
+                    actual_path = path.replace('{id}', created['id'])
+                    status, response_headers, data = dispatch_request(method, actual_path, query, self.cache,
+                        request_body=body, request_headers=auth)
+                    self.assertEqual(status, expected)
+                    self.assertEqual(response_headers['Cache-Control'], 'no-store')
+                    response = self.spec['paths'][path][method.lower()]['responses'][str(status)]
+                    if '$ref' in response:
+                        response = self.spec['components']['responses'][response['$ref'].rsplit('/', 1)[-1]]
+                    schema = response['content']['application/json']['schema']
+                    Draft202012Validator({'$ref': '#/$defs/response', '$defs': {'response': schema},
+                                          'components': self.spec['components']}, format_checker=FormatChecker()).validate(json.loads(data))
+                    return json.loads(data)
+                self.assertEqual(check('GET', collection, 200)['suggestions'][0]['id'], created['id'])
+                check('GET', collection, 401, auth={})
+                check('GET', collection, 400, query='status=unknown')
+                changed = check('PATCH', item, 200, body=b'{"status":"approved"}')
+                self.assertEqual(changed['status'], 'approved')
+                check('PATCH', item, 400, body=b'{"status":"pending"}')
+                self.assertTrue(check('DELETE', item, 200)['deleted'])
+                check('DELETE', item, 404)
+
     def test_school_query_validation_matches_openapi(self):
         for path in ('/api/v1/schools', '/api/v1/neis/schools'):
             schema = self.spec['paths'][path]['get']['parameters'][0]['schema']

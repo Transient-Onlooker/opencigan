@@ -145,6 +145,94 @@ paths:
         '401': { description: Missing or invalid author token, or unknown identifier. }
         '429': { description: Rate limit reached. }
         '503': { description: Suggestion store or gateway unavailable. }
+  /api/v1/admin/suggestions:
+    parameters:
+      - { name: status, in: query, schema: { type: string, enum: [pending, approved, rejected, merged] } }
+      - { name: cursor, in: query, schema: { type: string, pattern: '^[0-9]{1,19}$' }, description: Positive ASCII decimal cursor within signed 64-bit range. }
+      - { name: limit, in: query, schema: { type: string }, description: Decimal page size from 1 to 100; defaults to 50. }
+    get:
+      tags: [System]
+      summary: List feature suggestions for review
+      security: [{ AnalyticsAdmin: [] }]
+      responses:
+        '200':
+          description: Suggestions and next-page cursor.
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [suggestions, nextCursor]
+                properties:
+                  suggestions: { type: array, items: { $ref: '#/components/schemas/AdminSuggestion' } }
+                  nextCursor: { type: [string, 'null'] }
+        '400': { $ref: '#/components/responses/SuggestionAdminBadRequest' }
+        '401': { $ref: '#/components/responses/SuggestionAdminUnauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/SuggestionAdminUnavailable' }
+    head:
+      tags: [System]
+      summary: Check access to the suggestion review list
+      security: [{ AnalyticsAdmin: [] }]
+      responses:
+        '200': { description: List accessible; no response body, headers: { Cache-Control: { schema: { type: string, const: no-store } } } }
+        '400': { description: Invalid query. }
+        '401': { description: Invalid administrator token, headers: { WWW-Authenticate: { schema: { type: string } } } }
+        '429': { description: Rate limit reached. }
+        '503': { description: Store or gateway unavailable. }
+  /api/v1/admin/suggestions/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
+    patch:
+      tags: [System]
+      summary: Review a feature suggestion
+      description: Allowed transitions are pending to approved, rejected or merged; approved to rejected; rejected to approved; and merged to pending. Merge requires an eligible distinct target.
+      security: [{ AnalyticsAdmin: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              additionalProperties: false
+              properties:
+                status: { type: string, enum: [pending, approved, rejected, merged] }
+                merged_into: { type: [string, 'null'], description: Target identifier when merging. }
+                reviewer_note: { type: [string, 'null'], description: Optional review note, at most 500 characters after trimming. }
+      responses:
+        '200':
+          description: Updated suggestion.
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminSuggestion' }
+        '400': { $ref: '#/components/responses/SuggestionAdminBadRequest' }
+        '401': { $ref: '#/components/responses/SuggestionAdminUnauthorized' }
+        '404': { $ref: '#/components/responses/SuggestionAdminNotFound' }
+        '413': { $ref: '#/components/responses/SuggestionAdminTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/SuggestionAdminUnavailable' }
+    delete:
+      tags: [System]
+      summary: Delete a feature suggestion
+      security: [{ AnalyticsAdmin: [] }]
+      responses:
+        '200':
+          description: Deleted.
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
+          content:
+            application/json:
+              schema: { type: object, required: [deleted], properties: { deleted: { const: true } } }
+        '400': { $ref: '#/components/responses/SuggestionAdminBadRequest' }
+        '401': { $ref: '#/components/responses/SuggestionAdminUnauthorized' }
+        '404': { $ref: '#/components/responses/SuggestionAdminNotFound' }
+        '413': { $ref: '#/components/responses/SuggestionAdminTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/SuggestionAdminUnavailable' }
   /api/v1/webhooks:
     post:
       tags: [System]
@@ -1195,6 +1283,20 @@ components:
         created_at: { type: string, format: date-time }
         reviewed_at: { type: [string, 'null'], format: date-time }
         merged_into: { type: [string, 'null'], pattern: '^[A-Za-z0-9_-]{24}$' }
+    AdminSuggestion:
+      type: object
+      required: [id, title, description, context, status, created_at, reviewed_at, merged_into, reviewer_note]
+      additionalProperties: false
+      properties:
+        id: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' }
+        title: { type: string }
+        description: { type: string }
+        context: { type: [string, 'null'] }
+        status: { type: string, enum: [pending, approved, rejected, merged] }
+        created_at: { type: string, format: date-time }
+        reviewed_at: { type: [string, 'null'], format: date-time }
+        merged_into: { type: [string, 'null'], pattern: '^[A-Za-z0-9_-]{24}$' }
+        reviewer_note: { type: [string, 'null'] }
     AccessAnomalyReview:
       type: object
       required: [findings, window_hours, thresholds]
@@ -1358,6 +1460,35 @@ components:
         nextCursor: { type: [string, 'null'], description: Opaque cursor for the next page; null when exhausted. }
       additionalProperties: false
   responses:
+    SuggestionAdminBadRequest:
+      description: Invalid request or state transition.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SuggestionAdminUnauthorized:
+      description: Missing or invalid administrator token.
+      headers:
+        WWW-Authenticate: { schema: { type: string } }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SuggestionAdminNotFound:
+      description: Suggestion not found.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SuggestionAdminTooLarge:
+      description: Request body exceeds 4096 bytes.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SuggestionAdminUnavailable:
+      description: Suggestion store or gateway unavailable.
+      headers:
+        Retry-After: { description: Present when the service is overloaded., schema: { type: string } }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     WebhookUnauthorized:
       description: Invalid subscription or management token.
       content:
