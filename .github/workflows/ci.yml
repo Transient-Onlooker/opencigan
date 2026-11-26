@@ -30,6 +30,8 @@ jobs:
       - run: npm ci
         working-directory: frontend
       - run: node --experimental-strip-types clients/ts/tests/client.test.ts
+      - run: ./node_modules/.bin/tsc --noEmit --strict --target ES2022 --module ESNext --moduleResolution Bundler --allowImportingTsExtensions ../clients/ts/tests/meal-types.test.ts
+        working-directory: frontend
       - run: node --test cloudflare-gateway/test/*.test.mjs
       - run: python -m unittest discover -s tests/integration -v
       - run: npm run check

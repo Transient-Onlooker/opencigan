@@ -26,6 +26,26 @@ function setup({search = true, general = true, failFetch = false, blockedKey = '
   return { env, calls, limits };
 }
 
+test('timetable deadline aborts the private request and returns a gateway error', async (t) => {
+  const deadline = new AbortController();
+  let budget;
+  t.mock.method(AbortSignal, 'timeout', (ms) => { budget = ms; return deadline.signal; });
+  const { env } = setup();
+  let entered;
+  const started = new Promise(resolve => { entered = resolve; });
+  env.PRIVATE_API.fetch = request => new Promise((_resolve, reject) => {
+    request.signal.addEventListener('abort', () => reject(request.signal.reason), { once: true });
+    entered();
+  });
+  const pending = worker.fetch(req('/api/v1/timetable?school=1%3Atest&week=2026-11-23'), env);
+  await started;
+  assert.equal(budget, 40_000);
+  deadline.abort();
+  const response = await pending;
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).code, 'gateway_unavailable');
+});
+
 test('gateway errors follow the API error contract and retain message compatibility', async () => {
   const responses = [
     await worker.fetch(req('/unknown'), setup().env),

@@ -2,6 +2,8 @@ import os
 import logging
 import threading
 import time
+from contextvars import ContextVar
+from functools import wraps
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
@@ -9,6 +11,21 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 _lock = threading.Lock()
 _configured = False
 logger = logging.getLogger("opensigan.comcigan_proxy")
+_deadline = ContextVar("comcigan_deadline", default=None)
+UPSTREAM_BUDGET_SECONDS = 35
+
+
+def with_comcigan_budget(function):
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        if _deadline.get() is not None:
+            return function(*args, **kwargs)
+        token = _deadline.set(time.monotonic() + UPSTREAM_BUDGET_SECONDS)
+        try:
+            return function(*args, **kwargs)
+        finally:
+            _deadline.reset(token)
+    return wrapped
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -37,6 +54,12 @@ def configure_comcigan_proxy():
             target = urlsplit(request.full_url)
             if target.scheme != "http" or target.hostname != "comci.net" or target.port != 4082:
                 raise ValueError("Unexpected Comcigan request target")
+            deadline = _deadline.get()
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("Comcigan request budget exhausted")
+                timeout = min(timeout, remaining)
             request.set_proxy(parsed.netloc, "http")
             stage = "service_page" if target.path == "/st" else "data"
             started = time.monotonic()

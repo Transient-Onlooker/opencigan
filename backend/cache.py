@@ -38,7 +38,7 @@ class Cache:
         self._flights = tuple({} for _ in range(lock_stripes))
 
     @contextmanager
-    def _singleflight(self, key):
+    def _singleflight(self, key, *, wait=True):
         stripe = hash(key) % len(self.locks)
         with self.locks[stripe]:
             flight = self._flights[stripe].get(key)
@@ -48,6 +48,9 @@ class Cache:
             flight[1] += 1
         try:
             acquired = flight[0].acquire(blocking=False)
+            if not acquired and not wait:
+                yield False
+                return
             if not acquired:
                 started_at = time.monotonic()
                 flight[0].acquire()
@@ -58,7 +61,7 @@ class Cache:
                         elapsed = max(0, round((time.monotonic() - started_at) * 1000))
                         with self.guard:
                             self.wait_observations[resource] = {"waitMs": elapsed, "observedAt": datetime.now(timezone.utc).isoformat()}
-                yield
+                yield True
             finally:
                 flight[0].release()
         finally:
@@ -74,6 +77,7 @@ class Cache:
         resource = key[0] if isinstance(key, tuple) and key and key[0] in RESOURCE_TYPES else None
 
         now = time.monotonic()
+        stale_while_refreshing = None
         with self.guard:
             entry = self.entries.get(key)
             if entry is not None:
@@ -85,8 +89,12 @@ class Cache:
                     if value is not None:
                         return output(self._stale(value), "stale")
                     raise CacheBackoffError(retry_after - now)
+                if resource == "timetable" and value is not None:
+                    stale_while_refreshing = value
 
-        with self._singleflight(key):
+        with self._singleflight(key, wait=stale_while_refreshing is None) as acquired:
+            if not acquired:
+                return output(self._stale(stale_while_refreshing), "stale")
             now = time.monotonic()
             previous_value = None
             previous_fetched_at = 0
@@ -131,8 +139,13 @@ class Cache:
                 status = cause.code if isinstance(cause, HTTPError) and type(cause.code) is int and 100 <= cause.code <= 599 else None
                 cause_type = next((cls.__name__ for cls in (HTTPError, URLError, TimeoutError, OSError, ValueError, RuntimeError)
                                    if isinstance(cause, cls)), "other")
-                logger.warning("cache refresh failed resource=%s fallback=%s error_type=%s upstream_http_status=%s cause_type=%s",
-                               resource or "other", "stale" if previous_value is not None else "none", type(exc).__name__, status, cause_type)
+                failure_kind = ("timeout" if isinstance(cause, TimeoutError) or
+                                isinstance(getattr(cause, "reason", None), TimeoutError) else
+                                "http" if isinstance(cause, HTTPError) else
+                                "network" if isinstance(cause, (URLError, OSError)) else
+                                "provider_response" if isinstance(cause, (ValueError, RuntimeError)) else "other")
+                logger.warning("cache refresh failed resource=%s fallback=%s error_type=%s upstream_http_status=%s cause_type=%s failure_kind=%s",
+                               resource or "other", "stale" if previous_value is not None else "none", type(exc).__name__, status, cause_type, failure_kind)
                 if previous_value is not None:
                     return output(self._stale(previous_value), "stale")
                 if self.retry_delay > 0:

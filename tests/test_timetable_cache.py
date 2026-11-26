@@ -298,6 +298,41 @@ class TimetableTests(unittest.TestCase):
 
 
 class CacheTests(unittest.TestCase):
+    def test_failure_logs_distinguish_timeout_from_provider_response(self):
+        for error, kind in ((TimeoutError("private"), "timeout"), (RuntimeError("private"), "provider_response")):
+            cache = cache_module.Cache(retry_delay=0)
+            with self.subTest(kind=kind), self.assertLogs("opensigan.cache", level="WARNING") as logs:
+                with self.assertRaises(type(error)):
+                    cache.get(("timetable", "school", "week"), lambda: (_ for _ in ()).throw(error))
+            self.assertIn("failure_kind=" + kind, logs.output[0])
+            self.assertNotIn("private", logs.output[0])
+
+    def test_overlapping_refresh_returns_stale_without_another_upstream_call(self):
+        cache = cache_module.Cache(ttl=0)
+        key = ("timetable", "school", "week")
+        cache.get(key, lambda: {"records": ["old"], "stale": False})
+        started = threading.Event()
+        release = threading.Event()
+        calls = []
+
+        def refresh():
+            calls.append(1)
+            started.set()
+            self.assertTrue(release.wait(2))
+            return {"records": ["new"], "stale": False}
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(cache.get, key, refresh, with_status=True)
+            self.assertTrue(started.wait(2))
+            try:
+                second = pool.submit(cache.get, key, refresh, with_status=True)
+                self.assertEqual(second.result(timeout=0.5),
+                                 ({"records": ["old"], "stale": True}, "stale"))
+            finally:
+                release.set()
+            self.assertEqual(first.result(timeout=2), ({"records": ["new"], "stale": False}, "miss"))
+        self.assertEqual(len(calls), 1)
+
     def test_concurrent_misses_share_one_fetch(self):
         cache = cache_module.Cache(ttl=60)
         started = threading.Event()
