@@ -204,6 +204,7 @@ flowchart TB
 - 관리 정보 편집 중 이전 구독의 늦은 응답이 관리 화면에 나타나지 않도록 요청을 취소한다. 서버에서 이미 처리했을 수 있는 변경은 결과 확인이 필요하다.
 - [PR #179](https://github.com/Transient-Onlooker/opencigan/pull/179): 관리 링크 교체와 응답 유실 시 복구 안내를 추가하고 자동 검사를 통과했다. 운영 Webhook API와 발송 작업자는 별도 활성화하지 않았다.
 - 대기열이 가득 찬 상태에서 이미 큐에 있는 동일 관측을 다시 처리하면 실제 누락이 없는데 `dropped_events`가 증가하던 문제를 수정한다. 중복 관측과 신규 관측을 구분하는 격리 회귀를 추가하며 운영 발송은 비활성 상태를 유지한다.
+- 수신 서버의 `Retry-After`가 HTTP 날짜인 경우도 재시도 지연으로 해석한다. 과거·잘못된 날짜와 기존 1시간 상한을 모의 응답으로 검증하며 실제 발송은 하지 않는다.
 - [ ] 이미 있는 기본 비활성 API/큐/이력에서 빠진 구독 CRUD, 높은 엔트로피 관리 링크 인증·폐기, HMAC, 실패 재시도·멱등성·저장/큐 상한을 보강한다. **후속:** [#220](https://github.com/Transient-Onlooker/opencigan/pull/220)·[#221](https://github.com/Transient-Onlooker/opencigan/pull/221)·[#222](https://github.com/Transient-Onlooker/opencigan/pull/222)·[#223](https://github.com/Transient-Onlooker/opencigan/pull/223)·[#224](https://github.com/Transient-Onlooker/opencigan/pull/224)·[#226](https://github.com/Transient-Onlooker/opencigan/pull/226) 반영. #221의 소수 초 재시도 지연 처리는 격리 테스트를 통과했으며 운영 발송은 계속 비활성 상태다.
 - [x] 학급/과목/교사/요일/교시/변경 유형 필터·방해 금지 시간, 테스트 발송, 최근 성공/실패/재시도 조회를 API·UI 양쪽에서 연결한다. 기존 구현과 [#247](https://github.com/Transient-Onlooker/opencigan/pull/247) 교사 null 검증을 확인했고, 모의 API를 사용하는 Chromium 검사에서 필터 전체와 테스트 대기열·인증·상태 조회 연결을 검증했다. 실제 외부 발송은 OFF다.
 - **완료 조건:** 타 구독 접근 불가·토큰 유출 방지·중복/재시도·필터 회귀. 실제 Discord/Google Chat 발송 백엔드는 계속 OFF.

@@ -4,6 +4,8 @@ import hashlib
 import hmac
 import math
 import re
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from urllib.parse import parse_qs, urlsplit
 
 import requests
@@ -59,5 +61,12 @@ def send_webhook(url, body, secret, event_id, session_factory=requests.Session):
     delay = None
     if isinstance(retry_after, str) and len(retry_after) <= 12 and re.fullmatch(r"[0-9]{1,6}(?:\.[0-9]{1,6})?", retry_after, re.ASCII):
         delay = min(math.ceil(float(retry_after)), 3600)
+    elif isinstance(retry_after, str) and len(retry_after) <= 64:
+        try:
+            parsed = parsedate_to_datetime(retry_after)
+            if parsed.tzinfo is not None:
+                delay = min(3600, max(0, math.ceil((parsed - datetime.now(timezone.utc)).total_seconds())))
+        except (TypeError, ValueError, OverflowError):
+            pass
     return {"delivered": 200 <= status < 300, "retryable": status in (408, 429) or status >= 500,
             "status": status, "retryAfter": delay}
