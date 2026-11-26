@@ -3,13 +3,34 @@ import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from backend.app import dispatch_request
+from opensigan.client import OpensiganClient
 
 
 class BackendFilterContractTests(unittest.TestCase):
+    def test_sdk_weekday_override_reaches_calendar_renderer(self):
+        timetable = {
+            "schoolId": "2:Example", "weekStart": "2026-11-09",
+            "fetchedAt": "2026-11-09T00:00:00Z", "stale": False,
+            "records": [
+                {"grade": 1, "class": 1, "date": "2026-11-09", "period": 1, "subject": "Math", "teacher": None},
+                {"grade": 1, "class": 1, "date": "2026-11-10", "period": 1, "subject": "Art", "teacher": None},
+            ],
+        }
+        url = OpensiganClient().get_timetable_ics_url(
+            "2:Example", 1, 1, mode="timed", times="1:0900-0950", weekday_times="2.1:1000-1050"
+        )
+        with patch("backend.app._cached_timetable", return_value=(timetable, "hit")):
+            status, _, body = dispatch_request("GET", "/api/v1/timetable.ics", urlsplit(url).query)
+        self.assertEqual(status, 200)
+        self.assertIn(b"DTSTART:20261109T000000Z", body)
+        self.assertIn(b"DTSTART:20261110T010000Z", body)
+        self.assertIn(b"DTEND:20261110T015000Z", body)
+
     def test_teacher_substring_applies_to_json_and_all_ics_modes(self):
         timetable = {
             "schoolId": "2:Example", "weekStart": "2026-11-09",
