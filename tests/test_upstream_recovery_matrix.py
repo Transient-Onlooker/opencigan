@@ -1,6 +1,8 @@
 import json
 import time
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -14,6 +16,60 @@ class UpstreamRecoveryTests(unittest.TestCase):
         patcher = patch('backend.app.shutter.check', return_value=(True, 0))
         patcher.start()
         self.addCleanup(patcher.stop)
+
+    def test_same_key_wait_is_bounded_for_timetable_and_search(self):
+        for path, query, target in (
+            ('/api/v1/schools', 'q=Example', 'backend.app.search_schools'),
+            ('/api/v1/timetable', 'school=1%3AExample&week=2026-11-23', 'backend.app.fetch_timetable'),
+        ):
+            with self.subTest(path=path):
+                cache = Cache()
+                entered, release = threading.Event(), threading.Event()
+                def slow(*args):
+                    entered.set()
+                    if not release.wait(2):
+                        raise AssertionError('fixture was not released')
+                    if path.endswith('schools'):
+                        return []
+                    return {'schoolId': '1:Example', 'weekStart': '2026-11-23', 'records': [], 'stale': False}
+                def request():
+                    return dispatch_request('GET', path, query, cache)
+                with patch('backend.comcigan_proxy.UPSTREAM_BUDGET_SECONDS', 0.05), \
+                     patch('backend.app.validate_timetable_week'), patch('backend.app._history_store', return_value=None), \
+                     patch(target, side_effect=slow), ThreadPoolExecutor(max_workers=2) as pool:
+                    first = pool.submit(request)
+                    self.assertTrue(entered.wait(1))
+                    try:
+                        status, _, body = pool.submit(request).result(timeout=1)
+                        self.assertEqual(status, 503)
+                        self.assertEqual(json.loads(body)['code'], 'upstream_unavailable')
+                    finally:
+                        release.set()
+                    self.assertEqual(first.result(timeout=1)[0], 200)
+
+    def test_search_wait_timeout_returns_existing_stale_result(self):
+        cache = Cache(ttl=0)
+        entered, release = threading.Event(), threading.Event()
+        query = 'q=Example'
+        with patch('backend.app.search_schools', return_value=[{'id': '1:Example', 'name': 'Example', 'region': ''}]):
+            self.assertEqual(dispatch_request('GET', '/api/v1/schools', query, cache)[0], 200)
+        def slow(_):
+            entered.set()
+            if not release.wait(2):
+                raise AssertionError('fixture was not released')
+            return []
+        with patch('backend.comcigan_proxy.UPSTREAM_BUDGET_SECONDS', 0.05), \
+             patch('backend.app.search_schools', side_effect=slow), ThreadPoolExecutor(max_workers=2) as pool:
+            leader = pool.submit(dispatch_request, 'GET', '/api/v1/schools', query, cache)
+            self.assertTrue(entered.wait(1))
+            try:
+                status, _, body = pool.submit(dispatch_request, 'GET', '/api/v1/schools', query, cache).result(timeout=1)
+                self.assertEqual(status, 200)
+                self.assertTrue(json.loads(body)['stale'])
+                self.assertEqual(json.loads(body)['schools'][0]['id'], '1:Example')
+            finally:
+                release.set()
+            self.assertEqual(leader.result(timeout=1)[0], 200)
 
     def test_two_week_calendar_shares_budget_and_keeps_stale_weeks(self):
         cache = Cache(ttl=0, retry_delay=10)
