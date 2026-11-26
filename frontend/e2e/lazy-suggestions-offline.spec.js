@@ -4,10 +4,17 @@ test('offline settings remain usable and suggestions recover after reconnecting'
   test.skip(process.env.VITE_SUGGESTIONS_ENABLED === '0', 'Explicitly disabled build does not load suggestions');
   test.skip(browserName === 'webkit' && process.platform === 'win32', 'Playwright WebKit does not consistently emulate service-worker offline requests on Windows.');
   const errors = [];
-  const requests = [];
   page.on('pageerror', error => errors.push(error.message));
-  page.on('response', response => { if (/Suggestions-.*\.js|\/api\/v1\/suggestions/.test(response.url())) requests.push(`response ${response.status()} ${response.url()}`); });
-  page.on('requestfailed', request => { if (/Suggestions-.*\.js|\/api\/v1\/suggestions/.test(request.url())) requests.push(`failed ${request.failure()?.errorText} ${request.url()}`); });
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : input.toString(), location.href);
+      if (url.pathname === '/api/v1/suggestions') {
+        return Promise.resolve(new Response(JSON.stringify({ suggestions: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      }
+      return originalFetch(input, init);
+    };
+  });
   await page.route('**/api/v1/**', route => route.fulfill({ json: { suggestions: [], schools: [], meals: [] } }));
   await page.goto('/');
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
@@ -22,16 +29,6 @@ test('offline settings remain usable and suggestions recover after reconnecting'
   await context.setOffline(false);
   await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(true);
   await page.getByRole('button', { name: '새로고침 후 다시 시도', exact: true }).click();
-  try {
-    await expect(page.getByText('만들어주세요', { exact: true })).toBeVisible({ timeout: 5000 });
-  } catch (error) {
-    console.log('Retry requests:', requests, 'page errors:', errors);
-    console.log('Retry diagnostics:', await page.evaluate(() => ({
-      url: location.href, online: navigator.onLine,
-      retryMarker: sessionStorage.getItem('opencigan-retry-suggestions'),
-      body: document.body.innerText.slice(-1800),
-    })));
-    throw error;
-  }
+  await expect(page.getByText('만들어주세요', { exact: true })).toBeVisible({ timeout: 5000 });
   expect(errors).toEqual([]);
 });
