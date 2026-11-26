@@ -269,7 +269,7 @@ def _timetable_filters(query, require_class=False):
     return timetable_filters(query, require_class, _query_param)
 
 
-def _cached_timetable(school, week, current_cache):
+def _cached_timetable(school, week, current_cache, *, refresh_origin=None):
     def fetch_and_record():
         started_at = datetime.now(timezone.utc).isoformat()
         data = fetch_timetable(school, week)
@@ -283,7 +283,7 @@ def _cached_timetable(school, week, current_cache):
             logger.exception("history recording failed")
         return data
 
-    return current_cache.get(("timetable", school, week), fetch_and_record, with_status=True)
+    return current_cache.get(("timetable", school, week), fetch_and_record, with_status=True, refresh_origin=refresh_origin)
 
 
 def _read_request_body(stream, content_length):
@@ -358,9 +358,9 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
         elif path == "/api/v1/schools":
             result = search_timetable_schools(query, current_cache, _query_param, search_schools)
         elif path == "/api/v1/timetable":
-            result = get_timetable(query, current_cache, _query_param, validate_timetable_week, _timetable_filters, _cached_timetable)
+            result = get_timetable(query, current_cache, _query_param, validate_timetable_week, _timetable_filters, lambda school, week, cache: _cached_timetable(school, week, cache, refresh_origin='timetable'))
         elif path == "/api/v1/timetable.ics":
-            return timetable_calendar(query, current_cache, request_headers, headers, _query_param, _timetable_filters, _cached_timetable, render_timetable_ics)
+            return timetable_calendar(query, current_cache, request_headers, headers, _query_param, _timetable_filters, lambda school, week, cache: _cached_timetable(school, week, cache, refresh_origin='calendar'), render_timetable_ics)
         elif path in ("/api/v1/timetable/history", "/api/v1/timetable/history.rss"):
             result = timetable_history(path, query, request_headers, headers, _query_param, _timetable_filters, _history_store, render_history_feed)
             if isinstance(result, tuple):
