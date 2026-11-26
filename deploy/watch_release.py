@@ -4,16 +4,47 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
+from packaging.version import InvalidVersion, Version
 
 from deploy.fork_manifest import HEX40, TAG, api, load_release
 from deploy.release_deploy import deploy, retry_pending_pin
 
 
 def latest_release():
-    release = api("releases/latest")
-    tag = release.get("tag_name", "")
-    if release.get("draft") or release.get("prerelease") or not TAG.fullmatch(tag):
-        raise ValueError("Latest release is not a published stable release")
+    candidates = []
+    page = 1
+    while True:
+        releases = api(f"releases?per_page=100&page={page}")
+        if not isinstance(releases, list):
+            raise ValueError("Invalid release list")
+        for release in releases:
+            tag = release.get("tag_name", "")
+            if release.get("draft") or release.get("prerelease") or not isinstance(tag, str) or not TAG.fullmatch(tag):
+                continue
+            try:
+                version = Version(tag)
+            except InvalidVersion:
+                continue
+            if not version.is_prerelease and not version.is_devrelease:
+                candidates.append((version, tag))
+        if len(releases) < 100:
+            break
+        page += 1
+    if not candidates:
+        raise ValueError("No published stable release")
+    highest = max(version for version, _ in candidates)
+    selected = []
+    for version, tag in candidates:
+        if version != highest:
+            continue
+        sha = resolve_release(tag)
+        selected.append((tag, sha))
+    if len({sha for _, sha in selected}) != 1:
+        raise ValueError("Conflicting release commits for the same version")
+    return selected[0]
+
+
+def resolve_release(tag):
     obj = api("git/ref/tags/" + quote(tag, safe=""))["object"]
     for _ in range(4):
         if obj.get("type") != "tag":
@@ -25,8 +56,10 @@ def latest_release():
     sha = obj.get("sha", "")
     if obj.get("type") != "commit" or not HEX40.fullmatch(sha):
         raise ValueError("Invalid release commit")
-    load_release(tag, sha)
-    return tag, sha
+    manifest = load_release(tag, sha)
+    if Version(manifest["version"]) != Version(tag):
+        raise ValueError("Release tag and manifest version differ")
+    return sha
 
 
 def poll(root, release, school, week):
@@ -62,7 +95,7 @@ def poll(root, release, school, week):
         if pending and state.get("activeSha") == sha:
             return retry_pending_pin(root)
         try:
-            return deploy(tag, sha, root, release, school, week)
+            return deploy(tag, sha, root, release, school, week, automatic=True)
         except Exception:
             if pending and status.is_file():
                 current = json.loads(status.read_text(encoding="utf-8"))
