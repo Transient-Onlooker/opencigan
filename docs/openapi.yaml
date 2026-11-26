@@ -1088,6 +1088,17 @@ paths:
               schema: { type: string }
         '503': { description: Backend access-log storage or gateway configuration is unavailable. No response body. }
   /api/v1/status:
+    head:
+      tags: [System]
+      summary: Check process liveness without a response body
+      responses:
+        '200': { description: Process is responding; upstream providers are not checked. }
+        '404': { description: Route not found. }
+        '429':
+          description: Request rate limit reached.
+          headers:
+            Retry-After: { description: Retry delay when supplied by the server., schema: { type: string } }
+        '503': { description: Gateway unavailable or unconfigured. }
     get:
       tags: [System]
       summary: Check process liveness

@@ -52,6 +52,18 @@ class OpenApiContractTests(unittest.TestCase):
                                              'components': self.spec['components']})
             validator.validate({'code': code, 'error': 'unavailable', 'message': 'unavailable'})
 
+    def test_status_head_contract_has_no_body(self):
+        path = '/api/v1/status'
+        operation = self.spec['paths'][path]['head']
+        self.assertIn('200', operation['responses'])
+        self.assertNotIn('content', operation['responses']['200'])
+        statuses = []
+        from backend.app import make_app
+        body = b''.join(make_app()({'REQUEST_METHOD': 'HEAD', 'PATH_INFO': path, 'QUERY_STRING': '',
+                                   'REMOTE_ADDR': '127.0.0.1'}, lambda status, headers: statuses.append(status)))
+        self.assertEqual(statuses, ['200 OK'])
+        self.assertEqual(body, b'')
+
     def test_private_history_stats_contract_for_observed_and_unobserved_weeks(self):
         path = '/api/v1/admin/history-stats'
         headers = {'Authorization': 'Bearer ' + 'x' * 32}
