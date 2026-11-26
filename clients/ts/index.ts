@@ -30,6 +30,9 @@ export interface Meal {
   date: string;
   type: string;
   dishes: string[];
+  calories?: string | null;
+  nutrition?: string | null;
+  origin?: string | null;
 }
 
 export interface MealsResponse {
