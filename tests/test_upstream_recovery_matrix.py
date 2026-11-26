@@ -279,6 +279,27 @@ class UpstreamRecoveryTests(unittest.TestCase):
                     self.assertEqual(status, 200)
                     self.assertIn(b'NewMath', body)
 
+    def test_refresh_origin_distinguishes_timetable_and_calendar_without_private_data(self):
+        for path, query, origin in (
+            ('/api/v1/timetable', 'school=1%3APrivate&week=2026-11-23', 'timetable'),
+            ('/api/v1/timetable.ics', 'school=1%3APrivate&grade=1&class=1&weeks=1', 'calendar'),
+        ):
+            with self.subTest(path=path):
+                cache = Cache(ttl=0, retry_delay=10)
+                def fetch(school, week):
+                    return {'schoolId': school, 'weekStart': week, 'records': [], 'stale': False}
+                with patch('backend.app.validate_timetable_week'), patch('backend.app._history_store', return_value=None), \
+                     patch('backend.app.fetch_timetable', side_effect=fetch):
+                    self.assertEqual(dispatch_request('GET', path, query, cache)[0], 200)
+                with patch('backend.app.validate_timetable_week'), patch('backend.app._history_store', return_value=None), \
+                     patch('backend.app.fetch_timetable', side_effect=TimeoutError('private detail')):
+                    self.assertEqual(dispatch_request('GET', path, query, cache)[0], 200)
+                observation = cache.observations()['timetable']
+                self.assertEqual(observation['origin'], origin)
+                self.assertEqual(observation['result'], 'failure')
+                self.assertNotIn('Private', str(observation))
+                self.assertNotIn('private detail', str(observation))
+
 
 if __name__ == '__main__':
     unittest.main()

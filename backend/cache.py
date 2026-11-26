@@ -82,7 +82,9 @@ class Cache:
                 if flight[1] == 0:
                     del self._flights[stripe][key]
 
-    def get(self, key, fetch, *, with_status=False):
+    def get(self, key, fetch, *, with_status=False, refresh_origin=None):
+        if refresh_origin not in (None, 'timetable', 'calendar'):
+            raise ValueError('invalid refresh origin')
         def output(value, status):
             return (value, status) if with_status else value
 
@@ -150,6 +152,7 @@ class Cache:
                         observed_at = datetime.now(timezone.utc).isoformat()
                         self.refresh_observations[resource] = {**self.refresh_observations.get(resource, {}),
                                                                "result": "failure", "observedAt": observed_at,
+                                                               "origin": refresh_origin,
                                                                "durationMs": max(0, round((now - started_at) * 1000)),
                                                                "lastFailureAt": observed_at}
                 cause = exc
@@ -180,6 +183,7 @@ class Cache:
                     result = "success" if len(cached) <= self.max_bytes else "not_cached"
                     self.refresh_observations[resource] = {**self.refresh_observations.get(resource, {}),
                                                            "result": result, "observedAt": observed_at, "durationMs": duration_ms,
+                                                           "origin": refresh_origin,
                                                            **({"lastSuccessAt": observed_at} if result == "success" else {})}
                 if len(cached) <= self.max_bytes:
                     self._store(key, cached, time.monotonic(), 0)

@@ -7,7 +7,7 @@ test('admin hourly diagnostics show data, support older servers, and clear on lo
       { route: '/api/v1/timetable', requests: 2, errors: 1, avg_ms: 10, data_failures: 1, overload_errors: 0, unclassified_server_errors: 0 },
       { route: '/api/v1/meals', requests: 1, errors: 0, avg_ms: 5 },
     ],
-    refreshObservations: { timetable: { result: 'failure', observedAt: '2026-11-18T02:00:00+00:00', lastSuccessAt: '2026-11-18T01:00:00+00:00', lastFailureAt: '2026-11-18T02:00:00+00:00', durationMs: 1250 }, meals: { result: 'not_cached', observedAt: '2026-11-18T02:00:00+00:00' } },
+    refreshObservations: { timetable: { result: 'failure', origin: 'calendar', observedAt: '2026-11-18T02:00:00+00:00', lastSuccessAt: '2026-11-18T01:00:00+00:00', lastFailureAt: '2026-11-18T02:00:00+00:00', durationMs: 1250 }, meals: { result: 'not_cached', observedAt: '2026-11-18T02:00:00+00:00' } },
     cacheWaitObservations: { timetable: { waitMs: 320, observedAt: '2026-11-18T02:01:00+00:00' } },
     apiHourly: [{ hour: '2026-11-18T11:00:00+09:00', requests: 2, errors: 1,
       upstream_errors: 1, overload_errors: 0, cache_hits: 1, stale_responses: 0 }],
@@ -29,13 +29,14 @@ test('admin hourly diagnostics show data, support older servers, and clear on lo
   await expect(observations).toContainText('실패');
   await expect(observations).toContainText('응답 수신 · 캐시 저장 불가');
   const timetableObservation = observations.locator('tbody tr').nth(1).locator('td');
-  await expect(timetableObservation.nth(3)).not.toHaveText('—');
+  await expect(timetableObservation.nth(1)).toHaveText('캘린더 구독');
   await expect(timetableObservation.nth(4)).not.toHaveText('—');
-  await expect(timetableObservation.nth(5)).toHaveText('1,250 ms');
-  await expect(timetableObservation.nth(6)).toHaveText('320 ms');
-  await expect(timetableObservation.nth(7)).not.toHaveText('—');
+  await expect(timetableObservation.nth(5)).not.toHaveText('—');
+  await expect(timetableObservation.nth(6)).toHaveText('1,250 ms');
+  await expect(timetableObservation.nth(7)).toHaveText('320 ms');
+  await expect(timetableObservation.nth(8)).not.toHaveText('—');
   const oldServerObservation = observations.locator('tbody tr').nth(3).locator('td');
-  await expect(oldServerObservation.nth(3)).toHaveText('—');
+  await expect(oldServerObservation.nth(1)).toHaveText('—');
   await expect(oldServerObservation.nth(4)).toHaveText('—');
   await expect(oldServerObservation.nth(5)).toHaveText('—');
   await expect(oldServerObservation.nth(6)).toHaveText('—');
