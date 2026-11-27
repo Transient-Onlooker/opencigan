@@ -111,6 +111,28 @@ test('a failed write does not roll back a value changed by another tab', () => {
   assert.equal(values.get('opensigan-school'), 'other-tab-school');
 });
 
+test('a failed write preserves another tab selection even when the school is the same', () => {
+  const school = { id: '2:school', name: 'school', region: 'r' };
+  const values = new Map([['opensigan-school', 'old-school'], ['opensigan-grade', '1'], ['opensigan-class', '1']]);
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => {
+      if (key === 'opensigan-grade') {
+        values.set('opensigan-school', JSON.stringify(school));
+        values.set('opensigan-grade', '2');
+        values.set('opensigan-class', '3');
+        throw new Error('quota');
+      }
+      values.set(key, value);
+    },
+    removeItem: (key) => values.delete(key),
+  };
+  exports.saveSelection(storage, { school, grade: 1, classroom: 4 });
+  assert.equal(values.get('opensigan-school'), JSON.stringify(school));
+  assert.equal(values.get('opensigan-grade'), '2');
+  assert.equal(values.get('opensigan-class'), '3');
+});
+
 test('a failed selection write restores the previous keys and removes newly created keys', () => {
   for (const failingKey of ['opensigan-grade', 'opensigan-class']) {
     const initial = failingKey === 'opensigan-class' ? [['opensigan-school', 'old-school']] : [['opensigan-school', 'old-school'], ['opensigan-grade', '4']];
