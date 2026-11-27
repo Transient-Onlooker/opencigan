@@ -181,6 +181,8 @@ flowchart TB
 
 ### ST-04 · 레이아웃·날짜 입력·오류 안내 잔여 보완
 
+- QA3-002: 교사 검색값을 주차 이동 시 유지한다. 해당 주에 교사가 없으면 다른 이름 또는 주를 선택할 수 있도록 안내하며, 격리 Chromium에서 이동·복귀와 미일치 사례를 확인했다. 운영 확인은 별도다.
+
 - 320/390/700/960px 라이트·다크의 설정·학교 선택·주간 시간표 캡처를 기존 격리 Chromium 검사에서 선택적으로 생성할 수 있다. `frontend`에서 `ST04_CAPTURE=1 npx playwright test e2e/st04-responsive.spec.js e2e/teacher-mobile.spec.js --project=chromium --grep 'settings and selection fit|weekly timetable stays usable at (320|390|700|960)px' --workers=1`로 실행하며 파일은 `test-results`에 생성된다. Windows에서 16건이 통과했고 일부 화면을 확인했다. Linux 기준 이미지와 전후 비교는 아직 없다.
 
 - 320×600 격리 Chromium에서 오늘 시간표의 마지막 수업이 고정 하단 메뉴 위로 스크롤되고 문서에 가로 넘침이 없는지 확인한다. 다른 화면 크기·테마의 시각 비교와 운영 확인은 별도다.

@@ -682,9 +682,9 @@
     refreshCalendar(false); const next = addDays(week, delta * 7);
     if (next < current || next > addDays(current, 7)) return;
     if (next !== week) cancelSharedSelection();
-    tableRefreshState = ''; exportState = ''; teacherQuery = ''; selectionState.update({ week: next }); selectedDay = week === current ? today : week; loadTimetable(false, true);
+    tableRefreshState = ''; exportState = ''; selectionState.update({ week: next }); selectedDay = week === current ? today : week; loadTimetable(false, true);
   }
-  function currentWeek() { timetableDateError = ''; refreshCalendar(false); const preserve = week === current; tableRefreshState = ''; if (!preserve) { cancelSharedSelection(); teacherQuery = ''; } selectionState.update({ week: current }); selectedDay = today; loadTimetable(preserve); }
+  function currentWeek() { timetableDateError = ''; refreshCalendar(false); const preserve = week === current; tableRefreshState = ''; if (!preserve) cancelSharedSelection(); selectionState.update({ week: current }); selectedDay = today; loadTimetable(preserve); }
   function changeMealDate(delta: number) {
     const next = addDays(mealDate, delta);
     if (!validMealDate(next)) { dateError = '1900년 이후의 올바른 날짜를 선택해 주세요.'; return; }
