@@ -28,6 +28,7 @@
                     <span>남은 수업 {dayOverview.remaining}교시</span>
                     {#if dayOverview.current}<strong>현재 {dayOverview.current.period}교시 · {dayOverview.current.lessons.map((lesson) => displaySubject(lesson.subject, displaySettings)).join(' / ')}</strong>{:else if !dayOverview.next}<span>오늘 수업 종료</span>{/if}
                     {#if dayOverview.next}<strong>다음 {dayOverview.next.period}교시 · {dayOverview.next.lessons.map((lesson) => displaySubject(lesson.subject, displaySettings)).join(' / ')} <small>{dayOverview.next.time.start} 시작</small></strong>{/if}
+                  {:else if selectedClassLessons.some((lesson) => lessonTimes[Number(lesson.period)]?.start && !lessonTimes[Number(lesson.period)]?.end)}<span>종료 시각이 없어 현재·다음 수업을 확인할 수 없어요. 설정에서 각 교시의 시작·종료 시각을 입력해 주세요.</span>
                   {:else}<span>교시 시각 설정 후 현재·다음 수업을 볼 수 있어요.</span>{/if}
                 {/if}
               </div>

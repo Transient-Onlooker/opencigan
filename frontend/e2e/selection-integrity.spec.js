@@ -1702,7 +1702,8 @@ test('source lesson starts follow the selected school', async ({ page }) => {
   await expect(page.locator('#timetable-panel').getByRole('table')).toBeVisible();
   await page.locator('#timetable-panel').getByRole('button', { name: '오늘', exact: true }).click();
   await expect(page.locator('#timetable-panel .lesson-time')).toHaveText('09:00 시작');
-  await expect(page.locator('#timetable-panel .day-summary')).toContainText('교시 시각 설정 후 현재·다음 수업을 볼 수 있어요.');
+  await expect(page.locator('#timetable-panel .day-summary')).toContainText('종료 시각이 없어 현재·다음 수업을 확인할 수 없어요.');
+  await expect(page.locator('#timetable-panel .day-summary')).toContainText('각 교시의 시작·종료 시각을 입력해 주세요.');
   await page.getByRole('button', { name: '설정', exact: true }).click();
   await page.getByText('학교 교시 시각 설정', { exact: true }).click();
   await expect(page.getByLabel('원본 교시 시작 시각')).toContainText('1교시 09:00');
