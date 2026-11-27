@@ -9,7 +9,7 @@ interface Summary {
   cacheWaitObservations?: Record<string, { waitMs: number; observedAt: string }>;
   apiHourly?: { hour: string; requests: number; errors: number; upstream_errors: number; overload_errors: number; cache_hits: number; stale_responses: number }[];
   daily: { day: string; visitors: number; sessions: number; page_views: number; api_requests: number }[];
-  routes: { route: string; requests: number; errors: number; avg_ms: number; data_failures?: number; overload_errors?: number; unclassified_server_errors?: number }[];
+  routes: { route: string; requests: number; errors: number; avg_ms: number; data_failures?: number; overload_errors?: number; unclassified_server_errors?: number; cache_hits?: number; cache_misses?: number; stale_responses?: number }[];
 }
 
 interface HistoryStatsResponse {
@@ -89,8 +89,8 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
       ['방문 브라우저', data.visitors], ['세션', data.sessions], ['페이지 조회', data.pageViews],
       ['API 요청', data.apiRequests], ['API 오류율', `${(data.apiErrorRate * 100).toFixed(2)}%`],
       ['평균 처리 시간', `${data.apiAverageMs} ms`], ['이 프로세스의 누락 이벤트', data.droppedApiEvents],
-      ['시간표 캐시 적중률', cacheTotal ? `${((cache?.hit ?? 0) / cacheTotal * 100).toFixed(1)}%` : '기록 없음'],
-      ['시간표 캐시 적중', cache?.hit ?? 0], ['시간표 캐시 미스', cache?.miss ?? 0], ['이전 캐시 반환', cache?.stale ?? 0],
+      ['캐시 적중률', cacheTotal ? `${((cache?.hit ?? 0) / cacheTotal * 100).toFixed(1)}%` : '기록 없음'],
+      ['캐시 적중', cache?.hit ?? 0], ['캐시 미스', cache?.miss ?? 0], ['이전 캐시 반환', cache?.stale ?? 0],
       ['데이터 조회 실패', data.failureKinds?.upstream_unavailable ?? 0], ['과부하 차단', data.failureKinds?.service_overloaded ?? 0],
     ];
     for (const [label, value] of cards) {
@@ -100,7 +100,7 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
       card.append(heading, number); metrics.append(card);
     }
     rows('#daily', data.daily.map((d) => [d.day, d.visitors, d.sessions, d.page_views, d.api_requests]));
-    rows('#routes', data.routes.map((r) => [r.route, r.requests, r.errors, r.data_failures ?? '—', r.overload_errors ?? '—', r.unclassified_server_errors ?? '—', r.avg_ms]));
+    rows('#routes', data.routes.map((r) => [r.route, r.requests, r.errors, r.data_failures ?? '—', r.overload_errors ?? '—', r.unclassified_server_errors ?? '—', r.avg_ms, r.cache_hits ?? '—', r.cache_misses ?? '—', r.stale_responses ?? '—']));
     const observations = data.refreshObservations;
     const resourceLabels = [['school_search', '시간표 학교 검색'], ['timetable', '시간표'], ['neis_school_search', '급식 학교 검색'], ['meals', '급식']];
     rows('#refresh-observations', observations ? resourceLabels.map(([key, label]) => {

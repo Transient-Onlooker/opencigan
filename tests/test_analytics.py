@@ -94,14 +94,17 @@ class AnalyticsTests(unittest.TestCase):
         store.record_api("/api/v1/timetable", "GET", 503, 10, None, "upstream_unavailable")
         store.record_api("/api/v1/timetable", "GET", 503, 20, None, "service_overloaded")
         store.record_api("/api/v1/timetable", "GET", 500, 30)
-        store.record_api("/api/v1/timetable", "GET", 400, 40)
-        store.record_api("/api/v1/meals", "GET", 200, 10)
+        store.record_api("/api/v1/timetable", "GET", 400, 40, "hit")
+        store.record_api("/api/v1/meals", "GET", 200, 10, "stale")
+        store.record_api("/api/v1/meals", "GET", 200, 20, "miss")
         routes = {row["route"]: row for row in store.summary()["routes"]}
         self.assertEqual(routes["/api/v1/timetable"], {
             "route": "/api/v1/timetable", "requests": 4, "errors": 4, "avg_ms": 25.0,
             "data_failures": 1, "overload_errors": 1, "unclassified_server_errors": 1,
+            "cache_hits": 1, "cache_misses": 0, "stale_responses": 0,
         })
         self.assertEqual(routes["/api/v1/meals"]["data_failures"], 0)
+        self.assertEqual((routes["/api/v1/meals"]["cache_hits"], routes["/api/v1/meals"]["cache_misses"], routes["/api/v1/meals"]["stale_responses"]), (0, 1, 1))
 
     def test_pageview_endpoint_and_admin_authentication(self):
         store = self.store()

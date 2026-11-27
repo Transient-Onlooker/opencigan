@@ -144,7 +144,10 @@ class AnalyticsStore:
                 ROUND(AVG(duration_ms), 2) avg_ms,
                 SUM(CASE WHEN failure_kind = 'upstream_unavailable' THEN 1 ELSE 0 END) data_failures,
                 SUM(CASE WHEN failure_kind = 'service_overloaded' THEN 1 ELSE 0 END) overload_errors,
-                SUM(CASE WHEN status >= 500 AND failure_kind IS NULL THEN 1 ELSE 0 END) unclassified_server_errors
+                SUM(CASE WHEN status >= 500 AND failure_kind IS NULL THEN 1 ELSE 0 END) unclassified_server_errors,
+                SUM(CASE WHEN cache_status = 'hit' THEN 1 ELSE 0 END) cache_hits,
+                SUM(CASE WHEN cache_status = 'miss' THEN 1 ELSE 0 END) cache_misses,
+                SUM(CASE WHEN cache_status = 'stale' THEN 1 ELSE 0 END) stale_responses
                 FROM api_requests WHERE day >= ? GROUP BY route ORDER BY requests DESC""", (start,)).fetchall()
             cache = db.execute("SELECT cache_status, COUNT(*) count FROM api_requests WHERE day >= ? AND cache_status IS NOT NULL GROUP BY cache_status", (start,)).fetchall()
             failures = db.execute("SELECT failure_kind, COUNT(*) count FROM api_requests WHERE day >= ? AND failure_kind IS NOT NULL GROUP BY failure_kind", (start,)).fetchall()
