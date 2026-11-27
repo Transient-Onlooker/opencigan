@@ -17,6 +17,14 @@ export interface DisplaySettings {
   showTeachers: boolean;
 }
 
+export function classDisplayStorageKey(schoolId: string, grade: number, classroom: number): string {
+  return `${classDisplayStoragePrefix(schoolId)}${grade}:${classroom}`;
+}
+
+export function classDisplayStoragePrefix(schoolId: string): string {
+  return `opensigan-class-display:${schoolId}:`;
+}
+
 export function createClassDisplayPreferences(storage: () => Storage) {
   const drafts = new Map<string, DisplaySettings | null>();
   const unsaved = new Set<string>();

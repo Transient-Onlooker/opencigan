@@ -89,6 +89,13 @@ test('automatic colors are stable for the same original subject', () => {
   assert.equal(subjectColor('수학', settings), original);
   assert.equal(subjectColor('수학', parseDisplaySettings({ colorMode: 'auto' })), original);
 });
+
+test('class display storage key and event prefix preserve the existing format', () => {
+  assert.equal(helpers.classDisplayStorageKey('school-a', 1, 2), 'opensigan-class-display:school-a:1:2');
+  assert.equal(helpers.classDisplayStoragePrefix('school-a'), 'opensigan-class-display:school-a:');
+  assert.equal(helpers.classDisplayStorageKey('B10:1234567', 2, 3), 'opensigan-class-display:B10:1234567:2:3');
+});
+
 test('class display preferences remain isolated by school and class when storage is blocked', () => {
   const fallback = helpers.defaultDisplaySettings();
   const custom = { ...fallback, showTeachers: false };
@@ -112,7 +119,7 @@ test('class display storage events refresh another tab draft and removal disable
   });
   const firstTab = helpers.createClassDisplayPreferences(storage);
   const secondTab = helpers.createClassDisplayPreferences(storage);
-  const classKey = 'opensigan-class-display:school-a:1:2';
+  const classKey = helpers.classDisplayStorageKey('school-a', 1, 2);
   firstTab.read(classKey, fallback);
   secondTab.set(classKey, { ...fallback, density: 'compact' });
 
