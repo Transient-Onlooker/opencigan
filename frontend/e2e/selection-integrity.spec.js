@@ -1790,6 +1790,27 @@ test('source lesson starts follow the selected school', async ({ page }) => {
   await expect(page.locator('#timetable-panel .lesson-time')).toHaveText('08:20 시작');
 });
 
+test('saving a missing lesson end enables the current lesson summary', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/v1/timetable?*', (route) => route.fulfill({ json: {
+    ...timetable, sourceLessonStarts: { '1': '09:00' },
+  } }));
+  await page.goto('/' + sharedHash(1));
+  const panel = page.locator('#timetable-panel');
+  await panel.getByRole('button', { name: '오늘', exact: true }).click();
+  await expect(panel.locator('.day-summary')).toContainText('종료 시각이 없어');
+  await page.getByRole('button', { name: '설정', exact: true }).click();
+  await page.getByText('학교 교시 시각 설정', { exact: true }).click();
+  await page.getByText('상세 시간 설정하기', { exact: true }).click();
+  await expect(page.getByLabel('1교시 시작', { exact: true })).toHaveValue('09:00');
+  await page.getByLabel('1교시 종료', { exact: true }).fill('12:00');
+  await page.getByRole('button', { name: '시각 저장', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: '교시 시각을 저장했어요' })).toBeVisible();
+  await page.getByRole('button', { name: '시간표', exact: true }).click();
+  await expect(panel.locator('.day-summary')).toContainText('현재 1교시');
+  await expect(panel.locator('.day-summary')).not.toContainText('종료 시각이 없어');
+});
+
 test('late source timetable responses cannot replace the selected school defaults', async ({ page }) => {
   const other = { id: '3:푸른중학교', name: '푸른중학교', region: '서울' };
   await mockApi(page);
