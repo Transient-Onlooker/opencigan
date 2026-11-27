@@ -319,7 +319,8 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
         response_headers['Content-Length'] = str(len(body))
         return status, response_headers, body
     if path == '/api/v1/admin/school-usage':
-        status, response_headers, body = school_usage_admin(method, query_string, request_headers, headers, _access_log_store)
+        status, response_headers, body = school_usage_admin(method, query_string, request_headers, headers,
+                                                            _access_log_store, current_cache)
         response_headers.setdefault('Content-Length', str(len(body)))
         return status, response_headers, body
     if path == '/api/v1/admin/access-anomalies':

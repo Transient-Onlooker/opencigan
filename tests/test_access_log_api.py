@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 
 from backend.app import dispatch_request
 from backend.access_logs import AccessLogRecorder, AccessLogStore, SEOUL
+from backend.cache import Cache
 
 
 class AccessLogApiTests(unittest.TestCase):
@@ -45,6 +46,62 @@ class AccessLogApiTests(unittest.TestCase):
         serialized = json.dumps(payload)
         for private_value in ('203.0.113.', 'grade', 'class_nm'):
             self.assertNotIn(private_value, serialized)
+
+    def test_school_usage_names_match_fresh_cache_ids_and_leave_conflicts_unresolved(self):
+        store = AccessLogStore(':memory:', retention_days=7)
+        self.addCleanup(store.close)
+        for datatype, school_id in (
+            ('timetable', '1234:Example High'),
+            ('timetable', '5678:Example High'),
+            ('meals', 'B10:1234567'),
+        ):
+            store.record({'datatype': datatype, 'school_id': school_id})
+
+        cache = Cache()
+        cache.get(('school_search', 'Example'), lambda: {'schools': [
+            {'id': '1234:Example High', 'name': 'Example High', 'region': 'Region'},
+            {'id': '5678:Example High', 'name': 'Example High', 'region': 'Region'},
+        ], 'stale': False})
+        cache.get(('neis_school_search', 'Example'), lambda: {'schools': [
+            {'id': 'B10:1234567', 'name': 'NEIS Name', 'region': 'High', 'address': 'Address'},
+        ], 'stale': False})
+        cache.get(('neis_school_search', 'Other query'), lambda: {'schools': [
+            {'id': 'B10:1234567', 'name': 'Conflicting Name', 'region': 'High', 'address': 'Address'},
+        ], 'stale': False})
+
+        with patch.dict('os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'test-secret'}), patch(
+            'backend.app._access_log_store', return_value=store
+        ):
+            status, _, body = dispatch_request(
+                'GET', '/api/v1/admin/school-usage', '', cache_instance=cache,
+                request_headers={'Authorization': 'Bearer test-secret'},
+            )
+
+        items = json.loads(body)['items']
+        self.assertEqual(status, 200)
+        self.assertEqual({(item['datatype'], item['school_id']): item['school_name'] for item in items}, {
+            ('timetable', '1234:Example High'): 'Example High',
+            ('timetable', '5678:Example High'): 'Example High',
+            ('meals', 'B10:1234567'): None,
+        })
+
+    def test_school_usage_ignores_expired_school_search_cache_entries(self):
+        store = AccessLogStore(':memory:', retention_days=7)
+        self.addCleanup(store.close)
+        store.record({'datatype': 'timetable', 'school_id': '1234:Example High'})
+        cache = Cache(ttl=1)
+        cache.get(('school_search', 'Example'), lambda: {'schools': [
+            {'id': '1234:Example High', 'name': 'Example High', 'region': 'Region'},
+        ], 'stale': False})
+        with patch('backend.cache.time.monotonic', return_value=10**12), patch.dict(
+            'os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'test-secret'}
+        ), patch('backend.app._access_log_store', return_value=store):
+            status, _, body = dispatch_request(
+                'GET', '/api/v1/admin/school-usage', '', cache_instance=cache,
+                request_headers={'Authorization': 'Bearer test-secret'},
+            )
+        self.assertEqual(status, 200)
+        self.assertIsNone(json.loads(body)['items'][0]['school_name'])
 
     def test_school_usage_auth_limits_and_disabled_storage(self):
         store = AccessLogStore(':memory:', retention_days=7)

@@ -107,9 +107,9 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
       ['방문 브라우저', data.visitors], ['세션', data.sessions], ['페이지 조회', data.pageViews],
       ['API 요청', data.apiRequests], ['API 오류율', `${(data.apiErrorRate * 100).toFixed(2)}%`],
       ['평균 처리 시간', `${data.apiAverageMs} ms`], ['이 프로세스의 누락 이벤트', data.droppedApiEvents],
-      ['기록된 캐시 적중률', cacheTotal ? `${((cache?.hit ?? 0) / cacheTotal * 100).toFixed(1)}%` : '기록 없음'],
-      ['캐시 적중', cache?.hit ?? 0], ['캐시 미스', cache?.miss ?? 0], ['이전 캐시 반환', cache?.stale ?? 0],
-      ['데이터 조회 실패', data.failureKinds?.upstream_unavailable ?? 0], ['과부하 차단', data.failureKinds?.service_overloaded ?? 0],
+      ['기록된 캐시 적중률', !cache ? '미제공' : cacheTotal ? `${((cache.hit ?? 0) / cacheTotal * 100).toFixed(1)}%` : '기록 없음'],
+      ['캐시 적중', cache ? cache.hit ?? 0 : '미제공'], ['캐시 미스', cache ? cache.miss ?? 0 : '미제공'], ['이전 캐시 반환', cache ? cache.stale ?? 0 : '미제공'],
+      ['데이터 조회 실패', data.failureKinds ? data.failureKinds.upstream_unavailable ?? 0 : '미제공'], ['과부하 차단', data.failureKinds ? data.failureKinds.service_overloaded ?? 0 : '미제공'],
     ];
     for (const [label, value] of cards) {
       const card = document.createElement('div');

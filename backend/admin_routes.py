@@ -57,7 +57,7 @@ def access_log_admin(method, query_string, request_headers, headers, access_log_
         return json_response(503, headers, {"error": "접속 로그를 불러오지 못했습니다", "code": "access_logs_unavailable"})
 
 
-def school_usage_admin(method, query_string, request_headers, headers, access_log_store):
+def school_usage_admin(method, query_string, request_headers, headers, access_log_store, current_cache=None):
     if method not in ('GET', 'HEAD'):
         return json_response(405, headers, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
     token = os.environ.get('OPENCIGAN_ADMIN_TOKEN', '')
@@ -77,6 +77,13 @@ def school_usage_admin(method, query_string, request_headers, headers, access_lo
         if days is None:
             days = min(7, store.retention_days)
         result = store.school_usage(days, limit=limit)
+        if current_cache is not None:
+            identifiers = {}
+            for item in result["items"]:
+                identifiers.setdefault(item["datatype"], set()).add(item["school_id"])
+            names = current_cache.school_names(identifiers)
+            for item in result["items"]:
+                item["school_name"] = names.get((item["datatype"], item["school_id"]))
         body = json.dumps(result, ensure_ascii=False).encode()
         headers['Content-Length'] = str(len(body))
         return 200, headers, body

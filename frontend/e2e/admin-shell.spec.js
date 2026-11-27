@@ -23,6 +23,7 @@ test('admin login, charts, navigation and lock keep credentials out of URLs and 
   await page.getByRole('button', { name: '잠금 해제' }).click();
   const analytics = page.frameLocator('iframe[title="이용 통계"]');
   await expect(analytics.locator('#charts svg')).toHaveCount(7);
+  await expect(analytics.locator('#metrics').getByText('미제공')).toHaveCount(6);
   expect(requests).toEqual(['Bearer example-admin-token', 'Bearer example-admin-token']);
   await page.getByRole('button', { name: '접속 로그' }).click();
   await expect(page.frameLocator('iframe[title="접속 로그"]').locator('#token')).toHaveValue('example-admin-token');
