@@ -44,7 +44,7 @@ test('teacher and grade views keep class labels legible on narrow screens', asyn
 
 for (const viewport of [{ width: 320, height: 700 }, { width: 375, height: 812 }, { width: 390, height: 844 }, { width: 667, height: 375 }, { width: 700, height: 844 }, { width: 768, height: 1024 }, { width: 960, height: 800 }, { width: 1280, height: 800 }]) {
   for (const theme of ['light', 'dark']) {
-    test(`weekly timetable stays usable at ${viewport.width}px in ${theme} mode`, async ({ page }) => {
+    test(`weekly timetable stays usable at ${viewport.width}px in ${theme} mode`, async ({ page }, testInfo) => {
       await page.setViewportSize(viewport);
       const school = { id: '2:봄빛고등학교', name: '아주 긴 이름의 봄빛고등학교', region: '서울' };
       await page.clock.setFixedTime(new Date('2026-11-09T02:00:00Z'));
@@ -72,6 +72,9 @@ for (const viewport of [{ width: 320, height: 700 }, { width: 375, height: 812 }
       if (theme === 'dark') await expect(page.locator('.app-shell')).toHaveClass(/dark/);
       else await expect(page.locator('.app-shell')).not.toHaveClass(/dark/);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+      if (process.env.ST04_CAPTURE === '1') {
+        await page.screenshot({ path: testInfo.outputPath('timetable.png'), fullPage: true, animations: 'disabled' });
+      }
       const last = table.getByText('마지막 수업');
       await last.scrollIntoViewIfNeeded();
       const box = await last.boundingBox();
