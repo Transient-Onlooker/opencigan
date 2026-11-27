@@ -1,7 +1,16 @@
 import { parseDisplaySettings, type DisplaySettings } from './personalization';
-import { parseLessonTimes, parseWeekdayLessonTimes, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
+import { parseLessonTimes, parseWeekdayLessonTimes, parseSourceLessonPreference, type LessonTimes, type WeekdayLessonTimes, type SourceLessonPreference } from './lesson-times';
 
 export const MAX_SETTINGS_BACKUP_BYTES = 64 * 1024;
+
+export function readSourceLessonPreference(storage: () => Storage, schoolId: string): SourceLessonPreference {
+  try {
+    const raw = storage().getItem('opensigan-source-lesson-preference:' + schoolId);
+    return parseSourceLessonPreference(JSON.parse(raw ?? 'null'));
+  } catch {
+    return { enabled: true, applied: {}, previous: {} };
+  }
+}
 
 function rollbackWritten(storage: Storage, written: Array<[string, string]>, previous: Map<string, string | null>): boolean {
   let restored = true;

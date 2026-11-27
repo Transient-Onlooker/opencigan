@@ -16,7 +16,7 @@ async function loadModule(filename, imports = {}) {
 
 const personalization = await loadModule('personalization.ts');
 const lessonTimes = await loadModule('lesson-times.ts');
-const { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, saveLessonTimePreferences, MAX_SETTINGS_BACKUP_BYTES } = await loadModule('settings-backup.ts', {
+const { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, saveLessonTimePreferences, readSourceLessonPreference, MAX_SETTINGS_BACKUP_BYTES } = await loadModule('settings-backup.ts', {
   './personalization': personalization,
   './lesson-times': lessonTimes,
 });
@@ -24,6 +24,25 @@ const { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, sav
 const schoolId = 'test-school-123';
 const display = { ...personalization.defaultDisplaySettings(), showTeachers: false, density: 'compact', colorMode: 'custom', subjectAliases: { math: 'M', science: 'S' }, subjectColors: { math: '#123456', science: '#abcdef' } };
 const times = { 1: { start: '09:00', end: '09:50' }, 2: { start: '10:00', end: '10:50' } };
+
+test('source lesson preference reads the existing school key and keeps schools separate', () => {
+  const values = new Map([
+    ['opensigan-source-lesson-preference:school-a', JSON.stringify({ enabled: false, applied: { 1: '09:00' }, previous: { 1: { start: '08:30', end: '09:20' } } })],
+    ['opensigan-source-lesson-preference:school-b', JSON.stringify({ enabled: true, applied: {}, previous: {} })],
+  ]);
+  const storage = { getItem: (key) => values.get(key) ?? null };
+  assert.deepEqual(JSON.parse(JSON.stringify(readSourceLessonPreference(() => storage, 'school-a'))), {
+    enabled: false, applied: { 1: '09:00' }, previous: { 1: { start: '08:30', end: '09:20' } },
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(readSourceLessonPreference(() => storage, 'school-b'))), { enabled: true, applied: {}, previous: {} });
+});
+
+test('source lesson preference read errors and malformed JSON return the existing default', () => {
+  const fallback = { enabled: true, applied: {}, previous: {} };
+  assert.deepEqual(JSON.parse(JSON.stringify(readSourceLessonPreference(() => ({ getItem: () => '{invalid' }), schoolId))), fallback);
+  assert.deepEqual(JSON.parse(JSON.stringify(readSourceLessonPreference(() => ({ getItem: () => { throw new Error('blocked'); } }), schoolId))), fallback);
+  assert.deepEqual(JSON.parse(JSON.stringify(readSourceLessonPreference(() => { throw new Error('blocked getter'); }, schoolId))), fallback);
+});
 
 test('school settings import restores prior values if the second write fails', () => {
   const values = new Map([['opensigan-display:' + schoolId, 'old-display'], ['opensigan-lesson-times:' + schoolId, 'old-times']]);
