@@ -222,6 +222,26 @@ test('private request URL remains fixed and conditional ICS headers survive', as
   assert.equal(outgoing.headers.get('host'), null);
 });
 
+test('history HEAD requests retain method, query and conditional headers', async () => {
+  for (const path of ['/api/v1/timetable/history', '/api/v1/timetable/history.rss']) {
+    const { env, calls } = setup();
+    env.PRIVATE_API.fetch = async (request) => {
+      calls.push(request);
+      return new Response(null, { status: 304, headers: { ETag: '"abc"' } });
+    };
+    const response = await worker.fetch(req(`${path}?school=1%3ATest`, {
+      method: 'HEAD', headers: { 'If-None-Match': '"abc"' },
+    }), env);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].method, 'HEAD');
+    assert.equal(new URL(calls[0].url).search, '?school=1%3ATest');
+    assert.equal(calls[0].headers.get('if-none-match'), '"abc"');
+    assert.equal(response.status, 304);
+    assert.equal(response.headers.get('etag'), '"abc"');
+    assert.equal(await response.text(), '');
+  }
+});
+
 test('school search is separately rate limited', async () => {
   const { env, calls } = setup({ search: false });
   const response = await worker.fetch(req('/api/v1/schools?q=test'), env);
