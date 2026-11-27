@@ -79,3 +79,19 @@ test('locking discards an in-flight embedded request', async ({ page }) => {
   await expect(page.locator('#admin-workspace')).toBeHidden();
   await expect(page.locator('#admin-content')).toBeEmpty();
 });
+
+test('enabled history and anomaly views use the shared token', async ({ page }) => {
+  test.skip(process.env.VITE_HISTORY_STATS_ENABLED !== '1' || process.env.VITE_ACCESS_ANOMALIES_ENABLED !== '1', 'Optional administrator views are disabled in this build');
+  await page.route('**/api/v1/admin/analytics?**', (route) => route.fulfill({ json: { visitors: 0, sessions: 0, pageViews: 0, apiRequests: 0, apiErrorRate: 0, apiAverageMs: 0, droppedApiEvents: 0, daily: [], routes: [] } }));
+  await page.goto('/admin/');
+  await page.locator('#admin-token').fill('example-admin-token');
+  await page.getByRole('button', { name: '잠금 해제' }).click();
+  await page.getByRole('button', { name: '시간표 관측' }).click();
+  const history = page.frameLocator('iframe[title="시간표 관측"]');
+  await expect(history.locator('#history-stats-section')).toBeVisible();
+  await expect(history.locator('#token')).toHaveValue('example-admin-token');
+  await page.getByRole('button', { name: '이상 접근' }).click();
+  const anomalies = page.frameLocator('iframe[title="이상 접근"]');
+  await expect(anomalies.locator('#anomaly-review')).toBeVisible();
+  await expect(anomalies.locator('#token')).toHaveValue('example-admin-token');
+});
