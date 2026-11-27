@@ -2,6 +2,56 @@ import { expect, test } from '@playwright/test';
 
 const school = { id: '2:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
 
+for (const width of [320, 960]) {
+  for (const theme of ['light', 'dark']) {
+    test(`widget link uses the action style at ${width}px in ${theme} mode`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.addInitScript(({ school, theme }) => {
+        localStorage.setItem('opensigan-school', JSON.stringify(school));
+        localStorage.setItem('opensigan-theme', theme);
+      }, { school, theme });
+      await page.route('**/api/v1/**', async (route) => {
+        const url = new URL(route.request().url());
+        if (url.pathname === '/api/v1/timetable') return route.fulfill({ json: {
+          schoolId: school.id, weekStart: url.searchParams.get('week'), records: [], stale: false,
+        } });
+        return route.fulfill({ json: { schools: [], meals: [], changes: [], stale: false } });
+      });
+      await page.goto('/');
+      await page.getByRole('button', { name: '시간표', exact: true }).click();
+      const link = page.locator('.secondary-actions').getByRole('link', { name: '시간표 위젯 만들기' });
+      await expect(link).toHaveAttribute('href', './embed-builder.html');
+      await expect(link).toBeVisible();
+      const styles = await link.evaluate((element) => {
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return { color: style.color, decoration: style.textDecorationLine, left: rect.left, right: rect.right, height: rect.height };
+      });
+      expect(styles.color).toBe(await link.evaluate((element) => {
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--ink)';
+        element.append(probe);
+        const color = getComputedStyle(probe).color;
+        probe.remove();
+        return color;
+      }));
+      expect(styles.decoration).toBe('none');
+      expect(styles.left).toBeGreaterThanOrEqual(0);
+      expect(styles.right).toBeLessThanOrEqual(width);
+      expect(styles.height).toBeGreaterThanOrEqual(44);
+      await page.keyboard.press('Tab');
+      await link.focus();
+      await expect(link).toBeFocused();
+      expect(await link.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe('none');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      await page.keyboard.press('Enter');
+      await expect(page).toHaveURL(/\/embed-builder\.html$/);
+      await page.goBack();
+      await expect(page.locator('.secondary-actions').getByRole('link', { name: '시간표 위젯 만들기' })).toHaveCSS('color', styles.color);
+    });
+  }
+}
+
 test('today lessons fit above mobile navigation', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 600 });
   await page.clock.setFixedTime(new Date('2026-11-09T02:00:00Z'));
