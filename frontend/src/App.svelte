@@ -649,6 +649,7 @@
     timetableDateError = '';
     timetableView = value;
     exportState = '';
+    if (value === 'week' && week !== current) { currentWeek(); return; }
     if (value === 'today' || value === 'grade') selectedDay = week === current ? today : week;
   }
   function loadMeals(preserve = false) {

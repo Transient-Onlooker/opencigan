@@ -654,6 +654,39 @@ test('teacher subtitle follows the selected week', async ({ page }) => {
   await expect(panel.getByText('김교사 선생님 · 이번 주 수업', { exact: false })).toBeVisible();
 });
 
+test('this week selection wins over a delayed next week and history stays consistent', async ({ page }) => {
+  await mockApi(page);
+  let releaseNext;
+  let nextStarted;
+  const nextPending = new Promise((resolve) => { releaseNext = resolve; });
+  const nextRequested = new Promise((resolve) => { nextStarted = resolve; });
+  await page.route('**/api/v1/timetable?*', async (route) => {
+    const requestedWeek = new URL(route.request().url()).searchParams.get('week');
+    if (requestedWeek === '2026-11-16') { nextStarted(); await nextPending; }
+    await route.fulfill({ json: { ...timetable, weekStart: requestedWeek,
+      records: timetable.records.map((record) => ({ ...record, date: requestedWeek, subject: `${requestedWeek} 반${record.class}` })) } }).catch(() => {});
+  });
+  await page.goto('/' + sharedHash(1));
+  const panel = page.locator('#timetable-panel');
+  await expect(panel.getByRole('table')).toContainText('2026-11-09 반1');
+  await page.locator('.quick-class select').nth(1).selectOption('2');
+  await expect(panel.getByRole('table')).toContainText('2026-11-09 반2');
+  await panel.getByRole('button', { name: '다음 주', exact: true }).click();
+  await nextRequested;
+  await panel.getByRole('group', { name: '시간표 보기' }).getByRole('button', { name: '이번 주', exact: true }).click();
+  releaseNext();
+  await expect(panel.locator('.calendar-date')).toContainText('11.9');
+  await expect(panel.getByRole('table')).toContainText('2026-11-09 반2');
+  await expect.poll(() => page.evaluate(() => history.state?.opensigan?.week)).toBe('2026-11-09');
+  await expect.poll(() => new URLSearchParams(new URL(page.url()).hash.slice(1)).get('class')).toBe('2');
+  await page.goBack();
+  await expect.poll(() => page.evaluate(() => history.state?.opensigan?.week)).toBe('2026-11-16');
+  await expect(panel.locator('.calendar-date')).toContainText('11.16');
+  await page.goForward();
+  await expect(panel.locator('.calendar-date')).toContainText('11.9');
+  await expect(panel.getByRole('table')).toContainText('2026-11-09 반2');
+});
+
 test('invalid shared classroom explains why the saved class is retained', async ({ page }) => {
   await mockApi(page);
   await page.addInitScript((saved) => {
