@@ -15,6 +15,7 @@ test('원본 시작 시각은 유효한 빈 교시에만 기본 적용하고 교
   const result = applySourceLessonStarts(manual, { 1: '09:00', 2: '10:00', 3: '25:00', 4: '10:30' }, [1, 2, 3, 4]);
   assert.equal(result[1].start, '08:50');
   assert.equal(result[2].start, '09:50');
+  assert.equal(result[3], undefined);
   assert.deepEqual(JSON.parse(JSON.stringify(result[4])), { start: '10:30', end: '' });
   const refreshed = applySourceLessonStarts({ 1: { start: '09:00', end: '' } }, { 1: '09:10' }, [1], [1]);
   assert.deepEqual(JSON.parse(JSON.stringify(refreshed[1])), { start: '09:10', end: '' });
@@ -110,6 +111,12 @@ test('원본 시작 시각은 날짜별 실제 표시 기본값으로 쓰되 종
   const overridden = lessonTimesForDate({ 1: times[1] }, { 2: { 1: { start: '08:30', end: '09:20' } } }, '2026-11-10', { 1: '09:00', 2: '10:00' });
   assert.equal(overridden[1].start, '08:30');
   assert.equal(overridden[2].start, '10:00');
+  const mixed = { ...overridden, 3: times[3] };
+  assert.equal(dailyLessonOverview(records, mixed, 10 * 60, true).timed, false);
+  const completed = { ...mixed, 2: { start: '10:00', end: '10:50' } };
+  const overview = dailyLessonOverview(records, completed, 10 * 60 + 20, true);
+  assert.equal(overview.timed, true);
+  assert.equal(overview.current.period, 2);
 });
 
 test('교시 규칙은 점심에 기본 쉬는 시간을 더하지 않고 입력과 하루 범위를 검증한다', () => {
