@@ -1,6 +1,6 @@
 # OpenCigan 아키텍처와 데이터 흐름
 
-> **구분:** 이 문서는 공개할 수 있는 일반화된 구성을 설명합니다. 실제 운영 상태·배포 버전·미검증 항목은 [운영 문서](operations/README.md)와 [P0 로드맵](roadmap/core-quality.md)을 기준으로 확인합니다. 마지막 문서 정리: 2026-11-25.
+OpenCigan의 주요 구성 요소와 데이터 흐름을 설명합니다. 운영 현황은 [운영 문서](operations/README.md)에서 확인할 수 있습니다.
 
 ## 공개 서비스 구성
 
@@ -14,9 +14,8 @@ flowchart LR
     Browser -.-> Local["로컬 설정"]
 ```
 
-- 공개 웹과 읽기 API는 연결되지만 동일한 장애 원인을 공유할 수 있습니다. 보조 주소는 독립된 백업 API가 아닙니다.
-- 프런트엔드·API·캐시·데이터 제공처 계층을 분리합니다. **실서비스 네트워크 방식·장비 식별자·접속 경로·관리용 설정값은 공개하지 않습니다.**
-- 공개 URL: [공식 웹](https://opencigan.mcv.kr/) · [보조 웹](https://opencigan.pages.dev/).
+- [공식 웹](https://opencigan.mcv.kr/)과 [보조 웹](https://opencigan.pages.dev/)은 같은 읽기 API를 사용합니다.
+- 프런트엔드, API, 캐시와 데이터 제공처는 각각 역할을 나누어 처리합니다.
 
 ## 주요 코드와 책임
 

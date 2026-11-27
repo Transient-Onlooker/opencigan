@@ -64,6 +64,26 @@ class OpenApiContractTests(unittest.TestCase):
         self.assertEqual(statuses, ['200 OK'])
         self.assertEqual(body, b'')
 
+    def test_school_search_head_contract_matches_wsgi(self):
+        from backend.app import make_app
+        from backend.neis import School
+        cases = [('/api/v1/schools', 'backend.app.search_schools', [{'id': '2:School', 'name': 'School', 'region': 'Seoul'}]),
+                 ('/api/v1/neis/schools', 'backend.app.NEISClient.from_environment', None)]
+        for path, target, result in cases:
+            with self.subTest(path=path), patch(target) as source, patch.dict('os.environ', {'NEIS_API_KEY': 'synthetic'}):
+                if result is None:
+                    source.return_value.search_schools.return_value = [School('B10', '1234567', 'School', 'high', 'Seoul')]
+                else:
+                    source.return_value = result
+                operation = self.spec['paths'][path]['head']
+                self.assertTrue(operation['parameters'][0]['required'])
+                self.assertNotIn('content', operation['responses']['200'])
+                statuses = []
+                body = b''.join(make_app()({'REQUEST_METHOD': 'HEAD', 'PATH_INFO': path, 'QUERY_STRING': 'q=School',
+                                           'REMOTE_ADDR': '127.0.0.1'}, lambda status, headers: statuses.append(status)))
+                self.assertEqual(statuses, ['200 OK'])
+                self.assertEqual(body, b'')
+
     def test_private_history_stats_contract_for_observed_and_unobserved_weeks(self):
         path = '/api/v1/admin/history-stats'
         headers = {'Authorization': 'Bearer ' + 'x' * 32}
