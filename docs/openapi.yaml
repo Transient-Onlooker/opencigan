@@ -17,6 +17,59 @@ tags:
   - name: Meals
   - name: History
 paths:
+  /api/v1/admin/school-usage:
+    parameters:
+      - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 90 }, description: Must not exceed the configured access-log retention period; defaults to the lesser of seven days and that period. }
+      - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 100 } }
+    get:
+      tags: [System]
+      summary: Aggregate retained school requests
+      description: Administrator-only counts of requests, not unique visitors. Timetable and meal identifiers are kept separate; no upstream lookups are performed.
+      security: [{ AnalyticsAdmin: [] }]
+      responses:
+        '200':
+          description: Counts within the configured retention period.
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [start_day, end_day, period_days, limit, has_more, items]
+                properties:
+                  start_day: { type: string, format: date }
+                  end_day: { type: string, format: date }
+                  period_days: { type: integer }
+                  limit: { type: integer }
+                  has_more: { type: boolean }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [datatype, school_id, school_name, requests]
+                      properties:
+                        datatype: { type: string, enum: [timetable, meals] }
+                        school_id: { type: string }
+                        school_name: { type: [string, 'null'] }
+                        requests: { type: integer, minimum: 0 }
+        '400': { $ref: '#/components/responses/SuggestionAdminBadRequest' }
+        '401': { $ref: '#/components/responses/SuggestionAdminUnauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: Access log store or gateway unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    head:
+      tags: [System]
+      summary: Check school request aggregates
+      security: [{ AnalyticsAdmin: [] }]
+      responses:
+        '200': { description: Query successful; no response body. }
+        '400': { description: Invalid query. }
+        '401': { description: Invalid administrator token. }
+        '429': { description: Rate limit reached. }
+        '503': { description: Access log store or gateway unavailable. }
   /api/v1/admin/access-logs:
     parameters:
       - { name: client_ip, in: query, schema: { type: string, maxLength: 255 } }
@@ -901,6 +954,7 @@ paths:
                         upstream_errors: { type: integer, minimum: 0 }
                         overload_errors: { type: integer, minimum: 0 }
                         cache_hits: { type: integer, minimum: 0 }
+                        cache_misses: { type: integer, minimum: 0, description: Responses recorded as cache misses; absent on older servers. }
                         stale_responses: { type: integer, minimum: 0 }
                   daily:
                     type: array
@@ -936,6 +990,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
         '503':
           description: Analytics disabled or storage temporarily unavailable.
           content:

@@ -26,6 +26,16 @@ LOGGER = logging.getLogger("opensigan.access_logs")
 FORMULA_CONTROL_PREFIXES = ("\t", "\r")
 FORMULA_OPERATOR_PREFIXES = ("=", "+", "-", "@")
 DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+COMCIGAN_SCHOOL_ID = re.compile(r"([0-9]+):([^:\x00-\x1f\x7f]{1,50})\Z")
+NEIS_SCHOOL_ID = re.compile(r"[A-Z][0-9]{2}:[0-9]{7}\Z")
+
+
+def _valid_school_usage_id(datatype: str, school_id: str) -> int:
+    if datatype == "timetable":
+        return int(COMCIGAN_SCHOOL_ID.fullmatch(school_id) is not None)
+    if datatype == "meals":
+        return int(NEIS_SCHOOL_ID.fullmatch(school_id) is not None)
+    return 0
 
 
 def get_access_log_store(retention_days: int = 7) -> Optional["AccessLogStore"]:
@@ -440,6 +450,60 @@ class AccessLogStore:
             "next_cursor": next_cursor,
             "limit": limit,
             "has_more": has_more,
+        }
+
+    def school_usage(self, days: int, *, limit: int = 100) -> Dict[str, Any]:
+        """Aggregate retained timetable and meal requests by typed school ID."""
+        if isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= min(90, self.retention_days):
+            raise ValueError("days must fit the retained access-log period")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+            raise ValueError("limit must be between 1 and 100")
+
+        today = self._current_day()
+        start_day = (date.fromisoformat(today) - timedelta(days=days - 1)).isoformat()
+        with closing(self._connect()) as db:
+            self._purge_if_due(db, today)
+            db.create_function("valid_school_usage_id", 2, _valid_school_usage_id, deterministic=True)
+            rows = db.execute(
+                """WITH grouped AS (
+                       SELECT datatype, school_id, COUNT(*) AS requests
+                       FROM access_logs
+                       WHERE day >= ? AND day <= ? AND datatype IN ('timetable', 'meals')
+                         AND (
+                           (datatype = 'timetable' AND school_id GLOB '[0-9]*:*'
+                            AND instr(school_id, ':') > 1
+                            AND length(school_id) - length(replace(school_id, ':', '')) = 1
+                            AND length(substr(school_id, instr(school_id, ':') + 1)) BETWEEN 1 AND 50)
+                           OR (datatype = 'meals' AND school_id GLOB
+                               '[A-Z][0-9][0-9]:[0-9][0-9][0-9][0-9][0-9][0-9][0-9]')
+                         )
+                       GROUP BY datatype, school_id
+                   )
+                   SELECT datatype, school_id, requests
+                   FROM grouped
+                   WHERE valid_school_usage_id(datatype, school_id) = 1
+                   ORDER BY requests DESC, datatype ASC, school_id ASC
+                   LIMIT ?""",
+                (start_day, today, limit + 1),
+            ).fetchall()
+
+        items = [
+            {
+                "datatype": datatype,
+                "school_id": school_id,
+                "school_name": None,
+                "requests": requests,
+            }
+            for datatype, school_id, requests in rows
+        ]
+
+        return {
+            "start_day": start_day,
+            "end_day": today,
+            "period_days": days,
+            "limit": limit,
+            "has_more": len(items) > limit,
+            "items": items[:limit],
         }
 
     def review_anomalies(self, *, window_hours: int, max_requests_per_ip: int,

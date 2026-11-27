@@ -202,6 +202,54 @@ class Cache:
         with self.guard:
             return {resource: value.copy() for resource, value in self.wait_observations.items()}
 
+    def school_names(self, identifiers):
+        """Return unambiguous names for typed school IDs in fresh search entries."""
+        requested = {
+            datatype: set(school_ids)
+            for datatype, school_ids in identifiers.items()
+            if datatype in ("timetable", "meals") and school_ids
+        }
+        if not requested:
+            return {}
+
+        resource_by_datatype = {
+            "timetable": "school_search",
+            "meals": "neis_school_search",
+        }
+        resources = {resource_by_datatype[kind] for kind in requested}
+        now = time.monotonic()
+        with self.guard:
+            entries = [
+                (key[0], value)
+                for key, (value, fetched_at, _) in self.entries.items()
+                if isinstance(key, tuple) and key
+                and key[0] in ("school_search", "neis_school_search")
+                and key[0] in resources
+                and value is not None and now - fetched_at < self.ttl
+            ]
+
+        matched_names = {}
+        for resource, value in entries:
+            datatype = "timetable" if resource == "school_search" else "meals"
+            payload = json.loads(value)
+            if not isinstance(payload, dict) or not isinstance(payload.get("schools"), list):
+                continue
+            for school in payload["schools"]:
+                if not isinstance(school, dict):
+                    continue
+                school_id = school.get("id")
+                name = school.get("name")
+                if (isinstance(school_id, str) and school_id in requested.get(datatype, ())
+                        and isinstance(name, str) and name
+                        and (datatype != "timetable" or school_id.split(":", 1)[-1] == name)):
+                    matched_names.setdefault((datatype, school_id), set()).add(name)
+
+        return {
+            key: next(iter(names))
+            for key, names in matched_names.items()
+            if len(names) == 1
+        }
+
     @staticmethod
     def _stale(value):
         result = json.loads(value)

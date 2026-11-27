@@ -66,6 +66,12 @@ let activeAbortController: AbortController | undefined;
 let nextCursor: string | null = null;
 let currentLoadedCount = 0;
 
+window.addEventListener('opencigan-admin-lock', () => {
+  activeAbortController?.abort(); anomalyController?.abort();
+  tokenInput.value = '';
+  logsBody.replaceChildren(); anomalyResults.replaceChildren();
+});
+
 function clearAnomalies() {
   anomalyController?.abort();
   anomalyController = undefined;

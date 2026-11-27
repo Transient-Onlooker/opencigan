@@ -31,7 +31,7 @@ from backend.calendar_routes import timetable_calendar
 from backend.history_routes import timetable_history
 from backend.history_stats_routes import history_stats
 from backend.analytics_routes import record_pageview, analytics_summary
-from backend.admin_routes import access_log_admin
+from backend.admin_routes import access_log_admin, school_usage_admin
 from backend.admin_routes import access_anomaly_review
 from backend.timetable import fetch_timetable, search_schools, validate_timetable_week
 
@@ -307,7 +307,8 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
     if method == "OPTIONS":
         return preflight_response(path, headers)
 
-    if client and path in ("/api/v1/admin/analytics", "/api/v1/admin/access-logs", "/api/v1/admin/history-stats", "/api/v1/admin/access-anomalies"):
+    if client and (path in ("/api/v1/admin/analytics", "/api/v1/admin/access-logs", "/api/v1/admin/history-stats", "/api/v1/admin/access-anomalies", "/api/v1/admin/school-usage")
+                   or path == "/api/v1/admin/suggestions" or path.startswith("/api/v1/admin/suggestions/")):
         retry = _rate_allowed(("admin", client))
         if retry:
             headers["Retry-After"] = str(retry)
@@ -316,6 +317,11 @@ def _dispatch_request(method, path, query_string, cache_instance=None, client=No
     if path == '/api/v1/admin/access-logs':
         status, response_headers, body = _access_log_admin(method, query_string, request_headers, headers)
         response_headers['Content-Length'] = str(len(body))
+        return status, response_headers, body
+    if path == '/api/v1/admin/school-usage':
+        status, response_headers, body = school_usage_admin(method, query_string, request_headers, headers,
+                                                            _access_log_store, current_cache)
+        response_headers.setdefault('Content-Length', str(len(body)))
         return status, response_headers, body
     if path == '/api/v1/admin/access-anomalies':
         status, response_headers, body = access_anomaly_review(method, query_string, request_headers, headers, _access_log_store)

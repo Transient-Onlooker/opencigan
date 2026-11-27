@@ -158,6 +158,7 @@ class AnalyticsStore:
                 SUM(CASE WHEN failure_kind = 'upstream_unavailable' THEN 1 ELSE 0 END) upstream_errors,
                 SUM(CASE WHEN failure_kind = 'service_overloaded' THEN 1 ELSE 0 END) overload_errors,
                 SUM(CASE WHEN cache_status = 'hit' THEN 1 ELSE 0 END) cache_hits,
+                SUM(CASE WHEN cache_status = 'miss' THEN 1 ELSE 0 END) cache_misses,
                 SUM(CASE WHEN cache_status = 'stale' THEN 1 ELSE 0 END) stale_responses
                 FROM api_requests WHERE day >= ? AND occurred_at >= ? AND occurred_at <= ?
                 GROUP BY substr(occurred_at, 1, 13) ORDER BY hour""",

@@ -4,7 +4,7 @@ const READ_PATHS = new Set([
   '/api/v1/status', '/api/v1/schools', '/api/v1/neis/schools',
   '/api/v1/timetable', '/api/v1/timetable.ics', '/api/v1/timetable/history',
   '/api/v1/timetable/history.rss', '/api/v1/meals',
-  '/api/v1/admin/analytics', '/api/v1/admin/access-logs',
+  '/api/v1/admin/analytics', '/api/v1/admin/access-logs', '/api/v1/admin/school-usage',
 ]);
 // Suggestion intake stays OFF unless Pi persistence and edge budget are configured.
 const SUGGESTION_ITEM = /^\/api\/v1\/suggestions\/[A-Za-z0-9_-]{24}$/;
