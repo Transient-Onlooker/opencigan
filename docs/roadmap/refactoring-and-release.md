@@ -32,6 +32,7 @@
 
 - 사용자 제공 판정 CONDITIONAL PASS. 5d3a17c에서 시작, 도중 fb9ed13으로 배포 변경; 두 SHA의 GitHub CI check/deploy 성공은 별도 조회로 확인 ([5d3a17c CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/45422361152), [fb9ed13 CI](https://github.com/Transient-Onlooker/opencigan/actions/runs/45425309399)).
 - 운영 API/ICS HTTP·내부 공개 경계 및 학교 3곳 핵심 조회, PNG/PDF/설정 JSON 내보내기 보고 확인. QA2-003·QA3-001 재개방, QA2-008은 원래 공유 진입 범위 유지 및 별도 UX 결정. 실제 파일 가져오기·실기기·PWA·실캘린더·장애/롤백 검증 미완료. [3차 QA 후속](qa3-followup-2026-11-25.md).
+- **2026-11-27 QA4:** [4차 QA 후속](qa4-followup-2026-11-27.md), CONDITIONAL PASS. 기존 4건 운영 해결, 무효 반 링크 재개방·교사 선택 부분 실패·신규 주차 경합 및 시각 안내. PNG/ICS 확인, PDF/JSON 이번 차수 재검증 미완료. 화면 폭별/PWA 외부 도구 제약, 실제 Pi/Worker 버전·DB 안전·롤백 미확인. 제안 공개 접수 조회 확인, 발송 OFF 유지. 최종 게이트는 닫지 않는다.
 - ST-14 전체 최종 릴리스 게이트는 닫지 않는다.
 
 ### 2026-11-16 종합 QA 이후 릴리스 체크

@@ -56,3 +56,5 @@
 - #162는 [#213](https://github.com/Transient-Onlooker/opencigan/pull/213)·[#245](https://github.com/Transient-Onlooker/opencigan/pull/245)·[#255](https://github.com/Transient-Onlooker/opencigan/pull/255)로 대체되어 종료. Cache MISS 상류 3→1회, POST 이후 1596→488ms(단일 학교, 동일 826건, 검색 준비 제외). 공개 종단·다학교·HIT 별도.
 - [#233](https://github.com/Transient-Onlooker/opencigan/pull/233)·[#246](https://github.com/Transient-Onlooker/opencigan/pull/246)·[#257](https://github.com/Transient-Onlooker/opencigan/pull/257)·[#259](https://github.com/Transient-Onlooker/opencigan/pull/259)·[#260](https://github.com/Transient-Onlooker/opencigan/pull/260)·[#261](https://github.com/Transient-Onlooker/opencigan/pull/261) 날짜·주간 화면·저장 실패·검색 캐시·보기 아이콘 후속. 설정 복원·실기기·실캘린더·장애 UX 미검증.
 - 최신 집계는 [단기 로드맵](short-term-2026-11-21.md)을 따른다.
+
+> **후속 기록 (2026-11-27):** [4차 QA 후속](qa4-followup-2026-11-27.md)에서 운영 재검증 결과를 추적한다. 이 문서의 발견 당시 상태 및 당시 병합 기록은 역사적 증거로 유지한다.
