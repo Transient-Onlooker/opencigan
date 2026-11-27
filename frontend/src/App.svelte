@@ -11,7 +11,8 @@
   import { readAllergies, readMealPreferences, saveMealPreferences as persistMealPreferences, saveAllergies, readMealAllergyFilter, saveMealAllergyFilter, readSchoolPreference, readTheme, writeTheme, readAnimations, writeAnimations, readMealSchool, writeMealSchool } from './preferences';
   import type { MealAllergyFilter } from './meal-filter';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
-  import { saveSelection, readSelection, gradesInTimetable, classesInGrade, createSelectionState, createSharedSelectionSession, validateSharedCandidate, type PendingSharedClass } from './selection';
+  import { gradesInTimetable, classesInGrade, createSelectionState, createSharedSelectionSession, validateSharedCandidate, type PendingSharedClass } from './selection';
+  import { saveSelection, readSelection } from './selection-storage';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
