@@ -145,6 +145,7 @@ class AnalyticsStore:
                 SUM(CASE WHEN failure_kind = 'upstream_unavailable' THEN 1 ELSE 0 END) data_failures,
                 SUM(CASE WHEN failure_kind = 'service_overloaded' THEN 1 ELSE 0 END) overload_errors,
                 SUM(CASE WHEN status >= 500 AND failure_kind IS NULL THEN 1 ELSE 0 END) unclassified_server_errors,
+                SUM(CASE WHEN cache_status IS NOT NULL THEN 1 ELSE 0 END) cache_observed,
                 SUM(CASE WHEN cache_status = 'hit' THEN 1 ELSE 0 END) cache_hits,
                 SUM(CASE WHEN cache_status = 'miss' THEN 1 ELSE 0 END) cache_misses,
                 SUM(CASE WHEN cache_status = 'stale' THEN 1 ELSE 0 END) stale_responses

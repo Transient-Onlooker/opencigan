@@ -926,6 +926,7 @@ paths:
                         data_failures: { type: integer, minimum: 0, description: Generic upstream_unavailable responses; not proof of provider failure. }
                         overload_errors: { type: integer, minimum: 0, description: service_overloaded responses. }
                         unclassified_server_errors: { type: integer, minimum: 0, description: HTTP 5xx records without a recorded failure category, including older data. }
+                        cache_observed: { type: integer, minimum: 0, description: Requests with a recorded cache status for this route. }
                         cache_hits: { type: integer, minimum: 0, description: Responses recorded as cache hits for this route. }
                         cache_misses: { type: integer, minimum: 0, description: Responses recorded as cache misses for this route. }
                         stale_responses: { type: integer, minimum: 0, description: Responses recorded as stale for this route. }
