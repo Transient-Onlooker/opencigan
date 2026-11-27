@@ -129,7 +129,7 @@ test('settings last allergy control stays above the fixed nav at 667x320', async
 
 for (const width of [320, 390, 700, 960]) {
   for (const theme of ['light', 'dark']) {
-    test(`settings and selection fit ${width}px in ${theme} mode`, async ({ page }) => {
+    test(`settings and selection fit ${width}px in ${theme} mode`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 900 });
       await page.addInitScript(({ school, theme }) => {
         localStorage.setItem('opensigan-school', JSON.stringify(school));
@@ -163,6 +163,9 @@ for (const width of [320, 390, 700, 960]) {
       });
       expect(overflow, `settings overflow at ${width}px`).toEqual([]);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      if (process.env.ST04_CAPTURE === '1') {
+        await page.screenshot({ path: testInfo.outputPath('settings.png'), fullPage: true, animations: 'disabled' });
+      }
       await page.getByRole('button', { name: '학교/학년 변경' }).click();
       const selectionWidth = await page.locator('#school-settings').evaluate((element) => ({ right: element.getBoundingClientRect().right, width: element.getBoundingClientRect().width }));
       expect(selectionWidth.right, `school selector overflow at ${width}px`).toBeLessThanOrEqual(width + 1);
@@ -173,6 +176,9 @@ for (const width of [320, 390, 700, 960]) {
         });
         expect(rect.left, `${control} left at ${width}px`).toBeGreaterThanOrEqual(-1);
         expect(rect.right, `${control} right at ${width}px`).toBeLessThanOrEqual(width + 1);
+      }
+      if (process.env.ST04_CAPTURE === '1') {
+        await page.screenshot({ path: testInfo.outputPath('selection.png'), fullPage: true, animations: 'disabled' });
       }
     });
   }
