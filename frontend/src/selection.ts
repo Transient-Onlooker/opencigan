@@ -52,6 +52,12 @@ export function saveSelection(storage: Pick<Storage, 'getItem' | 'setItem' | 're
     for (const [key] of entries) previous.push([key, storage.getItem(key)]);
     for (const [key, value] of entries) { storage.setItem(key, value); written += 1; }
   } catch {
+    // A different tab may have completed a selection using the same school value.
+    // Avoid restoring any part of our snapshot if another field has changed.
+    try {
+      if (previous.length === entries.length && entries.some(([key, value], index) =>
+        storage.getItem(key) !== (index < written ? value : previous[index][1]))) return;
+    } catch { return; }
     for (let index = written - 1; index >= 0; index -= 1) {
       const [key, value] = previous[index];
       try {
