@@ -732,6 +732,26 @@ test('invalid shared classroom explains why the saved class is retained', async 
   expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('class')).toBe('1');
 });
 
+test('shared address remains intact until the school check finishes', async ({ page }) => {
+  let release;
+  let started;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const searchStarted = new Promise((resolve) => { started = resolve; });
+  await mockApi(page, pending, started);
+  await page.addInitScript((saved) => {
+    localStorage.setItem('opensigan-school', JSON.stringify(saved));
+    localStorage.setItem('opensigan-grade', '1');
+    localStorage.setItem('opensigan-class', '2');
+  }, school);
+  await page.goto('/' + sharedHash(99));
+  await searchStarted;
+  await expect(page.locator('#timetable-panel').getByRole('table')).toBeVisible();
+  await expect.poll(() => new URLSearchParams(new URL(page.url()).hash.slice(1)).get('class')).toBe('99');
+  release();
+  await expect(page.getByRole('status').filter({ hasText: '공유 링크의 1학년 99반' })).toContainText('기존 봄빛고등학교 1학년 2반을 유지');
+  await expect.poll(() => new URLSearchParams(new URL(page.url()).hash.slice(1)).get('class')).toBe('2');
+});
+
 test('invalid shared classroom exposes an error and can be corrected without saving the forged class', async ({ page }) => {
   await mockApi(page);
   await page.goto('/' + sharedHash());
