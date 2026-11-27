@@ -305,6 +305,7 @@ flowchart TB
 - 공개 기능 제안의 제출·승인된 제안 검색 경로가 OpenAPI에 누락돼 있어 입력, 결과 및 오류 계약을 추가한다. 격리 저장소를 사용하는 실제 라우트 응답으로 제출·검색·입력 오류·중복·크기 제한을 대조한다. 작성자·관리자 경로와 SDK 계약은 별도다.
 
 - Python·TypeScript SDK의 JSON 및 iCalendar HTTP 오류에 `Retry-After` 원문을 전달한다. 숫자와 HTTP 날짜를 그대로 제공하며 자동 재시도는 하지 않는다.
+- TypeScript SDK의 본문 시간 초과 검사는 응답 후 지연을 격리해 확인한다. 헤더 수신 전 시간 초과와 구분하며 실제 연결 취소 검사도 유지한다.
 
 - 시간표 이력 JSON 조회의 503 명세를 실제 `history_disabled` 및 저장소 오류 응답과 대조하고 각각의 회귀 검사를 추가한다. 다른 API 계약과 운영 관측은 별도다.
 - [PR #185](https://github.com/Transient-Onlooker/opencigan/pull/185): Webhook 템플릿 조회·저장·초기화와 두 제공자의 미리보기 성공 응답을 OpenAPI에 명시하고 격리 라우트 응답과 대조했다. 나머지 계약과 운영 관측은 미완료다.

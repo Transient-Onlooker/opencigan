@@ -140,12 +140,26 @@ test('HTTP deadline and caller cancellation cover JSON, ICS and error bodies', a
   const address = server.address();
   const client = new OpensiganClient({ baseUrl: `http://127.0.0.1:${address.port}`, timeoutMs: 2000 });
   try {
+    const hangingFetch: typeof globalThis.fetch = async (_url, init) => new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{'));
+        const signal = init?.signal;
+        if (signal?.aborted) controller.error(signal.reason);
+        else signal?.addEventListener('abort', () => controller.error(signal.reason), { once: true });
+      },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const hangingClient = new OpensiganClient({ fetch: hangingFetch });
     for (const calendar of [false, true]) {
       const pending = calendar
-        ? client.getTimetableIcs('2:학교', 1, 1, { timeoutMs: 100 })
-        : client.getStatus({ timeoutMs: 100 });
+        ? hangingClient.getTimetableIcs('2:학교', 1, 1, { timeoutMs: 100 })
+        : hangingClient.getStatus({ timeoutMs: 100 });
       await assert.rejects(pending, { name: 'OpensiganError', status: 200, isTimeout: true });
     }
+    const callerController = new AbortController();
+    const callerPending = hangingClient.getStatus({ signal: callerController.signal });
+    callerController.abort();
+    await assert.rejects(callerPending, { name: 'AbortError' });
+
     const controller = new AbortController();
     const headersReceived = new Promise<void>((resolve) => { received = resolve; });
     const pending = client.getStatus({ signal: controller.signal });
