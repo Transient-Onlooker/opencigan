@@ -72,6 +72,33 @@ test('can authenticate using access logs if analytics is unavailable', async ({ 
   await expect(page.frameLocator('iframe[title="접속 로그"]').locator('#token')).toHaveValue('example-admin-token');
 });
 
+test('can authenticate using suggestions if analytics and access logs are unavailable', async ({ page }) => {
+  await page.route('**/api/v1/admin/analytics?**', (route) => route.fulfill({ status: 503, json: {} }));
+  await page.route('**/api/v1/admin/access-logs?**', (route) => route.fulfill({ status: 503, json: {} }));
+  await page.route('**/api/v1/admin/suggestions?**', (route) => route.fulfill({ json: { suggestions: [], nextCursor: null } }));
+  await page.goto('/admin/');
+  await page.locator('#admin-token').fill('example-admin-token');
+  await page.getByRole('button', { name: '잠금 해제' }).click();
+  await page.getByRole('button', { name: '기능 제안' }).click();
+  await expect(page.getByText('제안이 없습니다.')).toBeVisible();
+});
+
+test('admin sign-in and menu can be operated with the keyboard', async ({ page }) => {
+  await page.route('**/api/v1/admin/analytics?**', (route) => route.fulfill({ json: { visitors: 0, sessions: 0, pageViews: 0, apiRequests: 0, apiErrorRate: 0, apiAverageMs: 0, droppedApiEvents: 0, daily: [], routes: [] } }));
+  await page.route('**/api/v1/status', (route) => route.fulfill({ json: { status: 'ok', scope: 'process liveness' } }));
+  await page.goto('/admin/');
+  await page.locator('#admin-token').focus();
+  await page.keyboard.type('example-admin-token');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#admin-workspace')).toBeVisible();
+  await page.getByRole('button', { name: '서비스 상태' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('백엔드 프로세스 응답 정상')).toBeVisible();
+  await page.getByRole('button', { name: '잠금', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#admin-token')).toBeFocused();
+});
+
 test('locking discards an in-flight embedded request', async ({ page }) => {
   let seen = 0;
   let release;

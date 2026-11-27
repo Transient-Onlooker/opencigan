@@ -112,7 +112,7 @@ form.addEventListener('submit', async (event) => {
   state.textContent = '인증 중…';
   try {
     let verified = false;
-    for (const path of ['/api/v1/admin/analytics?days=7', '/api/v1/admin/access-logs?limit=1']) {
+    for (const path of ['/api/v1/admin/analytics?days=7', '/api/v1/admin/access-logs?limit=1', '/api/v1/admin/suggestions?limit=1']) {
       const response = await fetch(`${base}${path}`, {
         headers: { Authorization: `Bearer ${candidate}`, Accept: 'application/json' },
         credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer',
@@ -122,7 +122,7 @@ form.addEventListener('submit', async (event) => {
       if (response.status === 429) throw new Error('요청이 많아요. 잠시 후 다시 시도해 주세요.');
       if (response.ok) {
         const data = await response.json();
-        verified = path.includes('/analytics?') ? Array.isArray(data.daily) && Array.isArray(data.routes) : Array.isArray(data.items);
+        verified = path.includes('/analytics?') ? Array.isArray(data.daily) && Array.isArray(data.routes) : path.includes('/suggestions?') ? Array.isArray(data.suggestions) : Array.isArray(data.items);
         if (verified) break;
       }
     }
