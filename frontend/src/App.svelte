@@ -23,7 +23,7 @@
   import { createSchoolSearchSession } from './school-search-session';
   import { classLessons, teacherLessons, teacherNamesInTimetable, teacherSuggestions as findTeacherSuggestions, selectedTeacherName as findSelectedTeacherName, gradeLessons, comparisonClasses, missingWeekdayDates, observedClassCount as countObservedClasses, subjectNamesInTimetable } from './timetable-view';
   import { applySourceLessonStarts, dailyLessonOverview, koreaClockMinutes, parseLessonTimes, parseWeekdayLessonTimes, parseSourceLessonPreference, lessonTimesForDate, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
-  import { createClassDisplayPreferences, createSchoolDisplayPreferences, defaultDisplaySettings, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
+  import { classDisplayStorageKey, classDisplayStoragePrefix, createClassDisplayPreferences, createSchoolDisplayPreferences, defaultDisplaySettings, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
   import { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, saveLessonTimePreferences, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
   import { apiNotConfigured, getMeals, getTimetable, searchSchools, searchNeisSchools, timetableSubscriptionUrl, type Meal, type NeisSchool, type School, type TimetableRecord, type TimetableResponse } from './api';
 
@@ -277,7 +277,7 @@
     const color = subjectColor(subject, settings);
     return color ? `background-color:${color};color:${subjectTextColor(color)}` : undefined;
   })(displaySettings);
-  $: classDisplayKey = school ? `opensigan-class-display:${school.id}:${grade}:${classroom}` : '';
+  $: classDisplayKey = school ? classDisplayStorageKey(school.id, grade, classroom) : '';
   $: if (classDisplayKey) loadClassDisplay(classDisplayKey, schoolDisplaySettings);
 
   function loadClassDisplay(key: string, fallback: DisplaySettings) {
@@ -941,7 +941,7 @@
           if (!useClassDisplay) displaySettings = schoolDisplaySettings;
         } catch { /* Keep the current in-memory settings when storage is unavailable or unreadable. */ }
       }
-      const classDisplayPrefix = `opensigan-class-display:${school.id}:`;
+      const classDisplayPrefix = classDisplayStoragePrefix(school.id);
       if (event.key === null) {
         if (classDisplayKey) {
           const saved = classDisplayPreferences.syncFromStorage(classDisplayKey);
