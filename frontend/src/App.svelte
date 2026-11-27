@@ -22,9 +22,9 @@
   import { createMealSession } from './meal-session';
   import { createSchoolSearchSession } from './school-search-session';
   import { classLessons, teacherLessons, teacherNamesInTimetable, teacherSuggestions as findTeacherSuggestions, selectedTeacherName as findSelectedTeacherName, gradeLessons, comparisonClasses, missingWeekdayDates, observedClassCount as countObservedClasses, subjectNamesInTimetable } from './timetable-view';
-  import { applySourceLessonStarts, dailyLessonOverview, koreaClockMinutes, parseLessonTimes, parseWeekdayLessonTimes, parseSourceLessonPreference, lessonTimesForDate, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
+  import { applySourceLessonStarts, dailyLessonOverview, koreaClockMinutes, parseLessonTimes, parseWeekdayLessonTimes, lessonTimesForDate, type LessonTimes, type WeekdayLessonTimes } from './lesson-times';
   import { classDisplayStorageKey, classDisplayStoragePrefix, createClassDisplayPreferences, createSchoolDisplayPreferences, defaultDisplaySettings, displayTeacher, subjectColor, subjectTextColor, type ColorMode, type DisplaySettings } from './personalization';
-  import { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, saveLessonTimePreferences, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
+  import { createSettingsBackup, parseSettingsBackup, saveSchoolSettingsBackup, saveLessonTimePreferences, readSourceLessonPreference, MAX_SETTINGS_BACKUP_BYTES } from './settings-backup';
   import { apiNotConfigured, getMeals, getTimetable, searchSchools, searchNeisSchools, timetableSubscriptionUrl, type Meal, type NeisSchool, type School, type TimetableRecord, type TimetableResponse } from './api';
 
   let school: School | null = null;
@@ -552,12 +552,10 @@
     catch { weekdayLessonTimes = {}; }
     weekdayTimeDrafts = { ...weekdayLessonTimes };
     lessonTimeDrafts = { ...lessonTimes }; lessonTimeState = '';
-    try {
-      const preference = parseSourceLessonPreference(JSON.parse(localStorage.getItem(`opensigan-source-lesson-preference:${value.id}`) ?? 'null'));
-      sourceLessonAutoEnabled = preference.enabled;
-      sourceLessonApplied = preference.applied;
-      sourceLessonPrevious = preference.previous;
-    } catch { sourceLessonAutoEnabled = true; sourceLessonApplied = {}; sourceLessonPrevious = {}; }
+    const preference = readSourceLessonPreference(() => localStorage, value.id);
+    sourceLessonAutoEnabled = preference.enabled;
+    sourceLessonApplied = preference.applied;
+    sourceLessonPrevious = preference.previous;
     autoSourceDraftPeriods = []; editedSourcePeriods = new Set(); appliedSourceKey = '';
     subscriptionTimesConsent = false;
     settingsBackupState = '';
