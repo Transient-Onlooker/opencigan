@@ -84,6 +84,32 @@ class OpenApiContractTests(unittest.TestCase):
                 self.assertEqual(statuses, ['200 OK'])
                 self.assertEqual(body, b'')
 
+    def test_timetable_calendar_and_meals_head_contract(self):
+        from backend.app import make_app
+        week = self.start.isoformat()
+        source = {'schoolId': '2:Example', 'weekStart': week, 'records': [],
+                  'sourceUpdatedAt': None, 'fetchedAt': '2026-11-14T00:00:00Z', 'stale': False}
+        cases = [('/api/v1/timetable', {'school': '2:Example', 'week': week}),
+                 ('/api/v1/timetable.ics', {'school': '2:Example', 'grade': '1', 'class': '1'}),
+                 ('/api/v1/meals', {'school': 'B10:1234567', 'from': week, 'to': week})]
+        neis = Mock()
+        neis.get_meals.return_value = []
+        with patch('backend.app.fetch_timetable', return_value=source), \
+             patch('backend.app.NEISClient.from_environment', return_value=neis), \
+             patch.dict('os.environ', {'NEIS_API_KEY': 'synthetic'}):
+            for path, params in cases:
+                with self.subTest(path=path):
+                    item = self.spec['paths'][path]
+                    self.assertEqual(item['head']['parameters'], item['get']['parameters'])
+                    self.assertNotIn('content', item['head']['responses']['200'])
+                    for query, expected in ((urlencode(params), '200 OK'), ('', '400 Bad Request')):
+                        statuses = []
+                        body = b''.join(make_app()({'REQUEST_METHOD': 'HEAD', 'PATH_INFO': path,
+                                                   'QUERY_STRING': query, 'REMOTE_ADDR': '127.0.0.1'},
+                                                  lambda status, headers: statuses.append(status)))
+                        self.assertEqual(statuses, [expected])
+                        self.assertEqual(body, b'')
+
     def test_private_history_stats_contract_for_observed_and_unobserved_weeks(self):
         path = '/api/v1/admin/history-stats'
         headers = {'Authorization': 'Bearer ' + 'x' * 32}

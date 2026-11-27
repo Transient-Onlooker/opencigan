@@ -1214,7 +1214,7 @@ paths:
       tags: [Timetable]
       summary: Get a school's timetable for a week
       description: Optional filters apply to records after the shared school/week cache lookup; filters do not trigger extra upstream requests.
-      parameters:
+      parameters: &timetableParameters
         - name: school
           in: query
           required: true
@@ -1259,6 +1259,17 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+    head:
+      tags: [Timetable]
+      summary: Check a school's weekly timetable
+      description: Uses the same query, cache and upstream lookup as GET, without a response body.
+      parameters: *timetableParameters
+      responses:
+        '200': { description: Timetable is available; no response body. }
+        '400': { description: Invalid request; no response body. }
+        '404': { description: Resource not found; no response body. }
+        '429': { description: Rate limit exceeded; no response body, headers: { Retry-After: { schema: { type: string } } } }
+        '503': { description: Service unavailable; no response body, headers: { Retry-After: { schema: { type: string } } } }
   /api/v1/timetable.ics:
     get:
       tags: [Timetable]
@@ -1271,7 +1282,7 @@ paths:
         are interpreted in Asia/Seoul and serialized as UTC instants. Missing
         periods remain explicitly labelled all-day events. Times in the URL are
         shared with the API and calendar service; no server-side profile is saved.
-      parameters:
+      parameters: &calendarParameters
         - name: school
           in: query
           required: true
@@ -1332,11 +1343,27 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+    head:
+      tags: [Timetable]
+      summary: Check an iCalendar subscription
+      description: Uses the same query, cache and upstream lookup as GET, without a response body.
+      parameters: *calendarParameters
+      responses:
+        '200':
+          description: Calendar is available; no response body.
+          headers: { ETag: { schema: { type: string } }, Cache-Control: { schema: { type: string } } }
+        '304':
+          description: Calendar unchanged; no response body.
+          headers: { ETag: { schema: { type: string } } }
+        '400': { description: Invalid request; no response body. }
+        '404': { description: Resource not found; no response body. }
+        '429': { description: Rate limit exceeded; no response body, headers: { Retry-After: { schema: { type: string } } } }
+        '503': { description: Service unavailable; no response body, headers: { Retry-After: { schema: { type: string } } } }
   /api/v1/meals:
     get:
       tags: [Meals]
       summary: Get meals for a NEIS school
-      parameters:
+      parameters: &mealParameters
         - name: school
           in: query
           required: true
@@ -1368,6 +1395,17 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+    head:
+      tags: [Meals]
+      summary: Check meals for a NEIS school
+      description: Uses the same query, cache and upstream lookup as GET, without a response body.
+      parameters: *mealParameters
+      responses:
+        '200': { description: Meals are available; no response body. }
+        '400': { description: Invalid request; no response body. }
+        '404': { description: Resource not found; no response body. }
+        '429': { description: Rate limit exceeded; no response body, headers: { Retry-After: { schema: { type: string } } } }
+        '503': { description: Service unavailable; no response body, headers: { Retry-After: { schema: { type: string } } } }
   /api/v1/timetable/history.rss:
     get:
       tags: [History]
