@@ -7,7 +7,7 @@
   import type { School } from './api';
   import type { DisplaySettings } from './personalization';
   import type { MealAllergyFilter } from './meal-filter';
-  import { PERSONAL_STORAGE_PREFIX } from './personal-timetable';
+  import { createPersonalDataBackup, hasPersonalData as hasSavedPersonalData } from './personal-data-backup';
   export let view: 'timetable' | 'meals' | 'settings';
   export let school: School | null;
   export let useClassDisplay: boolean;
@@ -71,14 +71,12 @@
   let hasPersonalData = false;
   let personalExportState = '';
   onMount(() => {
-    try { hasPersonalData = Object.keys(localStorage).some((key) => key.startsWith(PERSONAL_STORAGE_PREFIX)); }
+    try { hasPersonalData = hasSavedPersonalData(localStorage); }
     catch { hasPersonalData = false; }
   });
   function exportPersonalData() {
     try {
-      const entries = Object.keys(localStorage).filter((key) => key.startsWith(PERSONAL_STORAGE_PREFIX))
-        .map((key) => ({ key, value: localStorage.getItem(key) }));
-      const blob = new Blob([JSON.stringify({ format: 'opencigan-personal-data', version: 1, entries }, null, 2)], { type: 'application/json' });
+      const blob = new Blob([createPersonalDataBackup(localStorage)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url; link.download = 'opencigan-personal-data.json';
