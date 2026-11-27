@@ -171,12 +171,25 @@ test('anomaly review is opt-in and uses admin rate limiting and bearer forwardin
   assert.deepEqual(preflight.limits, [['general', `preflight:${ip}`]]);
 });
 
+test('school usage aggregation is forwarded through the admin limiter', async () => {
+  const { env, calls, limits } = setup();
+  const ip = '203.0.113.9';
+  const response = await worker.fetch(req('/api/v1/admin/school-usage?days=7&limit=25', {
+    headers: {'CF-Connecting-IP': ip, Authorization: 'Bearer admin-secret'},
+  }), env);
+  assert.equal(response.status, 200);
+  assert.deepEqual(limits, [['general', ip], ['admin', ip]]);
+  assert.equal(calls[0].headers.get('authorization'), 'Bearer admin-secret');
+  assert.equal(new URL(calls[0].url).search, '?days=7&limit=25');
+});
+
 test('meal, admin and webhook limits reject only their own category before forwarding', async () => {
   const ip = '203.0.113.9';
   const headers = {'CF-Connecting-IP': ip};
   for (const [category, path, init] of [
     ['meal', '/api/v1/meals', {}],
     ['admin', '/api/v1/admin/analytics', {}],
+    ['admin', '/api/v1/admin/school-usage', {}],
     ['webhook', '/api/v1/webhooks', {method: 'POST'}],
     ['webhook', '/api/v1/webhooks/abcdefghijklmnopqrstuvwx/deliveries', {}],
   ]) {

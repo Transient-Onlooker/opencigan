@@ -40,6 +40,18 @@ class OpenApiContractTests(unittest.TestCase):
                                          "components": self.spec["components"]}, format_checker=FormatChecker())
         validator.validate(json.loads(body))
 
+    def test_school_usage_contract_matches_admin_route(self):
+        path = '/api/v1/admin/school-usage'
+        result = {'start_day': '2026-11-21', 'end_day': '2026-11-27', 'period_days': 7, 'limit': 50,
+                  'has_more': False, 'items': [{'datatype': 'timetable', 'school_id': '123:School', 'school_name': None, 'requests': 3}]}
+        store = SimpleNamespace(retention_days=7, school_usage=Mock(return_value=result))
+        with patch.dict('os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'synthetic-token'}), patch('backend.app._access_log_store', return_value=store):
+            status, headers, body = dispatch_request('GET', path, 'days=7&limit=50', request_headers={'Authorization': 'Bearer synthetic-token'})
+        self.assertEqual(status, 200)
+        self.assertEqual(headers['Cache-Control'], 'no-store')
+        self.assert_json_response(path, status, headers, body)
+        store.school_usage.assert_called_once_with(7, limit=50)
+
     def test_status_documents_gateway_errors_and_retry_header(self):
         operation = self.spec['paths']['/api/v1/status']['get']
         self.assertIn('429', operation['responses'])

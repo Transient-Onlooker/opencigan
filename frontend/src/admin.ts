@@ -1,5 +1,6 @@
 import './admin.css';
 import './standalone-theme';
+import { createAnalyticsCharts } from './admin-charts';
 
 interface Summary {
   visitors: number; sessions: number; pageViews: number; apiRequests: number;
@@ -29,6 +30,7 @@ interface HistoryStatsResponse {
 const base = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const token = document.querySelector<HTMLInputElement>('#token')!;
 const days = document.querySelector<HTMLSelectElement>('#days')!;
+const autoRefresh = document.querySelector<HTMLSelectElement>('#auto-refresh')!;
 const button = document.querySelector<HTMLButtonElement>('#load')!;
 const state = document.querySelector<HTMLParagraphElement>('#state')!;
 const results = document.querySelector<HTMLElement>('#results')!;
@@ -37,6 +39,21 @@ const hourlyTable = document.querySelector<HTMLElement>('#hourly-table')!;
 const refreshState = document.querySelector<HTMLElement>('#refresh-state')!;
 const refreshTable = document.querySelector<HTMLElement>('#refresh-table')!;
 let request: AbortController | undefined;
+let refreshTimer: ReturnType<typeof setInterval> | undefined;
+
+function stopRefresh() {
+  if (refreshTimer !== undefined) clearInterval(refreshTimer);
+  refreshTimer = undefined;
+  autoRefresh.value = '0';
+}
+autoRefresh.addEventListener('change', () => {
+  if (refreshTimer !== undefined) clearInterval(refreshTimer);
+  refreshTimer = undefined;
+  const seconds = Number(autoRefresh.value);
+  if (seconds === 60 || seconds === 300) refreshTimer = setInterval(() => {
+    if (token.value && !button.disabled && document.visibilityState === 'visible') document.querySelector<HTMLFormElement>('#login')!.requestSubmit();
+  }, seconds * 1000);
+});
 
 const historyStatsEnabled = import.meta.env.VITE_HISTORY_STATS_ENABLED === '1';
 const historySection = document.querySelector<HTMLElement>('#history-stats-section');
@@ -81,6 +98,7 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
     if (!response.ok) throw new Error(response.status === 401 ? '관리자 토큰을 확인해 주세요.' : response.status === 503 ? '서버의 통계 설정이나 저장소 상태를 확인해 주세요.' : `조회에 실패했습니다. (${response.status})`);
     const data: Summary = await response.json();
     if (controller.signal.aborted) return;
+    document.querySelector('#charts')!.replaceChildren(...createAnalyticsCharts(data));
     const metrics = document.querySelector('#metrics')!;
     metrics.replaceChildren();
     const cache = data.cacheStatuses;
@@ -124,16 +142,26 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
 });
 
 document.querySelector('#clear')!.addEventListener('click', () => {
+  stopRefresh();
   request?.abort(); request = undefined; button.disabled = false;
   historyRequest?.abort(); historyRequest = undefined;
   if (historyButton) historyButton.disabled = false;
   if (historyResults) { historyResults.hidden = true; historyResults.replaceChildren(); }
   if (historyState) historyState.textContent = '';
   token.value = ''; results.hidden = true;
+  document.querySelector('#charts')!.replaceChildren();
   document.querySelector('#metrics')!.replaceChildren(); rows('#daily', []); rows('#routes', []); rows('#hourly', []);
   hourlyTable.hidden = true; hourlyState.textContent = '';
   rows('#refresh-observations', []); refreshTable.hidden = true; refreshState.textContent = '';
   state.textContent = '잠겼습니다. 다시 조회하려면 토큰을 입력하세요.'; token.focus();
+});
+
+window.addEventListener('opencigan-admin-lock', () => {
+  stopRefresh();
+  request?.abort(); historyRequest?.abort();
+  token.value = '';
+  results.replaceChildren();
+  historyResults?.replaceChildren();
 });
 
 if (historyStatsEnabled && historyForm && historySchool && historyWeek && historyButton && historyState && historyResults) {

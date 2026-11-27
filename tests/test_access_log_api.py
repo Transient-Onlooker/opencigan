@@ -1,12 +1,95 @@
 import json
 import unittest
+from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 
 from backend.app import dispatch_request
-from backend.access_logs import AccessLogRecorder, AccessLogStore
+from backend.access_logs import AccessLogRecorder, AccessLogStore, SEOUL
 
 
 class AccessLogApiTests(unittest.TestCase):
+    def test_school_usage_aggregates_typed_valid_ids_without_personal_fields(self):
+        store = AccessLogStore(':memory:', retention_days=7)
+        self.addCleanup(store.close)
+        now = datetime.now(SEOUL)
+        events = [
+            ('timetable', '1234:Example High', '203.0.113.1', now),
+            ('timetable', '1234:Example High', '203.0.113.2', now - timedelta(days=1)),
+            ('meals', 'B10:1234567', '203.0.113.3', now),
+            ('meals', '1234:Example High', '203.0.113.4', now),
+            ('timetable', 'invalid', '203.0.113.5', now),
+            ('other', '9999:Other', '203.0.113.6', now),
+        ]
+        for datatype, school_id, ip, received_at in events:
+            store.record({
+                'datatype': datatype, 'school_id': school_id, 'client_ip': ip,
+                'route': '/api/v1/timetable', 'status': 200, 'cache_status': 'hit',
+                'grade': '2', 'class_nm': '3',
+            }, received_at=received_at)
+
+        with patch('backend.app._access_log_store', return_value=store), patch.dict(
+            'os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'test-secret'}
+        ):
+            status, headers, body = dispatch_request(
+                'GET', '/api/v1/admin/school-usage', 'days=2&limit=10',
+                request_headers={'Authorization': 'Bearer test-secret'},
+            )
+        payload = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual(headers['Cache-Control'], 'no-store')
+        self.assertEqual(payload['period_days'], 2)
+        self.assertEqual(payload['items'], [
+            {'datatype': 'timetable', 'school_id': '1234:Example High', 'school_name': None, 'requests': 2},
+            {'datatype': 'meals', 'school_id': 'B10:1234567', 'school_name': None, 'requests': 1},
+        ])
+        serialized = json.dumps(payload)
+        for private_value in ('203.0.113.', 'grade', 'class_nm'):
+            self.assertNotIn(private_value, serialized)
+
+    def test_school_usage_auth_limits_and_disabled_storage(self):
+        store = AccessLogStore(':memory:', retention_days=7)
+        self.addCleanup(store.close)
+        with patch.dict('os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'test-secret'}), patch(
+            'backend.app._access_log_store', return_value=store
+        ):
+            auth = {'Authorization': 'Bearer test-secret'}
+            self.assertEqual(dispatch_request('GET', '/api/v1/admin/school-usage', '')[0], 401)
+            for query in ('days=8', 'days=0', 'limit=101', 'days=2&days=3', 'unknown=x'):
+                with self.subTest(query=query):
+                    self.assertEqual(dispatch_request('GET', '/api/v1/admin/school-usage', query, request_headers=auth)[0], 400)
+        with patch.dict('os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'test-secret'}), patch(
+            'backend.app._access_log_store', return_value=None
+        ):
+            self.assertEqual(dispatch_request('GET', '/api/v1/admin/school-usage', '', request_headers=auth)[0], 503)
+
+    def test_school_usage_limit_counts_only_exactly_valid_ids(self):
+        store = AccessLogStore(':memory:', retention_days=7)
+        self.addCleanup(store.close)
+        for school_id, count in (
+            ('1:Highest', 3), ('2:Next', 2),
+            *((f'{code}:Invalid\x01Name', 5) for code in range(10, 20)),
+        ):
+            for _ in range(count):
+                store.record({'datatype': 'timetable', 'school_id': school_id})
+
+        result = store.school_usage(7, limit=1)
+        self.assertEqual(result['items'], [
+            {'datatype': 'timetable', 'school_id': '1:Highest', 'school_name': None, 'requests': 3},
+        ])
+        self.assertTrue(result['has_more'])
+        limited = store.school_usage(7, limit=2)
+        self.assertEqual([item['school_id'] for item in limited['items']], ['1:Highest', '2:Next'])
+        self.assertFalse(limited['has_more'])
+
+    def test_common_admin_rate_limit_includes_suggestion_routes(self):
+        with patch('backend.app._rate_allowed', return_value=12) as rate:
+            for path in ('/api/v1/admin/suggestions', '/api/v1/admin/suggestions/abcdefghijklmnopqrstuvwx',
+                         '/api/v1/admin/school-usage'):
+                status, headers, _ = dispatch_request('GET', path, '', client='203.0.113.9')
+                self.assertEqual(status, 429)
+                self.assertEqual(headers['Retry-After'], '12')
+            self.assertEqual(rate.call_args_list[0].args[0], ('admin', '203.0.113.9'))
+
     def test_admin_errors_include_standard_error_and_code(self):
         with patch.dict('os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'test-secret'}), \
              patch('backend.app._access_log_store', return_value=None):

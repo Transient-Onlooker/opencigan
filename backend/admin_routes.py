@@ -57,6 +57,35 @@ def access_log_admin(method, query_string, request_headers, headers, access_log_
         return json_response(503, headers, {"error": "접속 로그를 불러오지 못했습니다", "code": "access_logs_unavailable"})
 
 
+def school_usage_admin(method, query_string, request_headers, headers, access_log_store):
+    if method not in ('GET', 'HEAD'):
+        return json_response(405, headers, {"error": "지원하지 않는 메서드입니다", "code": "method_not_allowed"})
+    token = os.environ.get('OPENCIGAN_ADMIN_TOKEN', '')
+    supplied = (request_headers or {}).get('Authorization', '')
+    if not token or not hmac.compare_digest(supplied.encode(), ('Bearer ' + token).encode()):
+        headers['WWW-Authenticate'] = 'Bearer realm="Opencigan school usage"'
+        return json_response(401, headers, {"error": "인증이 필요합니다", "code": "unauthorized"})
+    try:
+        values = parse_qs(query_string, keep_blank_values=True, max_num_fields=4)
+        if set(values) - {'days', 'limit'} or any(len(items) != 1 for items in values.values()):
+            raise ValueError('invalid query')
+        days = int(values['days'][0]) if 'days' in values else None
+        limit = int(values.get('limit', ['100'])[0])
+        store = access_log_store()
+        if store is None:
+            return json_response(503, headers, {"error": "접속 로그가 비활성화되어 있습니다", "code": "access_logs_disabled"})
+        if days is None:
+            days = min(7, store.retention_days)
+        result = store.school_usage(days, limit=limit)
+        body = json.dumps(result, ensure_ascii=False).encode()
+        headers['Content-Length'] = str(len(body))
+        return 200, headers, body
+    except (ValueError, TypeError):
+        return json_response(400, headers, {"error": "조회 조건이 올바르지 않습니다", "code": "invalid_request"})
+    except (OSError, sqlite3.Error):
+        return json_response(503, headers, {"error": "접속 로그를 불러오지 못했습니다", "code": "access_logs_unavailable"})
+
+
 def access_anomaly_review(method, query_string, request_headers, headers, access_log_store):
     def bad_request(message):
         return json_response(400, headers, {"error": message, "code": "invalid_request"})
