@@ -60,6 +60,19 @@ class OpenApiContractTests(unittest.TestCase):
         self.assertEqual(headers['Retry-After'], '12')
         self.assert_json_response(path, status, headers, body)
 
+    def test_school_usage_unavailable_contract(self):
+        import sqlite3
+        path = '/api/v1/admin/school-usage'
+        auth = {'Authorization': 'Bearer synthetic-token'}
+        failing = SimpleNamespace(retention_days=7, school_usage=Mock(side_effect=sqlite3.OperationalError('synthetic')))
+        with patch.dict('os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'synthetic-token'}):
+            for store, code in ((None, 'access_logs_disabled'), (failing, 'access_logs_unavailable')):
+                with self.subTest(code=code), patch('backend.app._access_log_store', return_value=store):
+                    status, headers, body = dispatch_request('GET', path, '', request_headers=auth)
+                self.assertEqual(status, 503)
+                self.assertEqual(json.loads(body)['code'], code)
+                self.assert_json_response(path, status, headers, body)
+
     def test_status_documents_gateway_errors_and_retry_header(self):
         operation = self.spec['paths']['/api/v1/status']['get']
         self.assertIn('429', operation['responses'])

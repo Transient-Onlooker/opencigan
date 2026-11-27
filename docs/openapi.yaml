@@ -55,7 +55,11 @@ paths:
         '400': { $ref: '#/components/responses/SuggestionAdminBadRequest' }
         '401': { $ref: '#/components/responses/SuggestionAdminUnauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-        '503': { description: Access log store or gateway unavailable. }
+        '503':
+          description: Access log store or gateway unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
     head:
       tags: [System]
       summary: Check school request aggregates
