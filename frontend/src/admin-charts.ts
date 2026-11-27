@@ -13,6 +13,7 @@ export interface AnalyticsChartSummary {
     upstream_errors?: number | null;
     overload_errors?: number | null;
     cache_hits?: number | null;
+    cache_misses?: number | null;
     stale_responses?: number | null;
   }>;
   routes?: Array<{
@@ -150,6 +151,7 @@ export function createAnalyticsCharts(summary: AnalyticsChartSummary, doc: Docum
   ];
   const cacheSeries: Series[] = [
     { key: 'cache_hits', label: '적중', color: '#16803d' },
+    { key: 'cache_misses', label: '미스', color: '#2563eb' },
     { key: 'stale_responses', label: '이전 캐시', color: '#c2410c' },
   ];
   const toData = (rows: Array<Record<string, unknown>>, labelKey: string, series: Series[], format: (label: string) => string): Datum[] =>
@@ -161,7 +163,7 @@ export function createAnalyticsCharts(summary: AnalyticsChartSummary, doc: Docum
 
   if (summary.daily) charts.push(makeChart(doc, '일별 이용', '날짜별 방문자, 세션, 페이지 조회, API 요청 수입니다. 자료 누락은 자료 없음으로 표시합니다.', toData(summary.daily, 'day', dailySeries, kstDate), dailySeries));
   if (summary.apiHourly) charts.push(makeChart(doc, '시간별 API 요청', '한국 시간 기준 시간대별 요청과 오류 수입니다. 요청이 없던 시간대는 응답 자료에 포함되지 않습니다.', toData(summary.apiHourly, 'hour', hourlySeries, kstHour), hourlySeries));
-  if (summary.apiHourly) charts.push(makeChart(doc, '시간별 캐시 응답', '캐시 상태가 기록된 적중과 이전 캐시 응답 건수입니다. 미스는 시간별로 제공되지 않습니다.', toData(summary.apiHourly, 'hour', cacheSeries, kstHour), cacheSeries));
+  if (summary.apiHourly) charts.push(makeChart(doc, '시간별 캐시 응답', '캐시 상태가 기록된 적중, 미스, 이전 캐시 응답 건수입니다. 자료가 제공되지 않으면 자료 없음으로 표시합니다.', toData(summary.apiHourly, 'hour', cacheSeries, kstHour), cacheSeries));
   if (summary.apiHourly) {
     const errors = summary.apiHourly.map((row) => ({ label: kstHour(row.hour), values: [typeof row.requests === 'number' && row.requests > 0 && typeof row.errors === 'number' ? Math.round(row.errors / row.requests * 1000) / 10 : null] }));
     charts.push(makeChart(doc, '시간별 API 오류율 (%)', '각 시간의 오류 응답 수를 전체 API 요청 수로 나눈 값입니다.', errors, [{ key: 'rate', label: '오류율 %', color: '#dc2626' }]));

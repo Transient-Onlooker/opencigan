@@ -8,7 +8,7 @@ interface Summary {
   cacheStatuses?: Record<string, number>; failureKinds?: Record<string, number>;
   refreshObservations?: Record<string, { result: 'success' | 'failure' | 'not_cached'; observedAt: string; lastSuccessAt?: string; lastFailureAt?: string; durationMs?: number; origin?: 'timetable' | 'calendar' | null }>;
   cacheWaitObservations?: Record<string, { waitMs: number; observedAt: string }>;
-  apiHourly?: { hour: string; requests: number; errors: number; upstream_errors: number; overload_errors: number; cache_hits: number; stale_responses: number }[];
+  apiHourly?: { hour: string; requests: number; errors: number; upstream_errors: number; overload_errors: number; cache_hits: number; cache_misses?: number; stale_responses: number }[];
   daily: { day: string; visitors: number; sessions: number; page_views: number; api_requests: number }[];
   routes: { route: string; requests: number; errors: number; avg_ms: number; data_failures?: number; overload_errors?: number; unclassified_server_errors?: number; cache_observed?: number; cache_hits?: number; cache_misses?: number; stale_responses?: number }[];
 }
@@ -129,7 +129,7 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
     refreshTable.hidden = !observations;
     refreshState.textContent = observations ? '' : '현재 서버에서는 갱신 관측을 제공하지 않습니다.';
     const hourly = data.apiHourly;
-    rows('#hourly', (hourly ?? []).map((h) => [h.hour.slice(0, 16).replace('T', ' '), h.requests, h.errors, h.upstream_errors, h.overload_errors, h.cache_hits, h.stale_responses]));
+    rows('#hourly', (hourly ?? []).map((h) => [h.hour.slice(0, 16).replace('T', ' '), h.requests, h.errors, h.upstream_errors, h.overload_errors, h.cache_hits, h.cache_misses ?? '미제공', h.stale_responses]));
     hourlyTable.hidden = !hourly?.length;
     hourlyState.textContent = !hourly ? '현재 서버에서는 시간대별 통계를 제공하지 않습니다.' : hourly.length ? '' : '최근 24시간에 기록된 API 요청이 없습니다.';
     results.hidden = false;

@@ -60,6 +60,7 @@ class AnalyticsTests(unittest.TestCase):
             ("2026-11-17T10:00:00+09:00", 503, None, "upstream_unavailable"),
             ("2026-11-17T13:15:00+09:00", 200, "hit", None),
             ("2026-11-17T13:30:00+09:00", 200, "stale", None),
+            ("2026-11-17T13:45:00+09:00", 200, "miss", None),
             ("2026-11-18T11:00:00+09:00", 503, None, "service_overloaded"),
             ("2026-11-18T11:30:00+09:00", 503, None, "upstream_unavailable"),
         ]
@@ -69,10 +70,10 @@ class AnalyticsTests(unittest.TestCase):
         with patch.object(store, "_now", return_value=("2026-11-18", "2026-11-18T12:00:00+09:00")):
             hourly = store.summary(30)["apiHourly"]
         self.assertEqual(hourly, [
-            {"hour": "2026-11-17T13:00:00+09:00", "requests": 2, "errors": 0, "upstream_errors": 0,
-             "overload_errors": 0, "cache_hits": 1, "stale_responses": 1},
+            {"hour": "2026-11-17T13:00:00+09:00", "requests": 3, "errors": 0, "upstream_errors": 0,
+             "overload_errors": 0, "cache_hits": 1, "cache_misses": 1, "stale_responses": 1},
             {"hour": "2026-11-18T11:00:00+09:00", "requests": 2, "errors": 2, "upstream_errors": 1,
-             "overload_errors": 1, "cache_hits": 0, "stale_responses": 0},
+             "overload_errors": 1, "cache_hits": 0, "cache_misses": 0, "stale_responses": 0},
         ])
 
     def test_request_metadata_is_forwarded_to_analytics(self):

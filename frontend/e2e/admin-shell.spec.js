@@ -61,6 +61,17 @@ test('rejects invalid admin credentials without showing a workspace', async ({ p
   await expect(page.locator('iframe')).toHaveCount(0);
 });
 
+test('can authenticate using access logs if analytics is unavailable', async ({ page }) => {
+  await page.route('**/api/v1/admin/analytics?**', (route) => route.fulfill({ status: 503, json: { code: 'analytics_disabled' } }));
+  await page.route('**/api/v1/admin/access-logs?**', (route) => route.fulfill({ json: { items: [], next_cursor: null, limit: 1, has_more: false } }));
+  await page.goto('/admin/');
+  await page.locator('#admin-token').fill('example-admin-token');
+  await page.getByRole('button', { name: '잠금 해제' }).click();
+  await expect(page.locator('#admin-workspace')).toBeVisible();
+  await page.getByRole('button', { name: '접속 로그' }).click();
+  await expect(page.frameLocator('iframe[title="접속 로그"]').locator('#token')).toHaveValue('example-admin-token');
+});
+
 test('locking discards an in-flight embedded request', async ({ page }) => {
   let seen = 0;
   let release;
