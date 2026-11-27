@@ -22,7 +22,10 @@ test('admin hourly diagnostics show data, support older servers, and clear on lo
   await expect(table).toBeVisible();
   await expect(table.locator('tbody tr')).toHaveCount(1);
   await expect(table).toContainText('2026-11-18 11:00');
-  await expect(table.locator('tbody tr').locator('td')).toHaveText(['2026-11-18 11:00', '2', '1', '1', '0', '1', '0']);
+  await expect(table.locator('tbody tr').locator('td')).toHaveText(['2026-11-18 11:00', '2', '1', '1', '0', '1', '미제공', '0']);
+  summary.apiHourly[0].cache_misses = 0;
+  await page.getByRole('button', { name: '조회 / 새로고침' }).click();
+  await expect(table.locator('tbody tr').locator('td')).toHaveText(['2026-11-18 11:00', '2', '1', '1', '0', '1', '0', '0']);
   const routes = page.getByRole('region', { name: '경로별 통계 표' }).locator('tbody tr');
   await expect(routes.nth(0).locator('td')).toHaveText(['/api/v1/timetable', '2', '1', '1', '0', '0', '10', '2', '1', '0', '1']);
   await expect(routes.nth(1).locator('td')).toHaveText(['/api/v1/meals', '1', '0', '—', '—', '—', '5', '—', '—', '—', '—']);
