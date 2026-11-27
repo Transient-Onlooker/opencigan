@@ -130,6 +130,32 @@ test('locking discards an in-flight embedded request', async ({ page }) => {
   await expect(page.locator('#admin-content')).toBeEmpty();
 });
 
+test('suggestion actions require confirmation and report failed writes', async ({ page }) => {
+  const item = { id: 'a'.repeat(24), title: '제안', description: '내용', context: null, status: 'pending', created_at: '2026-11-27', reviewed_at: null, merged_into: null, reviewer_note: null };
+  let writes = 0;
+  await page.route('**/api/v1/admin/analytics?**', (route) => route.fulfill({ json: { visitors: 0, sessions: 0, pageViews: 0, apiRequests: 0, apiErrorRate: 0, apiAverageMs: 0, droppedApiEvents: 0, daily: [], routes: [] } }));
+  await page.route(/\/api\/v1\/admin\/suggestions(?:[/?].*)?$/, (route) => {
+    if (route.request().method() === 'PATCH' || route.request().method() === 'DELETE') {
+      writes++;
+      return route.fulfill({ status: 503, json: { code: 'unavailable' } });
+    }
+    return route.fulfill({ json: { suggestions: [item], nextCursor: null } });
+  });
+  await page.goto('/admin/');
+  await page.locator('#admin-token').fill('example-admin-token');
+  await page.getByRole('button', { name: '잠금 해제' }).click();
+  await page.getByRole('button', { name: '기능 제안' }).click();
+  await expect(page.getByRole('heading', { name: '제안', exact: true })).toBeVisible();
+  page.once('dialog', (dialog) => dialog.dismiss());
+  await page.getByRole('button', { name: '삭제', exact: true }).click();
+  expect(writes).toBe(0);
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: '승인', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: '변경을 저장하지 못했습니다.' })).toBeVisible();
+  expect(writes).toBe(1);
+  await expect(page.getByRole('heading', { name: '제안', exact: true })).toBeVisible();
+});
+
 test('enabled history and anomaly views use the shared token', async ({ page }) => {
   test.skip(process.env.VITE_HISTORY_STATS_ENABLED !== '1' || process.env.VITE_ACCESS_ANOMALIES_ENABLED !== '1', 'Optional administrator views are disabled in this build');
   await page.route('**/api/v1/admin/analytics?**', (route) => route.fulfill({ json: { visitors: 0, sessions: 0, pageViews: 0, apiRequests: 0, apiErrorRate: 0, apiAverageMs: 0, droppedApiEvents: 0, daily: [], routes: [] } }));
