@@ -52,6 +52,14 @@ class OpenApiContractTests(unittest.TestCase):
         self.assert_json_response(path, status, headers, body)
         store.school_usage.assert_called_once_with(7, limit=50)
 
+    def test_admin_analytics_rate_limit_contract(self):
+        path = '/api/v1/admin/analytics'
+        with patch('backend.app._rate_allowed', return_value=12):
+            status, headers, body = dispatch_request('GET', path, 'days=7', client='203.0.113.1')
+        self.assertEqual(status, 429)
+        self.assertEqual(headers['Retry-After'], '12')
+        self.assert_json_response(path, status, headers, body)
+
     def test_status_documents_gateway_errors_and_retry_header(self):
         operation = self.spec['paths']['/api/v1/status']['get']
         self.assertIn('429', operation['responses'])

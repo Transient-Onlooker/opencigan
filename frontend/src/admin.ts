@@ -95,7 +95,7 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
       credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer',
       signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]),
     });
-    if (!response.ok) throw new Error(response.status === 401 ? '관리자 토큰을 확인해 주세요.' : response.status === 503 ? '서버의 통계 설정이나 저장소 상태를 확인해 주세요.' : `조회에 실패했습니다. (${response.status})`);
+    if (!response.ok) throw new Error(response.status === 401 ? '관리자 토큰을 확인해 주세요.' : response.status === 429 ? '요청이 많아요. 잠시 후 다시 시도해 주세요.' : response.status === 503 ? '서버의 통계 설정이나 저장소 상태를 확인해 주세요.' : `조회에 실패했습니다. (${response.status})`);
     const data: Summary = await response.json();
     if (controller.signal.aborted) return;
     document.querySelector('#charts')!.replaceChildren(...createAnalyticsCharts(data));
