@@ -38,7 +38,7 @@ function lock() {
 }
 
 function showPage(page: string) {
-  if (!token || (page !== 'analytics' && page !== 'logs' && page !== 'suggestions' && page !== 'status' && page !== 'schools')) return;
+  if (!token || !['analytics', 'logs', 'anomalies', 'history', 'suggestions', 'status', 'schools'].includes(page)) return;
   const current = ++generation;
   clearContent();
   document.querySelectorAll<HTMLButtonElement>('[data-page]').forEach((button) => {
@@ -51,6 +51,11 @@ function showPage(page: string) {
   if (page === 'schools') {
     disposeContent = mountSchoolUsage(content, token, base);
     return;
+  }
+  if ((page === 'history' && import.meta.env.VITE_HISTORY_STATS_ENABLED !== '1') || (page === 'anomalies' && import.meta.env.VITE_ACCESS_ANOMALIES_ENABLED !== '1')) {
+    const notice = document.createElement('p'); notice.setAttribute('role', 'status');
+    notice.textContent = page === 'history' ? '시간표 관측 통계가 이 배포에서 활성화되지 않았습니다.' : '이상 접근 검토가 이 배포에서 활성화되지 않았습니다.';
+    content.append(notice); return;
   }
   if (page === 'status') {
     const controller = new AbortController();
@@ -68,7 +73,8 @@ function showPage(page: string) {
     return;
   }
   const frame = document.createElement('iframe');
-  frame.title = page === 'analytics' ? '이용 통계' : '접속 로그';
+  const isAnalytics = page === 'analytics' || page === 'history';
+  frame.title = page === 'history' ? '시간표 관측' : page === 'anomalies' ? '이상 접근' : isAnalytics ? '이용 통계' : '접속 로그';
   frame.className = 'admin-frame';
   frame.addEventListener('load', () => {
     if (generation !== current || !token || !frame.isConnected) return;
@@ -78,11 +84,19 @@ function showPage(page: string) {
     field.value = token;
     field.closest('label')?.setAttribute('hidden', '');
     doc.querySelector('header')?.setAttribute('hidden', '');
-    const oldLock = doc.querySelector<HTMLButtonElement>(page === 'analytics' ? '#clear' : '#lock-btn');
+    const oldLock = doc.querySelector<HTMLButtonElement>(isAnalytics ? '#clear' : '#lock-btn');
     oldLock?.addEventListener('click', (event) => { event.stopImmediatePropagation(); lock(); }, { capture: true });
     if (page === 'analytics') doc.querySelector<HTMLFormElement>('#login')?.requestSubmit();
+    if (page === 'history') {
+      doc.querySelector('#login')?.setAttribute('hidden', '');
+      doc.querySelector('#state')?.setAttribute('hidden', '');
+    }
+    if (page === 'anomalies') {
+      doc.querySelector('#filter-form')?.setAttribute('hidden', '');
+      doc.querySelector('#state')?.setAttribute('hidden', '');
+    }
   }, { once: true });
-  frame.src = page === 'analytics' ? '/analytics.html' : '/access-logs.html';
+  frame.src = isAnalytics ? '/analytics.html' : '/access-logs.html';
   content.append(frame);
 }
 

@@ -38,6 +38,10 @@ test('admin login, charts, navigation and lock keep credentials out of URLs and 
   await page.getByRole('button', { name: '학교별 조회' }).click();
   await expect(page.getByRole('cell', { name: '샘플학교', exact: true })).toBeVisible();
   await expect(page.locator('.school-bar')).toHaveCount(1);
+  await page.getByRole('button', { name: '시간표 관측' }).click();
+  await expect(page.getByText('시간표 관측 통계가 이 배포에서 활성화되지 않았습니다.')).toBeVisible();
+  await page.getByRole('button', { name: '이상 접근' }).click();
+  await expect(page.getByText('이상 접근 검토가 이 배포에서 활성화되지 않았습니다.')).toBeVisible();
   await page.getByRole('button', { name: '잠금', exact: true }).click();
   await expect(page.locator('iframe')).toHaveCount(0);
   await expect(page.locator('#admin-content')).toBeEmpty();
