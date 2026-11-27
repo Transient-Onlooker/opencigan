@@ -7,7 +7,7 @@
 ### QA4 후속 개발
 
 - QA4-001: [#345](https://github.com/Transient-Onlooker/opencigan/pull/345)에서 ‘이번 주’ 선택 시 현재 주로 돌아가도록 수정하고 느린 응답과 뒤로·앞으로 이동을 검사했다.
-- QA3-001: 무효 학급 공유 링크의 안내·주소 복원은 기존 코드와 자동 검사에 반영돼 있다. 지연된 학교 확인의 추가 회귀는 [#348](https://github.com/Transient-Onlooker/opencigan/pull/348)에서 검토 중이다.
+- QA3-001: 무효 학급 공유 링크의 안내·주소 복원은 기존 코드와 자동 검사에 반영돼 있다. [#348](https://github.com/Transient-Onlooker/opencigan/pull/348)에서 지연된 학교 확인의 회귀 검사도 추가했다.
 - QA3-002: [#346](https://github.com/Transient-Onlooker/opencigan/pull/346)에서 주차 이동 시 교사 선택을 유지하고 해당 주에 교사가 없을 때 안내한다.
 - QA4-002: [#347](https://github.com/Transient-Onlooker/opencigan/pull/347)에서 종료 시각이 없어 현재·다음 수업을 판정할 수 없는 이유를 안내한다.
 
