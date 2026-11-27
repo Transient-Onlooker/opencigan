@@ -647,10 +647,29 @@ test('teacher subtitle follows the selected week', async ({ page }) => {
   await panel.getByLabel('교사별 주간 시간표').fill('김교사');
   await expect(panel.getByText('김교사 선생님 · 이번 주 수업', { exact: false })).toBeVisible();
   await panel.getByRole('button', { name: '다음 주', exact: true }).click();
-  await panel.getByLabel('교사별 주간 시간표').fill('김교사');
+  await expect(panel.getByLabel('교사별 주간 시간표')).toHaveValue('김교사');
   await expect(panel.getByText('김교사 선생님 · 다음 주 수업', { exact: false })).toBeVisible();
   await panel.getByRole('button', { name: '이전 주', exact: true }).click();
+  await expect(panel.getByLabel('교사별 주간 시간표')).toHaveValue('김교사');
+  await expect(panel.getByText('김교사 선생님 · 이번 주 수업', { exact: false })).toBeVisible();
+});
+
+test('teacher selection remains editable when no matching teacher exists in the next week', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/v1/timetable?*', (route) => {
+    const requestedWeek = new URL(route.request().url()).searchParams.get('week');
+    return route.fulfill({ json: { ...timetable, weekStart: requestedWeek,
+      records: timetable.records.map((record) => ({ ...record, date: requestedWeek, teacher: requestedWeek === week ? '김교사' : '박교사' })) } });
+  });
+  await page.goto('/' + sharedHash(1));
+  const panel = page.locator('#timetable-panel');
+  await panel.getByRole('group', { name: '시간표 보기' }).getByRole('button', { name: '교사', exact: true }).click();
   await panel.getByLabel('교사별 주간 시간표').fill('김교사');
+  await expect(panel.getByText('김교사 선생님 · 이번 주 수업', { exact: false })).toBeVisible();
+  await panel.getByRole('button', { name: '다음 주', exact: true }).click();
+  await expect(panel.getByLabel('교사별 주간 시간표')).toHaveValue('김교사');
+  await expect(panel.getByText('이 주에 검색된 교사가 없어요')).toBeVisible();
+  await panel.getByRole('button', { name: '이전 주', exact: true }).click();
   await expect(panel.getByText('김교사 선생님 · 이번 주 수업', { exact: false })).toBeVisible();
 });
 
