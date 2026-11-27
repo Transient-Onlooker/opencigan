@@ -48,11 +48,12 @@
           {/if}
         {/if}
       {/if}
-      <p><a href="./embed-builder.html">시간표 위젯 만들기</a></p>
+      <p><a class="secondary-button widget-link" href="./embed-builder.html">시간표 위젯 만들기 <span aria-hidden="true">↗</span></a></p>
     </section>
 
 <style>
 .secondary-actions{border-top:1px solid var(--line);margin-top:28px;padding-top:20px}
+.widget-link,.widget-link:visited{display:inline-flex;align-items:center;gap:8px;box-sizing:border-box;max-width:100%;color:var(--ink);text-decoration:none}.widget-link:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .share-tools{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:16px;font-size:14px}.shared-link{display:grid;gap:4px;margin-bottom:20px}.shared-link input{width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
 .subscription-example{margin:8px 0 16px;padding:12px;border:1px solid var(--line);font-size:13px;line-height:1.6;overflow-wrap:anywhere}.subscription-example p{margin:4px 0 8px;color:var(--muted)}.subscription-example small{color:var(--muted)}
 @media(max-width:700px){.share-tools{margin-bottom:8px;gap:6px}.share-tools .secondary-button{min-height:38px;padding:5px 9px;font-size:12px}}
