@@ -5,8 +5,10 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 
 const source = await readFile(new URL('../src/selection.ts', import.meta.url), 'utf8');
+const storageSource = await readFile(new URL('../src/selection-storage.ts', import.meta.url), 'utf8');
 const exports = {};
 runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports, AbortController });
+runInNewContext(ts.transpileModule(storageSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports });
 
 test('selection owners publish independent snapshots without losing unrelated selection fields', () => {
   const initial = { school: null, grade: 1, classroom: 1, week: '2026-11-09' };

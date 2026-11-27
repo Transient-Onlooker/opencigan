@@ -11,6 +11,8 @@ export const personalizationVm = {};
 runInNewContext(compiled, { exports: personalizationVm });
 const selection = readFileSync(new URL('../../src/selection.ts', import.meta.url), 'utf8');
 runInNewContext(ts.transpileModule(selection, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports: personalizationVm, AbortController });
+const selectionStorage = readFileSync(new URL('../../src/selection-storage.ts', import.meta.url), 'utf8');
+runInNewContext(ts.transpileModule(selectionStorage, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports: personalizationVm });
 const cache = readFileSync(new URL('../../src/timetable-cache.ts', import.meta.url), 'utf8');
 runInNewContext(ts.transpileModule(cache, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { exports: personalizationVm, AbortController });
 const timetableView = readFileSync(new URL('../../src/timetable-view.ts', import.meta.url), 'utf8');
