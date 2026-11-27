@@ -110,6 +110,37 @@ class OpenApiContractTests(unittest.TestCase):
                         self.assertEqual(statuses, [expected])
                         self.assertEqual(body, b'')
 
+    def test_history_head_contract_matches_wsgi(self):
+        from backend.app import make_app
+        cases = [('/api/v1/timetable/history', {'school': '2:Example', 'week': self.start.isoformat()}),
+                 ('/api/v1/timetable/history.rss', {'school': '2:Example', 'grade': '1', 'class': '1'})]
+        store = Mock()
+        store.list.return_value = {'changes': [], 'nextCursor': None}
+
+        def request(path, query, etag=None):
+            result = []
+            env = {'REQUEST_METHOD': 'HEAD', 'PATH_INFO': path, 'QUERY_STRING': query, 'REMOTE_ADDR': '127.0.0.1'}
+            if etag:
+                env['HTTP_IF_NONE_MATCH'] = etag
+            body = b''.join(make_app()(env, lambda status, headers: result.append((status, dict(headers)))))
+            self.assertEqual(body, b'')
+            return result[0]
+
+        for path, params in cases:
+            with self.subTest(path=path):
+                operation = self.spec['paths'][path]
+                self.assertEqual(operation['head']['parameters'], operation['get']['parameters'])
+                self.assertNotIn('content', operation['head']['responses']['200'])
+                with patch('backend.app._history_store', return_value=store):
+                    status, headers = request(path, urlencode(params))
+                    self.assertEqual(status, '200 OK')
+                    self.assertEqual(request(path, '')[0], '400 Bad Request')
+                    if path.endswith('.rss'):
+                        self.assertIn('ETag', headers)
+                        self.assertEqual(request(path, urlencode(params), headers['ETag'])[0], '304 Not Modified')
+                with patch('backend.app._history_store', return_value=None):
+                    self.assertEqual(request(path, urlencode(params))[0], '503 Service Unavailable')
+
     def test_private_history_stats_contract_for_observed_and_unobserved_weeks(self):
         path = '/api/v1/admin/history-stats'
         headers = {'Authorization': 'Bearer ' + 'x' * 32}

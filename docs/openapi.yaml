@@ -1411,7 +1411,7 @@ paths:
       tags: [History]
       summary: Subscribe to observed classroom changes as RSS
       description: Most recent 50 observed changes for one classroom. Defaults to the current KST week; the feed does not refresh the source timetable and may miss unobserved changes. History must be enabled.
-      parameters:
+      parameters: &historyRssParameters
         - { name: school, in: query, required: true, schema: { type: string, pattern: '^[0-9]+:[^:]{1,50}$' } }
         - { name: grade, in: query, required: true, schema: { type: integer, minimum: 1, maximum: 6 } }
         - { name: class, in: query, required: true, schema: { type: integer, minimum: 1, maximum: 99 } }
@@ -1443,6 +1443,17 @@ paths:
                   value: { error: 변경 이력 저장이 활성화되지 않았습니다, code: history_disabled }
                 unavailable:
                   value: { error: 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요., code: upstream_unavailable }
+    head:
+      tags: [History]
+      summary: Check the observed classroom changes feed
+      description: Uses the same query and history store as GET, without a response body.
+      parameters: *historyRssParameters
+      responses:
+        '200': { description: Feed is available; no response body, headers: { ETag: { schema: { type: string } } } }
+        '304': { description: Feed unchanged; no response body, headers: { ETag: { schema: { type: string } } } }
+        '400': { description: Invalid request; no response body. }
+        '429': { description: Rate limit exceeded; no response body, headers: { Retry-After: { schema: { type: string } } } }
+        '503': { description: History is unavailable; no response body. }
   /api/v1/timetable/history:
     get:
       tags: [History]
@@ -1451,7 +1462,7 @@ paths:
         Returns observed changes, not a complete historical timetable. Pass
         `nextCursor` back as `cursor` to fetch the next page. History is kept
         for 30 days, and the first observation establishes a baseline.
-      parameters:
+      parameters: &historyParameters
         - name: school
           in: query
           required: true
@@ -1499,6 +1510,17 @@ paths:
                   value: { error: 변경 이력 저장이 활성화되지 않았습니다, code: history_disabled }
                 unavailable:
                   value: { error: 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요., code: upstream_unavailable }
+    head:
+      tags: [History]
+      summary: Check observed timetable changes
+      description: Uses the same query and history store as GET, without a response body.
+      parameters: *historyParameters
+      responses:
+        '200': { description: History is available; no response body. }
+        '400': { description: Invalid request; no response body. }
+        '404': { description: Resource not found; no response body. }
+        '429': { description: Rate limit exceeded; no response body, headers: { Retry-After: { schema: { type: string } } } }
+        '503': { description: History is unavailable; no response body. }
 components:
   securitySchemes:
     SuggestionAuthor:
