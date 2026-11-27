@@ -4,8 +4,9 @@ test('admin hourly diagnostics show data, support older servers, and clear on lo
   const summary = {
     visitors: 0, sessions: 0, pageViews: 0, apiRequests: 2, apiErrorRate: 0.5,
     apiAverageMs: 10, droppedApiEvents: 0, daily: [], routes: [
-      { route: '/api/v1/timetable', requests: 2, errors: 1, avg_ms: 10, data_failures: 1, overload_errors: 0, unclassified_server_errors: 0 },
+      { route: '/api/v1/timetable', requests: 2, errors: 1, avg_ms: 10, data_failures: 1, overload_errors: 0, unclassified_server_errors: 0, cache_observed: 2, cache_hits: 1, cache_misses: 0, stale_responses: 1 },
       { route: '/api/v1/meals', requests: 1, errors: 0, avg_ms: 5 },
+      { route: '/api/v1/schools', requests: 1, errors: 0, avg_ms: 5, cache_observed: 0, cache_hits: 0, cache_misses: 0, stale_responses: 0 },
     ],
     refreshObservations: { timetable: { result: 'failure', origin: 'calendar', observedAt: '2026-11-18T02:00:00+00:00', lastSuccessAt: '2026-11-18T01:00:00+00:00', lastFailureAt: '2026-11-18T02:00:00+00:00', durationMs: 1250 }, meals: { result: 'not_cached', observedAt: '2026-11-18T02:00:00+00:00' } },
     cacheWaitObservations: { timetable: { waitMs: 320, observedAt: '2026-11-18T02:01:00+00:00' } },
@@ -16,14 +17,16 @@ test('admin hourly diagnostics show data, support older servers, and clear on lo
   await page.goto('/analytics.html');
   await page.getByLabel('관리자 토큰').fill('test-token');
   await page.getByRole('button', { name: '조회 / 새로고침' }).click();
+  await expect(page.locator('#metrics')).toContainText('기록된 캐시 적중률');
   const table = page.getByRole('region', { name: '시간대별 API 상태 표' });
   await expect(table).toBeVisible();
   await expect(table.locator('tbody tr')).toHaveCount(1);
   await expect(table).toContainText('2026-11-18 11:00');
   await expect(table.locator('tbody tr').locator('td')).toHaveText(['2026-11-18 11:00', '2', '1', '1', '0', '1', '0']);
   const routes = page.getByRole('region', { name: '경로별 통계 표' }).locator('tbody tr');
-  await expect(routes.nth(0).locator('td')).toHaveText(['/api/v1/timetable', '2', '1', '1', '0', '0', '10']);
-  await expect(routes.nth(1).locator('td')).toHaveText(['/api/v1/meals', '1', '0', '—', '—', '—', '5']);
+  await expect(routes.nth(0).locator('td')).toHaveText(['/api/v1/timetable', '2', '1', '1', '0', '0', '10', '2', '1', '0', '1']);
+  await expect(routes.nth(1).locator('td')).toHaveText(['/api/v1/meals', '1', '0', '—', '—', '—', '5', '—', '—', '—', '—']);
+  await expect(routes.nth(2).locator('td')).toHaveText(['/api/v1/schools', '1', '0', '—', '—', '—', '5', '0', '—', '—', '—']);
   const observations = page.getByRole('region', { name: '데이터 갱신 관측 표' });
   await expect(observations).toContainText('아직 관측 없음');
   await expect(observations).toContainText('실패');
