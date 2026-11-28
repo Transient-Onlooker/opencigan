@@ -31,14 +31,18 @@ export function writeAnimations(storage: Pick<Storage, 'setItem'>, enabled: bool
 }
 
 export function readAllergies(storage: Pick<Storage, 'getItem'>) {
-  const allergies: unknown = JSON.parse(storage.getItem('opensigan-allergies') || '[]');
+  const raw = storage.getItem('opensigan-allergies');
+  let allergies: unknown;
+  try { allergies = JSON.parse(raw || '[]'); } catch { return []; }
   return Array.isArray(allergies)
     ? [...new Set(allergies.filter((id): id is number => Number.isInteger(id) && id >= 1 && id <= 19))].sort((a, b) => a - b)
     : [];
 }
 
 export function readMealPreferences(storage: Pick<Storage, 'getItem'>, mealTypes: string[], defaults: MealPreferences) {
-  const saved: unknown = JSON.parse(storage.getItem('opensigan-meal-preferences') || 'null');
+  const raw = storage.getItem('opensigan-meal-preferences');
+  let saved: unknown;
+  try { saved = JSON.parse(raw || 'null'); } catch { saved = null; }
   const value = { ...defaults, types: [...defaults.types] };
   if (saved && typeof saved === 'object') {
     const preferences = saved as { view?: unknown; types?: unknown; showAllergenNumbers?: unknown };

@@ -31,6 +31,23 @@ test('school preferences isolate keys and recover malformed stored data', () => 
   assert.equal(values.get('pref:b'), '{bad');
 });
 
+test('malformed meal settings fall back independently without overwriting stored data', () => {
+  const values = new Map([
+    ['opensigan-allergies', '{bad'],
+    ['opensigan-meal-preferences', '{bad'],
+  ]);
+  const storage = { getItem: key => values.get(key) ?? null };
+  const defaults = { view: 'day', types: ['중식'], showAllergenNumbers: true };
+  assert.deepEqual(Array.from(prefs.readAllergies(storage)), []);
+  const result = prefs.readMealPreferences(storage, ['조식', '중식', '석식'], defaults);
+  assert.equal(result.view, 'day');
+  assert.deepEqual(Array.from(result.types), ['중식']);
+  assert.equal(result.showAllergenNumbers, true);
+  assert.notEqual(result.types, defaults.types);
+  assert.equal(values.get('opensigan-allergies'), '{bad');
+  assert.equal(values.get('opensigan-meal-preferences'), '{bad');
+});
+
 test('meal allergy filter is saved independently and ignores invalid values', () => {
   const values = new Map();
   const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };

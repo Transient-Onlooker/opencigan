@@ -25,6 +25,23 @@ async function mockApi(page, delayedSearch, onSchoolSearch) {
   });
 }
 
+for (const key of ['opensigan-allergies', 'opensigan-meal-preferences']) {
+  test(`malformed ${key} does not prevent saved class restoration`, async ({ page }) => {
+    await mockApi(page);
+    await page.addInitScript(({ saved, corruptKey }) => {
+      localStorage.setItem('opensigan-school', JSON.stringify(saved));
+      localStorage.setItem('opensigan-grade', '1');
+      localStorage.setItem('opensigan-class', '2');
+      localStorage.setItem(corruptKey, '{bad');
+    }, { saved: school, corruptKey: key });
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: school.name })).toBeVisible();
+    await expect(page.locator('.school-facts')).toContainText('1학년 2반');
+    await expect(page.locator('#timetable-panel').getByRole('table')).toBeVisible();
+    expect(await page.evaluate(k => localStorage.getItem(k), key)).toBe('{bad');
+  });
+}
+
 test('school selection storage failure preserves the previous saved selection', async ({ page }) => {
   const other = { id: '3:푸른중학교', name: '푸른중학교', region: '서울' };
   await mockApi(page);
