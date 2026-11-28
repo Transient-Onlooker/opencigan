@@ -125,6 +125,7 @@ class AnalyticsStore:
         today, now_text = self._now()
         start = (datetime.fromisoformat(today).date() - timedelta(days=days - 1)).isoformat()
         hourly_start = (datetime.fromisoformat(now_text) - timedelta(hours=24)).isoformat()
+        period_start = f"{start}T00:00:00+09:00"
         with closing(self._connect()) as db:
             self._purge_if_due(db, today)
             db.commit()
@@ -145,12 +146,13 @@ class AnalyticsStore:
                 SUM(CASE WHEN failure_kind = 'upstream_unavailable' THEN 1 ELSE 0 END) data_failures,
                 SUM(CASE WHEN failure_kind = 'service_overloaded' THEN 1 ELSE 0 END) overload_errors,
                 SUM(CASE WHEN status >= 500 AND failure_kind IS NULL THEN 1 ELSE 0 END) unclassified_server_errors,
-                SUM(CASE WHEN cache_status IS NOT NULL THEN 1 ELSE 0 END) cache_observed,
-                SUM(CASE WHEN cache_status = 'hit' THEN 1 ELSE 0 END) cache_hits,
-                SUM(CASE WHEN cache_status = 'miss' THEN 1 ELSE 0 END) cache_misses,
-                SUM(CASE WHEN cache_status = 'stale' THEN 1 ELSE 0 END) stale_responses
-                FROM api_requests WHERE day >= ? GROUP BY route ORDER BY requests DESC""", (start,)).fetchall()
-            cache = db.execute("SELECT cache_status, COUNT(*) count FROM api_requests WHERE day >= ? AND cache_status IS NOT NULL GROUP BY cache_status", (start,)).fetchall()
+                SUM(CASE WHEN occurred_at >= ? AND occurred_at <= ? AND cache_status IS NOT NULL THEN 1 ELSE 0 END) cache_observed,
+                SUM(CASE WHEN occurred_at >= ? AND occurred_at <= ? AND cache_status = 'hit' THEN 1 ELSE 0 END) cache_hits,
+                SUM(CASE WHEN occurred_at >= ? AND occurred_at <= ? AND cache_status = 'miss' THEN 1 ELSE 0 END) cache_misses,
+                SUM(CASE WHEN occurred_at >= ? AND occurred_at <= ? AND cache_status = 'stale' THEN 1 ELSE 0 END) stale_responses
+                FROM api_requests WHERE day >= ? GROUP BY route ORDER BY requests DESC""", (period_start, now_text, period_start, now_text, period_start, now_text, period_start, now_text, start)).fetchall()
+            cache = db.execute("SELECT cache_status, COUNT(*) count FROM api_requests WHERE day >= ? AND occurred_at >= ? AND occurred_at <= ? AND cache_status IS NOT NULL GROUP BY cache_status", (start, period_start, now_text)).fetchall()
+            cache_observed = db.execute("SELECT COUNT(*) FROM api_requests WHERE day >= ? AND occurred_at >= ? AND occurred_at <= ? AND cache_status IS NOT NULL", (start, period_start, now_text)).fetchone()[0]
             failures = db.execute("SELECT failure_kind, COUNT(*) count FROM api_requests WHERE day >= ? AND failure_kind IS NOT NULL GROUP BY failure_kind", (start,)).fetchall()
             hourly = db.execute("""SELECT substr(occurred_at, 1, 13) || ':00:00+09:00' hour,
                 COUNT(*) requests,
@@ -163,6 +165,13 @@ class AnalyticsStore:
                 FROM api_requests WHERE day >= ? AND occurred_at >= ? AND occurred_at <= ?
                 GROUP BY substr(occurred_at, 1, 13) ORDER BY hour""",
                 (hourly_start[:10], hourly_start, now_text)).fetchall()
+            cache_hourly = db.execute("""SELECT substr(occurred_at, 1, 13) || ':00:00+09:00' hour,
+                SUM(CASE WHEN cache_status IS NOT NULL THEN 1 ELSE 0 END) cache_observed,
+                SUM(CASE WHEN cache_status = 'hit' THEN 1 ELSE 0 END) cache_hits,
+                SUM(CASE WHEN cache_status = 'miss' THEN 1 ELSE 0 END) cache_misses,
+                SUM(CASE WHEN cache_status = 'stale' THEN 1 ELSE 0 END) stale_responses
+                FROM api_requests WHERE day >= ? AND occurred_at >= ? AND occurred_at <= ?
+                GROUP BY substr(occurred_at, 1, 13) ORDER BY hour""", (start, period_start, now_text)).fetchall()
         count = api[0] or 0
         errors = api[1] or 0
         return {
@@ -177,8 +186,10 @@ class AnalyticsStore:
             "daily": [dict(row) for row in daily],
             "routes": [dict(row) for row in routes],
             "cacheStatuses": {row["cache_status"]: row["count"] for row in cache},
+            "cacheObserved": cache_observed,
             "failureKinds": {row["failure_kind"]: row["count"] for row in failures},
             "apiHourly": [dict(row) for row in hourly],
+            "cacheHourly": [dict(row) for row in cache_hourly],
         }
 
 

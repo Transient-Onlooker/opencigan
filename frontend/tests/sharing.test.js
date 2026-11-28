@@ -12,7 +12,7 @@ import { lessonTimesVm } from './helpers/lesson-times-vm.js';
 const source = await readFile(new URL('../src/sharing.ts', import.meta.url), 'utf8');
 const context = { exports: {}, URL, URLSearchParams };
 runInNewContext(ts.transpile(source, { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }), context);
-const { shareClassUrl, readSharedClass } = context.exports;
+const { shareClassUrl, readSharedClass, inspectSharedClass } = context.exports;
 
 test('shared class restores Korean names and keeps identifiers in the URL fragment', () => {
   const school = { id: '123:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
@@ -26,6 +26,18 @@ test('malformed, duplicated and out-of-range shared class values are ignored', (
   for (const hash of ['', good + '&grade=3', good.replace('class=7', 'class=0'), good.replace('grade=2', 'grade=7'), good.replace('123%3ASchool', 'invalid'), 'x'.repeat(4097)]) {
     assert.equal(readSharedClass(hash), null);
   }
+});
+
+test('shared link inspection distinguishes ordinary fragments, malformed encoding, and missing fields', () => {
+  const good = 'school=123%3ASchool&name=School&region=Seoul&grade=2&class=7';
+  assert.deepEqual(JSON.parse(JSON.stringify(inspectSharedClass(''))), { status: 'absent' });
+  assert.deepEqual(JSON.parse(JSON.stringify(inspectSharedClass('#section'))), { status: 'absent' });
+  assert.deepEqual(JSON.parse(JSON.stringify(inspectSharedClass(good.replace('name=School', 'name=%E0%A4%A')))), { status: 'invalid', reason: 'encoding' });
+  assert.deepEqual(JSON.parse(JSON.stringify(inspectSharedClass(good.replace('&region=Seoul', '')))), { status: 'invalid', reason: 'fields' });
+  assert.deepEqual(JSON.parse(JSON.stringify(inspectSharedClass(good))), {
+    status: 'valid', value: { school: { id: '123:School', name: 'School', region: 'Seoul' }, grade: 2, classroom: 7 },
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(readSharedClass(good))), { school: { id: '123:School', name: 'School', region: 'Seoul' }, grade: 2, classroom: 7 });
 });
 
 test('shared class takes precedence at startup even when browser storage is blocked', async () => {

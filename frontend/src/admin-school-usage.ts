@@ -25,10 +25,25 @@ export function mountSchoolUsage(container: HTMLElement, token: string, base: st
         credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer',
         signal: AbortSignal.any([current.signal, AbortSignal.timeout(10_000)]),
       });
-      if (!response.ok) throw new Error(response.status === 400 ? '선택한 기간이 로그 보존 기간을 초과합니다.' : response.status === 401 ? '관리자 토큰을 확인해 주세요.' : '학교별 조회 통계를 사용할 수 없습니다.');
+      if (!response.ok) {
+        let code = '';
+        try { code = (await response.json()).code ?? ''; } catch { /* Keep the status-based message for non-JSON errors. */ }
+        const message = response.status === 400 ? '선택한 기간이 로그 보존 기간을 초과합니다.'
+          : response.status === 401 ? '관리자 토큰을 확인해 주세요.'
+          : response.status === 429 ? '요청이 많아요. 잠시 후 다시 시도해 주세요.'
+          : code === 'access_logs_disabled' ? '학교별 조회 통계가 이 배포에서 비활성화되어 있습니다.'
+          : code === 'access_logs_unavailable' ? '학교별 조회 통계 저장소에 연결할 수 없습니다.'
+          : '학교별 조회 통계를 사용할 수 없습니다.';
+        throw new Error(message);
+      }
       const data = await response.json();
       if (!Array.isArray(data.items)) throw new Error('통계 응답을 확인하지 못했습니다.');
       if (disposed || current.signal.aborted || controller !== current) return;
+      if (!query.has('days') && Number.isInteger(data.period_days) && data.period_days > 0) {
+        for (const option of Array.from(select.options)) {
+          if (option.value && Number(option.value) > data.period_days) option.remove();
+        }
+      }
       state.textContent = `${data.start_day} ~ ${data.end_day} · ${data.items.length}개 항목${data.has_more ? ' (상위 50개)' : ''}`;
       if (!data.items.length) { results.textContent = '조회 기록이 없습니다.'; return; }
       const table = document.createElement('table');

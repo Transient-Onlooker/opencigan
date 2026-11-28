@@ -5,10 +5,11 @@ import { createAnalyticsCharts } from './admin-charts';
 interface Summary {
   visitors: number; sessions: number; pageViews: number; apiRequests: number;
   apiErrorRate: number; apiAverageMs: number; droppedApiEvents: number;
-  cacheStatuses?: Record<string, number>; failureKinds?: Record<string, number>;
+  cacheStatuses?: Record<string, number>; cacheObserved?: number; failureKinds?: Record<string, number>;
   refreshObservations?: Record<string, { result: 'success' | 'failure' | 'not_cached'; observedAt: string; lastSuccessAt?: string; lastFailureAt?: string; lastFailureKind?: string; durationMs?: number; origin?: 'timetable' | 'calendar' | null }>;
   cacheWaitObservations?: Record<string, { waitMs: number; observedAt: string }>;
-  apiHourly?: { hour: string; requests: number; errors: number; upstream_errors: number; overload_errors: number; cache_hits: number; cache_misses?: number; stale_responses: number }[];
+  apiHourly?: { hour: string; requests: number; errors: number; upstream_errors: number; overload_errors: number }[];
+  cacheHourly?: { hour: string; cache_observed: number; cache_hits: number; cache_misses: number; stale_responses: number }[];
   daily: { day: string; visitors: number; sessions: number; page_views: number; api_requests: number }[];
   routes: { route: string; requests: number; errors: number; avg_ms: number; data_failures?: number; overload_errors?: number; unclassified_server_errors?: number; cache_observed?: number; cache_hits?: number; cache_misses?: number; stale_responses?: number }[];
 }
@@ -36,6 +37,8 @@ const state = document.querySelector<HTMLParagraphElement>('#state')!;
 const results = document.querySelector<HTMLElement>('#results')!;
 const hourlyState = document.querySelector<HTMLElement>('#hourly-state')!;
 const hourlyTable = document.querySelector<HTMLElement>('#hourly-table')!;
+const cacheHourlyState = document.querySelector<HTMLElement>('#cache-hourly-state')!;
+const cacheHourlyTable = document.querySelector<HTMLElement>('#cache-hourly-table')!;
 const refreshState = document.querySelector<HTMLElement>('#refresh-state')!;
 const refreshTable = document.querySelector<HTMLElement>('#refresh-table')!;
 let request: AbortController | undefined;
@@ -103,12 +106,15 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
     metrics.replaceChildren();
     const cache = data.cacheStatuses;
     const cacheTotal = (cache?.hit ?? 0) + (cache?.miss ?? 0) + (cache?.stale ?? 0);
+    const cacheObserved = data.cacheObserved ?? cacheTotal;
+    const cacheWasObserved = cacheObserved > 0;
     const cards: [string, string | number][] = [
       ['방문 브라우저', data.visitors], ['세션', data.sessions], ['페이지 조회', data.pageViews],
       ['API 요청', data.apiRequests], ['API 오류율', `${(data.apiErrorRate * 100).toFixed(2)}%`],
       ['평균 처리 시간', `${data.apiAverageMs} ms`], ['이 프로세스의 누락 이벤트', data.droppedApiEvents],
-      ['기록된 캐시 적중률', !cache ? '미제공' : cacheTotal ? `${((cache.hit ?? 0) / cacheTotal * 100).toFixed(1)}%` : '기록 없음'],
-      ['캐시 적중', cache ? cache.hit ?? 0 : '미제공'], ['캐시 미스', cache ? cache.miss ?? 0 : '미제공'], ['이전 캐시 반환', cache ? cache.stale ?? 0 : '미제공'],
+      ['캐시 관측 응답', data.cacheObserved === undefined ? (cache ? cacheTotal : '미제공') : cacheObserved],
+      ['기록된 캐시 적중률', !cache ? '미제공' : cacheWasObserved ? `${((cache.hit ?? 0) / cacheObserved * 100).toFixed(1)}%` : '미관측'],
+      ['캐시 적중', cache ? (cacheWasObserved ? cache.hit ?? 0 : '미관측') : '미제공'], ['캐시 미스', cache ? (cacheWasObserved ? cache.miss ?? 0 : '미관측') : '미제공'], ['이전 캐시 반환', cache ? (cacheWasObserved ? cache.stale ?? 0 : '미관측') : '미제공'],
       ['데이터 조회 실패', data.failureKinds ? data.failureKinds.upstream_unavailable ?? 0 : '미제공'], ['과부하 차단', data.failureKinds ? data.failureKinds.service_overloaded ?? 0 : '미제공'],
     ];
     for (const [label, value] of cards) {
@@ -130,9 +136,13 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
     refreshTable.hidden = !observations;
     refreshState.textContent = observations ? '' : '현재 서버에서는 갱신 관측을 제공하지 않습니다.';
     const hourly = data.apiHourly;
-    rows('#hourly', (hourly ?? []).map((h) => [h.hour.slice(0, 16).replace('T', ' '), h.requests, h.errors, h.upstream_errors, h.overload_errors, h.cache_hits, h.cache_misses ?? '미제공', h.stale_responses]));
+    rows('#hourly', (hourly ?? []).map((h) => [h.hour.slice(0, 16).replace('T', ' '), h.requests, h.errors, h.upstream_errors, h.overload_errors]));
     hourlyTable.hidden = !hourly?.length;
     hourlyState.textContent = !hourly ? '현재 서버에서는 시간대별 통계를 제공하지 않습니다.' : hourly.length ? '' : '최근 24시간에 기록된 API 요청이 없습니다.';
+    const cacheHourly = data.cacheHourly;
+    rows('#cache-hourly', (cacheHourly ?? []).map((h) => [h.hour.slice(0, 16).replace('T', ' '), h.cache_observed, h.cache_observed ? h.cache_hits : '미관측', h.cache_observed ? h.cache_misses : '미관측', h.cache_observed ? h.stale_responses : '미관측']));
+    cacheHourlyTable.hidden = !cacheHourly?.length;
+    cacheHourlyState.textContent = !cacheHourly ? '현재 서버에서는 선택 기간별 시간대 캐시 지표를 제공하지 않습니다.' : cacheHourly.length ? '' : '선택 기간에 기록된 API 요청이 없습니다.';
     results.hidden = false;
     state.textContent = data.pageViews || data.apiRequests ? `조회 완료 · ${new Date().toLocaleTimeString('ko-KR')}` : '선택한 기간에 수집된 이용 기록이 없습니다.';
   } catch (error) {
@@ -151,8 +161,9 @@ document.querySelector('#clear')!.addEventListener('click', () => {
   if (historyState) historyState.textContent = '';
   token.value = ''; results.hidden = true;
   document.querySelector('#charts')!.replaceChildren();
-  document.querySelector('#metrics')!.replaceChildren(); rows('#daily', []); rows('#routes', []); rows('#hourly', []);
+  document.querySelector('#metrics')!.replaceChildren(); rows('#daily', []); rows('#routes', []); rows('#hourly', []); rows('#cache-hourly', []);
   hourlyTable.hidden = true; hourlyState.textContent = '';
+  cacheHourlyTable.hidden = true; cacheHourlyState.textContent = '';
   rows('#refresh-observations', []); refreshTable.hidden = true; refreshState.textContent = '';
   state.textContent = '잠겼습니다. 다시 조회하려면 토큰을 입력하세요.'; token.focus();
 });

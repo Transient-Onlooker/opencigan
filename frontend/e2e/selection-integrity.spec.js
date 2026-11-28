@@ -25,6 +25,16 @@ async function mockApi(page, delayedSearch, onSchoolSearch) {
   });
 }
 
+test('new profile validates a normal shared link and keeps it on reload', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/' + sharedHash(2));
+  await expect(page.locator('.quick-class select').nth(1)).toHaveValue('2');
+  await expect(page.locator('#timetable-panel').getByRole('table')).toContainText('과목2');
+  await page.reload();
+  await expect(page.locator('.quick-class select').nth(1)).toHaveValue('2');
+  await expect(page.locator('#timetable-panel').getByRole('table')).toContainText('과목2');
+});
+
 for (const key of ['opensigan-allergies', 'opensigan-meal-preferences']) {
   test(`malformed ${key} does not prevent saved class restoration`, async ({ page }) => {
     await mockApi(page);

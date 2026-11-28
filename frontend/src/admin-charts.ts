@@ -16,6 +16,13 @@ export interface AnalyticsChartSummary {
     cache_misses?: number | null;
     stale_responses?: number | null;
   }>;
+  cacheHourly?: Array<{
+    hour: string;
+    cache_observed?: number | null;
+    cache_hits?: number | null;
+    cache_misses?: number | null;
+    stale_responses?: number | null;
+  }>;
   routes?: Array<{
     route: string;
     requests?: number | null;
@@ -134,7 +141,7 @@ function makeChart(doc: Document, title: string, description: string, data: Datu
 
 export function createAnalyticsCharts(summary: AnalyticsChartSummary, doc: Document = document): HTMLElement[] {
   const dailySeries: Series[] = [
-    { key: 'visitors', label: '방문자', color: '#2563eb' },
+    { key: 'visitors', label: '방문 브라우저', color: '#2563eb' },
     { key: 'sessions', label: '세션', color: '#7c3aed' },
     { key: 'page_views', label: '페이지 조회', color: '#0891b2' },
     { key: 'api_requests', label: 'API 요청', color: '#ea580c' },
@@ -161,9 +168,19 @@ export function createAnalyticsCharts(summary: AnalyticsChartSummary, doc: Docum
     }));
   const charts: HTMLElement[] = [];
 
-  if (summary.daily) charts.push(makeChart(doc, '일별 이용', '날짜별 방문자, 세션, 페이지 조회, API 요청 수입니다. 자료 누락은 자료 없음으로 표시합니다.', toData(summary.daily, 'day', dailySeries, kstDate), dailySeries));
+  if (summary.daily) charts.push(makeChart(doc, '일별 이용', '날짜별 방문 브라우저, 세션, 페이지 조회, API 요청 수입니다. 자료 누락은 자료 없음으로 표시합니다.', toData(summary.daily, 'day', dailySeries, kstDate), dailySeries));
   if (summary.apiHourly) charts.push(makeChart(doc, '시간별 API 요청', '한국 시간 기준 시간대별 요청과 오류 수입니다. 요청이 없던 시간대는 응답 자료에 포함되지 않습니다.', toData(summary.apiHourly, 'hour', hourlySeries, kstHour), hourlySeries));
-  if (summary.apiHourly) charts.push(makeChart(doc, '시간별 캐시 응답', '캐시 상태가 기록된 적중, 미스, 이전 캐시 응답 건수입니다. 자료가 제공되지 않으면 자료 없음으로 표시합니다.', toData(summary.apiHourly, 'hour', cacheSeries, kstHour), cacheSeries));
+  if (summary.cacheHourly) {
+    const cacheData = summary.cacheHourly.map((row) => ({
+      label: kstHour(row.hour),
+      values: typeof row.cache_observed === 'number' && row.cache_observed > 0
+        ? [row.cache_hits ?? null, row.cache_misses ?? null, row.stale_responses ?? null]
+        : cacheSeries.map(() => null),
+    }));
+    charts.push(makeChart(doc, '시간별 캐시 응답', '선택한 기간의 시간대별 캐시 응답입니다. 분모는 같은 시간대의 캐시 상태 기록 건수이며, 기록이 없으면 자료 없음으로 표시합니다.', cacheData, cacheSeries));
+  } else if (summary.apiHourly) {
+    charts.push(makeChart(doc, '시간별 캐시 응답 (최근 24시간)', '이전 서버의 최근 24시간 자료입니다. 관측 분모는 제공되지 않습니다.', toData(summary.apiHourly, 'hour', cacheSeries, kstHour), cacheSeries));
+  }
   if (summary.apiHourly) {
     const errors = summary.apiHourly.map((row) => ({ label: kstHour(row.hour), values: [typeof row.requests === 'number' && row.requests > 0 && typeof row.errors === 'number' ? Math.round(row.errors / row.requests * 1000) / 10 : null] }));
     charts.push(makeChart(doc, '시간별 API 오류율 (%)', '각 시간의 오류 응답 수를 전체 API 요청 수로 나눈 값입니다.', errors, [{ key: 'rate', label: '오류율 %', color: '#dc2626' }]));

@@ -16,7 +16,7 @@
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
-  import { shareClassUrl, readSharedClass } from './sharing';
+  import { shareClassUrl, readSharedClass, inspectSharedClass } from './sharing';
   import { saveTimetablePdf, saveTimetablePng, shareTimetablePng, type ExportOptions } from './export-png';
   import { createTimetableSession } from './timetable-cache';
   import { createMealSession } from './meal-session';
@@ -113,6 +113,7 @@
   let analyticsReady = false;
   let navigationReady = false;
   let applyingNavigation = false;
+  let navigationApplySequence = 0;
   let timetable: TimetableResponse | null = null;
   let timetableFromDevice = false;
   let meals: Meal[] = [];
@@ -228,12 +229,13 @@
       nextUrl.hash = new URL(shareClassUrl(nextUrl.href, school, Number(grade), Number(classroom))).hash;
       navigationUrl = nextUrl.href;
     }
-    pushNavigationState({ version: 1, view, timetableView, school, grade: Number(grade), classroom: Number(classroom), week, selectedDay, mealDate }, current, undefined, navigationUrl);
+    pushNavigationState({ version: 1, view, timetableView, teacherQuery, school, grade: Number(grade), classroom: Number(classroom), week, selectedDay, mealDate }, current, undefined, navigationUrl);
   }
 
-  function applyNavigation(state: NavigationState | null) {
+  async function applyNavigation(state: NavigationState | null) {
     state = parseNavigationState(state, monday(currentKoreaDate(new Date())));
     if (!state) return;
+    const sequence = ++navigationApplySequence;
     applyingNavigation = true;
     cancelSharedSelection();
     const previousSchool = school?.id;
@@ -252,8 +254,11 @@
       loadMeals();
       persistClassSelection();
     }
+    teacherQuery = state.teacherQuery ?? '';
     shareUrl = ''; subscriptionUrl = ''; shareState = ''; subscriptionState = '';
-    applyingNavigation = false;
+    // Keep history writes suppressed until Svelte has applied the restored state.
+    await tick();
+    if (sequence === navigationApplySequence) applyingNavigation = false;
   }
 
   function dateText(key: string, options: Intl.DateTimeFormatOptions = { month: 'numeric', day: 'numeric' }) {
@@ -923,7 +928,8 @@
   }
 
   onMount(() => {
-    const shared = typeof window !== 'undefined' && window.location?.hash ? readSharedClass(window.location.hash) : null;
+    const sharedResult = inspectSharedClass(window.location?.hash ?? '');
+    const shared = sharedResult.status === 'valid' ? sharedResult.value : null;
     let savedSchool: School | null = null;
     analyticsReady = true;
     refreshCalendar();
@@ -1013,8 +1019,12 @@
         }
       } catch { /* Navigation remains usable without session storage. */ }
       if (new URLSearchParams(window.location.search).get('view') === 'settings') view = 'settings';
-      replaceNavigationState({ version: 1, view, timetableView, school, grade: Number(grade), classroom: Number(classroom), week, selectedDay, mealDate });
+      replaceNavigationState({ version: 1, view, timetableView, teacherQuery, school, grade: Number(grade), classroom: Number(classroom), week, selectedDay, mealDate });
       navigationReady = true;
+    }
+    if (sharedResult.status === 'invalid') {
+      const reason = sharedResult.reason === 'encoding' ? '인코딩이 올바르지 않아요.' : sharedResult.reason === 'fields' ? '필수 정보가 빠졌거나 중복됐어요.' : '정보가 올바르지 않아요.';
+      sharedClassState = `공유 링크의 ${reason} ${school ? '기존 학교와 학급 설정을 유지했어요.' : '학교와 학급을 직접 선택해 주세요.'}`;
     }
     const stopNavigation = typeof window.history?.replaceState === 'function'
       ? subscribeNavigation(current, applyNavigation) : () => {};

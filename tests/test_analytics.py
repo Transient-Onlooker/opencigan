@@ -50,6 +50,7 @@ class AnalyticsTests(unittest.TestCase):
                 result = store.summary(30)
                 self.assertEqual(result["apiRequests"], 5)
                 self.assertEqual(result["cacheStatuses"], {"hit": 1, "stale": 1})
+                self.assertEqual(result["cacheObserved"], 2)
                 self.assertEqual(result["failureKinds"], {"upstream_unavailable": 1})
             finally:
                 store.close()
@@ -68,12 +69,19 @@ class AnalyticsTests(unittest.TestCase):
             with patch.object(store, "_now", return_value=(when[:10], when)):
                 store.record_api("/api/v1/timetable", "GET", status, 1, cache_status, failure_kind)
         with patch.object(store, "_now", return_value=("2026-11-18", "2026-11-18T12:00:00+09:00")):
-            hourly = store.summary(30)["apiHourly"]
+            summary = store.summary(30)
+            hourly = summary["apiHourly"]
+            cache_hourly = summary["cacheHourly"]
         self.assertEqual(hourly, [
             {"hour": "2026-11-17T13:00:00+09:00", "requests": 3, "errors": 0, "upstream_errors": 0,
              "overload_errors": 0, "cache_hits": 1, "cache_misses": 1, "stale_responses": 1},
             {"hour": "2026-11-18T11:00:00+09:00", "requests": 2, "errors": 2, "upstream_errors": 1,
              "overload_errors": 1, "cache_hits": 0, "cache_misses": 0, "stale_responses": 0},
+        ])
+        self.assertEqual(cache_hourly, [
+            {"hour": "2026-11-17T10:00:00+09:00", "cache_observed": 0, "cache_hits": 0, "cache_misses": 0, "stale_responses": 0},
+            {"hour": "2026-11-17T13:00:00+09:00", "cache_observed": 3, "cache_hits": 1, "cache_misses": 1, "stale_responses": 1},
+            {"hour": "2026-11-18T11:00:00+09:00", "cache_observed": 0, "cache_hits": 0, "cache_misses": 0, "stale_responses": 0},
         ])
 
     def test_request_metadata_is_forwarded_to_analytics(self):
@@ -100,6 +108,7 @@ class AnalyticsTests(unittest.TestCase):
         store.record_api("/api/v1/meals", "GET", 200, 20, "miss")
         store.record_api("/api/v1/schools", "GET", 200, 5)
         routes = {row["route"]: row for row in store.summary()["routes"]}
+        self.assertEqual(store.summary()["cacheObserved"], 3)
         self.assertEqual(routes["/api/v1/timetable"], {
             "route": "/api/v1/timetable", "requests": 4, "errors": 4, "avg_ms": 25.0,
             "data_failures": 1, "overload_errors": 1, "unclassified_server_errors": 1,
@@ -108,6 +117,33 @@ class AnalyticsTests(unittest.TestCase):
         self.assertEqual(routes["/api/v1/meals"]["data_failures"], 0)
         self.assertEqual((routes["/api/v1/meals"]["cache_hits"], routes["/api/v1/meals"]["cache_misses"], routes["/api/v1/meals"]["stale_responses"]), (0, 1, 1))
         self.assertEqual(routes["/api/v1/schools"]["cache_observed"], 0)
+
+    def test_cache_summary_reports_zero_observations_without_inventing_outcomes(self):
+        store = self.store()
+        store.record_api("/api/v1/status", "GET", 200, 1)
+        result = store.summary(7)
+        self.assertEqual(result["cacheObserved"], 0)
+        self.assertEqual(result["cacheStatuses"], {})
+        self.assertEqual(result["cacheHourly"][0]["cache_observed"], 0)
+
+    def test_cache_summary_routes_and_hourly_share_the_selected_period(self):
+        store = self.store()
+        events = [
+            ("2026-11-10T12:00:00+09:00", "hit"),
+            ("2026-11-17T12:00:00+09:00", "miss"),
+            ("2026-11-18T11:00:00+09:00", "stale"),
+            ("2026-11-18T13:00:00+09:00", "hit"),  # Future timestamps must not skew route cache counts.
+        ]
+        for when, status in events:
+            with patch.object(store, "_now", return_value=(when[:10], when)):
+                store.record_api("/api/v1/timetable", "GET", 200, 1, status)
+        with patch.object(store, "_now", return_value=("2026-11-18", "2026-11-18T12:00:00+09:00")):
+            result = store.summary(2)
+
+        self.assertEqual(result["cacheObserved"], 2)
+        self.assertEqual(result["cacheStatuses"], {"miss": 1, "stale": 1})
+        self.assertEqual(sum(hour["cache_observed"] for hour in result["cacheHourly"]), 2)
+        self.assertEqual(result["routes"][0]["cache_observed"], 2)
 
     def test_pageview_endpoint_and_admin_authentication(self):
         store = self.store()

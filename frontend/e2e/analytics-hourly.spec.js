@@ -11,7 +11,8 @@ test('admin hourly diagnostics show data, support older servers, and clear on lo
     refreshObservations: { timetable: { result: 'failure', origin: 'calendar', observedAt: '2026-11-18T02:00:00+00:00', lastSuccessAt: '2026-11-18T01:00:00+00:00', lastFailureAt: '2026-11-18T02:00:00+00:00', lastFailureKind: 'timeout', durationMs: 1250 }, meals: { result: 'not_cached', observedAt: '2026-11-18T02:00:00+00:00' } },
     cacheWaitObservations: { timetable: { waitMs: 320, observedAt: '2026-11-18T02:01:00+00:00' } },
     apiHourly: [{ hour: '2026-11-18T11:00:00+09:00', requests: 2, errors: 1,
-      upstream_errors: 1, overload_errors: 0, cache_hits: 1, stale_responses: 0 }],
+      upstream_errors: 1, overload_errors: 0 }],
+    cacheHourly: [{ hour: '2026-11-18T11:00:00+09:00', cache_observed: 2, cache_hits: 1, cache_misses: 0, stale_responses: 1 }],
   };
   await page.route('**/api/v1/admin/analytics?*', (route) => route.fulfill({ json: summary }));
   await page.goto('/analytics.html');
@@ -22,10 +23,9 @@ test('admin hourly diagnostics show data, support older servers, and clear on lo
   await expect(table).toBeVisible();
   await expect(table.locator('tbody tr')).toHaveCount(1);
   await expect(table).toContainText('2026-11-18 11:00');
-  await expect(table.locator('tbody tr').locator('td')).toHaveText(['2026-11-18 11:00', '2', '1', '1', '0', '1', '미제공', '0']);
-  summary.apiHourly[0].cache_misses = 0;
-  await page.getByRole('button', { name: '조회 / 새로고침' }).click();
-  await expect(table.locator('tbody tr').locator('td')).toHaveText(['2026-11-18 11:00', '2', '1', '1', '0', '1', '0', '0']);
+  await expect(table.locator('tbody tr').locator('td')).toHaveText(['2026-11-18 11:00', '2', '1', '1', '0']);
+  const cacheTable = page.getByRole('region', { name: '시간별 캐시 응답 표' });
+  await expect(cacheTable.locator('tbody tr').locator('td')).toHaveText(['2026-11-18 11:00', '2', '1', '0', '1']);
   const routes = page.getByRole('region', { name: '경로별 통계 표' }).locator('tbody tr');
   await expect(routes.nth(0).locator('td')).toHaveText(['/api/v1/timetable', '2', '1', '1', '0', '0', '10', '2', '1', '0', '1']);
   await expect(routes.nth(1).locator('td')).toHaveText(['/api/v1/meals', '1', '0', '—', '—', '—', '5', '—', '—', '—', '—']);
@@ -50,13 +50,16 @@ test('admin hourly diagnostics show data, support older servers, and clear on lo
   await expect(oldServerObservation.nth(9)).toHaveText('—');
   await page.getByRole('button', { name: '잠금' }).click();
   await expect(page.locator('#hourly tr')).toHaveCount(0);
+  await expect(page.locator('#cache-hourly tr')).toHaveCount(0);
   await expect(page.locator('#refresh-observations tr')).toHaveCount(0);
   await expect(page.getByLabel('관리자 토큰')).toHaveValue('');
   delete summary.apiHourly;
+  delete summary.cacheHourly;
   delete summary.refreshObservations;
   await page.getByLabel('관리자 토큰').fill('test-token');
   await page.getByRole('button', { name: '조회 / 새로고침' }).click();
   await expect(page.locator('#hourly-state')).toHaveText('현재 서버에서는 시간대별 통계를 제공하지 않습니다.');
+  await expect(page.locator('#cache-hourly-state')).toHaveText('현재 서버에서는 선택 기간별 시간대 캐시 지표를 제공하지 않습니다.');
   await expect(page.locator('#refresh-state')).toHaveText('현재 서버에서는 갱신 관측을 제공하지 않습니다.');
   await expect(table).toBeHidden();
   summary.apiHourly = [];

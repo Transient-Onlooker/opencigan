@@ -40,6 +40,7 @@ test('builds labelled, colored SVG charts with Korea-local date and hour labels'
   const charts = create({
     daily: [{ day: '2026-11-18', visitors: 4, sessions: 3, page_views: 8, api_requests: 2 }],
     apiHourly: [{ hour: '2026-11-18T11:00:00+09:00', requests: 2, errors: 1, upstream_errors: 1, overload_errors: 0 }],
+    cacheHourly: [{ hour: '2026-11-18T11:00:00+09:00', cache_observed: 1, cache_hits: 1, cache_misses: 0, stale_responses: 0 }],
     routes: [{ route: '/api/v1/<img>', requests: 2, errors: 0 }],
   }, doc);
 
@@ -70,6 +71,7 @@ test('shows missing values separately from zero and handles empty/zero denominat
   const { create, doc } = await chartApi();
   const [hourly, , , routes] = create({
     apiHourly: [{ hour: '2026-11-18T11:00:00+09:00', requests: 0, errors: null }],
+    cacheHourly: [{ hour: '2026-11-18T11:00:00+09:00', cache_observed: 0, cache_hits: 0, cache_misses: 0, stale_responses: 0 }],
     routes: [{ route: '/empty', requests: 0, errors: 0 }],
   }, doc);
   const hourlySvg = descendants(hourly, 'svg')[0];
@@ -80,6 +82,20 @@ test('shows missing values separately from zero and handles empty/zero denominat
   assert.ok(descendants(routesSvg, 'circle').length >= 1);
   assert.ok(descendants(routesSvg, 'rect').length === 0, 'zero denominator does not create invalid-width bars');
   assert.ok(descendants(routesSvg, 'text').some((node) => node.textContent === '0'));
+});
+
+test('hourly cache charts distinguish observed zero outcomes from no cache observations', async () => {
+  const { create, doc } = await chartApi();
+  const charts = create({ cacheHourly: [
+    { hour: '2026-11-18T10:00:00+09:00', requests: 1, cache_observed: 1, cache_hits: 1, cache_misses: 0, stale_responses: 0 },
+    { hour: '2026-11-18T11:00:00+09:00', requests: 2, cache_observed: 0, cache_hits: 0, cache_misses: 0, stale_responses: 0 },
+  ] }, doc);
+  const cacheSvg = descendants(charts[0], 'svg')[0];
+  const labels = descendants(cacheSvg, 'text').map((node) => node.textContent);
+
+  assert.ok(descendants(cacheSvg, 'circle').some((circle) => circle.attributes['aria-label']?.includes('미스: 0')));
+  assert.ok(labels.some((value) => value === '적중: 자료 없음'));
+  assert.ok(labels.some((value) => value === '미스: 자료 없음'));
 });
 
 test('omits a chart only when its response field is absent and renders present empty arrays safely', async () => {

@@ -78,6 +78,17 @@ const validState = {
   mealDate: '2026-11-10'
 };
 
+test('teacher selection is restored and edits replace the current history entry', () => {
+  const win = createFakeWindow();
+  const first = { ...validState, timetableView: 'teacher', teacherQuery: '김교사' };
+  replaceNavigationState(first, win);
+  assert.equal(getNavigationFromHistory(currentMonday, win).teacherQuery, '김교사');
+  pushNavigationState({ ...first, teacherQuery: '이교사' }, currentMonday, win);
+  assert.equal(win.history.pushCount, 0);
+  assert.equal(win.history.state.opensigan.teacherQuery, '이교사');
+  assert.equal(parseNavigationState({ ...first, teacherQuery: 'x'.repeat(101) }, currentMonday), null);
+});
+
 test('parseNavigationState parses valid navigation state', () => {
   const parsed = parseNavigationState(validState, currentMonday);
   assert.deepEqual(JSON.parse(JSON.stringify(parsed)), validState);
