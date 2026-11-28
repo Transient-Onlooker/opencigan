@@ -19,6 +19,7 @@ for (const failure of ['property access', 'storage methods']) {
     const context = {
       ...personalizationVm,
       ...lessonTimesVm,
+      inspectSharedClass: () => ({ status: 'absent' }),
       onMount: (callback) => { mount = callback; },
       isAnalyticsEnabled: () => false,
       currentKoreaDate: () => '2026-11-10', monday: () => '2026-11-09',

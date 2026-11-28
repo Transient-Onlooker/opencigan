@@ -23,7 +23,7 @@ test('admin login, charts, navigation and lock keep credentials out of URLs and 
   await page.getByRole('button', { name: '잠금 해제' }).click();
   const analytics = page.frameLocator('iframe[title="이용 통계"]');
   await expect(analytics.locator('#charts svg')).toHaveCount(7);
-  await expect(analytics.locator('#metrics').getByText('미제공')).toHaveCount(6);
+  await expect(analytics.locator('#metrics').getByText('미제공')).toHaveCount(7);
   expect(requests).toEqual(['Bearer example-admin-token', 'Bearer example-admin-token']);
   await page.getByRole('button', { name: '접속 로그' }).click();
   await expect(page.frameLocator('iframe[title="접속 로그"]').locator('#token')).toHaveValue('example-admin-token');
@@ -90,6 +90,26 @@ test('can authenticate using access logs if analytics is unavailable', async ({ 
   await expect(page.locator('#admin-workspace')).toBeVisible();
   await page.getByRole('button', { name: '접속 로그' }).click();
   await expect(page.frameLocator('iframe[title="접속 로그"]').locator('#token')).toHaveValue('example-admin-token');
+});
+
+test('limits school usage periods to the configured retention and explains disabled storage', async ({ page }) => {
+  await page.route('**/api/v1/admin/analytics?**', route => route.fulfill({ json: { daily: [], routes: [] } }));
+  let schoolRequests = 0;
+  await page.route('**/api/v1/admin/school-usage?**', route => {
+    schoolRequests++;
+    return schoolRequests === 1
+      ? route.fulfill({ json: { period_days: 2, start_day: '2026-11-27', end_day: '2026-11-28', has_more: false, items: [] } })
+      : route.fulfill({ status: 503, json: { error: '접속 로그가 비활성화되어 있습니다', code: 'access_logs_disabled' } });
+  });
+  await page.goto('/admin/');
+  await page.locator('#admin-token').fill('example-admin-token');
+  await page.getByRole('button', { name: '잠금 해제' }).click();
+  await page.getByRole('button', { name: '학교별 조회' }).click();
+  const period = page.getByLabel('조회 기간');
+  await expect(period.locator('option')).toHaveCount(2);
+  await period.selectOption('1');
+  await page.getByRole('button', { name: '조회', exact: true }).click();
+  await expect(page.locator('#admin-content').getByRole('status')).toHaveText('학교별 조회 통계가 이 배포에서 비활성화되어 있습니다.');
 });
 
 test('can authenticate using suggestions if analytics and access logs are unavailable', async ({ page }) => {

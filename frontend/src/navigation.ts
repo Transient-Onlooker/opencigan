@@ -8,6 +8,7 @@ export interface NavigationState {
   version: 1;
   view: NavigationView;
   timetableView: TimetableViewMode;
+  teacherQuery?: string;
   school: School | null;
   grade: number;
   classroom: number;
@@ -83,6 +84,8 @@ export function parseNavigationState(
     return null;
   }
 
+  if (obj.teacherQuery !== undefined && (typeof obj.teacherQuery !== 'string' || obj.teacherQuery.length > 100)) return null;
+
   let school: School | null = null;
   if (obj.school !== null) {
     if (!isValidSchool(obj.school)) return null;
@@ -128,6 +131,7 @@ export function parseNavigationState(
     version: 1,
     view: obj.view,
     timetableView: obj.timetableView,
+    ...(obj.teacherQuery === undefined ? {} : { teacherQuery: obj.teacherQuery as string }),
     school,
     grade: obj.grade,
     classroom: obj.classroom,
@@ -147,6 +151,7 @@ export function areNavigationStatesEqual(
     a.version !== b.version ||
     a.view !== b.view ||
     a.timetableView !== b.timetableView ||
+    (a.teacherQuery ?? '') !== (b.teacherQuery ?? '') ||
     a.grade !== b.grade ||
     a.classroom !== b.classroom ||
     a.week !== b.week ||
@@ -196,6 +201,7 @@ function prepareHistoryStateObject(
     version: 1,
     view: navState.view,
     timetableView: navState.timetableView,
+    ...(navState.teacherQuery === undefined ? {} : { teacherQuery: navState.teacherQuery }),
     school: navState.school
       ? {
           id: navState.school.id,
@@ -234,6 +240,12 @@ export function pushNavigationState(
 
   const currentNav = getNavigationFromHistory(currentMonday, target);
   if (areNavigationStatesEqual(currentNav, state)) {
+    return false;
+  }
+
+  // Searching a teacher updates this entry, rather than creating an entry per keystroke.
+  if (currentNav && areNavigationStatesEqual({ ...currentNav, teacherQuery: state.teacherQuery }, state)) {
+    replaceNavigationState(state, target);
     return false;
   }
 

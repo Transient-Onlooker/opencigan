@@ -916,7 +916,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [periodDays, visitors, sessions, pageViews, apiRequests, apiErrors, apiErrorRate, apiAverageMs, droppedApiEvents, daily, routes]
+                required: [periodDays, visitors, sessions, pageViews, apiRequests, apiErrors, apiErrorRate, apiAverageMs, droppedApiEvents, cacheObserved, cacheHourly, daily, routes]
                 properties:
                   periodDays: { type: integer, minimum: 1, maximum: 90 }
                   visitors: { type: integer, minimum: 0 }
@@ -952,8 +952,24 @@ paths:
                         observedAt: { type: string, format: date-time }
                   cacheStatuses:
                     type: object
-                    description: Counts of recorded timetable cache outcomes; older events may have no outcome.
+                    description: Counts of recorded cache outcomes during periodDays; use cacheObserved as their denominator. A zero cacheObserved means no outcomes were observed in that period.
                     additionalProperties: { type: integer, minimum: 0 }
+                  cacheObserved:
+                    type: integer
+                    minimum: 0
+                    description: Number of API requests with a recorded cache outcome during periodDays, the shared denominator for cacheStatuses.
+                  cacheHourly:
+                    type: array
+                    description: Cache outcome counts grouped by Asia/Seoul hour across periodDays, using the same date and observation scope as cacheStatuses and route cache metrics. Hours without API requests are omitted. cache_observed is the per-hour denominator and zero means no cache outcomes were observed.
+                    items:
+                      type: object
+                      required: [hour, cache_observed, cache_hits, cache_misses, stale_responses]
+                      properties:
+                        hour: { type: string, format: date-time }
+                        cache_observed: { type: integer, minimum: 0 }
+                        cache_hits: { type: integer, minimum: 0 }
+                        cache_misses: { type: integer, minimum: 0 }
+                        stale_responses: { type: integer, minimum: 0 }
                   failureKinds:
                     type: object
                     description: Counts of recorded upstream_unavailable and service_overloaded errors.
