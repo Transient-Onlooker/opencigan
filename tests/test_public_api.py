@@ -1,15 +1,61 @@
 import json
+import io
+import tempfile
 import unittest
+from contextlib import closing
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import patch
+from urllib.parse import urlencode
 
-from backend.app import dispatch_request, _rate_clients
+from backend.app import dispatch_request, make_app, _rate_clients
 from backend.cache import Cache
 
 
 class PublicApiTests(unittest.TestCase):
     def setUp(self):
         _rate_clients.clear()
+
+    def test_meal_date_range_http_boundary(self):
+        app = make_app(cache_instance=Cache())
+        for start, end in [('2026-11-23', '2026-11-22'), ('2026-11-23', '2026-11-30')]:
+            with self.subTest(start=start, end=end):
+                captured = []
+                body = b''.join(app({'REQUEST_METHOD': 'GET', 'PATH_INFO': '/api/v1/meals',
+                    'QUERY_STRING': urlencode({'school': 'B10:1234567', 'from': start, 'to': end}),
+                    'wsgi.input': io.BytesIO()}, lambda status, headers: captured.append(status)))
+                self.assertEqual(captured, ['400 Bad Request'])
+                self.assertEqual(json.loads(body)['code'], 'invalid_request')
+
+    def test_history_cursor_connects_http_pages(self):
+        from backend.history import HistoryStore
+        week = '2026-11-23'
+        with tempfile.TemporaryDirectory() as directory:
+            store = HistoryStore(Path(directory) / 'history.sqlite')
+            now = datetime.now(timezone.utc).isoformat()
+            with closing(store._connect()) as db:
+                rows = [('1:School', week, now, 1, 1, week, 1, 'changed',
+                         json.dumps({'subject': str(i), 'teacher': ''}),
+                         json.dumps({'subject': str(i + 1), 'teacher': ''})) for i in range(52)]
+                db.executemany('INSERT INTO changes (school, week, observed_at, grade, class_number, date, period, type, before_json, after_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
+            app = make_app(cache_instance=Cache())
+            def get_page(cursor=None):
+                query = {'school': '1:School', 'week': week}
+                if cursor is not None:
+                    query['cursor'] = cursor
+                captured = []
+                body = b''.join(app({'REQUEST_METHOD': 'GET', 'PATH_INFO': '/api/v1/timetable/history',
+                    'QUERY_STRING': urlencode(query), 'wsgi.input': io.BytesIO()},
+                    lambda status, headers: captured.append(status)))
+                self.assertEqual(captured, ['200 OK'])
+                return json.loads(body)
+            with patch('backend.app._history_store', return_value=store):
+                first = get_page()
+                self.assertIsNotNone(first['nextCursor'])
+                second = get_page(first['nextCursor'])
+            self.assertEqual([row['after']['subject'] for row in first['changes'] + second['changes']],
+                             [str(i) for i in range(52, 0, -1)])
+            self.assertIsNone(second['nextCursor'])
 
     def test_filter_validation_uses_patchable_query_boundary(self):
         from backend.app import _timetable_filters
