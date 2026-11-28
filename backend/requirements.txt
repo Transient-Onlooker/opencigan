@@ -1,4 +1,4 @@
-pycomcigan @ git+https://github.com/Transient-Onlooker/pycomcigan.git@65f4a820e4c3cf9e94da55becc7d6cacaefa10e0
+pycomcigan @ git+https://github.com/Transient-Onlooker/pycomcigan.git@6cf44ad760041105a1a56f16bbf37e1db625f4e3
 requests>=2.32.0
 waitress>=3.0.0
 packaging>=24,<27
