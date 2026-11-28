@@ -186,11 +186,11 @@
           {/if}
           <div class="settings-cards" bind:this={settingsContent} hidden={!!settingsQuery.trim()}>
           <details class="display-settings" hidden={!settingsMatch('개발자 연동 알림 API 위젯', settingsQuery)}>
-            <summary>개발자용 · 연동</summary>
+            <summary><Icon name="link" /> 개발자용 · 연동</summary>
             <div class="display-settings-grid">
-              <a class="notification-link" href="./webhooks.html">시간표 변경 알림 관리 <span aria-hidden="true">↗</span></a>
-              <a class="notification-link" href="./api-docs.html">API 문서 <span aria-hidden="true">↗</span></a>
-              <a class="notification-link" href="./embed-builder.html">시간표 위젯 만들기 <span aria-hidden="true">↗</span></a>
+              <a class="notification-link" href="./webhooks.html"><Icon name="link" /> 시간표 변경 알림 관리 <span aria-hidden="true">↗</span></a>
+              <a class="notification-link" href="./api-docs.html"><Icon name="link" /> API 문서 <span aria-hidden="true">↗</span></a>
+              <a class="notification-link" href="./embed-builder.html"><Icon name="link" /> 시간표 위젯 만들기 <span aria-hidden="true">↗</span></a>
             </div>
           </details>
           <details class="display-settings" hidden={!settingsMatch('일반 테마 애니메이션', settingsQuery)} bind:open={settingsOpen.general}>
@@ -230,7 +230,7 @@
                <div class="display-settings-grid">
                  <label>과목 색상<select aria-label="과목 색상" value={displaySettings.colorMode} onchange={(event) => setColorMode(event.currentTarget.value)}><option value="none">색상 없음 (기본)</option><option value="auto">자동 색상</option><option value="custom">직접 선택</option></select></label>
                  {#if displaySettings.colorMode === 'custom'}
-                   <button type="button" class="secondary-button display-reset" onclick={clearSubjectColors}>과목 색상 초기화</button>
+                   <button type="button" class="secondary-button display-reset" onclick={clearSubjectColors}><Icon name="refresh" /> 과목 색상 초기화</button>
                  {/if}
                </div>
                <details class="subject-settings">
@@ -243,7 +243,7 @@
                        <li><div class="subject-original"><strong>{subject}</strong>{#if !subjectNames.includes(subject)} <small>저장된 과목</small>{/if}</div>
                          <label class="subject-alias"><span class="sr-only">{subject} 표시 이름</span><input aria-label={`${subject} 표시 이름`} type="text" value={displaySettings.subjectAliases[subject] || ''} maxlength="60" placeholder="원본 이름 유지" onchange={(event) => saveAlias('subject', subject, event.currentTarget.value)} /></label>
                          <label class="subject-color"><span class="sr-only">{subject} 색상</span><input aria-label={`${subject} 색상`} type="color" value={displaySettings.subjectColors[subject] || '#425a75'} onchange={(event) => saveSubjectColor(subject, event.currentTarget.value)} /><small>{displaySettings.subjectColors[subject] || '미설정'}</small></label>
-                         <button class="text-button" type="button" aria-label={`${subject} 설정 초기화`} disabled={!displaySettings.subjectAliases[subject] && !displaySettings.subjectColors[subject]} onclick={() => resetSubject(subject)}>초기화</button>
+                         <button class="text-button" type="button" aria-label={`${subject} 설정 초기화`} disabled={!displaySettings.subjectAliases[subject] && !displaySettings.subjectColors[subject]} onclick={() => resetSubject(subject)}><Icon name="refresh" /> 초기화</button>
                        </li>
                      {/each}
                    </ul>
@@ -258,7 +258,7 @@
                      {#each visibleAliasTeachers as teacher (teacher)}
                        <li><div><strong>{teacher}</strong>{#if displaySettings.teacherAliases[teacher]} <small>변경됨</small>{/if}{#if !teacherNames.includes(teacher)} <small>저장된 이름</small>{/if}</div>
                          <label><span class="sr-only">{teacher} 표시 이름</span><input aria-label={`${teacher} 표시 이름`} type="text" value={displaySettings.teacherAliases[teacher] || ''} maxlength="60" placeholder="원본 이름 유지" onchange={(event) => saveAlias('teacher', teacher, event.currentTarget.value)} /></label>
-                         <button class="text-button" type="button" aria-label={`${teacher} 표시 이름 초기화`} disabled={!displaySettings.teacherAliases[teacher]} onclick={() => saveAlias('teacher', teacher, '')}>초기화</button>
+                         <button class="text-button" type="button" aria-label={`${teacher} 표시 이름 초기화`} disabled={!displaySettings.teacherAliases[teacher]} onclick={() => saveAlias('teacher', teacher, '')}><Icon name="refresh" /> 초기화</button>
                        </li>
                      {/each}
                    </ul>
@@ -274,7 +274,7 @@
                </div>
              </details>
              <details class="lesson-time-settings" hidden={!settingsMatch('학교 교시 시각 시간 시작 종료', settingsQuery)} bind:open={settingsOpen.times}>
-               <summary>학교 교시 시각 설정</summary>
+               <summary><Icon name="school" /> 학교 교시 시각 설정</summary>
                <p class="display-settings-hint">설정은 이 브라우저의 해당 학교에만 저장돼요. 원본에 시작 시각만 있으면 종료 시각은 비워 두며 추측하지 않아요.</p>
                <label class="display-settings-hint"><input type="checkbox" checked={sourceLessonAutoEnabled} onchange={(event) => { if (!setSourceLessonAuto(event.currentTarget.checked)) event.currentTarget.checked = sourceLessonAutoEnabled; }} /> 원본 시작 시각 자동 적용</label>
                {#if sourceLessonStarts && Object.keys(sourceLessonStarts).length}
@@ -332,18 +332,18 @@
                  {/each}</div>
                </details>
                <p class="display-settings-hint">시각 초기화는 저장된 기본 교시 시각과 요일별 예외를 지워요. 위의 계산 입력값은 유지돼요.</p>
-               <div class="lesson-time-actions"><button class="secondary-button" type="button" onclick={(event) => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); event.currentTarget.focus(); submitLessonTimes(); }}><Icon name="save" /> 시각 저장</button><button class="secondary-button" type="button" onclick={() => { timeError = null; clearLessonTimes(); }}>시각 초기화</button></div>
+               <div class="lesson-time-actions"><button class="secondary-button" type="button" onclick={(event) => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); event.currentTarget.focus(); submitLessonTimes(); }}><Icon name="save" /> 시각 저장</button><button class="secondary-button" type="button" onclick={() => { timeError = null; clearLessonTimes(); }}><Icon name="refresh" /> 시각 초기화</button></div>
                {#if lessonTimeState}<p class="state-inline" role="status">{lessonTimeState}</p>{/if}
              </details>
              <details class="settings-backup" hidden={!settingsMatch('설정 백업 복원 파일 저장 가져오기 내보내기 초기화', settingsQuery)} bind:open={settingsOpen.backup}>
-               <summary>설정 백업·복원</summary>
+               <summary><Icon name="share" /> 설정 백업·복원</summary>
                <p class="display-settings-hint">학교 파일에는 기본 표시 설정과 교시 시각을, 학급 파일에는 해당 학급의 표시 설정을 저장해요. 두 파일 모두 급식 알레르기 설정은 포함하지 않아요.</p>
                {#if !useClassDisplay}<p class="display-settings-hint">학급 설정 파일을 저장하려면 시간표 표시 설정에서 ‘{grade}학년 {classroom}반만 따로 설정’을 켜 주세요.</p>{/if}
                <div class="lesson-time-actions">
                  <button class="secondary-button" type="button" onclick={() => downloadSettingsBackup()}><Icon name="save" /> 학교 설정 파일 저장</button>
                  {#if useClassDisplay}<button class="secondary-button" type="button" disabled={classError} onclick={() => downloadSettingsBackup(true)}><Icon name="save" /> 학급 설정 파일 저장</button>{/if}
-                 <label class="settings-import">설정 파일 불러오기 <input type="file" accept=".json,application/json" aria-label="Opencigan 설정 JSON 파일 불러오기" onchange={importSettingsFile} /></label>
-                 <button class="secondary-button" type="button" onclick={resetDisplaySettings}>{useClassDisplay ? '이 학급에 학교 기본 설정 적용' : '학교 표시 설정 초기화'}</button>
+                 <label class="settings-import"><Icon name="share" /> 설정 파일 불러오기 <input type="file" accept=".json,application/json" aria-label="Opencigan 설정 JSON 파일 불러오기" onchange={importSettingsFile} /></label>
+                 <button class="secondary-button" type="button" onclick={resetDisplaySettings}><Icon name="refresh" /> {useClassDisplay ? '이 학급에 학교 기본 설정 적용' : '학교 표시 설정 초기화'}</button>
                </div>
                {#if settingsBackupState}<p class="state-inline" role="status">{settingsBackupState}</p>{/if}
              </details>
@@ -358,7 +358,7 @@
              </details>
           </div>
           {#if hasPersonalData}
-            <div class="personal-export"><p>이 브라우저에 이전 개인 시간표·일정 데이터가 남아 있어요. 파일에는 모든 학교·학급의 개인 데이터가 포함되므로 보관에 주의해 주세요.</p><button class="secondary-button" type="button" onclick={exportPersonalData}>기존 개인 데이터 내보내기</button>{#if personalExportState}<p role="status">{personalExportState}</p>{/if}</div>
+            <div class="personal-export"><p>이 브라우저에 이전 개인 시간표·일정 데이터가 남아 있어요. 파일에는 모든 학교·학급의 개인 데이터가 포함되므로 보관에 주의해 주세요.</p><button class="secondary-button" type="button" onclick={exportPersonalData}><Icon name="share" /> 기존 개인 데이터 내보내기</button>{#if personalExportState}<p role="status">{personalExportState}</p>{/if}</div>
           {/if}
           <BuildInfo />
         </section>
