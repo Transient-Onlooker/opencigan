@@ -359,6 +359,7 @@ flowchart TB
 - 2026-11-26: 관리자 이상조회 `GET`·`HEAD /api/v1/admin/access-anomalies`의 OpenAPI 3.1 계약과 합성 메모리 SQLite 자료를 이용한 `dispatch_request` 검증을 추가한다. 실제 `detect` 결과 및 백엔드 200/400/401/503과 WSGI HEAD의 빈 본문을 대조하고, 게이트웨이 비활성 404·메서드 405·제한 429·설정/전달 오류 503을 문서화한다. Gateway 테스트는 숨김 플래그와 404/405/429/503 오류 본문을 확인한다. 이 변경은 격리 계약 검증이며 실 Cloudflare/Pi 운영 경로, SDK 전체 계약, 운영 제한값·배포 검증은 포함하지 않으므로 ST-10은 계속 부분 진행이다.
 - [ ] 관리자 관측에서 경로별 지연/오류/캐시·상류 실패를 구분하는 코드의 누락 부분만 보완한다. `status` 프로세스 생존과 상류 readiness를 섞지 않는다. **후속:** [#238](https://github.com/Transient-Onlooker/opencigan/pull/238)·[#240](https://github.com/Transient-Onlooker/opencigan/pull/240)·[#252](https://github.com/Transient-Onlooker/opencigan/pull/252) 계측 완료 범위 및 Pi HIT/MISS 내부 집계와 외부 종단을 구분.
 - [#276](https://github.com/Transient-Onlooker/opencigan/pull/276)은 학교 검색·급식 등 JSON의 오래된 캐시 대체 응답을 경로별 통계에서 `stale`로 구분한다. 분석 테스트 13건과 PR CI가 통과했다. 운영 경로 관측은 별도다.
+- 관리자 갱신 관측 표에 기존 `lastFailureKind`를 표시해 시간 초과·HTTP·네트워크·응답 처리 오류를 구분한다. 해당 분류는 이후 성공 시에도 남으며 원인을 확정하지 않고, 이전 서버의 필드 누락도 처리한다.
 - **완료 조건:** 문서-테스트-실제 응답 일치, 민감한 요청 내용·토큰·IP 노출 추가 금지.
 - 원본: [P2 API 운영](api-operations.md).
 
