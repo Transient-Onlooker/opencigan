@@ -83,7 +83,7 @@
            {#if school}<QuickClass {grade} {classroom} {gradeOptions} {availableClasses} {tableLoading} {selectGrade} {selectClass} showClass={timetableView !== 'grade'} />{/if}
            <div class="calendar-toolbar"><button class="arrow-button" onclick={() => changeWeek(-1)} disabled={week <= current} aria-label="이전 주">←</button><div class="calendar-date" aria-live="polite"><strong>{shortDate(week)} ~ {shortDate(addDays(week, weekendClasses ? 6 : 4))}</strong></div><button class="arrow-button" onclick={() => changeWeek(1)} disabled={week >= addDays(current, 7)} aria-label="다음 주">→</button></div>
            <div class="quick-class-hint">이번 주·다음 주만 조회할 수 있어요. <Help label="시간표 조회 범위" text="원본 서비스가 제공하는 현재 주와 다음 주를 조회합니다. 과거 또는 더 먼 미래의 시간표는 제공하지 않아요." /></div>
-          {#if tableState}<div class="notice" role="alert">{tableRefreshState === '새로고침 실패' ? '새로고침 실패. ' : ''}{timetable ? '이전 시간표를 표시하고 있어요. ' : '이 학교와 주에 저장된 시간표가 없어요. '}{tableState}{tableRefreshState === '새로고침 실패' && timetableCheckedAt ? ' · 마지막 확인 ' + timeText(timetableCheckedAt, true) : ''} <button class="text-button" onclick={() => loadTimetable(!!timetable)}>다시 시도</button></div>{/if}
+          {#if tableState}<div class="notice" role="alert">{tableRefreshState === '새로고침 실패' ? '새로고침 실패. ' : ''}{timetable ? '이전 시간표를 표시하고 있어요. ' : '이 학교와 주에 저장된 시간표가 없어요. '}{tableState}{tableRefreshState === '새로고침 실패' && timetableCheckedAt ? ' · 마지막 확인 ' + timeText(timetableCheckedAt, true) : ''} <button class="text-button" onclick={() => loadTimetable(!!timetable)}><Icon name="refresh" /> 다시 시도</button></div>{/if}
           {#if tableLoading && timetable}<p class="state-inline" role="status">새 시간표를 확인하는 동안 이전 시간표를 표시하고 있어요.</p>{/if}
           <div class:today-layout={timetableView === 'today'}><div class="timetable-content">
           {#if !school}<div class="state-message"><strong>학교를 먼저 선택해 주세요</strong><p>학교와 학급을 선택하면 시간표가 표시돼요.</p></div>
@@ -106,7 +106,7 @@
               {#if todayMeal.neisLoading}<p role="status">급식을 연결하고 있어요.</p>
               {:else if !todayMeal.neis}<p>{todayMeal.neisSearchState || '급식 학교를 연결해 주세요.'}</p>
               {:else}
-                {#if todayMeal.mealState}<div class="notice" role="alert">급식을 불러오지 못했어요. {todayMeal.hasMeals ? '이전 급식 정보를 표시하고 있어요. ' : ''}{todayMeal.mealState} <button class="text-button" onclick={() => todayMeal.loadMeals(true)}>다시 시도</button></div>{/if}
+                {#if todayMeal.mealState}<div class="notice" role="alert">급식을 불러오지 못했어요. {todayMeal.hasMeals ? '이전 급식 정보를 표시하고 있어요. ' : ''}{todayMeal.mealState} <button class="text-button" onclick={() => todayMeal.loadMeals(true)}><Icon name="refresh" /> 다시 시도</button></div>{/if}
                 {#if todayMeal.mealLoading}<p role="status">{todayMeal.hasMeals ? '이전 식단을 표시하며 확인하고 있어요.' : '식단을 불러오고 있어요.'}</p>{/if}
                 {#if todayMeal.mealsStale && todayMeal.hasMeals && !todayMeal.mealState}<p class="notice">저장된 급식 정보예요. 최신 정보가 아닐 수 있습니다.</p>{/if}
                 {#if todayMeal.hasMeals}<MealMenu meals={todayMeal.meals} dates={[selectedDay]} {today} visibleTypes={todayMeal.visibleMealTypes} allergySelection={todayMeal.allergySelection} allergyFilter={todayMeal.mealAllergyFilter} showAllergenNumbers={todayMeal.showAllergenNumbers} timetableFrom={current} timetableTo={addDays(current, 13)} formatDate={(date) => dateText(date, { month: 'numeric', day: 'numeric', weekday: 'long' })} />{/if}

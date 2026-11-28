@@ -194,7 +194,7 @@
             </div>
           </details>
           <details class="display-settings" hidden={!settingsMatch('일반 테마 애니메이션', settingsQuery)} bind:open={settingsOpen.general}>
-            <summary>일반 설정</summary>
+            <summary><Icon name="settings" /> 일반 설정</summary>
             <div class="display-settings-grid">
               <label>테마<select aria-label="테마" value={theme} onchange={(event) => setTheme(event.currentTarget.value)}><option value="light">라이트 모드</option><option value="dark">다크 모드</option><option value="system">시스템 설정 따르기</option></select></label>
               <label class="display-toggle"><input type="checkbox" checked={animationsEnabled} onchange={(event) => setAnimationsEnabled(event.currentTarget.checked)} /> 애니메이션 사용</label>
@@ -202,7 +202,7 @@
           </details>
            {#if school}
              <details class="display-settings" hidden={!settingsMatch('시간표 표시 교사 날짜 변경 변동 배지 테두리 밀도 종료 요일 학급', settingsQuery)} bind:open={settingsOpen.display}>
-               <summary>시간표 표시 설정</summary>
+               <summary><Icon name="week" /> 시간표 표시 설정</summary>
                <label class="display-toggle"><input type="checkbox" checked={useClassDisplay} disabled={classError} onchange={(event) => setClassDisplay(event.currentTarget.checked)} /> {grade}학년 {classroom}반만 따로 설정</label>
                <div class="display-settings-grid">
                  <label class="display-toggle"><input type="checkbox" checked={displaySettings.showTeachers} onchange={(event) => saveDisplaySettings({ ...displaySettings, showTeachers: event.currentTarget.checked })} /> 시간표에 교사 표시</label>
@@ -225,7 +225,7 @@
                <p class="display-settings-hint">{useClassDisplay ? '현재 학급에만 적용돼요.' : '별도 설정이 없는 이 학교 학급에 적용돼요.'}</p>
              </details>
              <details class="display-settings" hidden={!settingsMatch('데이터 고급 과목 색상 별칭 교사 이름 상세', settingsQuery)} bind:open={settingsOpen.advanced}>
-               <summary>과목·교사 상세 설정</summary>
+               <summary><Icon name="teacher" /> 과목·교사 상세 설정</summary>
                <p class="display-settings-hint">{useClassDisplay ? '현재 학급에만 적용돼요.' : '별도 설정이 없는 이 학교 학급에 적용돼요.'}</p>
                <div class="display-settings-grid">
                  <label>과목 색상<select aria-label="과목 색상" value={displaySettings.colorMode} onchange={(event) => setColorMode(event.currentTarget.value)}><option value="none">색상 없음 (기본)</option><option value="auto">자동 색상</option><option value="custom">직접 선택</option></select></label>
@@ -350,7 +350,7 @@
            {/if}
           {#if !school}<p class="display-settings-hint">학교를 선택하면 시간표 설정을 바꿀 수 있어요.</p>{/if}
              <details class="meal-preferences" hidden={!settingsMatch('급식 보기 식사 조식 중식 석식 알레르기 번호', settingsQuery)} bind:open={settingsOpen.meals}>
-               <summary>급식 설정</summary>
+               <summary><Icon name="today" /> 급식 설정</summary>
                <div class="meal-preference-options" aria-label="표시할 식사"><span>표시할 식사</span>{#each mealTypes as type}<label><input type="checkbox" checked={enabledMealTypes.includes(type)} disabled={enabledMealTypes.length === 1 && enabledMealTypes.includes(type)} onchange={(event) => toggleMealType(type, event.currentTarget.checked)} />{type}</label>{/each}</div>
                <label class="meal-number-toggle"><input type="checkbox" checked={showAllergenNumbers} onchange={(event) => setAllergenNumbersVisible(event.currentTarget.checked)} />메뉴의 알레르기 번호 표시</label>
                <p>하루·주간 보기와 표시 설정은 이 브라우저에 저장돼요. 주의 알레르기 경고는 항상 표시됩니다.</p>
