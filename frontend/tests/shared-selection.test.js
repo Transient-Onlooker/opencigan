@@ -35,6 +35,7 @@ function setup({ fallback = savedSchool, shared = sharedSchool, sharedGrade = 1 
   const app = runInNewContext(source, {
     ...personalizationVm, ...lessonTimesVm, ...selectionExports,
     onMount(callback) { mount = callback; },
+    inspectSharedClass: () => ({ status: 'valid', value: { school: shared, grade: sharedGrade, classroom: 7 } }),
     readSharedClass: () => ({ school: shared, grade: sharedGrade, classroom: 7 }),
     currentKoreaDate: () => '2026-11-09', monday: () => '2026-11-09',
     addDays: () => '2026-11-15', clampWeek: (value) => value,
