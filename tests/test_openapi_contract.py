@@ -52,6 +52,23 @@ class OpenApiContractTests(unittest.TestCase):
         self.assert_json_response(path, status, headers, body)
         store.school_usage.assert_called_once_with(7, limit=50)
 
+    def test_legacy_history_with_null_teacher_matches_contract(self):
+        from contextlib import closing
+        from backend.history import HistoryStore
+        with tempfile.TemporaryDirectory() as directory:
+            store = HistoryStore(Path(directory) / 'history.sqlite')
+            week = self.start.isoformat()
+            observed = datetime.now(timezone.utc).isoformat()
+            with closing(store._connect()) as db:
+                db.execute('INSERT INTO changes (school, week, observed_at, grade, class_number, date, period, type, before_json, after_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                           ('1:School', week, observed, 1, 1, week, 1, 'changed', json.dumps({'subject': 'Math', 'teacher': None}), json.dumps({'subject': 'Science', 'teacher': ''})))
+            query = urlencode({'school': '1:School', 'week': week})
+            with patch('backend.app._history_store', return_value=store):
+                status, headers, body = dispatch_request('GET', '/api/v1/timetable/history', query)
+            self.assertEqual(status, 200)
+            self.assertIsNone(json.loads(body)['changes'][0]['before']['teacher'])
+            self.assert_json_response('/api/v1/timetable/history', status, headers, body)
+
     def test_admin_analytics_rate_limit_contract(self):
         path = '/api/v1/admin/analytics'
         with patch('backend.app._rate_allowed', return_value=12):

@@ -1785,7 +1785,7 @@ components:
       required: [subject, teacher]
       properties:
         subject: { type: string }
-        teacher: { type: string }
+        teacher: { type: [string, 'null'], description: Older retained history may contain null; newly observed missing teachers are stored as an empty string. }
       additionalProperties: false
     HistoryResponse:
       type: object
