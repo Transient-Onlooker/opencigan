@@ -367,6 +367,9 @@ test('settings groups keep advanced controls separate and restore expanded state
   await page.goto('/' + sharedHash(1));
   await expect(page.locator('.quick-class select').nth(1)).toHaveValue('1');
   await page.getByRole('button', { name: '설정', exact: true }).click();
+  for (const label of ['일반 설정', '시간표 표시 설정', '과목·교사 상세 설정', '급식 설정']) {
+    await expect(page.locator('summary').filter({ hasText: label }).locator('svg[aria-hidden="true"]')).toHaveCount(1);
+  }
   await page.getByText('일반 설정', { exact: true }).click();
   await expect(page.getByLabel('테마', { exact: true })).toBeVisible();
   await page.getByText('시간표 표시 설정', { exact: true }).click();
