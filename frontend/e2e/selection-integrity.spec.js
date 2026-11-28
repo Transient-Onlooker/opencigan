@@ -1077,6 +1077,11 @@ test('meal return button follows day, week and Korea midnight', async ({ page })
   await page.getByRole('button', { name: '급식', exact: true }).click();
   const panel = page.locator('#meals-panel');
   const back = panel.getByRole('button', { name: '오늘로', exact: true });
+  const dayView = panel.getByRole('button', { name: '하루 식단', exact: true });
+  const weekView = panel.getByRole('button', { name: '주간 식단', exact: true });
+  await expect(dayView.locator('svg[aria-hidden="true"]')).toHaveCount(1);
+  await expect(weekView.locator('svg[aria-hidden="true"]')).toHaveCount(1);
+  await expect(dayView).toHaveAttribute('aria-pressed', 'true');
   const date = panel.getByLabel('날짜 선택');
   await expect(date).toHaveValue('2026-11-15');
   await expect(back).toHaveCount(0);
@@ -1085,6 +1090,7 @@ test('meal return button follows day, week and Korea midnight', async ({ page })
   await back.click();
   await expect(date).toHaveValue('2026-11-15');
   await panel.getByRole('button', { name: '주간 식단' }).click();
+  await expect(weekView).toHaveAttribute('aria-pressed', 'true');
   await expect(back).toHaveCount(0);
   await panel.getByRole('button', { name: '이전 급식 주' }).click();
   await expect(back).toBeVisible();
@@ -1321,6 +1327,7 @@ test('school search shows matching saved results on failure and clears the notic
   await expect(page.locator('.search-results p').filter({ hasText: '이 기기에 저장된 검색 결과' })).toBeVisible();
   await expect(page.getByRole('button', { name: /봄빛고등학교/ })).toBeVisible();
   fail = false;
+  await expect(page.getByRole('button', { name: '학교 검색 다시 시도' }).locator('svg[aria-hidden="true"]')).toHaveCount(1);
   await page.getByRole('button', { name: '학교 검색 다시 시도' }).click();
   await expect(page.getByRole('button', { name: /봄빛고등학교/ })).toBeVisible();
   await expect(page.locator('.search-results p').filter({ hasText: '이 기기에 저장된 검색 결과' })).toHaveCount(0);

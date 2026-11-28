@@ -134,7 +134,9 @@ test('switching classes updates lessons, PNG and both links', async ({ page }) =
   await expect(subscription).toHaveCount(0);
   await expect(classes).toHaveValue('1');
   await classes.selectOption('2');
+  await expect(page.getByRole('button', { name: '학급 링크 복사' }).locator('svg[aria-hidden="true"]')).toHaveCount(1);
   await page.getByRole('button', { name: '학급 링크 복사' }).click();
+  await expect(page.getByRole('button', { name: '학급 링크 닫기' }).locator('svg[aria-hidden="true"]')).toHaveCount(1);
   const shared = await page.getByLabel('공유 링크', { exact: true }).inputValue();
   await page.goto(shared);
   await page.reload();

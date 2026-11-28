@@ -24,7 +24,7 @@
 
 <section class="secondary-actions" aria-label="공유" hidden={view !== 'timetable'}>
       {#if school}
-        <div class="share-tools"><button class="secondary-button" disabled={!classActionsReady} onclick={shareClass} aria-expanded={classActionsReady && !!shareUrl}><Icon name="link" /> {classActionsReady && shareUrl ? '학급 링크 닫기' : '학급 링크 복사'}</button><button class="secondary-button" disabled={!classActionsReady || apiNotConfigured} onclick={subscribeTimetable} aria-expanded={classActionsReady && subscriptionPanelOpen}><Icon name="link" /> {classActionsReady && subscriptionPanelOpen ? '구독 링크 닫기' : '캘린더 구독 링크'}</button>{#if canExport}<button class="secondary-button" disabled={exportBusy} onclick={() => exportTimetable('PDF')}><Icon name="save" /> PDF 저장</button>{/if}<span role="status">{classActionsReady ? shareState || subscriptionState : ''}</span></div>
+        <div class="share-tools"><button class="secondary-button" disabled={!classActionsReady} onclick={shareClass} aria-expanded={classActionsReady && !!shareUrl}><Icon name={classActionsReady && shareUrl ? 'close' : 'share'} /> {classActionsReady && shareUrl ? '학급 링크 닫기' : '학급 링크 복사'}</button><button class="secondary-button" disabled={!classActionsReady || apiNotConfigured} onclick={subscribeTimetable} aria-expanded={classActionsReady && subscriptionPanelOpen}><Icon name={classActionsReady && subscriptionPanelOpen ? 'close' : 'week'} /> {classActionsReady && subscriptionPanelOpen ? '구독 링크 닫기' : '캘린더 구독 링크'}</button>{#if canExport}<button class="secondary-button" disabled={exportBusy} onclick={() => exportTimetable('PDF')}><Icon name="save" /> PDF 저장</button>{/if}<span role="status">{classActionsReady ? shareState || subscriptionState : ''}</span></div>
         {#if classActionsReady && shareUrl}<label class="shared-link">공유 링크<input type="text" readonly value={shareUrl} onfocus={(event) => event.currentTarget.select()} /></label>{/if}
         {#if classActionsReady && subscriptionPanelOpen}
           <div class="lesson-search-fields">
@@ -48,7 +48,7 @@
           {/if}
         {/if}
       {/if}
-      <p><a class="secondary-button widget-link" href="./embed-builder.html">시간표 위젯 만들기 <span aria-hidden="true">↗</span></a></p>
+      <p><a class="secondary-button widget-link" href="./embed-builder.html"><Icon name="settings" /> 시간표 위젯 만들기 <span aria-hidden="true">↗</span></a></p>
     </section>
 
 <style>
