@@ -40,9 +40,17 @@ test('admin login, charts, navigation and lock keep credentials out of URLs and 
   await expect(page.getByRole('cell', { name: '샘플학교', exact: true })).toBeVisible();
   await expect(page.locator('.school-bar')).toHaveCount(1);
   await page.getByRole('button', { name: '시간표 관측' }).click();
-  await expect(page.getByText('시간표 관측 통계가 이 배포에서 활성화되지 않았습니다.')).toBeVisible();
+  if (process.env.VITE_HISTORY_STATS_ENABLED === '1') {
+    await expect(page.frameLocator('iframe[title="시간표 관측"]').locator('#history-stats-section')).toBeVisible();
+  } else {
+    await expect(page.getByText('시간표 관측 통계가 이 배포에서 활성화되지 않았습니다.')).toBeVisible();
+  }
   await page.getByRole('button', { name: '이상 접근' }).click();
-  await expect(page.getByText('이상 접근 검토가 이 배포에서 활성화되지 않았습니다.')).toBeVisible();
+  if (process.env.VITE_ACCESS_ANOMALIES_ENABLED === '1') {
+    await expect(page.frameLocator('iframe[title="이상 접근"]').locator('#anomaly-review')).toBeVisible();
+  } else {
+    await expect(page.getByText('이상 접근 검토가 이 배포에서 활성화되지 않았습니다.')).toBeVisible();
+  }
   await page.getByRole('button', { name: '잠금', exact: true }).click();
   await expect(page.locator('iframe')).toHaveCount(0);
   await expect(page.locator('#admin-content')).toBeEmpty();
@@ -128,6 +136,31 @@ test('locking discards an in-flight embedded request', async ({ page }) => {
   release();
   await expect(page.locator('#admin-workspace')).toBeHidden();
   await expect(page.locator('#admin-content')).toBeEmpty();
+});
+
+test('switching menus discards a delayed school usage response', async ({ page }) => {
+  let release;
+  let markStarted;
+  const waiting = new Promise(resolve => { release = resolve; });
+  const started = new Promise(resolve => { markStarted = resolve; });
+  await page.route('**/api/v1/admin/analytics?**', route => route.fulfill({ json: { daily: [], routes: [] } }));
+  await page.route('**/api/v1/admin/school-usage?**', async route => {
+    markStarted();
+    await waiting;
+    await route.fulfill({ json: { start_day: '2026-11-21', end_day: '2026-11-27', has_more: false, items: [{ datatype: 'timetable', school_id: '123:test', school_name: '늦은 학교 결과', requests: 12 }] } }).catch(() => {});
+  });
+  await page.route('**/api/v1/status', route => route.fulfill({ json: { status: 'ok', scope: 'process liveness' } }));
+  await page.goto('/admin/');
+  await page.locator('#admin-token').fill('example-admin-token');
+  await page.getByRole('button', { name: '잠금 해제' }).click();
+  await page.getByRole('button', { name: '학교별 조회' }).click();
+  await started;
+  await page.getByRole('button', { name: '서비스 상태' }).click();
+  release();
+  await expect(page.getByText('백엔드 프로세스 응답 정상')).toBeVisible();
+  await expect(page.getByText('늦은 학교 결과')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '서비스 상태' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: '학교별 조회' })).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('suggestion actions require confirmation and report failed writes', async ({ page }) => {
