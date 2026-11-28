@@ -21,8 +21,12 @@ export function inspectSharedClass(hash: string): SharedClassReadResult {
   if (!keys.some((key) => params.has(key))) return { status: 'absent' };
   for (const part of raw.split('&')) {
     const separator = part.indexOf('=');
+    const key = separator < 0 ? part : part.slice(0, separator);
     const value = separator < 0 ? '' : part.slice(separator + 1);
-    try { decodeURIComponent(value.replace(/\+/g, ' ')); }
+    try {
+      decodeURIComponent(key.replace(/\+/g, ' '));
+      decodeURIComponent(value.replace(/\+/g, ' '));
+    }
     catch { return { status: 'invalid', reason: 'encoding' }; }
   }
   if (keys.some((key) => params.getAll(key).length !== 1)) return { status: 'invalid', reason: 'fields' };

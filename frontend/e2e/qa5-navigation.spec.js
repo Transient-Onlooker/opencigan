@@ -65,13 +65,22 @@ test('teacher view explains an absent teacher for the destination week and resto
   await panel.getByRole('button', { name: '이번 주로', exact: true }).click();
   await expect(panel.locator('.teacher-table')).toContainText('수학');
   await expect(panel.getByRole('searchbox', { name: '교사별 주간 시간표' })).toHaveValue('김교사');
+  await page.goBack();
+  await expect(panel.locator('.calendar-date')).toContainText('11.16');
+  await expect(panel.getByText('이 주에 검색된 교사가 없어요')).toBeVisible();
+  await expect(panel.getByRole('searchbox', { name: '교사별 주간 시간표' })).toHaveValue('김교사');
+  await page.goForward();
+  await expect(panel.locator('.calendar-date')).toContainText('11.9');
+  await expect(panel.locator('.teacher-table')).toContainText('수학');
+  await expect(panel.getByRole('searchbox', { name: '교사별 주간 시간표' })).toHaveValue('김교사');
 });
 
 for (const [fragment, explanation] of [
   ['#school=2%3A%ED%&name=x&region=y&grade=1&class=1', '인코딩이 올바르지'],
+  ['#school=2%3A%EB%B4%84%EB%B9%9B%EA%B3%A0%EB%93%B1%ED%95%99%EA%B5%90&name=x&region=y&grade=1&class=1&%ZZ=x', '인코딩이 올바르지'],
   ['#school=2%3A%EB%B4%84%EB%B9%9B%EA%B3%A0%EB%93%B1%ED%95%99%EA%B5%90&grade=1&class=1', '필수 정보가 빠졌거나'],
 ]) {
-  test(`invalid shared link keeps saved selection: ${explanation}`, async ({ page }) => {
+  test(`invalid shared link keeps saved selection: ${fragment}`, async ({ page }) => {
     const school = { id: '2:봄빛고등학교', name: '봄빛고등학교', region: '서울' };
     await page.addInitScript((s) => {
       localStorage.setItem('opensigan-school', JSON.stringify(s));
