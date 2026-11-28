@@ -27,6 +27,7 @@ class SharedAdminAuthTests(unittest.TestCase):
                 ("/api/v1/admin/analytics", "days=30"),
                 ("/api/v1/admin/history-stats", "school=1%3AExample&week=2026-11-16"),
                 ("/api/v1/admin/access-logs", ""),
+                ("/api/v1/admin/school-usage", ""),
                 ("/api/v1/admin/suggestions", ""),
             )
             with patch.dict(

@@ -174,14 +174,15 @@ class WsGITests(unittest.TestCase):
                             "OPENCIGAN_PROXY_IP_SIGNING_KEY": ""})
     @patch("backend.app.shutter.check", return_value=(True, 0))
     def test_admin_auth_attempts_are_rate_limited_separately_per_client(self, _shutter):
-        paths = ("/api/v1/admin/analytics", "/api/v1/admin/access-logs", "/api/v1/admin/access-anomalies")
+        paths = ("/api/v1/admin/analytics", "/api/v1/admin/access-logs", "/api/v1/admin/access-anomalies", "/api/v1/admin/school-usage")
         for i in range(60):
-            status, _, _ = self._call_app("GET", paths[i % 2], remote_addr="203.0.113.9")
+            status, _, _ = self._call_app("GET", paths[i % len(paths)], remote_addr="203.0.113.9")
             self.assertEqual(status, "401 Unauthorized")
         status, headers, body = self._call_app("GET", paths[0], remote_addr="203.0.113.9")
         self.assertEqual(status, "429 Too Many Requests")
         self.assertGreater(int(headers["Retry-After"]), 0)
         self.assertEqual(json.loads(body)["code"], "rate_limited")
+        self.assertEqual(self._call_app("GET", paths[3], remote_addr="203.0.113.9")[0], "429 Too Many Requests")
         self.assertEqual(self._call_app("GET", paths[1], remote_addr="203.0.113.10")[0], "401 Unauthorized")
         self.assertEqual(self._call_app("GET", "/api/v1/status", remote_addr="203.0.113.9")[0], "200 OK")
         self.assertEqual(self._call_app("GET", "/api/v1/unknown", remote_addr="203.0.113.9")[0], "404 Not Found")
