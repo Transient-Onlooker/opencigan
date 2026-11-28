@@ -25,6 +25,8 @@ Opensigan provides lightweight TypeScript and Python API clients for programmati
 
 JSON timetable and ICS apply `teacher` as a case-insensitive substring (1–50 characters), combined with grade/class filters. ICS requires grade/class and defaults to all-day events (`periods` or `summary`); `timed` mode maps supplied bell times to UTC. NEIS search/meals need the server-side NEIS key. School IDs and dates in snippets are synthetic; replace dates with the current/next KST Monday and use IDs from search.
 
+Both SDKs remove leading and trailing whitespace from school search terms before sending them. Direct API requests are subject to the 50-character limit before the server removes that whitespace, so a padded term near the limit can behave differently when sent directly.
+
 ---
 
 ## TypeScript Client (`clients/ts`)

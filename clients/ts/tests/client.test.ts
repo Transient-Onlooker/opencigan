@@ -4,6 +4,18 @@ import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { OpensiganClient, OpensiganError } from '../index.ts';
 
+test('school searches strip outer whitespace before sending', async () => {
+  const urls: URL[] = [];
+  const client = new OpensiganClient({ baseUrl: 'https://example.test', fetch: async (url) => {
+    urls.push(new URL(url.toString()));
+    return new Response(JSON.stringify({ schools: [], stale: false }), { status: 200 });
+  }});
+  await client.searchSchools(` ${'x'.repeat(50)} `);
+  await client.searchNeisSchools(' 학교 ');
+  assert.equal(urls[0].searchParams.get('q'), 'x'.repeat(50));
+  assert.equal(urls[1].searchParams.get('q'), '학교');
+});
+
 test('OpensiganClient query encoding and URL construction', async () => {
   const requests: { url: string; headers: Record<string, string> }[] = [];
   const mockFetch = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {

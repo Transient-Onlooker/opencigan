@@ -14,6 +14,16 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from opensigan import OpensiganClient, OpensiganError
 
 
+class SearchNormalizationTests(unittest.TestCase):
+    def test_both_searches_strip_outer_whitespace_before_request(self):
+        client = OpensiganClient("https://example.test")
+        with patch.object(client, "_get_json") as request:
+            client.search_schools(" " + "x" * 50 + " ")
+            request.assert_called_with("/api/v1/schools", {"q": "x" * 50}, timeout=None)
+            client.search_neis_schools(" 학교 ")
+            request.assert_called_with("/api/v1/neis/schools", {"q": "학교"}, timeout=None)
+
+
 class MockServerHandler(BaseHTTPRequestHandler):
     last_request_path = ""
     last_request_headers = {}
