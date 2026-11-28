@@ -8,7 +8,7 @@ test('admin hourly diagnostics show data, support older servers, and clear on lo
       { route: '/api/v1/meals', requests: 1, errors: 0, avg_ms: 5 },
       { route: '/api/v1/schools', requests: 1, errors: 0, avg_ms: 5, cache_observed: 0, cache_hits: 0, cache_misses: 0, stale_responses: 0 },
     ],
-    refreshObservations: { timetable: { result: 'failure', origin: 'calendar', observedAt: '2026-11-18T02:00:00+00:00', lastSuccessAt: '2026-11-18T01:00:00+00:00', lastFailureAt: '2026-11-18T02:00:00+00:00', durationMs: 1250 }, meals: { result: 'not_cached', observedAt: '2026-11-18T02:00:00+00:00' } },
+    refreshObservations: { timetable: { result: 'failure', origin: 'calendar', observedAt: '2026-11-18T02:00:00+00:00', lastSuccessAt: '2026-11-18T01:00:00+00:00', lastFailureAt: '2026-11-18T02:00:00+00:00', lastFailureKind: 'timeout', durationMs: 1250 }, meals: { result: 'not_cached', observedAt: '2026-11-18T02:00:00+00:00' } },
     cacheWaitObservations: { timetable: { waitMs: 320, observedAt: '2026-11-18T02:01:00+00:00' } },
     apiHourly: [{ hour: '2026-11-18T11:00:00+09:00', requests: 2, errors: 1,
       upstream_errors: 1, overload_errors: 0, cache_hits: 1, stale_responses: 0 }],
@@ -41,11 +41,13 @@ test('admin hourly diagnostics show data, support older servers, and clear on lo
   await expect(timetableObservation.nth(6)).toHaveText('1,250 ms');
   await expect(timetableObservation.nth(7)).toHaveText('320 ms');
   await expect(timetableObservation.nth(8)).not.toHaveText('—');
+  await expect(timetableObservation.nth(9)).toHaveText('시간 초과');
   const oldServerObservation = observations.locator('tbody tr').nth(3).locator('td');
   await expect(oldServerObservation.nth(1)).toHaveText('—');
   await expect(oldServerObservation.nth(4)).toHaveText('—');
   await expect(oldServerObservation.nth(5)).toHaveText('—');
   await expect(oldServerObservation.nth(6)).toHaveText('—');
+  await expect(oldServerObservation.nth(9)).toHaveText('—');
   await page.getByRole('button', { name: '잠금' }).click();
   await expect(page.locator('#hourly tr')).toHaveCount(0);
   await expect(page.locator('#refresh-observations tr')).toHaveCount(0);
