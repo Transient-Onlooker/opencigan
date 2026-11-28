@@ -63,4 +63,6 @@
 - 사용자 결정에 따라 수동 실기기, 실제 Apple/Google Calendar 구독/갱신, 설정 JSON 수동 왕복은 단기 QA 제외. 격리 환경·내부 Pi/VM 권한 없음. 자동 검증은 유지.
 - 단기 체크박스 34/43 유지(완료 조건 전체 충족 근거 없음). 기존 장기 체크는 구현/명시된 부분 검증 이력이며 QA4 실패를 해결로 해석하지 않는다. 자동수정기 v2 추가 시험·운영 장애 유발 불필요.
 
-[단기 실행 큐](short-term-2026-11-21.md) · [UX](user-experience.md) · [P0](core-quality.md) · [API](api-operations.md) · [릴리스](refactoring-and-release.md)
+[당시 단기 기록](https://github.com/Transient-Onlooker/opencigan/blob/74fcd8bee81d2508555c79f651615e1a096fb310/docs/roadmap/short-term-2026-11-21.md) · [UX](user-experience.md) · [P0](core-quality.md) · [API](api-operations.md) · [릴리스](refactoring-and-release.md)
+
+> **2026-11-28 후속:** [5차 QA 및 운영 검증](qa5-followup-2026-11-28.md)에서 정규 공유 링크 재현 조건의 정정 및 실제 잔여 결함을 확인한다. 현재 우선순위는 [메인 로드맵](README.md)으로 통합했다.

@@ -48,13 +48,15 @@
 - 핵심 공개 기능 운영 유지에 대한 QA 보고의 조건부 통과 판단을 기록한다. 전체 출시/실기기/외부 허락/보안 검증 통과 선언은 아니다.
 - QA 동안 코드·설정 변경 없음은 사용자 제공 보고 기준. 본 반영은 로드맵 문서만 변경하며 기존 코드·운영 환경 및 QA 원문 파일은 건드리지 않는다.
 
-[단기 실행 큐](short-term-2026-11-21.md) · [UX](user-experience.md) · [P0](core-quality.md) · [API](api-operations.md) · [릴리스](refactoring-and-release.md)
+[당시 단기 기록](https://github.com/Transient-Onlooker/opencigan/blob/74fcd8bee81d2508555c79f651615e1a096fb310/docs/roadmap/short-term-2026-11-21.md) · [UX](user-experience.md) · [P0](core-quality.md) · [API](api-operations.md) · [릴리스](refactoring-and-release.md)
 
 ## 2026-11-25 후속 병합 및 검증 상태
 
 - QA2-003 [#214](https://github.com/Transient-Onlooker/opencigan/pull/214), NEW-04/QA3-001 [#228](https://github.com/Transient-Onlooker/opencigan/pull/228)·[#234](https://github.com/Transient-Onlooker/opencigan/pull/234), QA3-002~005 [#215](https://github.com/Transient-Onlooker/opencigan/pull/215)~[#218](https://github.com/Transient-Onlooker/opencigan/pull/218) 수정 병합 완료. 발견 당시 기록은 보존하며 운영 재검증은 미완료.
 - #162는 [#213](https://github.com/Transient-Onlooker/opencigan/pull/213)·[#245](https://github.com/Transient-Onlooker/opencigan/pull/245)·[#255](https://github.com/Transient-Onlooker/opencigan/pull/255)로 대체되어 종료. Cache MISS 상류 3→1회, POST 이후 1596→488ms(단일 학교, 동일 826건, 검색 준비 제외). 공개 종단·다학교·HIT 별도.
 - [#233](https://github.com/Transient-Onlooker/opencigan/pull/233)·[#246](https://github.com/Transient-Onlooker/opencigan/pull/246)·[#257](https://github.com/Transient-Onlooker/opencigan/pull/257)·[#259](https://github.com/Transient-Onlooker/opencigan/pull/259)·[#260](https://github.com/Transient-Onlooker/opencigan/pull/260)·[#261](https://github.com/Transient-Onlooker/opencigan/pull/261) 날짜·주간 화면·저장 실패·검색 캐시·보기 아이콘 후속. 설정 복원·실기기·실캘린더·장애 UX 미검증.
-- 최신 집계는 [단기 로드맵](short-term-2026-11-21.md)을 따른다.
+- 최신 집계는 [당시 단기 기록](https://github.com/Transient-Onlooker/opencigan/blob/74fcd8bee81d2508555c79f651615e1a096fb310/docs/roadmap/short-term-2026-11-21.md)을 따른다.
 
 > **후속 기록 (2026-11-27):** [4차 QA 후속](qa4-followup-2026-11-27.md)에서 운영 재검증 결과를 추적한다. 이 문서의 발견 당시 상태 및 당시 병합 기록은 역사적 증거로 유지한다.
+
+> **2026-11-28 후속:** [5차 QA 및 운영 검증](qa5-followup-2026-11-28.md)에서 정규 공유 링크 재현 조건의 정정 및 실제 잔여 결함을 확인한다. 현재 우선순위는 [메인 로드맵](README.md)으로 통합했다.

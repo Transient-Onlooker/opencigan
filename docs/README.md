@@ -37,7 +37,7 @@
 
 [전체 로드맵](roadmap/README.md)에서 P0~P4의 진행 방향과 세부 작업을 확인합니다.
 
-- [단기 실행 큐 및 최신 작업 현황](roadmap/short-term-2026-11-21.md)
+- [최신 운영 QA 및 후속 검증](roadmap/qa5-followup-2026-11-28.md)
 - [핵심 품질·운영](roadmap/core-quality.md)
 - [사용자 경험](roadmap/user-experience.md)
 - [API·운영](roadmap/api-operations.md)
