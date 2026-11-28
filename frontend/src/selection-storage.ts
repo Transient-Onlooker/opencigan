@@ -1,6 +1,10 @@
 import type { School } from './api';
 import type { SelectionState } from './selection';
 
+export function clearSavedSchool(storage: Pick<Storage, 'removeItem'>): void {
+  storage.removeItem('opensigan-school');
+}
+
 export function saveSelection(storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>, selection: { school?: School; grade?: number; classroom: number }): void {
   const entries: [string, string][] = [];
   if (selection.school) entries.push(['opensigan-school', JSON.stringify(selection.school)]);

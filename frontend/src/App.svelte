@@ -12,7 +12,7 @@
   import type { MealAllergyFilter } from './meal-filter';
   import { getNavigationFromHistory, parseNavigationState, replaceNavigationState, pushNavigationState, subscribeNavigation, type NavigationState } from './navigation';
   import { gradesInTimetable, classesInGrade, createSelectionState, createSharedSelectionSession, validateSharedCandidate, type PendingSharedClass } from './selection';
-  import { saveSelection, readSelection } from './selection-storage';
+  import { saveSelection, readSelection, clearSavedSchool } from './selection-storage';
   import { currentKoreaDate, monday, addDays, clampWeek } from './date';
   import { resolveMealSchool, mealSchoolCandidates } from './neis-match';
   import { trackPageView } from './analytics';
@@ -245,7 +245,7 @@
     else if (!state.school) {
       timetableSession.cancel(); mealSession.cancel();
       selectionState.update({ school: null }); timetableSession.update({ data: null, loading: false }); mealSession.update({ neis: null, meals: [], loading: false }); schoolEditorOpen = true;
-      try { localStorage.removeItem('opensigan-school'); } catch { /* 현재 탐색을 유지합니다. */ }
+      try { clearSavedSchool(localStorage); } catch { /* 현재 탐색을 유지합니다. */ }
     } else {
       if (previousWeek !== week) loadTimetable(false, true, true);
       else ensureAvailableClass();

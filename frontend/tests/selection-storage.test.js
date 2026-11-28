@@ -83,6 +83,14 @@ test('selection persistence preserves keys, values and write order', () => {
   ]);
 });
 
+test('clearing a saved school preserves the stored grade and class', () => {
+  const values = new Map([['opensigan-school', 'school'], ['opensigan-grade', '2'], ['opensigan-class', '3']]);
+  exports.clearSavedSchool({ removeItem: key => values.delete(key) });
+  assert.equal(values.has('opensigan-school'), false);
+  assert.equal(values.get('opensigan-grade'), '2');
+  assert.equal(values.get('opensigan-class'), '3');
+});
+
 test('selection persistence tolerates blocked storage and stops subsequent writes', () => {
   const attempted = [];
   const storage = { getItem: () => null, setItem: (key) => { attempted.push(key); throw new Error('blocked'); }, removeItem: () => {} };
