@@ -34,6 +34,7 @@ test('shared link inspection distinguishes ordinary fragments, malformed encodin
   assert.deepEqual(JSON.parse(JSON.stringify(inspectSharedClass('#section'))), { status: 'absent' });
   assert.deepEqual(JSON.parse(JSON.stringify(inspectSharedClass(good.replace('name=School', 'name=%E0%A4%A')))), { status: 'invalid', reason: 'encoding' });
   assert.deepEqual(JSON.parse(JSON.stringify(inspectSharedClass(good.replace('&region=Seoul', '')))), { status: 'invalid', reason: 'fields' });
+  assert.deepEqual(JSON.parse(JSON.stringify(inspectSharedClass(good.replace('&name=School', '')))), { status: 'invalid', reason: 'fields' });
   assert.deepEqual(JSON.parse(JSON.stringify(inspectSharedClass(good))), {
     status: 'valid', value: { school: { id: '123:School', name: 'School', region: 'Seoul' }, grade: 2, classroom: 7 },
   });

@@ -91,3 +91,11 @@ for (const [fragment, explanation] of [
     expect(await page.evaluate(() => [localStorage.getItem('opensigan-grade'), localStorage.getItem('opensigan-class')])).toEqual(['2', '3']);
   });
 }
+
+test('a malformed shared link in a new profile does not save an unverified class', async ({ page }) => {
+  await page.goto('/#school=2%3A%EB%B4%84%EB%B9%9B%EA%B3%A0%EB%93%B1%ED%95%99%EA%B5%90&grade=1&class=2');
+  await expect(page.getByRole('status').filter({ hasText: '필수 정보가 빠졌거나' })).toContainText('학교와 학급을 직접 선택');
+  expect(await page.evaluate(() => [localStorage.getItem('opensigan-school'), localStorage.getItem('opensigan-grade'), localStorage.getItem('opensigan-class')])).toEqual([null, null, null]);
+  await page.reload();
+  await expect(page.getByRole('status').filter({ hasText: '필수 정보가 빠졌거나' })).toBeVisible();
+});
