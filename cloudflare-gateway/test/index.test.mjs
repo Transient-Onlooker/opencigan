@@ -94,6 +94,18 @@ test('only /api/v1/ routes are forwarded; no open proxy', async () => {
   assert.equal(calls.length, 0);
 });
 
+test('private history statistics remain unavailable through the public gateway', async () => {
+  const { env, calls } = setup();
+  for (const method of ['GET', 'HEAD', 'OPTIONS']) {
+    const response = await worker.fetch(req('/api/v1/admin/history-stats?school=123%3Atest&week=2026-11-23', {
+      method, headers: { Authorization: 'Bearer test-secret' },
+    }), env);
+    assert.equal(response.status, 404);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+  }
+  assert.equal(calls.length, 0);
+});
+
 test('requires VPC service and existing core limiters', async () => {
   const response = await worker.fetch(req('/api/v1/status'), {});
   assert.equal(response.status, 503);
