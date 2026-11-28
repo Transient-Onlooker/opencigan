@@ -31,3 +31,12 @@ test('today heading follows the selected date while other views retain the week'
     await expect(panel.locator('.section-heading .eyebrow')).toHaveText('이번 주');
   }
 });
+
+test('today heading uses the Korean date at midnight even without lessons', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-15T15:01:00Z'));
+  await page.route('**/api/v1/**', (route) => route.fulfill({ json: { schools: [], meals: [], changes: [], stale: false } }));
+  await page.goto('/');
+  const panel = page.locator('#timetable-panel');
+  await panel.getByRole('button', { name: '오늘', exact: true }).click();
+  await expect(panel.locator('.calendar-date strong')).toHaveText('2026. 11. 16.');
+});
