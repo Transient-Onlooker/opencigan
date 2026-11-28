@@ -6,7 +6,7 @@ interface Summary {
   visitors: number; sessions: number; pageViews: number; apiRequests: number;
   apiErrorRate: number; apiAverageMs: number; droppedApiEvents: number;
   cacheStatuses?: Record<string, number>; failureKinds?: Record<string, number>;
-  refreshObservations?: Record<string, { result: 'success' | 'failure' | 'not_cached'; observedAt: string; lastSuccessAt?: string; lastFailureAt?: string; durationMs?: number; origin?: 'timetable' | 'calendar' | null }>;
+  refreshObservations?: Record<string, { result: 'success' | 'failure' | 'not_cached'; observedAt: string; lastSuccessAt?: string; lastFailureAt?: string; lastFailureKind?: string; durationMs?: number; origin?: 'timetable' | 'calendar' | null }>;
   cacheWaitObservations?: Record<string, { waitMs: number; observedAt: string }>;
   apiHourly?: { hour: string; requests: number; errors: number; upstream_errors: number; overload_errors: number; cache_hits: number; cache_misses?: number; stale_responses: number }[];
   daily: { day: string; visitors: number; sessions: number; page_views: number; api_requests: number }[];
@@ -121,10 +121,11 @@ document.querySelector('#login')!.addEventListener('submit', async (event) => {
     rows('#routes', data.routes.map((r) => [r.route, r.requests, r.errors, r.data_failures ?? '—', r.overload_errors ?? '—', r.unclassified_server_errors ?? '—', r.avg_ms, r.cache_observed ?? '—', r.cache_observed ? r.cache_hits ?? '—' : '—', r.cache_observed ? r.cache_misses ?? '—' : '—', r.cache_observed ? r.stale_responses ?? '—' : '—']));
     const observations = data.refreshObservations;
     const resourceLabels = [['school_search', '시간표 학교 검색'], ['timetable', '시간표'], ['neis_school_search', '급식 학교 검색'], ['meals', '급식']];
+    const failureLabels = new Map([['timeout', '시간 초과'], ['http', 'HTTP 오류'], ['network', '네트워크 오류'], ['provider_response', '응답 처리 오류'], ['other', '기타 오류']]);
     rows('#refresh-observations', observations ? resourceLabels.map(([key, label]) => {
       const entry = observations[key];
       const wait = data.cacheWaitObservations?.[key];
-      return [label, entry?.origin === 'timetable' ? '시간표 조회' : entry?.origin === 'calendar' ? '캘린더 구독' : '—', entry ? entry.result === 'success' ? '성공' : entry.result === 'not_cached' ? '응답 수신 · 캐시 저장 불가' : '실패' : '아직 관측 없음', entry ? new Date(entry.observedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—', entry?.lastSuccessAt ? new Date(entry.lastSuccessAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—', entry?.lastFailureAt ? new Date(entry.lastFailureAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—', typeof entry?.durationMs === 'number' ? `${entry.durationMs.toLocaleString('ko-KR')} ms` : '—', typeof wait?.waitMs === 'number' ? `${wait.waitMs.toLocaleString('ko-KR')} ms` : '—', wait?.observedAt ? new Date(wait.observedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—'];
+      return [label, entry?.origin === 'timetable' ? '시간표 조회' : entry?.origin === 'calendar' ? '캘린더 구독' : '—', entry ? entry.result === 'success' ? '성공' : entry.result === 'not_cached' ? '응답 수신 · 캐시 저장 불가' : '실패' : '아직 관측 없음', entry ? new Date(entry.observedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—', entry?.lastSuccessAt ? new Date(entry.lastSuccessAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—', entry?.lastFailureAt ? new Date(entry.lastFailureAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—', typeof entry?.durationMs === 'number' ? `${entry.durationMs.toLocaleString('ko-KR')} ms` : '—', typeof wait?.waitMs === 'number' ? `${wait.waitMs.toLocaleString('ko-KR')} ms` : '—', wait?.observedAt ? new Date(wait.observedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '—', entry?.lastFailureKind ? failureLabels.get(entry.lastFailureKind) ?? '알 수 없는 오류' : '—'];
     }) : []);
     refreshTable.hidden = !observations;
     refreshState.textContent = observations ? '' : '현재 서버에서는 갱신 관측을 제공하지 않습니다.';
