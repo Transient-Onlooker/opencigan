@@ -622,7 +622,7 @@
     if (!changed) return;
     if (!hasClassroomDraft) classError = false;
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
-    persistSelection({ grade, classroom });
+    persistSelection({ ...(school ? { school } : {}), grade, classroom });
   }
   function loadTimetable(preserve = false, reuseCachedWeek = false, validateClass = false) {
     validateClass = validateClass || !!pendingSharedClass;
