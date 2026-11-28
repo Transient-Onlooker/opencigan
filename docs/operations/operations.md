@@ -15,7 +15,7 @@
 | **Pi Python API** | `backend.app` / Waitress, 데이터 조회·캐시 | `127.0.0.1:8000` 루프백 수신, Cloudflare Tunnel로 연결 |
 | **Pi 내부 시간표 API** | 토큰 인증, 캐시 없는 시간표 조회 | `127.0.0.1:8001`, 공개 경로에 연결하지 않음 |
 | **Pi LAN 미리보기** | 선택적인 개발/검수 화면 및 API | 2026-11-25 중지 및 자동 시작 해제; 필요한 경우 별도 확인 후 사용 |
-| **기존 GitHub Pages** | 보존된 별도 정적 프런트엔드 배포 | 저장소 변수 `API_BASE_URL`로 별도 API 출처 지정 |
+| **기존 GitHub Pages** | 보존된 정적 프런트엔드·리디렉션 | 자동 배포 중단; 기존 빌드는 별도 API 출처 사용 가능 |
 | **과거 Workers/D1 실험** | `experiments/workers-api/`의 예전 실험 코드 | 현재 운영하는 `cloudflare-gateway/` Worker와 다름 |
 
 운영 파일: `deploy/opensigan.service`, `deploy/opencigan-internal.service`, `deploy/opencigan-release-watch.service`와 `.timer`. 이전 미리보기용 `deploy/opensigan-preview.service` 및 관련 설정은 선택적입니다. 서비스는 `systemd --user`에서 실행하며 실제 설치·자동 시작 상태는 Pi에서 확인합니다.
@@ -32,7 +32,7 @@
 - LAN 주소: `~/.config/opensigan/preview.env`의 `LAN_HOST`. 저장소에 실제 내부망 주소를 고정하지 마세요.
 - 공개 CORS Origin: 서비스의 `ALLOWED_ORIGIN`. 실제 프런트엔드 출처와 정확히 맞추세요.
 - 이력 저장: `OPENCIGAN_HISTORY_DB` 기본 미설정. 실제 데이터에 대한 수집·재제공 허용을 확인하기 전 활성화하지 마세요.
-- GitHub Pages 배포: 저장소 변수 `API_BASE_URL`을 프런트엔드 빌드에서 `VITE_API_BASE_URL`로 전달합니다. 값이 없으면 Pages에 정적 화면만 표시될 수 있습니다.
+- GitHub Actions는 프런트엔드를 빌드해 검증하지만 GitHub Pages에 자동 배포하지 않습니다. 기존 GitHub Pages 사이트와 주소는 유지합니다.
 
 ## 비파괴적 점검 (RPi 내부)
 

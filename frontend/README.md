@@ -28,4 +28,4 @@ Playwright는 배포용 화면을 빌드한 뒤 합성 데이터로 학급 전�
 
 `npm run build`의 결과는 `dist/`에 생성됩니다. 개발 서버와 빌드 모두 [OpenAPI 명세](../docs/openapi.yaml)를 정적 문서에 복사합니다. API 문서 경로는 `/api-docs.html`, 명세 경로는 `/openapi.yaml`입니다. 문서의 요청 실습은 같은 출처에 API가 있는 환경에서 사용할 수 있습니다.
 
-GitHub Pages의 정적 화면은 저장소 변수 `API_BASE_URL`을 빌드 시 `VITE_API_BASE_URL`로 받습니다. 현재 공개 API 출처는 `https://opencigan.pages.dev`이며, 중지된 Tailscale Funnel 주소를 사용하지 않습니다. 프런트엔드와 API의 출처가 다르면 [백엔드에서 프런트엔드 출처를 허용](../docs/operations/operations.md)해야 합니다.
+공식 웹은 Cloudflare Pages에서 제공됩니다. GitHub Actions는 테스트와 빌드를 검증하며 GitHub Pages에는 자동 배포하지 않습니다. 기존 GitHub Pages 빌드는 별도의 API 출처를 사용할 수 있으며, 프런트엔드와 API의 출처가 다르면 [백엔드에서 프런트엔드 출처를 허용](../docs/operations/operations.md)해야 합니다.
