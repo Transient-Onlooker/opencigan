@@ -407,6 +407,20 @@ paths:
         '401': { $ref: '#/components/responses/WebhookUnauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '503': { $ref: '#/components/responses/WebhookUnavailable' }
+    head: &webhookReadHead
+      tags: [System]
+      summary: Check an experimental webhook resource without a response body
+      description: Returns the same status and headers as GET without a response body.
+      security: [{ WebhookManagement: [] }]
+      responses:
+        '200': { description: Resource available. }
+        '401': { description: Missing or incorrect management token. }
+        '429':
+          description: Rate limited.
+          headers:
+            Retry-After:
+              schema: { type: string }
+        '503': { description: Webhook or scheduler unavailable. }
     put:
       tags: [System]
       summary: Replace subscription filters or its destination
@@ -493,6 +507,7 @@ paths:
   /api/v1/webhooks/{id}/schedule:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
+    head: *webhookReadHead
     get:
       tags: [System]
       summary: Get the subscription notification schedule
@@ -569,6 +584,7 @@ paths:
   /api/v1/webhooks/{id}/template:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
+    head: *webhookReadHead
     get:
       tags: [System]
       summary: Get a subscription message template
@@ -725,6 +741,7 @@ paths:
   /api/v1/webhooks/{id}/deliveries:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{24}$' } }
+    head: *webhookReadHead
     get:
       tags: [System]
       summary: List recent delivery states for a webhook subscription

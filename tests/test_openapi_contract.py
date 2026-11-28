@@ -104,6 +104,32 @@ class OpenApiContractTests(unittest.TestCase):
                 self.assertEqual(responses[0][0], responses[1][0])
                 self.assertEqual(responses[1][1], b'')
 
+    def test_webhook_read_head_contract_matches_wsgi(self):
+        from backend.app import make_app
+        from backend.webhook_store import WebhookStore
+        with tempfile.TemporaryDirectory() as directory:
+            store = WebhookStore(Path(directory) / 'webhooks.sqlite')
+            subscription = store.create('2:Example', 2, 3, 'https://discord.com/api/webhooks/123/secret')
+            app = make_app()
+            with patch.dict('os.environ', {'OPENCIGAN_SCHEDULER_ENABLED': '1'}), \
+                 patch('backend.app._webhook_store', return_value=store):
+                for suffix in ('', '/schedule', '/template', '/deliveries'):
+                    operation = self.spec['paths']['/api/v1/webhooks/{id}' + suffix]['head']
+                    self.assertEqual(operation['security'], [{'WebhookManagement': []}])
+                    self.assertNotIn('content', operation['responses']['200'])
+                    for token, expected in ((subscription['token'], 200), ('wrong-token', 401)):
+                        responses = []
+                        for method in ('GET', 'HEAD'):
+                            captured = []
+                            body = b''.join(app({'REQUEST_METHOD': method,
+                                'PATH_INFO': '/api/v1/webhooks/' + subscription['id'] + suffix,
+                                'QUERY_STRING': '', 'HTTP_AUTHORIZATION': 'Bearer ' + token},
+                                lambda status, headers: captured.append((status, dict(headers)))))
+                            responses.append((captured[0], body))
+                        self.assertEqual(int(responses[1][0][0].split()[0]), expected)
+                        self.assertEqual(responses[0][0], responses[1][0])
+                        self.assertEqual(responses[1][1], b'')
+
     def test_school_usage_unavailable_contract(self):
         import sqlite3
         path = '/api/v1/admin/school-usage'
