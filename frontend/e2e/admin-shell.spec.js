@@ -141,13 +141,16 @@ test('locking discards an in-flight embedded request', async ({ page }) => {
 test('switching menus discards a delayed school usage response', async ({ page }) => {
   let release;
   let markStarted;
+  let markFinished;
   const waiting = new Promise(resolve => { release = resolve; });
   const started = new Promise(resolve => { markStarted = resolve; });
+  const finished = new Promise(resolve => { markFinished = resolve; });
   await page.route('**/api/v1/admin/analytics?**', route => route.fulfill({ json: { daily: [], routes: [] } }));
   await page.route('**/api/v1/admin/school-usage?**', async route => {
     markStarted();
     await waiting;
     await route.fulfill({ json: { start_day: '2026-11-21', end_day: '2026-11-27', has_more: false, items: [{ datatype: 'timetable', school_id: '123:test', school_name: '늦은 학교 결과', requests: 12 }] } }).catch(() => {});
+    markFinished();
   });
   await page.route('**/api/v1/status', route => route.fulfill({ json: { status: 'ok', scope: 'process liveness' } }));
   await page.goto('/admin/');
@@ -157,6 +160,7 @@ test('switching menus discards a delayed school usage response', async ({ page }
   await started;
   await page.getByRole('button', { name: '서비스 상태' }).click();
   release();
+  await finished;
   await expect(page.getByText('백엔드 프로세스 응답 정상')).toBeVisible();
   await expect(page.getByText('늦은 학교 결과')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '서비스 상태' })).toHaveAttribute('aria-pressed', 'true');
