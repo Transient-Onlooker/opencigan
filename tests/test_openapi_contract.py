@@ -77,6 +77,33 @@ class OpenApiContractTests(unittest.TestCase):
         self.assertEqual(headers['Retry-After'], '12')
         self.assert_json_response(path, status, headers, body)
 
+    def test_admin_analytics_head_contract_matches_wsgi(self):
+        from backend.analytics import AnalyticsStore
+        from backend.app import make_app
+        path = '/api/v1/admin/analytics'
+        operation = self.spec['paths'][path]['head']
+        self.assertEqual(operation['security'], [{'AnalyticsAdmin': []}])
+        store = AnalyticsStore(':memory:', 'x' * 40)
+        self.addCleanup(store.close)
+        with patch.dict('os.environ', {'OPENCIGAN_ADMIN_TOKEN': 'synthetic-token'}), \
+             patch('backend.app._analytics_store', return_value=store), \
+             patch('backend.app._api_recorder', Mock(dropped=0)):
+            for query, auth, expected in [('days=7', 'Bearer synthetic-token', 200),
+                                          ('days=0', 'Bearer synthetic-token', 400),
+                                          ('', '', 401)]:
+                responses = []
+                for method in ('GET', 'HEAD'):
+                    captured = []
+                    body = b''.join(make_app()({'REQUEST_METHOD': method, 'PATH_INFO': path,
+                        'QUERY_STRING': query, 'HTTP_AUTHORIZATION': auth},
+                        lambda status, headers: captured.append((status, dict(headers)))))
+                    responses.append((captured[0], body))
+                self.assertEqual(int(responses[1][0][0].split()[0]), expected)
+                self.assertIn(str(expected), operation['responses'])
+                self.assertNotIn('content', operation['responses'][str(expected)])
+                self.assertEqual(responses[0][0], responses[1][0])
+                self.assertEqual(responses[1][1], b'')
+
     def test_school_usage_unavailable_contract(self):
         import sqlite3
         path = '/api/v1/admin/school-usage'

@@ -996,6 +996,25 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+    head:
+      tags: [System]
+      summary: Check private usage statistics without a response body
+      description: Returns the same status and headers as GET without a response body.
+      security: [{ AnalyticsAdmin: [] }]
+      parameters:
+        - name: days
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 90, default: 30 }
+      responses:
+        '200': { description: Aggregate statistics available. }
+        '400': { description: Invalid query parameters. }
+        '401': { description: Missing or incorrect bearer token. }
+        '429':
+          description: Rate limited.
+          headers:
+            Retry-After:
+              schema: { type: string }
+        '503': { description: Analytics disabled or storage temporarily unavailable. }
   /api/v1/admin/access-anomalies:
     parameters:
       - name: window_hours
