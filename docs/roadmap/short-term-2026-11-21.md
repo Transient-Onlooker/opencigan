@@ -348,6 +348,7 @@ flowchart TB
 - [x] 공개 API 버전 변경·하위 호환 정책을 문서화한다 ([#199](https://github.com/Transient-Onlooker/opencigan/pull/199)).
 - [ ] 기존 OpenAPI 3.1과 Worker/Pi/TypeScript/Python 클라이언트의 남은 오류·응답 계약을 대조하고 계약 회귀 테스트를 보강한다. **후속:** [#227](https://github.com/Transient-Onlooker/opencigan/pull/227)·[#232](https://github.com/Transient-Onlooker/opencigan/pull/232)·[#248](https://github.com/Transient-Onlooker/opencigan/pull/248) 완료 범위는 제외하고 나머지 계약 확인. Pi 전용 관리자 이력 통계의 응답과 오류 계약도 문서화하고 관측·미관측 응답을 검증한다.
 - [#282](https://github.com/Transient-Onlooker/opencigan/pull/282)는 `Retry-After`의 초 단위 문자열과 HTTP 날짜를 허용하도록 OpenAPI 헤더 타입을 수정했다. API 계약 검사 8건과 PR CI가 통과했다. 전체 계약 대조는 별도다.
+- 과거 저장된 이력의 교사명 `null`을 OpenAPI에 반영하고 합성 SQLite 이력의 실제 API 응답을 계약과 대조했다. 신규 관측의 누락 교사명은 빈 문자열로 저장하며 기존 DB와 SDK는 변경하지 않는다.
 - 컴시간·NEIS 학교 검색의 `q`에서 공백만 있는 값은 서버가 400으로 거부한다. OpenAPI에 비공백 필수 조건과 공백 제거 전 길이 제한을 명시하고 두 경로의 400 응답을 명세와 대조했다. 나머지 계약은 별도다.
 - 시간표 이력 커서의 양의 ASCII 정수·선행 0 금지·64비트 범위와 원문 길이 제한을 명시했다. 격리 SQLite에서 공백 처리 및 잘못된 커서의 400 응답을 대조했다.
 - 캘린더 구독 API의 요일별 교시 시각 `weekday_times`를 Python·TypeScript SDK에서 URL 생성과 조회에 전달할 수 있도록 추가했다. 기존 선택 인자와 호출 호환성을 유지하고 두 SDK의 인코딩 테스트를 확인했다.
