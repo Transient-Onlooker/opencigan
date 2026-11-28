@@ -1,5 +1,10 @@
 # 리팩터링 · 코드 정리 · 릴리스 게이트
 
+### GitHub Pages 자동 배포 정리
+
+- [ ] 공식 웹의 Cloudflare Pages 운영에 맞춰 GitHub Actions에서 GitHub Pages 전용 아티팩트 업로드와 배포 작업만 제거한다. 테스트와 프런트엔드 빌드는 유지하며 별도 PR 병합과 CI 검증 후 완료 처리한다.
+- 기존 GitHub Pages 설정에는 사용자 정의 도메인이 남아 있고, `transient-onlooker.github.io/opencigan/`은 공식 주소로 리디렉션된다. 저장소에는 기존 출처에 대한 호환 코드가 남아 있다. 공개 코드 검색에서 기존 두 저장소 경로의 직접 참조는 발견하지 못했지만, 북마크·외부 링크 이용 여부는 확인할 수 없다. 사이트 설정, 리디렉션, CORS 및 DNS의 제거는 별도 검토한다.
+
 ### 내부 시간표 API와 검증된 릴리스 배포
 
 - 2026-11-26 [#293](https://github.com/Transient-Onlooker/opencigan/pull/293) 자동 배포의 PEP 440 버전 선택·구버전 및 동일 버전 타 SHA 차단 구현, 관련 격리 테스트 35개 통과. 명시적 롤백·기존 검증·핀 동기화 유지. 운영 적용은 미확인.
