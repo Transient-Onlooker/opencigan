@@ -71,6 +71,53 @@ test('school selection storage failure preserves the previous saved selection', 
   expect(saved).toEqual([JSON.stringify(school), '1', '2']);
 });
 
+test('class selection write failure preserves the previous complete saved selection', async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript((saved) => {
+    localStorage.setItem('opensigan-school', JSON.stringify(saved));
+    localStorage.setItem('opensigan-grade', '1');
+    localStorage.setItem('opensigan-class', '2');
+  }, school);
+  await page.goto('/');
+  const classes = page.locator('.quick-class select').nth(1);
+  await expect(classes).toHaveValue('2');
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'opensigan-grade') throw new DOMException('quota', 'QuotaExceededError');
+      return original.call(this, key, value);
+    };
+  });
+  await classes.selectOption('1');
+  const saved = await page.evaluate(() => [localStorage.getItem('opensigan-school'), localStorage.getItem('opensigan-grade'), localStorage.getItem('opensigan-class')]);
+  expect(saved).toEqual([JSON.stringify(school), '1', '2']);
+});
+
+test('grade reconciliation write failure preserves the previous saved selection', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/v1/timetable?*', route => route.fulfill({ json: {
+    ...timetable, records: [...timetable.records, { grade: 2, class: 3, date: week, period: 1, subject: '수학', teacher: null, isChanged: false }],
+  } }));
+  await page.addInitScript(saved => {
+    localStorage.setItem('opensigan-school', JSON.stringify(saved));
+    localStorage.setItem('opensigan-grade', '1');
+    localStorage.setItem('opensigan-class', '2');
+  }, school);
+  await page.goto('/');
+  const grade = page.locator('.quick-class select').nth(0);
+  await expect(grade).toHaveValue('1');
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'opensigan-school') throw new DOMException('quota', 'QuotaExceededError');
+      return original.call(this, key, value);
+    };
+  });
+  await grade.selectOption('2');
+  const saved = await page.evaluate(() => [localStorage.getItem('opensigan-school'), localStorage.getItem('opensigan-grade'), localStorage.getItem('opensigan-class')]);
+  expect(saved).toEqual([JSON.stringify(school), '1', '2']);
+});
+
 test('out-of-range timetable dates show an accessible error until restored', async ({ page }) => {
   await mockApi(page);
   await page.goto('/' + sharedHash(1));

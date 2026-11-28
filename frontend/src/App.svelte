@@ -622,7 +622,7 @@
     if (!changed) return;
     if (!hasClassroomDraft) classError = false;
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
-    persistSelection({ grade, classroom });
+    persistSelection({ ...(school ? { school } : {}), grade, classroom });
   }
   function loadTimetable(preserve = false, reuseCachedWeek = false, validateClass = false) {
     validateClass = validateClass || !!pendingSharedClass;
@@ -806,8 +806,10 @@
     if (!classError) selectionState.commitClass(input.valueAsNumber);
     classroomDraft = String(classroom);
     input.value = classroomDraft;
-    if (!classError) persistSelection({ classroom });
-    persistClassSelection();
+    if (!classError) {
+      if (school) persistClassSelection();
+      else persistSelection({ classroom });
+    }
   }
   function saveGrade() {
     cancelSharedSelection();
@@ -815,8 +817,8 @@
     sharedClassState = '';
     ensureAvailableClass();
     classError = false;
-    persistSelection({ grade, classroom });
-    persistClassSelection();
+    if (school) persistClassSelection();
+    else persistSelection({ grade, classroom });
   }
   function selectGrade(event: Event) { selectionState.update({ grade: Number((event.currentTarget as HTMLSelectElement).value) }); saveGrade(); }
   function selectClass(event: Event) { selectionState.update({ classroom: Number((event.currentTarget as HTMLSelectElement).value) }); saveClassFromSelect(); }
@@ -826,8 +828,8 @@
     classError = false;
     sharedClassState = '';
     shareUrl = ''; shareState = ''; subscriptionUrl = ''; subscriptionState = '';
-    persistSelection({ classroom });
-    persistClassSelection();
+    if (school) persistClassSelection();
+    else persistSelection({ classroom });
   }
   async function shareClass() {
     if (!school || !classActionsReady) return;
